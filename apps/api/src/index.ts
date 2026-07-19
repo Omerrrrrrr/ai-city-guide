@@ -2,8 +2,9 @@ import 'dotenv/config';
 
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
-import { eq } from 'drizzle-orm';
-import { generateObject } from 'ai';
+import rateLimit from '@fastify/rate-limit';
+import { eq, ilike } from 'drizzle-orm';
+import { generateObject, generateText } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
 
@@ -27,7 +28,10 @@ import { previewGoogleHoursForPlace } from './google-places-hours';
 import { openingHoursSchema } from './opening-hours';
 import { enrichPlaceWithWikipedia, type AiProviderConfig } from './wiki-enrichment';
 import { toPlaceDto } from './place-dto';
-import { places } from './schema';
+import { createSlug } from './slug';
+import { discoverPlacesForCity, retryImagesForCity } from './place-discovery-service';
+import { haversineKm } from './geo';
+import { places, cities } from './schema';
 
 const PORT = Number(process.env.PORT ?? 4000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY?.trim();
@@ -35,10 +39,41 @@ const OPENAI_MODEL = process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY?.trim();
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL ?? 'anthropic/claude-sonnet-4.5';
 const APP_URL = process.env.APP_URL ?? 'http://localhost:4000';
+const OPENWEATHER_API_KEY = process.env.OPENWEATHER_API_KEY?.trim();
 const MAX_CONTEXT_PLACES = 14;
 const MIN_AI_RECOMMENDATIONS = 4;
 const MAX_AI_RECOMMENDATIONS = 5;
 const AI_PROVIDER = process.env.AI_PROVIDER?.trim().toLowerCase();
+const ADMIN_API_TOKEN = process.env.ADMIN_API_TOKEN?.trim() || undefined;
+const CORS_ORIGINS = (process.env.CORS_ORIGINS ?? '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const DEFAULT_DEV_CORS_ORIGINS = ['http://localhost:8081', 'http://localhost:19006'];
+
+function validateEnv() {
+  const result = z
+    .object({ DATABASE_URL: z.string().trim().min(1, 'DATABASE_URL is required') })
+    .safeParse(process.env);
+
+  if (!result.success) {
+    for (const issue of result.error.issues) {
+      console.error(`Invalid environment configuration - ${issue.path.join('.')}: ${issue.message}`);
+    }
+    process.exit(1);
+  }
+
+  if (!ADMIN_API_TOKEN) {
+    console.warn(
+      'ADMIN_API_TOKEN is not set. All /admin/* routes will respond 503 until it is configured.'
+    );
+  }
+}
+
+function isAdminPath(url: string) {
+  const path = url.split('?')[0];
+  return path === '/admin' || path.startsWith('/admin/');
+}
 const openai = createOpenAI({
   name: 'openai',
   apiKey: OPENAI_API_KEY,
@@ -68,15 +103,6 @@ const optionalUrlInput = z.preprocess(
   z.string().url().optional()
 );
 
-function createSlug(value: string) {
-  return value
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .replace(/[^a-zA-Z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .toLowerCase() || `place-${Date.now()}`;
-}
-
 async function reverseGeocode(latitude: number, longitude: number) {
   const response = await fetch(
     `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&addressdetails=1`,
@@ -103,6 +129,43 @@ async function reverseGeocode(latitude: number, longitude: number) {
     country: address.country || '',
     address,
   };
+}
+
+async function geocodeCityName(query: string) {
+  const params = new URLSearchParams({
+    format: 'jsonv2',
+    q: query,
+    featureType: 'city',
+    addressdetails: '1',
+    limit: '5',
+  });
+
+  const response = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
+    headers: {
+      'User-Agent': 'AI City Guide/1.0',
+      Accept: 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`City geocode failed with ${response.status}`);
+  }
+
+  const results = (await response.json()) as Array<{
+    display_name: string;
+    lat: string;
+    lon: string;
+    address?: { city?: string; town?: string; village?: string; country?: string };
+  }>;
+
+  return results.map((result) => ({
+    name:
+      result.address?.city || result.address?.town || result.address?.village || result.display_name.split(',')[0],
+    country: result.address?.country ?? '',
+    displayName: result.display_name,
+    lat: Number(result.lat),
+    lng: Number(result.lon),
+  }));
 }
 
 type AiProviderName = 'openai' | 'openrouter';
@@ -143,7 +206,26 @@ function getAiProviderConfig():
 async function buildServer() {
   const app = Fastify({ logger: true });
 
-  await app.register(cors, { origin: true });
+  await app.register(cors, {
+    origin: CORS_ORIGINS.length > 0 ? CORS_ORIGINS : DEFAULT_DEV_CORS_ORIGINS,
+  });
+  await app.register(rateLimit, { max: 120, timeWindow: '1 minute' });
+
+  app.addHook('onRequest', async (request, reply) => {
+    if (!isAdminPath(request.url)) return;
+
+    if (!ADMIN_API_TOKEN) {
+      return reply.code(503).send({
+        error: 'Admin routes are disabled. Set ADMIN_API_TOKEN in the backend environment to enable them.',
+      });
+    }
+
+    const [scheme, token] = (request.headers.authorization ?? '').split(' ');
+    if (scheme !== 'Bearer' || token !== ADMIN_API_TOKEN) {
+      return reply.code(401).send({ error: 'Unauthorized' });
+    }
+  });
+
   app.addHook('onClose', async () => {
     await closeDb();
   });
@@ -162,9 +244,112 @@ async function buildServer() {
     };
   });
 
-  app.get('/places', async () => {
-    const rows = await db.select().from(places);
+  app.get<{
+    Querystring: { city?: string };
+  }>('/places', async (request) => {
+    const city = request.query?.city?.trim();
+    const rows = city ? await db.select().from(places).where(ilike(places.city, city)) : await db.select().from(places);
     return rows.map(toPlaceDto);
+  });
+
+  app.get<{
+    Querystring: { q?: string; query?: string };
+  }>('/cities', async (request, reply) => {
+    const query = (request.query?.q ?? request.query?.query)?.trim();
+    if (!query || query.length < 2) {
+      return reply.code(400).send({ error: 'A query of at least 2 characters is required.' });
+    }
+
+    const knownCities = await db.select().from(cities).where(ilike(cities.name, `%${query}%`)).limit(5);
+    if (knownCities.length > 0) {
+      return { cities: knownCities.map((city) => ({ ...city, isKnown: true })) };
+    }
+
+    try {
+      const geocoded = await geocodeCityName(query);
+      return {
+        cities: geocoded.map((result) => ({
+          id: null,
+          name: result.name,
+          country: result.country,
+          centerLat: result.lat,
+          centerLng: result.lng,
+          status: 'discoverable',
+          isKnown: false,
+        })),
+      };
+    } catch (error: any) {
+      request.log.error(error);
+      return reply.code(502).send({ error: error?.message ?? 'City search failed' });
+    }
+  });
+
+  app.get<{
+    Params: { id: string };
+  }>('/cities/:id', async (request, reply) => {
+    const city = await db.query.cities.findFirst({ where: eq(cities.id, request.params.id) });
+    if (!city) {
+      return reply.code(404).send({ error: 'City not found' });
+    }
+    return city;
+  });
+
+  app.post<{
+    Body: { name: string; country?: string; lat: number; lng: number; radiusKm?: number };
+  }>('/cities/discover', async (request, reply) => {
+    const parsedBody = z
+      .object({
+        name: z.string().trim().min(1),
+        country: z.string().trim().optional(),
+        lat: z.number().min(-90).max(90),
+        lng: z.number().min(-180).max(180),
+        radiusKm: z.number().min(1).max(25).optional(),
+      })
+      .safeParse(request.body ?? {});
+
+    if (!parsedBody.success) {
+      return reply.code(400).send({ error: parsedBody.error.issues[0]?.message ?? 'Invalid request' });
+    }
+
+    const { name, country, lat, lng, radiusKm } = parsedBody.data;
+
+    const nearbyExisting = await db.select().from(cities);
+    // Use 8 km to de-duplicate queries for the same city (e.g. slightly
+    // different Nominatim results), but small enough that distinct nearby
+    // towns like Søgne vs Kristiansand each get their own discovery pass.
+    const existing = nearbyExisting.find(
+      (city) => haversineKm(lat, lng, city.centerLat, city.centerLng) <= 8
+    );
+
+    if (existing) {
+      if (existing.status === 'ready' || existing.status === 'discovering') {
+        return reply.code(200).send(existing);
+      }
+    }
+
+    const cityId = existing?.id ?? `${createSlug(name)}-${Date.now().toString(36)}`;
+
+    if (existing) {
+      await db.update(cities).set({ status: 'pending', errorMessage: null }).where(eq(cities.id, cityId));
+    } else {
+      await db.insert(cities).values({
+        id: cityId,
+        name,
+        country: country ?? null,
+        centerLat: lat,
+        centerLng: lng,
+        radiusKm: radiusKm ?? 8,
+        status: 'pending',
+      });
+    }
+
+    const aiProvider = getAiProviderConfig();
+    discoverPlacesForCity({ cityId, cityName: name, country, lat, lng, radiusKm, aiProvider }).catch((error) => {
+      app.log.error(error, `Background discovery failed for city ${cityId}`);
+    });
+
+    const created = await db.query.cities.findFirst({ where: eq(cities.id, cityId) });
+    return reply.code(202).send(created);
   });
 
   app.get<{
@@ -369,6 +554,42 @@ async function buildServer() {
     return { appliedCount: applied.length, applied };
   });
 
+  app.post<{
+    Params: { cityId: string };
+  }>('/admin/cities/:cityId/rediscover', async (request, reply) => {
+    const { cityId } = request.params;
+    const city = await db.query.cities.findFirst({ where: eq(cities.id, cityId) });
+    if (!city) return reply.code(404).send({ error: 'City not found' });
+
+    await db.update(cities).set({ status: 'pending', errorMessage: null }).where(eq(cities.id, cityId));
+    const aiProvider = getAiProviderConfig();
+    discoverPlacesForCity({
+      cityId,
+      cityName: city.name,
+      country: city.country ?? undefined,
+      lat: city.centerLat,
+      lng: city.centerLng,
+      radiusKm: city.radiusKm,
+      aiProvider,
+    }).catch((err) => app.log.error(err, `Rediscovery failed for city ${cityId}`));
+
+    return reply.code(202).send({ message: `Rediscovery started for ${city.name}` });
+  });
+
+  app.post<{
+    Params: { cityId: string };
+  }>('/admin/cities/:cityId/retry-images', async (request, reply) => {
+    const { cityId } = request.params;
+    const city = await db.query.cities.findFirst({ where: eq(cities.id, cityId) });
+    if (!city) return reply.code(404).send({ error: 'City not found' });
+
+    retryImagesForCity(cityId).catch((err) =>
+      app.log.error(err, `Image retry failed for city ${cityId}`)
+    );
+
+    return reply.code(202).send({ message: `Image retry started for ${city.name}` });
+  });
+
   app.put<{
     Params: { id: string };
     Body: {
@@ -505,13 +726,290 @@ async function buildServer() {
     };
   });
 
+  // ── /places/identify — Vision AI: photo + profile → personalized explanation ──
   app.post<{
-    Body: { query: string; messages?: Array<{ role: 'user' | 'assistant'; content: string }> };
-  }>('/places/recommend', async (request, reply) => {
+    Body: {
+      imageBase64: string;
+      mimeType?: string;
+      lat?: number;
+      lng?: number;
+      userProfile?: {
+        name?: string;
+        profession?: string;
+        interests?: string[];
+        faith?: string;
+      };
+    };
+  }>(
+    '/places/identify',
+    { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const parsedBody = z
+        .object({
+          imageBase64: z.string().min(1),
+          mimeType: z.string().optional().default('image/jpeg'),
+          lat: z.number().optional(),
+          lng: z.number().optional(),
+          userProfile: z
+            .object({
+              name: z.string().optional(),
+              profession: z.string().optional(),
+              interests: z.array(z.string()).optional(),
+              faith: z.string().optional(),
+            })
+            .optional(),
+        })
+        .safeParse(request.body);
+
+      if (!parsedBody.success) {
+        return reply.code(400).send({ error: 'Invalid request body' });
+      }
+
+      const { imageBase64, mimeType, lat, lng, userProfile } = parsedBody.data;
+      const aiProvider = getAiProviderConfig();
+
+      if (!aiProvider) {
+        return reply.code(500).send({ error: 'AI is not configured in the backend' });
+      }
+
+      const profileLines: string[] = [];
+      if (userProfile?.name) profileLines.push(`Name: ${userProfile.name}`);
+      if (userProfile?.profession && userProfile.profession !== 'other') {
+        profileLines.push(`Profession: ${userProfile.profession}`);
+      }
+      if (userProfile?.interests?.length) {
+        profileLines.push(`Interests: ${userProfile.interests.join(', ')}`);
+      }
+      if (userProfile?.faith && userProfile.faith !== 'prefer_not_to_say') {
+        profileLines.push(
+          userProfile.faith === 'secular'
+            ? 'Worldview: secular / non-religious'
+            : `Faith: ${userProfile.faith}`
+        );
+      }
+
+      const profileContext =
+        profileLines.length > 0
+          ? `\n\nUser profile:\n${profileLines.join('\n')}\n\nTailor every sentence to this specific person. An architect should hear about structure and engineering. A Muslim should hear about religious significance. A historian should hear about historical layers. A photographer should hear about light, composition, and visual opportunities. Be specific, not generic.`
+          : '';
+
+      const locationHint =
+        lat != null && lng != null
+          ? `The user is at coordinates ${lat.toFixed(5)}, ${lng.toFixed(5)}. Use this to help identify the place if the image alone is ambiguous.`
+          : '';
+
+      try {
+        const identifySchema = z.object({
+          title: z.string().describe('Name of the place or object (e.g. "Hagia Sophia", "A street café")'),
+          subtitle: z.string().describe('One-line category or type (e.g. "Byzantine cathedral turned mosque", "Seaside café")'),
+          explanation: z
+            .string()
+            .describe('3-5 sentence rich explanation tailored to the user profile. If no profile, give a balanced cultural overview.'),
+          highlights: z
+            .array(z.string())
+            .min(2)
+            .max(4)
+            .describe('2-4 specific highlights relevant to this user. Short, punchy sentences.'),
+        });
+        const { object } = (await generateObject({
+          model: aiProvider.client.chat(aiProvider.model),
+          schema: identifySchema,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'image',
+                  image: imageBase64,
+                  mimeType: mimeType as 'image/jpeg' | 'image/png' | 'image/webp',
+                },
+                {
+                  type: 'text',
+                  text: `What is this place? ${locationHint}`,
+                },
+              ],
+            },
+          ],
+          system: `You are Piri, a deeply knowledgeable personal travel guide. You identify places from photos and explain them in a way that speaks directly to who the user is.${profileContext}`,
+        } as any)) as { object: z.infer<typeof identifySchema> };
+
+        // Fuzzy-match the identified title against DB places
+        let matchedPlaceId: string | undefined;
+        try {
+          const normalise = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const needle = normalise(object.title);
+          const allPlaces = await db.select({ id: places.id, name: places.name }).from(places);
+          for (const p of allPlaces) {
+            const hay = normalise(p.name);
+            if (hay === needle || hay.includes(needle) || needle.includes(hay)) {
+              matchedPlaceId = p.id;
+              break;
+            }
+          }
+        } catch { /* non-critical */ }
+
+        return reply.send({ ...object, matchedPlaceId });
+      } catch (e: any) {
+        app.log.error(e);
+        return reply.code(500).send({ error: e.message || 'Failed to identify place' });
+      }
+    }
+  );
+
+  // ── /places/explain — Personalized AI explanation for a known place ──────────
+  app.post<{
+    Body: {
+      placeId: string;
+      userProfile?: {
+        name?: string;
+        profession?: string;
+        interests?: string[];
+        faith?: string;
+      };
+    };
+  }>(
+    '/places/explain',
+    { config: { rateLimit: { max: 40, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const parsed = z
+        .object({
+          placeId: z.string().min(1),
+          userProfile: z
+            .object({
+              name: z.string().optional(),
+              profession: z.string().optional(),
+              interests: z.array(z.string()).optional(),
+              faith: z.string().optional(),
+            })
+            .optional(),
+        })
+        .safeParse(request.body);
+
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'Invalid request' });
+      }
+
+      const { placeId, userProfile } = parsed.data;
+      const aiProvider = getAiProviderConfig();
+      if (!aiProvider) {
+        return reply.code(503).send({ error: 'AI not configured' });
+      }
+
+      const [placeRow] = await db.select().from(places).where(eq(places.id, placeId)).limit(1);
+      if (!placeRow) return reply.code(404).send({ error: 'Place not found' });
+
+      const profileLines: string[] = [];
+      if (userProfile?.name) profileLines.push(`Name: ${userProfile.name}`);
+      if (userProfile?.profession && userProfile.profession !== 'other') {
+        profileLines.push(`Profession: ${userProfile.profession}`);
+      }
+      if (userProfile?.interests?.length) {
+        profileLines.push(`Interests: ${userProfile.interests.join(', ')}`);
+      }
+      if (userProfile?.faith && userProfile.faith !== 'prefer_not_to_say') {
+        profileLines.push(
+          userProfile.faith === 'secular'
+            ? 'Worldview: secular / non-religious'
+            : `Faith: ${userProfile.faith}`
+        );
+      }
+
+      const hasProfile = profileLines.length > 0;
+      const profileContext = hasProfile
+        ? `\n\nUser profile:\n${profileLines.join('\n')}`
+        : '';
+
+      const placeContext = [
+        `Name: ${placeRow.name}`,
+        `Category: ${placeRow.category}`,
+        `Description: ${placeRow.description}`,
+        placeRow.shortStory ? `Story: ${placeRow.shortStory}` : null,
+        placeRow.tags ? `Tags: ${placeRow.tags}` : null,
+        placeRow.factType ? `Type/Facts: ${placeRow.factType}` : null,
+        placeRow.localVibeMood ? `Vibe: ${placeRow.localVibeMood}` : null,
+        placeRow.localVibeBestFor ? `Best for: ${placeRow.localVibeBestFor}` : null,
+        placeRow.rainyDayFit != null ? `Rainy day fit: ${placeRow.rainyDayFit}` : null,
+        placeRow.isIndoor != null ? `Indoor: ${placeRow.isIndoor}` : null,
+      ]
+        .filter(Boolean)
+        .join('\n');
+
+      const personalization = hasProfile
+        ? `Speak directly to this person. A ${userProfile?.profession ?? 'visitor'} should hear what they uniquely care about — structural details for an architect, spiritual layers for a person of faith, historical depth for a historian. Be specific. Avoid generic tourist-guide language.`
+        : `Give a warm, engaging overview that a curious traveler would enjoy.`;
+
+      try {
+        const { object } = await generateObject({
+          model: aiProvider.client.chat(aiProvider.model),
+          maxOutputTokens: 300,
+          schema: z.object({
+            headline: z
+              .string()
+              .describe('One punchy sentence that connects this place to who the user is. Max 12 words.'),
+            body: z
+              .string()
+              .describe('2-3 sentences of personalized insight. Speak directly to this person\'s expertise or interests.'),
+            highlights: z
+              .array(z.string())
+              .min(2)
+              .max(3)
+              .describe('2-3 specific things this particular person would find most interesting here.'),
+          }),
+          system: `You are Piri, a deeply knowledgeable personal travel guide. Your job is to explain a place in a way that speaks directly to who the user is — their profession, interests, and worldview.${profileContext}
+
+${personalization}`,
+          prompt: `Explain this place:\n\n${placeContext}`,
+        } as any);
+
+        return reply.send(object);
+      } catch (e: any) {
+        app.log.error(e);
+        return reply.code(500).send({ error: e.message || 'Failed to explain place' });
+      }
+    }
+  );
+
+  // ── /places/recommend ────────────────────────────────────────────────────────
+  app.post<{
+    Body: {
+      query: string;
+      city?: string;
+      messages?: Array<{ role: 'user' | 'assistant'; content: string }>;
+      userProfile?: {
+        name?: string;
+        profession?: string;
+        interests?: string[];
+        faith?: string;
+      };
+      weather?: {
+        condition: string;
+        temp: number;
+        city: string;
+        description: string;
+      };
+    };
+  }>('/places/recommend', { config: { rateLimit: { max: 12, timeWindow: '1 minute' } } }, async (request, reply) => {
     const parsedBody = z
       .object({
         query: z.string().trim().min(1, 'Query is required'),
+        city: z.string().trim().min(1).optional(),
         messages: z.array(chatMessageSchema).max(8).optional(),
+        userProfile: z
+          .object({
+            name: z.string().optional(),
+            profession: z.string().optional(),
+            interests: z.array(z.string()).optional(),
+            faith: z.string().optional(),
+          })
+          .optional(),
+        weather: z
+          .object({
+            condition: z.string(),
+            temp: z.number(),
+            city: z.string(),
+            description: z.string(),
+          })
+          .optional(),
       })
       .safeParse(request.body);
 
@@ -519,7 +1017,37 @@ async function buildServer() {
       return reply.code(400).send({ error: parsedBody.error.issues[0]?.message ?? 'Invalid request' });
     }
 
-    const { query, messages = [] } = parsedBody.data;
+    const { query, city, messages = [], userProfile, weather } = parsedBody.data;
+
+    const profileLines: string[] = [];
+    if (userProfile?.profession && userProfile.profession !== 'other') {
+      profileLines.push(`Profession: ${userProfile.profession}`);
+    }
+    if (userProfile?.interests?.length) {
+      profileLines.push(`Interests: ${userProfile.interests.join(', ')}`);
+    }
+    if (userProfile?.faith && userProfile.faith !== 'prefer_not_to_say') {
+      profileLines.push(
+        userProfile.faith === 'secular' ? 'Worldview: secular' : `Faith: ${userProfile.faith}`
+      );
+    }
+    const profileContext =
+      profileLines.length > 0
+        ? `\n\nUser profile:\n${profileLines.join('\n')}\nPersonalize your answer to this person.`
+        : '';
+
+    const weatherContext = weather
+      ? `\n\nCurrent weather: ${weather.description}, ${weather.temp}°C in ${weather.city}. Condition: ${weather.condition}. ${
+          weather.condition === 'rainy' || weather.condition === 'stormy'
+            ? 'Strongly prefer indoor venues unless the user specifically asks for outdoor.'
+            : weather.condition === 'sunny' && weather.temp > 18
+            ? 'Great weather for outdoor venues — highlight terraces, parks, and waterfront spots.'
+            : weather.condition === 'snowy'
+            ? 'Prefer indoor or cozy venues given the snow.'
+            : ''
+        }`
+      : '';
+
     const aiProvider = getAiProviderConfig();
 
     if (!aiProvider) {
@@ -528,7 +1056,8 @@ async function buildServer() {
       });
     }
 
-    const allRows = await db.select().from(places);
+    const allRows = city ? await db.select().from(places).where(ilike(places.city, city)) : await db.select().from(places);
+    const cityLabel = city ?? allRows[0]?.city ?? 'this city';
     const conversationSummary = messages
       .slice(-6)
       .map((message) => `${message.role.toUpperCase()}: ${message.content}`)
@@ -574,19 +1103,19 @@ async function buildServer() {
             })
           ),
         }) as any,
-        system: `You are a helpful local guide for Kristiansand.
-Continue the conversation naturally using the recent chat history when it is provided.
-Based on the user's request, pick 4 places when possible, or 5 when there are several strong matches.
-Only return 3 when the request is unusually narrow.
-Return ONLY places that exist in the provided shortlist. Use the exact ID.
-Spread picks across the strongest relevant place types instead of returning near-duplicates.
-Keep the answer concise and useful.
+        system: `You are Piri, a personal travel guide.${profileContext}${weatherContext}
+Continue the conversation naturally using the recent chat history when provided.
+Keep answers concise (1–3 sentences) and personalized to the user.
+
+${placeContext.length > 0
+  ? `You have ${placeContext.length} places in your database for ${cityLabel}. Pick 4 places when possible, 5 when there are several strong matches, 3 when unusually narrow. Return ONLY places from the provided shortlist using exact IDs. Spread picks across different place types.`
+  : `You have NO places in your database for ${cityLabel} yet. Answer from your own knowledge — give a helpful, accurate response about the place or question. Tell the user you don't have ${cityLabel} mapped yet and suggest they use city search to trigger discovery. Return an empty recommendations array.`
+}
 
 Recent conversation:
 ${conversationSummary || 'No prior conversation.'}
 
-Available shortlist:
-${JSON.stringify(placeContext, null, 2)}`,
+${placeContext.length > 0 ? `Available shortlist:\n${JSON.stringify(placeContext, null, 2)}` : ''}`,
         prompt: query,
       });
 
@@ -635,10 +1164,59 @@ ${JSON.stringify(placeContext, null, 2)}`,
     }
   });
 
+  // ── /weather — Proxy OpenWeatherMap current conditions ───────────────────────
+  app.get<{ Querystring: { lat: string; lng: string } }>(
+    '/weather',
+    { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const parsedLat = parseFloat(request.query.lat ?? '');
+      const parsedLng = parseFloat(request.query.lng ?? '');
+
+      if (isNaN(parsedLat) || isNaN(parsedLng)) {
+        return reply.code(400).send({ error: 'lat and lng query params are required' });
+      }
+
+      if (!OPENWEATHER_API_KEY) {
+        return reply.code(503).send({ error: 'Weather not configured' });
+      }
+
+      try {
+        const owUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${parsedLat}&lon=${parsedLng}&units=metric&appid=${OPENWEATHER_API_KEY}`;
+        const res = await fetch(owUrl);
+        if (!res.ok) throw new Error(`OpenWeather ${res.status}`);
+        const data = await res.json() as any;
+
+        const weatherId: number = data.weather?.[0]?.id ?? 800;
+        type WeatherCondition = 'sunny' | 'cloudy' | 'rainy' | 'snowy' | 'stormy' | 'foggy';
+        let condition: WeatherCondition;
+        if (weatherId >= 200 && weatherId < 300) condition = 'stormy';
+        else if (weatherId >= 300 && weatherId < 600) condition = 'rainy';
+        else if (weatherId >= 600 && weatherId < 700) condition = 'snowy';
+        else if (weatherId >= 700 && weatherId < 800) condition = 'foggy';
+        else if (weatherId === 800) condition = 'sunny';
+        else condition = 'cloudy';
+
+        return reply.send({
+          city: data.name as string,
+          temp: Math.round(data.main.temp as number),
+          feels_like: Math.round(data.main.feels_like as number),
+          condition,
+          description: (data.weather?.[0]?.description ?? '') as string,
+          humidity: data.main.humidity as number,
+          wind_speed: Math.round((data.wind?.speed ?? 0) as number),
+        });
+      } catch (e: any) {
+        app.log.error(e);
+        return reply.code(500).send({ error: 'Failed to fetch weather' });
+      }
+    }
+  );
+
   return app;
 }
 
 async function main() {
+  validateEnv();
   await connectDb();
   await ensureSchema();
   const app = await buildServer();

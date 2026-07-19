@@ -7,6 +7,7 @@ const place = {
   id: 'kristiansand-cathedral',
   name: 'Kristiansand Cathedral',
   city: 'Kristiansand',
+  country: 'Norway',
   category: 'landmark',
 } as const;
 

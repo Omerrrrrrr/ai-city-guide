@@ -18,7 +18,9 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.41",
+    "@duckdb/node-api": "^1.5.4-r.1",
     "@fastify/cors": "^10.0.1",
+    "@fastify/rate-limit": "^10.3.0",
     "ai": "^6.0.116",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.38.0",

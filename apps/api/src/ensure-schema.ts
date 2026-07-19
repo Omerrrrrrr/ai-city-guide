@@ -1,6 +1,7 @@
-import { sql } from 'drizzle-orm';
+import { inArray, sql } from 'drizzle-orm';
 
 import { db } from './db';
+import { places } from './schema';
 
 export async function ensureSchema() {
   await db.execute(sql`
@@ -128,4 +129,55 @@ export async function ensureSchema() {
     ADD COLUMN IF NOT EXISTS "image_type" varchar(32) NOT NULL DEFAULT 'wikimedia',
     ADD COLUMN IF NOT EXISTS "notes" text;
   `);
+
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS "cities" (
+      "id" varchar(96) PRIMARY KEY,
+      "name" varchar(256) NOT NULL,
+      "country" varchar(64),
+      "center_lat" double precision NOT NULL,
+      "center_lng" double precision NOT NULL,
+      "radius_km" double precision NOT NULL DEFAULT 6,
+      "status" varchar(32) NOT NULL DEFAULT 'pending',
+      "place_count" integer NOT NULL DEFAULT 0,
+      "error_message" text,
+      "discovered_at" varchar(64)
+    );
+  `);
+
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_places_slug" ON "places" ("slug");`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_places_city" ON "places" ("city");`);
+  await db.execute(
+    sql`CREATE INDEX IF NOT EXISTS "idx_place_image_candidates_place_id" ON "place_image_candidates" ("place_id");`
+  );
+  await db.execute(
+    sql`CREATE INDEX IF NOT EXISTS "idx_place_image_candidates_status" ON "place_image_candidates" ("status");`
+  );
+
+  // Remove places whose first tag (the original Overture leaf category) identifies
+  // them as non-tourist infrastructure that slipped through earlier discovery runs.
+  const NON_TOURIST_TAG_PREFIXES = [
+    'petrol station', 'gas station', 'fuel station', 'ev charging',
+    'parking', 'car wash', 'atm', 'currency exchange',
+    'post office', 'post box',
+    'laundry', 'dry cleaning',
+    'supermarket', 'grocery', 'convenience store', 'discount store',
+    'pharmacy', 'drugstore',
+    'car dealer', 'car rental', 'car repair', 'car wash',
+    'motorcycle dealer', 'automotive repair', 'vehicle inspection',
+    'travel agency', 'travel agent',
+    'real estate',
+  ];
+
+  const allPlaces = await db.select({ id: places.id, tags: places.tags }).from(places);
+  const toDelete = allPlaces
+    .filter((p) => {
+      const firstTag = p.tags.split(',')[0]?.trim().toLowerCase() ?? '';
+      return NON_TOURIST_TAG_PREFIXES.some((prefix) => firstTag.startsWith(prefix));
+    })
+    .map((p) => p.id);
+
+  if (toDelete.length > 0) {
+    await db.delete(places).where(inArray(places.id, toDelete));
+  }
 }

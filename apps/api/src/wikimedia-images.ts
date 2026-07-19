@@ -21,7 +21,7 @@ type WikimediaImageInfo = {
   license?: string;
 };
 
-export type DiscoveryPlace = Pick<PlaceRow, 'id' | 'name' | 'city' | 'category'>;
+export type DiscoveryPlace = Pick<PlaceRow, 'id' | 'name' | 'city' | 'country' | 'category'>;
 export type PlaceImageCandidateInsert = typeof placeImageCandidates.$inferInsert;
 
 function stripHtml(input?: string) {
@@ -53,12 +53,14 @@ export function createCandidateId(placeId: string, pageTitle: string) {
 
 function buildSearchQueries(place: DiscoveryPlace) {
   const safeName = place.name.replace(/[()]/g, ' ').trim();
-  return [
+  const countryHint = place.country ?? '';
+  const queries = [
     `intitle:"${safeName}" ${place.city}`,
     `${safeName} ${place.city}`,
-    `${safeName} ${place.city} Norway`,
     `${safeName} ${place.category.replace(/-/g, ' ')} ${place.city}`,
   ];
+  if (countryHint) queries.push(`${safeName} ${place.city} ${countryHint}`);
+  return queries;
 }
 
 async function searchFilePages(query: string, limit: number): Promise<WikimediaSearchResult[]> {
@@ -72,24 +74,33 @@ async function searchFilePages(query: string, limit: number): Promise<WikimediaS
     origin: '*',
   });
 
-  const response = await fetch(`${COMMONS_API_URL}?${params}`, {
-    headers: { 'user-agent': 'AI-City-Guide/1.0' },
-  });
+  let delay = 2000;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const response = await fetch(`${COMMONS_API_URL}?${params}`, {
+      headers: { 'user-agent': 'AI-City-Guide/1.0' },
+    });
 
-  if (!response.ok) {
-    throw new Error(`Wikimedia search failed with ${response.status}`);
+    if (response.status === 429) {
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      delay *= 2;
+      continue;
+    }
+
+    if (!response.ok) throw new Error(`Wikimedia search failed with ${response.status}`);
+
+    const payload = (await response.json()) as {
+      query?: { search?: Array<{ title: string; snippet: string }> };
+    };
+
+    return (payload.query?.search ?? []).map((entry, index) => ({
+      title: entry.title,
+      snippet: stripHtml(entry.snippet),
+      query,
+      rank: index + 1,
+    }));
   }
 
-  const payload = (await response.json()) as {
-    query?: { search?: Array<{ title: string; snippet: string }> };
-  };
-
-  return (payload.query?.search ?? []).map((entry, index) => ({
-    title: entry.title,
-    snippet: stripHtml(entry.snippet),
-    query,
-    rank: index + 1,
-  }));
+  return []; // all retries exhausted — silently return empty
 }
 
 async function fetchImageInfos(titles: string[]): Promise<WikimediaImageInfo[]> {
@@ -104,48 +115,57 @@ async function fetchImageInfos(titles: string[]): Promise<WikimediaImageInfo[]> 
     origin: '*',
   });
 
-  const response = await fetch(`${COMMONS_API_URL}?${params}`, {
-    headers: { 'user-agent': 'AI-City-Guide/1.0' },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Wikimedia imageinfo failed with ${response.status}`);
-  }
-
-  const payload = (await response.json()) as {
-    query?: {
-      pages?: Record<
-        string,
-        {
-          title: string;
-          imageinfo?: Array<{
-            url: string;
-            descriptionurl: string;
-            extmetadata?: Record<string, { value?: string }>;
-          }>;
-        }
-      >;
-    };
-  };
-
-  const results: WikimediaImageInfo[] = [];
-
-  for (const page of Object.values(payload.query?.pages ?? {})) {
-    const info = page.imageinfo?.[0];
-    if (!info) continue;
-
-    const metadata = info.extmetadata ?? {};
-    results.push({
-      title: page.title,
-      imageUrl: info.url,
-      sourceUrl: info.descriptionurl,
-      artist: stripHtml(metadata.Artist?.value) || undefined,
-      credit: stripHtml(metadata.Credit?.value) || undefined,
-      license: stripHtml(metadata.LicenseShortName?.value) || undefined,
+  let delay = 2000;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const response = await fetch(`${COMMONS_API_URL}?${params}`, {
+      headers: { 'user-agent': 'AI-City-Guide/1.0' },
     });
+
+    if (response.status === 429) {
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      delay *= 2;
+      continue;
+    }
+
+    if (!response.ok) throw new Error(`Wikimedia imageinfo failed with ${response.status}`);
+
+    const payload = (await response.json()) as {
+      query?: {
+        pages?: Record<
+          string,
+          {
+            title: string;
+            imageinfo?: Array<{
+              url: string;
+              descriptionurl: string;
+              extmetadata?: Record<string, { value?: string }>;
+            }>;
+          }
+        >;
+      };
+    };
+
+    const results: WikimediaImageInfo[] = [];
+
+    for (const page of Object.values(payload.query?.pages ?? {})) {
+      const info = page.imageinfo?.[0];
+      if (!info) continue;
+
+      const metadata = info.extmetadata ?? {};
+      results.push({
+        title: page.title,
+        imageUrl: info.url,
+        sourceUrl: info.descriptionurl,
+        artist: stripHtml(metadata.Artist?.value) || undefined,
+        credit: stripHtml(metadata.Credit?.value) || undefined,
+        license: stripHtml(metadata.LicenseShortName?.value) || undefined,
+      });
+    }
+
+    return results;
   }
 
-  return results;
+  return []; // all retries exhausted
 }
 
 export function scoreWikimediaCandidate(
@@ -157,6 +177,7 @@ export function scoreWikimediaCandidate(
   const normalizedSnippet = normalizeText(candidate.snippet ?? '');
   const placeTokens = tokenize(place.name);
   const cityTokens = tokenize(place.city);
+  const countryTokens = place.country ? tokenize(place.country) : [];
 
   const matchedNameTokens = placeTokens.filter(
     (token) => normalizedTitle.includes(token) || normalizedSnippet.includes(token)
@@ -164,14 +185,16 @@ export function scoreWikimediaCandidate(
   const matchedCityTokens = cityTokens.filter(
     (token) => normalizedTitle.includes(token) || normalizedSnippet.includes(token)
   ).length;
+  const matchedCountryTokens = countryTokens.filter(
+    (token) => normalizedTitle.includes(token) || normalizedSnippet.includes(token)
+  ).length;
 
   let score = Math.max(14, 86 - (rank - 1) * 9);
   score += matchedNameTokens * 10;
   score += matchedCityTokens * 6;
+  score += matchedCountryTokens * 2;
 
   if (placeTokens.length > 0 && matchedNameTokens === placeTokens.length) score += 18;
-  if (normalizedTitle.includes('kristiansand')) score += 6;
-  if (normalizedTitle.includes('norway')) score += 2;
   if (candidate.license) score += 4;
   if (matchedNameTokens === 0) score -= 30;
 
@@ -243,4 +266,132 @@ export async function discoverWikimediaCandidates(
     }));
 
   return ranked;
+}
+
+// Fetch the main article thumbnail from Wikipedia when a place already has a
+// confirmed wiki page (wikiPageTitle set). This is a separate source from the
+// Wikimedia Commons file search above and gives high-quality article images
+// for places that have dedicated Wikipedia pages.
+export async function getWikipediaThumbnail(
+  place: DiscoveryPlace & { wikiPageTitle?: string | null; wikiPageUrl?: string | null }
+): Promise<PlaceImageCandidateInsert | null> {
+  if (!place.wikiPageTitle) return null;
+
+  const lang = place.country?.toLowerCase() === 'norway' ? 'no' : 'en';
+  const params = new URLSearchParams({
+    action: 'query',
+    titles: place.wikiPageTitle,
+    prop: 'pageimages|imageinfo',
+    pithumbsize: '1200',
+    piprop: 'thumbnail|name',
+    format: 'json',
+    origin: '*',
+  });
+
+  try {
+    const res = await fetch(`https://${lang}.wikipedia.org/w/api.php?${params}`, {
+      headers: { 'user-agent': 'AI-City-Guide/1.0' },
+    });
+    if (!res.ok) return null;
+
+    const data = (await res.json()) as {
+      query?: {
+        pages?: Record<string, {
+          pageid?: number;
+          thumbnail?: { source?: string; width?: number };
+          pageimage?: string;
+        }>;
+      };
+    };
+
+    const page = Object.values(data.query?.pages ?? {})[0];
+    const thumbUrl = page?.thumbnail?.source;
+    if (!thumbUrl || !SUPPORTED_IMAGE_RE.test(thumbUrl)) return null;
+
+    const sourceUrl = place.wikiPageUrl ?? `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(place.wikiPageTitle)}`;
+    const candidateId = createCandidateId(place.id, `wikipedia-thumb:${place.wikiPageTitle}`);
+
+    return {
+      id: candidateId,
+      placeId: place.id,
+      provider: 'wikimedia',
+      status: 'pending',
+      confidence: 90, // direct article image — very high confidence
+      rank: 0,
+      searchQuery: place.wikiPageTitle,
+      pageTitle: page?.pageimage ? `File:${page.pageimage}` : place.wikiPageTitle,
+      imageUrl: thumbUrl,
+      sourceUrl,
+      sourceName: 'Wikipedia',
+      imageLicense: null,
+      imageAttribution: `From Wikipedia article "${place.wikiPageTitle}" (CC BY-SA).`,
+      imageType: 'wikimedia',
+      notes: 'Wikipedia article main thumbnail.',
+    } satisfies PlaceImageCandidateInsert;
+  } catch {
+    return null;
+  }
+}
+
+// Maps our internal category labels to English search terms that produce
+// good Wikimedia Commons results regardless of the city's country.
+const CATEGORY_SEARCH_TERMS: Record<string, string> = {
+  museum: 'museum interior exhibition',
+  landmark: 'historic landmark architecture',
+  'cultural-spot': 'cultural heritage site',
+  beach: 'beach coast sea',
+  'walking-area': 'park walking nature path',
+  cafe: 'cafe coffee shop',
+  restaurant: 'restaurant food dining',
+  viewpoint: 'viewpoint scenic landscape',
+  nature: 'nature park landscape',
+  'shopping-area': 'shopping market bazaar',
+  lodging: 'hotel accommodation',
+  'square-street': 'city square street',
+};
+
+async function findCategoryImage(queries: string[]): Promise<string | null> {
+  for (const query of queries) {
+    try {
+      const results = await searchFilePages(query, 5);
+      if (!results.length) continue;
+      const infos = await fetchImageInfos(results.slice(0, 3).map((r) => r.title));
+      const best = infos.find((i) => SUPPORTED_IMAGE_RE.test(i.imageUrl));
+      if (best) return best.imageUrl;
+    } catch {
+      // ignore and try next query
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  return null;
+}
+
+// Fetch one representative Wikimedia image per app-category for a city.
+// Makes O(category_count) API calls instead of O(place_count * 4).
+// Falls back to generic category search when city-specific search returns nothing.
+export async function fetchCategoryImagesForCity(
+  cityName: string,
+  country: string | null | undefined,
+  categories: string[]
+): Promise<Map<string, string>> {
+  const result = new Map<string, string>();
+  const uniqueCategories = [...new Set(categories)];
+  const countryHint = country ?? '';
+
+  for (const category of uniqueCategories) {
+    const term = CATEGORY_SEARCH_TERMS[category] ?? category.replace(/-/g, ' ');
+    // Try progressively broader queries: city-specific → country-level → generic
+    const queries = [
+      `${cityName} ${term}`,
+      countryHint ? `${countryHint} ${term}` : null,
+      term,
+    ].filter(Boolean) as string[];
+
+    const url = await findCategoryImage(queries);
+    if (url) result.set(category, url);
+
+    await new Promise((resolve) => setTimeout(resolve, 800));
+  }
+
+  return result;
 }

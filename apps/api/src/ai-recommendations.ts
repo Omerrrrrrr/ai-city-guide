@@ -1,3 +1,4 @@
+import { haversineKm } from './geo';
 import type { PlaceRow } from './schema';
 
 export type RecommendationSignals = {
@@ -102,7 +103,7 @@ function getPlaceSearchHaystack(row: PlaceRow) {
   );
 }
 
-function computePlaceQualityScore(row: PlaceRow) {
+export function computePlaceQualityScore(row: PlaceRow) {
   let score = 0;
 
   if (row.importanceTier === 'hero') score += 22;
@@ -122,7 +123,8 @@ function computePlaceQualityScore(row: PlaceRow) {
 
   if (row.wikiSummary && row.wikiSummary.length >= 240) score += 6;
   if (row.wikiPageTitle && row.wikiPageUrl) score += 4;
-  if (row.wikiStatus === 'not-found') score -= 10;
+  // No penalty for missing Wikipedia — global city coverage is uneven and
+  // Wikipedia 429 rate-limits can falsely set wikiStatus to not-found.
 
   if (row.durationMinutes != null && row.durationMinutes > 0 && row.durationMinutes <= 90) {
     score += 2;
@@ -149,24 +151,6 @@ function getPreferredSignalText(signals: RecommendationSignals) {
   if (signals.prefersWaterfront) return 'a waterfront option';
   if (signals.prefersViewpoint) return 'a scenic view';
   return 'the current vibe';
-}
-
-function haversineDistanceKm(
-  left: { lat: number; lng: number },
-  right: { lat: number; lng: number }
-) {
-  const toRadians = (value: number) => (value * Math.PI) / 180;
-  const earthRadiusKm = 6371;
-  const deltaLat = toRadians(right.lat - left.lat);
-  const deltaLng = toRadians(right.lng - left.lng);
-  const a =
-    Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
-    Math.cos(toRadians(left.lat)) *
-      Math.cos(toRadians(right.lat)) *
-      Math.sin(deltaLng / 2) *
-      Math.sin(deltaLng / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return earthRadiusKm * c;
 }
 
 function findAnchorPlace(allRows: PlaceRow[], combinedText: string) {
@@ -357,10 +341,7 @@ export function rankPlacesForQuery(
         row.lat != null &&
         row.lng != null
       ) {
-        distanceKm = haversineDistanceKm(
-          { lat: signals.anchorPlace.lat, lng: signals.anchorPlace.lng },
-          { lat: row.lat, lng: row.lng }
-        );
+        distanceKm = haversineKm(signals.anchorPlace.lat, signals.anchorPlace.lng, row.lat, row.lng);
 
         if (distanceKm <= 0.8) {
           score += 10;
@@ -435,7 +416,8 @@ export function buildFallbackReason(entry: RankedPlace, allRows: PlaceRow[], que
     return `${capitalize(reasonBits[0])}.`;
   }
 
-  return `Solid match for ${getPreferredSignalText(signals)} in Kristiansand.`;
+  const cityName = allRows.find((row) => row.city)?.city;
+  return `Solid match for ${getPreferredSignalText(signals)}${cityName ? ` in ${cityName}` : ''}.`;
 }
 
 function capitalize(input: string) {
