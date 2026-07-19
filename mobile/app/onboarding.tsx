@@ -12,9 +12,11 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import * as Haptics from 'expo-haptics';
 
+import { FAITHS, INTERESTS, PROFESSIONS } from '@/src/constants/profile-options';
 import { useUserProfile } from '@/src/store/user-profile';
 import type { Faith, Interest, Profession } from '@/src/store/user-profile';
 
@@ -22,44 +24,9 @@ const NAVY = '#0F1C3F';
 const GOLD = '#D4A843';
 const TOTAL_STEPS = 3;
 
-const PROFESSIONS: { value: Profession; label: string; emoji: string }[] = [
-  { value: 'architect', label: 'Architect', emoji: '🏛️' },
-  { value: 'historian', label: 'Historian', emoji: '📜' },
-  { value: 'photographer', label: 'Photographer', emoji: '📷' },
-  { value: 'artist', label: 'Artist', emoji: '🎨' },
-  { value: 'engineer', label: 'Engineer', emoji: '⚙️' },
-  { value: 'doctor', label: 'Doctor', emoji: '🩺' },
-  { value: 'foodie', label: 'Foodie', emoji: '🍽️' },
-  { value: 'student', label: 'Student', emoji: '📚' },
-  { value: 'writer', label: 'Writer', emoji: '✍️' },
-  { value: 'other', label: 'Other', emoji: '✦' },
-];
-
-const INTERESTS: { value: Interest; label: string; emoji: string }[] = [
-  { value: 'history', label: 'History', emoji: '⏳' },
-  { value: 'architecture', label: 'Architecture', emoji: '🏛️' },
-  { value: 'art', label: 'Art', emoji: '🖼️' },
-  { value: 'religion', label: 'Religion', emoji: '🕌' },
-  { value: 'food', label: 'Food & Drink', emoji: '🍜' },
-  { value: 'nature', label: 'Nature', emoji: '🌿' },
-  { value: 'nightlife', label: 'Nightlife', emoji: '🌙' },
-  { value: 'music', label: 'Music', emoji: '🎵' },
-  { value: 'photography', label: 'Photography', emoji: '📸' },
-  { value: 'sports', label: 'Sports', emoji: '⚽' },
-];
-
-const FAITHS: { value: Faith; label: string }[] = [
-  { value: 'muslim', label: 'Muslim' },
-  { value: 'christian', label: 'Christian' },
-  { value: 'jewish', label: 'Jewish' },
-  { value: 'buddhist', label: 'Buddhist' },
-  { value: 'hindu', label: 'Hindu' },
-  { value: 'secular', label: 'Secular / Non-religious' },
-  { value: 'prefer_not_to_say', label: 'Prefer not to say' },
-];
-
 export default function OnboardingScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { setProfile, completeOnboarding } = useUserProfile();
 
   const [step, setStep] = React.useState(0);
@@ -91,14 +58,12 @@ export default function OnboardingScreen() {
         <SafeAreaView style={styles.welcomeInner}>
           <View style={styles.welcomeContent}>
             <Text style={styles.compass}>◈</Text>
-            <Text style={styles.wordmark}>PIRI</Text>
-            <Text style={styles.tagline}>The world through your eyes</Text>
-            <Text style={styles.welcomeBody}>
-              Answer a few questions and Piri will explain every place — every monument, mosque, ruin, restaurant — through the lens of who you are.
-            </Text>
+            <Text style={styles.wordmark}>{t('onboarding.wordmark')}</Text>
+            <Text style={styles.tagline}>{t('onboarding.tagline')}</Text>
+            <Text style={styles.welcomeBody}>{t('onboarding.welcomeBody')}</Text>
           </View>
           <Pressable style={styles.goldButton} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setStep(1); }}>
-            <Text style={styles.goldButtonText}>Begin</Text>
+            <Text style={styles.goldButtonText}>{t('onboarding.begin')}</Text>
           </Pressable>
         </SafeAreaView>
       </View>
@@ -115,7 +80,7 @@ export default function OnboardingScreen() {
           <View style={styles.progressTrack}>
             <View style={[styles.progressFill, { width: `${(step / TOTAL_STEPS) * 100}%` }]} />
           </View>
-          <Text style={styles.stepLabel}>{step} / {TOTAL_STEPS}</Text>
+          <Text style={styles.stepLabel}>{t('onboarding.stepOf', { step, total: TOTAL_STEPS })}</Text>
         </View>
 
         <ScrollView
@@ -141,10 +106,10 @@ export default function OnboardingScreen() {
 
         <View style={styles.footer}>
           <Pressable style={styles.skipButton} onPress={next}>
-            <Text style={styles.skipText}>Skip</Text>
+            <Text style={styles.skipText}>{t('common.skip')}</Text>
           </Pressable>
           <Pressable style={styles.continueButton} onPress={next}>
-            <Text style={styles.continueText}>{step === TOTAL_STEPS ? 'Done' : 'Continue'}</Text>
+            <Text style={styles.continueText}>{step === TOTAL_STEPS ? t('common.done') : t('common.continue')}</Text>
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -153,13 +118,14 @@ export default function OnboardingScreen() {
 }
 
 function StepName({ name, onChange }: { name: string; onChange: (v: string) => void }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>What should we call you?</Text>
-      <Text style={styles.stepSubtitle}>Optional — used to personalize how Piri talks to you.</Text>
+      <Text style={styles.stepTitle}>{t('onboarding.name.title')}</Text>
+      <Text style={styles.stepSubtitle}>{t('onboarding.name.subtitle')}</Text>
       <TextInput
         style={styles.textInput}
-        placeholder="Your name"
+        placeholder={t('onboarding.name.placeholder')}
         placeholderTextColor="#999"
         value={name}
         onChangeText={onChange}
@@ -178,14 +144,13 @@ function StepProfession({
   selected: Profession | null;
   onSelect: (v: Profession) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>What do you do?</Text>
-      <Text style={styles.stepSubtitle}>
-        Piri tailors its explanations to your expertise. An architect hears about structure; a historian about context.
-      </Text>
+      <Text style={styles.stepTitle}>{t('onboarding.profession.title')}</Text>
+      <Text style={styles.stepSubtitle}>{t('onboarding.profession.subtitle')}</Text>
       <View style={styles.chipGrid}>
-        {PROFESSIONS.map(({ value, label, emoji }) => {
+        {PROFESSIONS.map(({ value, labelKey, emoji }) => {
           const active = selected === value;
           return (
             <Pressable
@@ -193,7 +158,7 @@ function StepProfession({
               style={[styles.chip, active && styles.chipActive]}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onSelect(value); }}>
               <Text style={styles.chipEmoji}>{emoji}</Text>
-              <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+              <Text style={[styles.chipText, active && styles.chipTextActive]}>{t(labelKey)}</Text>
             </Pressable>
           );
         })}
@@ -213,14 +178,15 @@ function StepFaithInterests({
   selectedFaith: Faith | null;
   onSelectFaith: (v: Faith) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>A bit more about you</Text>
-      <Text style={styles.stepSubtitle}>Both optional. Skip anything you'd rather not share.</Text>
+      <Text style={styles.stepTitle}>{t('onboarding.faithInterests.title')}</Text>
+      <Text style={styles.stepSubtitle}>{t('onboarding.faithInterests.subtitle')}</Text>
 
-      <Text style={styles.sectionLabel}>Interests</Text>
+      <Text style={styles.sectionLabel}>{t('onboarding.faithInterests.interestsLabel')}</Text>
       <View style={styles.chipGrid}>
-        {INTERESTS.map(({ value, label, emoji }) => {
+        {INTERESTS.map(({ value, labelKey, emoji }) => {
           const active = selectedInterests.includes(value);
           return (
             <Pressable
@@ -228,25 +194,23 @@ function StepFaithInterests({
               style={[styles.chip, active && styles.chipActive]}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onToggleInterest(value); }}>
               <Text style={styles.chipEmoji}>{emoji}</Text>
-              <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+              <Text style={[styles.chipText, active && styles.chipTextActive]}>{t(labelKey)}</Text>
             </Pressable>
           );
         })}
       </View>
 
-      <Text style={[styles.sectionLabel, { marginTop: 28 }]}>Faith & perspective</Text>
-      <Text style={styles.faithNote}>
-        Helps Piri frame sacred and historic spaces — a mosque explained to a Muslim differs from one explained to an architect.
-      </Text>
+      <Text style={[styles.sectionLabel, { marginTop: 28 }]}>{t('onboarding.faithInterests.faithLabel')}</Text>
+      <Text style={styles.faithNote}>{t('onboarding.faithInterests.faithNote')}</Text>
       <View style={styles.chipGrid}>
-        {FAITHS.map(({ value, label }) => {
+        {FAITHS.map(({ value, labelKey }) => {
           const active = selectedFaith === value;
           return (
             <Pressable
               key={value}
               style={[styles.chip, active && styles.chipActive]}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onSelectFaith(value); }}>
-              <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+              <Text style={[styles.chipText, active && styles.chipTextActive]}>{t(labelKey)}</Text>
             </Pressable>
           );
         })}

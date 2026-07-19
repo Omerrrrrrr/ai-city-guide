@@ -15,6 +15,7 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { PlaceImage } from '@/components/place-image';
 import { ThemedText } from '@/components/themed-text';
@@ -34,7 +35,8 @@ type State =
   | { kind: 'error'; message: string };
 
 function MatchedPlaceCard({ place, onPress }: { place: Place; onPress: () => void }) {
-  const status = getPlaceOpenStatus(place);
+  const { t } = useTranslation();
+  const status = getPlaceOpenStatus(place, t);
   const open = status.state === 'open' || status.state === 'all-day';
   return (
     <Pressable
@@ -42,7 +44,7 @@ function MatchedPlaceCard({ place, onPress }: { place: Place; onPress: () => voi
       style={({ pressed }) => [styles.matchedCard, pressed && { opacity: 0.85 }]}>
       <View style={styles.matchedCardBadge}>
         <ThemedText style={styles.matchedCardBadgeText} lightColor={GOLD} darkColor={GOLD}>
-          ◈ In Piri
+          {t('scan.inPiri')}
         </ThemedText>
       </View>
       <PlaceImage place={place} style={styles.matchedCardImage} />
@@ -56,7 +58,7 @@ function MatchedPlaceCard({ place, onPress }: { place: Place; onPress: () => voi
           </ThemedText>
         </View>
         <ThemedText style={styles.matchedCardCta} lightColor={GOLD} darkColor={GOLD}>
-          View full details →
+          {t('scan.viewFullDetails')}
         </ThemedText>
       </View>
     </Pressable>
@@ -67,6 +69,7 @@ export default function ScanScreen() {
   const colorScheme = useColorScheme();
   const dark = colorScheme === 'dark';
   const router = useRouter();
+  const { t } = useTranslation();
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = React.useState<'back' | 'front'>('back');
   const [flash, setFlash] = React.useState<'off' | 'on'>('off');
@@ -82,7 +85,7 @@ export default function ScanScreen() {
     try {
       await Share.share({
         title: result.title,
-        message: `${result.title}\n${result.subtitle}\n\n${result.explanation}\n\n— Discovered with Piri`,
+        message: t('scan.shareMessage', { title: result.title, subtitle: result.subtitle, explanation: result.explanation }),
       });
     } catch { /* ignore */ }
   };
@@ -115,7 +118,7 @@ export default function ScanScreen() {
         fetchPlace(result.matchedPlaceId).then(setMatchedPlace).catch(() => {});
       }
     } catch (e: any) {
-      setState({ kind: 'error', message: e.message || 'Could not identify this place.' });
+      setState({ kind: 'error', message: e.message || t('scan.errorIdentify') });
     }
   };
 
@@ -130,7 +133,7 @@ export default function ScanScreen() {
       });
       if (photo?.base64) await processImage(photo.base64, photo.uri);
     } catch {
-      setState({ kind: 'error', message: 'Failed to take photo.' });
+      setState({ kind: 'error', message: t('scan.errorPhoto') });
     }
   };
 
@@ -161,14 +164,14 @@ export default function ScanScreen() {
       <View style={[styles.center, { backgroundColor: NAVY }]}>
         <SafeAreaView style={styles.permissionBox}>
           <ThemedText style={styles.permissionTitle} lightColor="#fff" darkColor="#fff">
-            Camera access needed
+            {t('scan.permission.title')}
           </ThemedText>
           <ThemedText style={styles.permissionBody} lightColor="rgba(255,255,255,0.7)" darkColor="rgba(255,255,255,0.7)">
-            Point your camera at any place in the world and Piri will explain it — tailored to who you are.
+            {t('scan.permission.body')}
           </ThemedText>
           <Pressable style={styles.goldButton} onPress={requestPermission}>
             <ThemedText style={styles.goldButtonText} lightColor={NAVY} darkColor={NAVY}>
-              Allow Camera
+              {t('scan.permission.allow')}
             </ThemedText>
           </Pressable>
         </SafeAreaView>
@@ -186,7 +189,7 @@ export default function ScanScreen() {
         <View style={[styles.loadingOverlay, pendingImageUri ? { backgroundColor: 'rgba(15,28,63,0.7)' } : { backgroundColor: NAVY }]}>
           <ActivityIndicator size="large" color={GOLD} />
           <ThemedText style={styles.loadingText} lightColor="rgba(255,255,255,0.9)" darkColor="rgba(255,255,255,0.9)">
-            Piri is looking...
+            {t('scan.looking')}
           </ThemedText>
         </View>
       </View>
@@ -202,7 +205,7 @@ export default function ScanScreen() {
           <View style={styles.resultHeader}>
             <Pressable onPress={reset} style={({ pressed }) => pressed && { opacity: 0.7 }}>
               <ThemedText style={styles.backBtn} lightColor="rgba(255,255,255,0.7)" darkColor="rgba(255,255,255,0.7)">
-                ← Scan again
+                {t('scan.scanAgainHeader')}
               </ThemedText>
             </Pressable>
           </View>
@@ -237,18 +240,18 @@ export default function ScanScreen() {
             <Pressable
               style={({ pressed }) => [styles.actionBtn, styles.actionBtnSecondary, pressed && { opacity: 0.7 }]}
               onPress={() => handleShare(result)}>
-              <ThemedText style={styles.actionBtnText}>Share</ThemedText>
+              <ThemedText style={styles.actionBtnText}>{t('common.share')}</ThemedText>
             </Pressable>
             <Pressable
               style={({ pressed }) => [styles.actionBtn, styles.actionBtnPrimary, pressed && { opacity: 0.8 }]}
               onPress={() => {
                 router.navigate({
                   pathname: '/(tabs)/ai',
-                  params: { q: `Tell me more about ${result.title}` },
+                  params: { q: t('scan.askMoreQuery', { title: result.title }) },
                 });
               }}>
               <ThemedText style={styles.actionBtnTextPrimary} lightColor="#fff" darkColor="#fff">
-                Ask Piri more →
+                {t('scan.askMore')}
               </ThemedText>
             </Pressable>
           </View>
@@ -264,7 +267,7 @@ export default function ScanScreen() {
                 style={({ pressed }) => [styles.matchedPlaceBtn, pressed && { opacity: 0.8 }]}
                 onPress={() => router.push({ pathname: '/place/[id]', params: { id: result.matchedPlaceId! } })}>
                 <ThemedText style={styles.matchedPlaceBtnText} lightColor={GOLD} darkColor={GOLD}>
-                  ◈ View full details in Piri
+                  {t('scan.viewDetailsInPiri')}
                 </ThemedText>
               </Pressable>
             )
@@ -272,7 +275,7 @@ export default function ScanScreen() {
 
           <Pressable style={({ pressed }) => [styles.scanAgainBtn, pressed && { opacity: 0.8 }]} onPress={reset}>
             <ThemedText style={styles.scanAgainText} lightColor="rgba(255,255,255,0.7)" darkColor="rgba(255,255,255,0.7)">
-              Scan another place
+              {t('scan.scanAnother')}
             </ThemedText>
           </Pressable>
         </ScrollView>
@@ -294,7 +297,7 @@ export default function ScanScreen() {
           </ThemedText>
           <Pressable style={styles.goldButton} onPress={reset}>
             <ThemedText style={styles.goldButtonText} lightColor={NAVY} darkColor={NAVY}>
-              Try again
+              {t('common.tryAgain')}
             </ThemedText>
           </Pressable>
         </View>
@@ -320,7 +323,7 @@ export default function ScanScreen() {
               </ThemedText>
             </Pressable>
             <ThemedText style={styles.topBarText} lightColor="#fff" darkColor="#fff">
-              Point at any place
+              {t('scan.pointAtPlace')}
             </ThemedText>
             <View style={{ width: 36 }} />
           </View>
@@ -340,7 +343,7 @@ export default function ScanScreen() {
             style={({ pressed }) => [styles.sideBtn, pressed && { opacity: 0.7 }]}
             onPress={handleGallery}>
             <ThemedText style={styles.sideBtnText} lightColor="#fff" darkColor="#fff">
-              Gallery
+              {t('scan.gallery')}
             </ThemedText>
           </Pressable>
 
@@ -354,7 +357,7 @@ export default function ScanScreen() {
             style={({ pressed }) => [styles.sideBtn, pressed && { opacity: 0.7 }]}
             onPress={() => setFacing((f) => (f === 'back' ? 'front' : 'back'))}>
             <ThemedText style={styles.sideBtnText} lightColor="#fff" darkColor="#fff">
-              Flip
+              {t('scan.flip')}
             </ThemedText>
           </Pressable>
         </View>

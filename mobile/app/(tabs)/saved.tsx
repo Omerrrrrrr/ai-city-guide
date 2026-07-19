@@ -8,6 +8,7 @@ import {
   useColorScheme,
 } from 'react-native';
 import { Link, useLocalSearchParams, useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { PlaceImage } from '@/components/place-image';
 import { ThemedText } from '@/components/themed-text';
@@ -24,7 +25,8 @@ const GOLD = '#D4A843';
 type Tab = 'favorites' | 'plan' | 'visited';
 
 function PlaceListItem({ place }: { place: Place }) {
-  const status = getPlaceOpenStatus(place);
+  const { t } = useTranslation();
+  const status = getPlaceOpenStatus(place, t);
   const open = status.state === 'open' || status.state === 'all-day';
   const dark = useColorScheme() === 'dark';
   const cardBg = dark ? '#1A2744' : '#fff';
@@ -36,7 +38,7 @@ function PlaceListItem({ place }: { place: Place }) {
         <View style={styles.cardBody}>
           <ThemedText numberOfLines={2} style={styles.cardName}>{place.name}</ThemedText>
           <ThemedText style={styles.cardCategory}>
-            {CATEGORY_EMOJI[place.category] ?? '📍'} {formatCategory(place.category)}
+            {CATEGORY_EMOJI[place.category] ?? '📍'} {formatCategory(place.category, t)}
           </ThemedText>
           {place.shortStory ? (
             <ThemedText numberOfLines={1} style={styles.cardStory}>{place.shortStory}</ThemedText>
@@ -55,6 +57,7 @@ function PlaceListItem({ place }: { place: Place }) {
 
 export default function SavedScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const params = useLocalSearchParams<{ tab?: Tab }>();
   const { favoritePlaceIds, planPlaceIds, clearFavorites, clearPlan } = useSavedPlaces();
   const { viewedIds, clearHistory } = useRecentlyViewed();
@@ -83,17 +86,17 @@ export default function SavedScreen() {
     else clearHistory();
   };
 
-  const emptyTitle = tab === 'favorites' ? 'No favorites yet' : tab === 'plan' ? 'Your plan is empty' : 'No places visited yet';
+  const emptyTitle = tab === 'favorites' ? t('saved.empty.favoritesTitle') : tab === 'plan' ? t('saved.empty.planTitle') : t('saved.empty.visitedTitle');
   const emptyBody = tab === 'favorites'
-    ? 'Open a place and tap the heart icon to save it here.'
+    ? t('saved.empty.favoritesBody')
     : tab === 'plan'
-      ? 'Open a place and tap "Add to plan" to build your itinerary.'
-      : 'Places you open will appear here.';
+      ? t('saved.empty.planBody')
+      : t('saved.empty.visitedBody');
 
   const tabs: { id: Tab; label: string; count: number }[] = [
-    { id: 'favorites', label: 'Saved', count: favorites.length },
-    { id: 'plan', label: 'Plan', count: plan.length },
-    { id: 'visited', label: 'Visited', count: visited.length },
+    { id: 'favorites', label: t('saved.tabs.favorites'), count: favorites.length },
+    { id: 'plan', label: t('saved.tabs.plan'), count: plan.length },
+    { id: 'visited', label: t('saved.tabs.visited'), count: visited.length },
   ];
 
   return (
@@ -101,13 +104,13 @@ export default function SavedScreen() {
       <SafeAreaView style={{ backgroundColor: NAVY }}>
         <View style={styles.header}>
           <View style={styles.headerTop}>
-            <ThemedText style={styles.headerTitle} lightColor="#fff" darkColor="#fff">Collection</ThemedText>
+            <ThemedText style={styles.headerTitle} lightColor="#fff" darkColor="#fff">{t('saved.title')}</ThemedText>
             {list.length > 0 ? (
               <Pressable
                 onPress={handleClear}
                 style={({ pressed }) => pressed && { opacity: 0.7 }}>
                 <ThemedText style={styles.clearText} lightColor="rgba(255,255,255,0.6)" darkColor="rgba(255,255,255,0.6)">
-                  Clear
+                  {t('common.clear')}
                 </ThemedText>
               </Pressable>
             ) : null}
@@ -139,7 +142,7 @@ export default function SavedScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}>
 
-        {isLoading && <ThemedText style={styles.statusText}>Loading...</ThemedText>}
+        {isLoading && <ThemedText style={styles.statusText}>{t('saved.loading')}</ThemedText>}
 
         {/* Plan optimizer — shown when Plan tab has ≥2 places */}
         {tab === 'plan' && plan.length >= 2 && (
@@ -147,16 +150,16 @@ export default function SavedScreen() {
             style={({ pressed }) => [styles.optimizeBtn, pressed && { opacity: 0.85 }]}
             onPress={() => {
               const placeNames = plan.map((p) => p.name).join(', ');
-              const query = `I'm planning to visit: ${placeNames}. Suggest the best order to visit them today, with estimated time at each and any walking or transport tips between them.`;
+              const query = t('saved.optimize.query', { placeNames });
               router.push({ pathname: '/(tabs)/ai', params: { q: query } } as never);
             }}>
             <ThemedText style={styles.optimizeBtnEmoji}>◈</ThemedText>
             <View style={{ flex: 1 }}>
               <ThemedText style={styles.optimizeBtnTitle} lightColor="#fff" darkColor="#fff">
-                Optimize my day with Piri
+                {t('saved.optimize.title')}
               </ThemedText>
               <ThemedText style={styles.optimizeBtnSub} lightColor="rgba(255,255,255,0.6)" darkColor="rgba(255,255,255,0.6)">
-                Best order, timings & travel tips for {plan.length} places →
+                {t('saved.optimize.sub', { count: plan.length })}
               </ThemedText>
             </View>
           </Pressable>

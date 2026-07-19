@@ -1,0 +1,551 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "retry": "Retry",
+    "tryAgain": "Try again",
+    "share": "Share",
+    "save": "Save",
+    "saving": "Saving…",
+    "done": "Done",
+    "continue": "Continue",
+    "skip": "Skip",
+    "loading": "Loading…",
+    "searchPlaces": "Search places...",
+    "openInMaps": "Open in Maps",
+    "showAll": "Show all",
+    "results": "Results",
+    "seeAll": "See all ›",
+    "clear": "Clear",
+    "everywhere": "🌍 Everywhere"
+  },
+  "screenTitles": {
+    "manageHours": "Manage Hours",
+    "manageImages": "Manage Images"
+  },
+  "tabs": {
+    "home": "Home",
+    "scan": "Scan",
+    "map": "Map",
+    "ai": "Ask Piri",
+    "profile": "Profile"
+  },
+  "profileOptions": {
+    "professions": {
+      "architect": "Architect",
+      "historian": "Historian",
+      "photographer": "Photographer",
+      "artist": "Artist",
+      "engineer": "Engineer",
+      "doctor": "Doctor",
+      "foodie": "Foodie",
+      "student": "Student",
+      "writer": "Writer",
+      "other": "Other"
+    },
+    "interests": {
+      "history": "History",
+      "architecture": "Architecture",
+      "art": "Art",
+      "religion": "Religion",
+      "food": "Food & Drink",
+      "nature": "Nature",
+      "nightlife": "Nightlife",
+      "music": "Music",
+      "photography": "Photography",
+      "sports": "Sports"
+    },
+    "faiths": {
+      "muslim": "Muslim",
+      "christian": "Christian",
+      "jewish": "Jewish",
+      "buddhist": "Buddhist",
+      "hindu": "Hindu",
+      "secular": "Secular / Non-religious",
+      "preferNotToSay": "Prefer not to say"
+    }
+  },
+  "onboarding": {
+    "wordmark": "PIRI",
+    "tagline": "The world through your eyes",
+    "welcomeBody": "Answer a few questions and Piri will explain every place — every monument, mosque, ruin, restaurant — through the lens of who you are.",
+    "begin": "Begin",
+    "stepOf": "{{step}} / {{total}}",
+    "name": {
+      "title": "What should we call you?",
+      "subtitle": "Optional — used to personalize how Piri talks to you.",
+      "placeholder": "Your name"
+    },
+    "profession": {
+      "title": "What do you do?",
+      "subtitle": "Piri tailors its explanations to your expertise. An architect hears about structure; a historian about context."
+    },
+    "faithInterests": {
+      "title": "A bit more about you",
+      "subtitle": "Both optional. Skip anything you'd rather not share.",
+      "interestsLabel": "Interests",
+      "faithLabel": "Faith & perspective",
+      "faithNote": "Helps Piri frame sacred and historic spaces — a mosque explained to a Muslim differs from one explained to an architect."
+    }
+  },
+  "home": {
+    "intents": {
+      "openNow": "Open Now",
+      "rainyDay": "Rainy Day",
+      "photoSpots": "Photo Spots",
+      "family": "Family",
+      "localPicks": "Local Picks",
+      "quickStop": "Quick Stop"
+    },
+    "greeting": {
+      "morning": "Good morning",
+      "afternoon": "Good afternoon",
+      "evening": "Good evening",
+      "withName": "{{greeting}}, {{name}}"
+    },
+    "cityPill": "📍 {{cityName}}",
+    "weatherBanner": {
+      "rainy": "It's raining — perfect day for cozy cafes and indoor spots.",
+      "snowy": "Snow outside — let's find you somewhere warm.",
+      "sunnyHot": "Beautiful day — explore terraces and outdoor spots.",
+      "sunnyMild": "Great weather for a walk — see what's open nearby.",
+      "foggy": "Mysterious day — great for hidden gems and quiet corners.",
+      "fallback": "{{description}} in {{city}} — here's what's on today.",
+      "cta": "Ask Piri for suggestions →"
+    },
+    "staleBanner": "Showing cached data — refreshing…",
+    "error": "Couldn't reach the server. Check your connection.",
+    "profileNudge": {
+      "title": "Personalize Piri",
+      "body": "Tell us who you are — same place explained differently to an architect, a Muslim, a historian."
+    },
+    "discovery": {
+      "title": "Discovering {{cityName}}{{dots}}",
+      "body": "Piri is mapping places using global data. This takes 1–2 minutes."
+    },
+    "cityEmpty": {
+      "title": "No places yet in {{cityName}}",
+      "body": "Discovery may still be processing. Pull to refresh, or try exploring a different city.",
+      "button": "Pick a different city"
+    },
+    "sections": {
+      "featured": "Featured",
+      "exploreCity": "Explore {{cityName}}",
+      "recentlyViewed": "Recently Viewed",
+      "nearYou": "Near You",
+      "openRightNow": "Open Right Now",
+      "forYou": "For You",
+      "localFavorites": "Local Favorites",
+      "rainyDay": "Rainy Day"
+    },
+    "distance": {
+      "meters": "{{value}} m away",
+      "km": "{{value}} km away"
+    },
+    "aiBanner": {
+      "title": "Ask Piri anything",
+      "sub": "Tell me what you feel like — I'll find the perfect spot."
+    }
+  },
+  "ai": {
+    "title": "Ask Piri",
+    "headerSub": {
+      "withWeather": "{{emoji}} {{temp}}° · {{city}}",
+      "fallback": "Tell me what you feel like"
+    },
+    "tryAsking": "Try asking:",
+    "noMatches": "No matches this turn. Try a broader follow-up.",
+    "inputPlaceholder": "e.g. Something cozy and quiet...",
+    "ask": "Ask",
+    "errorNotConfigured": "AI recommendations are not configured in the backend yet.",
+    "errorGeneric": "Error fetching recommendations.",
+    "suggestions": {
+      "bestCafes": "Best cafes open right now",
+      "uniqueLocal": "Something unique only locals know",
+      "soloAfternoon": "Perfect for a solo afternoon",
+      "bestView": "Best view in the city",
+      "cozyRainy": "Cozy indoor places for a rainy day",
+      "outdoorTerraces": "Outdoor spots and terraces",
+      "photoSpots": "Best photo spots at any time of day",
+      "architectureBuildings": "Buildings worth seeing for the architecture",
+      "localFood": "Best local food — not tourist traps"
+    }
+  },
+  "categoryFilters": {
+    "all": "All",
+    "museums": "Museums",
+    "landmarks": "Landmarks",
+    "culture": "Culture",
+    "walks": "Walks",
+    "beaches": "Beaches",
+    "cafes": "Cafes",
+    "food": "Food",
+    "views": "Views",
+    "nature": "Nature",
+    "shopping": "Shopping"
+  },
+  "explore": {
+    "placesFallback": "Places",
+    "reset": "Reset",
+    "openNow": "Open now",
+    "sections": {
+      "openRightNow": "Open Right Now",
+      "featuredPlaces": "Featured Places",
+      "rainyDayPicks": "Rainy Day Picks",
+      "allPlaces": "All Places"
+    },
+    "emptyText": "No places match. Try a different search or filter.",
+    "placesFound_one": "{{count}} place found",
+    "placesFound_other": "{{count}} places found"
+  },
+  "map": {
+    "loading": "Loading map...",
+    "placesCount_one": "{{count}} place",
+    "placesCount_other": "{{count}} places"
+  },
+  "saved": {
+    "title": "Collection",
+    "loading": "Loading...",
+    "tabs": {
+      "favorites": "Saved",
+      "plan": "Plan",
+      "visited": "Visited"
+    },
+    "empty": {
+      "favoritesTitle": "No favorites yet",
+      "planTitle": "Your plan is empty",
+      "visitedTitle": "No places visited yet",
+      "favoritesBody": "Open a place and tap the heart icon to save it here.",
+      "planBody": "Open a place and tap \"Add to plan\" to build your itinerary.",
+      "visitedBody": "Places you open will appear here."
+    },
+    "optimize": {
+      "title": "Optimize my day with Piri",
+      "sub": "Best order, timings & travel tips for {{count}} places →",
+      "query": "I'm planning to visit: {{placeNames}}. Suggest the best order to visit them today, with estimated time at each and any walking or transport tips between them."
+    }
+  },
+  "scan": {
+    "inPiri": "◈ In Piri",
+    "viewFullDetails": "View full details →",
+    "permission": {
+      "title": "Camera access needed",
+      "body": "Point your camera at any place in the world and Piri will explain it — tailored to who you are.",
+      "allow": "Allow Camera"
+    },
+    "looking": "Piri is looking...",
+    "scanAgainHeader": "← Scan again",
+    "askMore": "Ask Piri more →",
+    "askMoreQuery": "Tell me more about {{title}}",
+    "viewDetailsInPiri": "◈ View full details in Piri",
+    "scanAnother": "Scan another place",
+    "errorIdentify": "Could not identify this place.",
+    "errorPhoto": "Failed to take photo.",
+    "pointAtPlace": "Point at any place",
+    "gallery": "Gallery",
+    "flip": "Flip",
+    "shareMessage": "{{title}}\n{{subtitle}}\n\n{{explanation}}\n\n— Discovered with Piri"
+  },
+  "settings": {
+    "travelerFallback": "Traveler",
+    "faithNote": "Helps Piri tailor explanations of sacred and historic spaces.",
+    "currentCity": "Current city",
+    "changeCity": "Change ›",
+    "savedPlaces": "Saved Places",
+    "viewAll": "View all →",
+    "stats": {
+      "saved": "saved",
+      "inPlan": "in plan",
+      "visited": "visited"
+    },
+    "clearFavorites": "Clear Favorites",
+    "clearPlan": "Clear Plan",
+    "clearHistory": "Clear History",
+    "version": "Piri v{{version}}",
+    "adminDevOnly": "Admin (dev only)",
+    "hoursReview": "Hours Review",
+    "imageReview": "Image Review",
+    "language": {
+      "label": "Language",
+      "system": "System",
+      "en": "English",
+      "tr": "Türkçe",
+      "nb": "Norsk"
+    }
+  },
+  "placeDetail": {
+    "errorTitle": "Couldn't load place",
+    "actionBar": {
+      "saved": "Saved",
+      "save": "Save",
+      "inPlan": "In plan",
+      "addToPlan": "Add to plan",
+      "directions": "Directions"
+    },
+    "shareMessage": "{{name}}\n{{category}} · {{city}}\n\n{{story}}{{wikiNote}}\n\n— Discovered with Piri",
+    "shareLearnMore": "\nLearn more: {{url}}",
+    "pirisTake": "Piri's Take",
+    "about": "About",
+    "hours": "Hours",
+    "verified": "Verified",
+    "estimated": "Estimated",
+    "temporarilyClosed": "Temporarily closed",
+    "typicalVisit": "Typical visit · {{minutes}} min",
+    "bestTime": "Best time · {{time}}",
+    "vibe": "Vibe",
+    "bestFor": "Best for",
+    "photos": "Photos",
+    "location": "Location",
+    "nearby": "Nearby",
+    "walkMin": "{{minutes}} min walk"
+  },
+  "cityPicker": {
+    "status": {
+      "ready": "Ready",
+      "discovering": "Discovering...",
+      "queued": "Queued",
+      "failed": "Failed",
+      "discover": "Discover"
+    },
+    "title": "Choose a city",
+    "searchPlaceholder": "Search any city in the world...",
+    "currentlyExploring": "Currently exploring",
+    "showAll": "Show all",
+    "results": "Results",
+    "placeCount_one": "{{count}} place",
+    "placeCount_other": "{{count}} places",
+    "searchFailed": "Search failed. Check your connection.",
+    "discoveryFailed": "Discovery failed",
+    "noResults": "No results for \"{{query}}\"",
+    "noResultsSub": "Try a different spelling or a nearby city name.",
+    "hintTitle": "Explore anywhere",
+    "hintBody": "Search a city and Piri will discover places there using global map data. First discovery takes 1-2 minutes."
+  },
+  "placeHours": {
+    "status": {
+      "openAllDay": "Open all day",
+      "openNow": "Open now",
+      "closedNow": "Closed now",
+      "usuallyOpenAllDay": "Usually open all day",
+      "likelyOpenNow": "Likely open now",
+      "likelyClosedNow": "Likely closed now",
+      "temporarilyClosed": "Temporarily closed"
+    },
+    "detail": {
+      "temporarilyClosed": "This place is marked as temporarily closed right now.",
+      "verifiedAllDay": "Verified public access throughout the day.",
+      "verifiedOpenUntil": "Verified hours. Open until {{time}} today.",
+      "verifiedClosedWithNext": "Verified hours. {{nextOpeningText}}",
+      "opensAt": "Opens {{day}} around {{time}}.",
+      "likelyOpensAt": "Likely opens {{day}} around {{time}}.",
+      "unclear": "Opening time is unclear right now.",
+      "likelyOpenUntil": "{{summary}} Open until about {{time}} today.",
+      "likelyClosedWithNext": "{{summary}} {{nextOpeningText}}"
+    },
+    "note": {
+      "publicOutdoor": "Public outdoor places are generally accessible, but weather and light still matter.",
+      "estimatedNotVerified": "Estimated from venue type, not live verified hours.",
+      "verifiedChecked": "Verified hours checked on {{date}}.",
+      "verifiedFromSource": "Verified from a linked source.",
+      "lastChecked": "Last checked on {{date}}."
+    },
+    "weeklyNote": {
+      "verifiedFromSource": "Verified weekly hours from a linked source.",
+      "estimatedNotVerified": "Estimated weekly hours from venue type, not live verified data.",
+      "verifiedChecked": "Verified weekly hours. Last checked on {{date}}."
+    },
+    "profile": {
+      "outdoor": "Usually accessible all day.",
+      "landmarkDaytime": "Estimated daytime access for landmarks.",
+      "museum": "Estimated museum-style hours.",
+      "culture": "Estimated venue hours for cultural stops.",
+      "cafe": "Estimated cafe hours.",
+      "restaurant": "Estimated restaurant hours.",
+      "shopping": "Estimated shopping hours."
+    },
+    "day": {
+      "today": "today",
+      "tomorrow": "tomorrow",
+      "another": "another day",
+      "sunday": "Sunday",
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday",
+      "saturday": "Saturday"
+    },
+    "weekdayShort": {
+      "mon": "Mon",
+      "tue": "Tue",
+      "wed": "Wed",
+      "thu": "Thu",
+      "fri": "Fri",
+      "sat": "Sat",
+      "sun": "Sun"
+    },
+    "allDay": "All day",
+    "closed": "Closed"
+  },
+  "categories": {
+    "landmark": "Landmark",
+    "museum": "Museum",
+    "culturalSpot": "Cultural Spot",
+    "squareStreet": "Square Street",
+    "beach": "Beach",
+    "walkingArea": "Walking Area",
+    "cafe": "Cafe",
+    "restaurant": "Restaurant",
+    "viewpoint": "Viewpoint",
+    "shoppingArea": "Shopping Area",
+    "lodging": "Lodging",
+    "nature": "Nature"
+  },
+  "tags": {
+    "rainyDay": "Rainy Day",
+    "shortStop": "Short Stop",
+    "family": "Family",
+    "budget": "Budget",
+    "localFavorite": "Local Favorite",
+    "waterfront": "Waterfront",
+    "photogenic": "Photogenic",
+    "dateNight": "Date Night",
+    "coffeeBreak": "Coffee Break",
+    "meal": "Meal"
+  },
+  "components": {
+    "errorBoundary": {
+      "title": "Something went wrong",
+      "body": "The app hit an unexpected error. You can try again, or restart the app if it keeps happening."
+    },
+    "adminGate": {
+      "title": "Admin access required",
+      "body": "Enter the ADMIN_API_TOKEN configured on the backend to use this screen.",
+      "placeholder": "Admin token",
+      "unlock": "Unlock"
+    },
+    "placeImage": {
+      "unavailable": "Photo unavailable",
+      "meta": "We only show real place photos after the source is verified."
+    },
+    "placeMiniMap": {
+      "badgeLabel": "Map preview",
+      "unavailable": "Map preview unavailable",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out"
+    }
+  },
+  "adminHours": {
+    "errorSavingFallback": "Something went wrong while saving hours.",
+    "validation": {
+      "formatError": "{{label}}: use HH:MM-HH:MM format.",
+      "endAfterStart": "{{label}}: end must be later than start.",
+      "noOverlap": "{{label}}: ranges cannot overlap."
+    },
+    "noBusinessStatus": "No business status",
+    "hero": {
+      "title": "Hours Review",
+      "body1": "Save verified opening hours, source links, and temporary closures without editing seed data.",
+      "body2": "Google preview only prefills the form. Nothing becomes live until you inspect it and press Save Hours."
+    },
+    "findPlace": "Find a Place",
+    "searchPlaceholder": "Search by place name or id…",
+    "refreshPlaces": "Refresh Places",
+    "loadingPlaces": "Loading places…",
+    "verifiedHoursLabel": "verified hours",
+    "estimatedHoursLabel": "estimated hours",
+    "lastChecked": "Last checked: {{date}}",
+    "close": "Close",
+    "editHours": "Edit Hours",
+    "toggles": {
+      "verified": "Verified",
+      "alwaysOpen": "Always Open",
+      "temporarilyClosed": "Temporarily Closed"
+    },
+    "sourceUrlPlaceholder": "Official hours source URL…",
+    "notePlaceholder": "Optional hours note…",
+    "dayInputPlaceholder": "10:00-17:00, 18:00-20:00",
+    "formatHint": "Use `HH:MM-HH:MM` and separate multiple windows with commas. Leave blank for closed.",
+    "loadingGoogle": "Loading Google…",
+    "fetchGooglePreview": "Fetch Google Preview",
+    "saveHours": "Save Hours",
+    "googlePreviewTitle": "Google Preview",
+    "googlePreviewBody": "Pull a candidate from Google Places, inspect the match, then save only if it looks right.",
+    "temporarilyClosedStatus": "temporarily closed",
+    "activeStatus": "active",
+    "noWeekdayDescriptions": "Google did not return structured weekday descriptions for this match.",
+    "useThisPreview": "Use This Preview",
+    "noGoogleCandidates": "No Google candidates were found for this place yet.",
+    "ptsSuffix": "{{points}} pts",
+    "info": {
+      "loadedPreviews": "Loaded {{count}} Google preview candidates for {{name}}.",
+      "noPreviewsFound": "No Google preview candidates found for {{name}}.",
+      "filledFromPreview": "Filled {{name}} with Google preview data. Review it, then save.",
+      "savedHours": "Saved verified hours for {{name}}."
+    }
+  },
+  "adminImages": {
+    "errorFallback": "Something went wrong while loading image candidates.",
+    "filters": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "applied": "Applied",
+      "rejected": "Rejected",
+      "all": "All"
+    },
+    "hero": {
+      "title": "Image Review",
+      "body": "Review pending Wikimedia candidates, then approve and apply real photos to places."
+    },
+    "coverage": {
+      "title": "Coverage",
+      "places": "places",
+      "verifiedMainPhotos": "verified main photos",
+      "stillMissing": "still missing",
+      "strongPending": "Strong pending candidates in this filter: {{count}}"
+    },
+    "actions": {
+      "title": "Actions",
+      "refresh": "Refresh",
+      "discovering": "Discovering…",
+      "discoverMissing": "Discover Missing",
+      "approveApply": "Approve + Apply",
+      "reject": "Reject"
+    },
+    "discoverOne": {
+      "title": "Discover for One Place",
+      "discoverThisPlace": "Discover This Place"
+    },
+    "searchPlacePlaceholder": "Search place name or id…",
+    "selectedPlace": "Selected: {{name}}",
+    "searchCandidates": {
+      "title": "Search Candidates",
+      "placeholder": "Filter by place name, id, or photo title…",
+      "showing": "Showing {{shown}} of {{total}} candidates in this filter."
+    },
+    "loadingCandidates": "Loading candidates…",
+    "noCandidates": "No candidates in this filter yet.",
+    "candidate": {
+      "statusLine": "{{status}} · confidence {{confidence}} · rank {{rank}}",
+      "currentImage": "Current image: {{status}}{{sourceName}}",
+      "verified": "verified",
+      "placeholder": "placeholder",
+      "license": "License: {{license}}",
+      "openSourcePage": "Open source page"
+    },
+    "reassign": {
+      "title": "Match to Another Place",
+      "matchToPlace": "Match to Place"
+    },
+    "info": {
+      "discoveredAcross": "Discovered {{candidates}} candidates across {{places}} places.",
+      "discoveredFor": "Discovered {{count}} candidates for {{name}}.",
+      "approvedApplied": "Candidate approved and applied.",
+      "rejected": "Candidate rejected.",
+      "movedTo": "Candidate moved to {{name}}."
+    }
+  },
+  "hooks": {
+    "loadError": "Something went wrong while loading data.",
+    "missingPlaceId": "Missing place id."
+  }
+}

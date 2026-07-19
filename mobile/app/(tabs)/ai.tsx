@@ -12,6 +12,7 @@ import {
   useColorScheme,
 } from 'react-native';
 import { Link, useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 const NAVY = '#0F1C3F';
 const GOLD = '#D4A843';
@@ -45,6 +46,7 @@ type ConversationTurn =
 export default function AiScreen() {
   const colorScheme = useColorScheme();
   const dark = colorScheme === 'dark';
+  const { t } = useTranslation();
   const params = useLocalSearchParams<{ q?: string }>();
   const scrollRef = React.useRef<ScrollView>(null);
   const inputRef = React.useRef<TextInput>(null);
@@ -61,22 +63,22 @@ export default function AiScreen() {
 
   const suggestions = React.useMemo(() => {
     const base = [
-      'Best cafes open right now',
-      'Something unique only locals know',
-      'Perfect for a solo afternoon',
-      'Best view in the city',
+      t('ai.suggestions.bestCafes'),
+      t('ai.suggestions.uniqueLocal'),
+      t('ai.suggestions.soloAfternoon'),
+      t('ai.suggestions.bestView'),
     ];
     if (weather?.condition === 'rainy' || weather?.condition === 'stormy') {
-      return ['Cozy indoor places for a rainy day', ...base.slice(0, 3)];
+      return [t('ai.suggestions.cozyRainy'), ...base.slice(0, 3)];
     }
     if (weather?.condition === 'sunny' && (weather?.temp ?? 0) > 18) {
-      return ['Outdoor spots and terraces', ...base.slice(0, 3)];
+      return [t('ai.suggestions.outdoorTerraces'), ...base.slice(0, 3)];
     }
-    if (profession === 'photographer') return ['Best photo spots at any time of day', ...base.slice(0, 3)];
-    if (profession === 'architect') return ['Buildings worth seeing for the architecture', ...base.slice(0, 3)];
-    if (profession === 'foodie') return ['Best local food — not tourist traps', ...base.slice(0, 3)];
+    if (profession === 'photographer') return [t('ai.suggestions.photoSpots'), ...base.slice(0, 3)];
+    if (profession === 'architect') return [t('ai.suggestions.architectureBuildings'), ...base.slice(0, 3)];
+    if (profession === 'foodie') return [t('ai.suggestions.localFood'), ...base.slice(0, 3)];
     return base;
-  }, [weather?.condition, weather?.temp, profession]);
+  }, [weather?.condition, weather?.temp, profession, t]);
 
   const history = React.useMemo<AIConversationMessage[]>(
     () =>
@@ -122,17 +124,17 @@ export default function AiScreen() {
           err.message.includes('OPENAI_API_KEY') ||
           err.message.includes('not configured in the backend'))
       ) {
-        setError('AI recommendations are not configured in the backend yet.');
+        setError(t('ai.errorNotConfigured'));
       } else if (err instanceof Error) {
         setError(err.message);
       } else {
-        setError('Error fetching recommendations.');
+        setError(t('ai.errorGeneric'));
       }
     } finally {
       setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, history, userProfile, weather, cityName]);
+  }, [query, history, userProfile, weather, cityName, t]);
 
   // Auto-submit once if navigated from scan with a pre-filled query
   React.useEffect(() => {
@@ -155,12 +157,12 @@ export default function AiScreen() {
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
             <ThemedText style={styles.headerTitle} lightColor={GOLD} darkColor={GOLD}>
-              Ask Piri
+              {t('ai.title')}
             </ThemedText>
             <ThemedText style={styles.headerSub} lightColor="rgba(255,255,255,0.65)" darkColor="rgba(255,255,255,0.65)">
               {weather
-                ? `${weatherEmoji(weather.condition)} ${weather.temp}° · ${cityName ?? 'Everywhere'}`
-                : cityName ?? 'Tell me what you feel like'}
+                ? t('ai.headerSub.withWeather', { emoji: weatherEmoji(weather.condition), temp: weather.temp, city: cityName ?? t('common.everywhere') })
+                : cityName ?? t('ai.headerSub.fallback')}
             </ThemedText>
           </View>
           {conversation.length > 0 && (
@@ -168,7 +170,7 @@ export default function AiScreen() {
               onPress={() => { setConversation([]); setError(null); }}
               style={({ pressed }) => [styles.clearBtn, pressed && { opacity: 0.6 }]}>
               <ThemedText style={styles.clearBtnText} lightColor="rgba(255,255,255,0.55)" darkColor="rgba(255,255,255,0.55)">
-                Clear
+                {t('common.clear')}
               </ThemedText>
             </Pressable>
           )}
@@ -197,7 +199,7 @@ export default function AiScreen() {
 
           {conversation.length === 0 ? (
             <View style={styles.emptyBox}>
-              <ThemedText style={styles.emptyHint}>Try asking:</ThemedText>
+              <ThemedText style={styles.emptyHint}>{t('ai.tryAsking')}</ThemedText>
               <View style={styles.suggestionGrid}>
                 {suggestions.map((s) => (
                   <Pressable
@@ -234,7 +236,7 @@ export default function AiScreen() {
                               <View style={styles.cardContent}>
                                 <ThemedText style={styles.cardTitle}>{place.name}</ThemedText>
                                 <ThemedText style={styles.cardTags}>
-                                  {CATEGORY_EMOJI[place.category] ?? '📍'} {formatCategory(place.category)}
+                                  {CATEGORY_EMOJI[place.category] ?? '📍'} {formatCategory(place.category, t)}
                                   {place.tags[0] ? ` · ${place.tags[0]}` : ''}
                                 </ThemedText>
                                 <View style={styles.reasonBox}>
@@ -248,9 +250,7 @@ export default function AiScreen() {
                       </View>
                     ) : (
                       <View style={styles.emptyBoxInline}>
-                        <ThemedText style={styles.emptyText}>
-                          No matches this turn. Try a broader follow-up.
-                        </ThemedText>
+                        <ThemedText style={styles.emptyText}>{t('ai.noMatches')}</ThemedText>
                       </View>
                     )}
                   </View>
@@ -273,7 +273,7 @@ export default function AiScreen() {
             <TextInput
               ref={inputRef}
               style={[styles.input, { color: inputColor, backgroundColor: inputBg }]}
-              placeholder="e.g. Something cozy and quiet..."
+              placeholder={t('ai.inputPlaceholder')}
               placeholderTextColor={dark ? 'rgba(255,255,255,0.4)' : '#999'}
               value={query}
               onChangeText={setQuery}
@@ -289,7 +289,7 @@ export default function AiScreen() {
                 pressed && styles.pressed,
                 (loading || !query.trim()) && styles.disabled,
               ]}>
-              <ThemedText style={styles.buttonText} lightColor="#fff" darkColor="#fff">Ask</ThemedText>
+              <ThemedText style={styles.buttonText} lightColor="#fff" darkColor="#fff">{t('ai.ask')}</ThemedText>
             </Pressable>
           </View>
         </SafeAreaView>

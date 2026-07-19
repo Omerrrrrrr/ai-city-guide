@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, TextInput } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -7,6 +8,7 @@ import { useThemeColor } from '@/hooks/use-theme-color';
 import { useAdminAuth } from '@/src/store/admin-auth';
 
 export function AdminGate({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation();
   const adminToken = useAdminAuth((state) => state.adminToken);
   const setAdminToken = useAdminAuth((state) => state.setAdminToken);
   const [draftToken, setDraftToken] = React.useState('');
@@ -20,14 +22,12 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
 
   return (
     <ThemedView style={styles.container}>
-      <ThemedText type="subtitle">Admin access required</ThemedText>
-      <ThemedText style={styles.text}>
-        Enter the ADMIN_API_TOKEN configured on the backend to use this screen.
-      </ThemedText>
+      <ThemedText type="subtitle">{t('components.adminGate.title')}</ThemedText>
+      <ThemedText style={styles.text}>{t('components.adminGate.body')}</ThemedText>
       <TextInput
         value={draftToken}
         onChangeText={setDraftToken}
-        placeholder="Admin token"
+        placeholder={t('components.adminGate.placeholder')}
         placeholderTextColor="rgba(127,127,127,0.7)"
         secureTextEntry
         autoCapitalize="none"
@@ -43,7 +43,7 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
           !draftToken.trim() && styles.buttonDisabled,
           pressed && styles.buttonPressed,
         ]}>
-        <ThemedText style={[styles.buttonText, { color: buttonTextColor }]}>Unlock</ThemedText>
+        <ThemedText style={[styles.buttonText, { color: buttonTextColor }]}>{t('components.adminGate.unlock')}</ThemedText>
       </Pressable>
     </ThemedView>
   );

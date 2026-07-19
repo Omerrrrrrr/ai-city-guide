@@ -1,0 +1,551 @@
+{
+  "common": {
+    "cancel": "Avbryt",
+    "retry": "Prøv igjen",
+    "tryAgain": "Prøv igjen",
+    "share": "Del",
+    "save": "Lagre",
+    "saving": "Lagrer…",
+    "done": "Ferdig",
+    "continue": "Fortsett",
+    "skip": "Hopp over",
+    "loading": "Laster…",
+    "searchPlaces": "Søk etter steder...",
+    "openInMaps": "Åpne i Kart",
+    "showAll": "Vis alle",
+    "results": "Resultater",
+    "seeAll": "Se alle ›",
+    "clear": "Fjern",
+    "everywhere": "🌍 Overalt"
+  },
+  "screenTitles": {
+    "manageHours": "Administrer åpningstider",
+    "manageImages": "Administrer bilder"
+  },
+  "tabs": {
+    "home": "Hjem",
+    "scan": "Skann",
+    "map": "Kart",
+    "ai": "Spør Piri",
+    "profile": "Profil"
+  },
+  "profileOptions": {
+    "professions": {
+      "architect": "Arkitekt",
+      "historian": "Historiker",
+      "photographer": "Fotograf",
+      "artist": "Kunstner",
+      "engineer": "Ingeniør",
+      "doctor": "Lege",
+      "foodie": "Matelsker",
+      "student": "Student",
+      "writer": "Forfatter",
+      "other": "Annet"
+    },
+    "interests": {
+      "history": "Historie",
+      "architecture": "Arkitektur",
+      "art": "Kunst",
+      "religion": "Religion",
+      "food": "Mat & drikke",
+      "nature": "Natur",
+      "nightlife": "Nattliv",
+      "music": "Musikk",
+      "photography": "Fotografering",
+      "sports": "Sport"
+    },
+    "faiths": {
+      "muslim": "Muslim",
+      "christian": "Kristen",
+      "jewish": "Jødisk",
+      "buddhist": "Buddhist",
+      "hindu": "Hindu",
+      "secular": "Sekulær / ikke-religiøs",
+      "preferNotToSay": "Foretrekker å ikke si"
+    }
+  },
+  "onboarding": {
+    "wordmark": "PIRI",
+    "tagline": "Verden gjennom dine øyne",
+    "welcomeBody": "Svar på noen få spørsmål, så forklarer Piri hvert sted — hvert monument, moské, ruin, restaurant — gjennom ditt eget perspektiv.",
+    "begin": "Kom i gang",
+    "stepOf": "{{step}} / {{total}}",
+    "name": {
+      "title": "Hva skal vi kalle deg?",
+      "subtitle": "Valgfritt — brukes til å tilpasse hvordan Piri snakker med deg.",
+      "placeholder": "Navnet ditt"
+    },
+    "profession": {
+      "title": "Hva jobber du med?",
+      "subtitle": "Piri tilpasser forklaringene til din ekspertise. En arkitekt hører om struktur; en historiker om kontekst."
+    },
+    "faithInterests": {
+      "title": "Litt mer om deg",
+      "subtitle": "Begge deler er valgfrie. Hopp over det du ikke ønsker å dele.",
+      "interestsLabel": "Interesser",
+      "faithLabel": "Tro & perspektiv",
+      "faithNote": "Hjelper Piri med å ramme inn hellige og historiske steder — en moské forklart til en muslim er annerledes enn forklart til en arkitekt."
+    }
+  },
+  "home": {
+    "intents": {
+      "openNow": "Åpent nå",
+      "rainyDay": "Regnværsdag",
+      "photoSpots": "Fotosteder",
+      "family": "Familie",
+      "localPicks": "Lokale favoritter",
+      "quickStop": "Kort stopp"
+    },
+    "greeting": {
+      "morning": "God morgen",
+      "afternoon": "God ettermiddag",
+      "evening": "God kveld",
+      "withName": "{{greeting}}, {{name}}"
+    },
+    "cityPill": "📍 {{cityName}}",
+    "weatherBanner": {
+      "rainy": "Det regner — perfekt dag for koselige kafeer og innendørs steder.",
+      "snowy": "Snø ute — la oss finne et varmt sted til deg.",
+      "sunnyHot": "Nydelig dag — utforsk terrasser og uteplasser.",
+      "sunnyMild": "Fint vær for en tur — se hva som er åpent i nærheten.",
+      "foggy": "Mystisk dag — perfekt for skjulte perler og rolige kroker.",
+      "fallback": "{{description}} i {{city}} — her er hva som skjer i dag.",
+      "cta": "Spør Piri om forslag →"
+    },
+    "staleBanner": "Viser bufrede data — oppdaterer…",
+    "error": "Klarte ikke å nå serveren. Sjekk internettforbindelsen din.",
+    "profileNudge": {
+      "title": "Tilpass Piri",
+      "body": "Fortell oss hvem du er — samme sted forklart ulikt til en arkitekt, en muslim, en historiker."
+    },
+    "discovery": {
+      "title": "Utforsker {{cityName}}{{dots}}",
+      "body": "Piri kartlegger steder med globale data. Dette tar 1–2 minutter."
+    },
+    "cityEmpty": {
+      "title": "Ingen steder ennå i {{cityName}}",
+      "body": "Utforskingen kan fortsatt pågå. Dra for å oppdatere, eller prøv en annen by.",
+      "button": "Velg en annen by"
+    },
+    "sections": {
+      "featured": "Utvalgte",
+      "exploreCity": "Utforsk {{cityName}}",
+      "recentlyViewed": "Nylig sett",
+      "nearYou": "I nærheten",
+      "openRightNow": "Åpent akkurat nå",
+      "forYou": "For deg",
+      "localFavorites": "Lokale favoritter",
+      "rainyDay": "Regnværsdag"
+    },
+    "distance": {
+      "meters": "{{value}} m unna",
+      "km": "{{value}} km unna"
+    },
+    "aiBanner": {
+      "title": "Spør Piri om hva som helst",
+      "sub": "Si hva du har lyst på — jeg finner det perfekte stedet."
+    }
+  },
+  "ai": {
+    "title": "Spør Piri",
+    "headerSub": {
+      "withWeather": "{{emoji}} {{temp}}° · {{city}}",
+      "fallback": "Si hva du har lyst på"
+    },
+    "tryAsking": "Prøv å spørre:",
+    "noMatches": "Ingen treff denne gangen. Prøv et bredere spørsmål.",
+    "inputPlaceholder": "f.eks. Noe koselig og rolig...",
+    "ask": "Spør",
+    "errorNotConfigured": "AI-anbefalinger er ikke konfigurert på baksiden ennå.",
+    "errorGeneric": "Feil ved henting av anbefalinger.",
+    "suggestions": {
+      "bestCafes": "Beste kafeer som er åpne akkurat nå",
+      "uniqueLocal": "Noe unikt bare lokalbefolkningen vet om",
+      "soloAfternoon": "Perfekt for en ettermiddag alene",
+      "bestView": "Beste utsikt i byen",
+      "cozyRainy": "Koselige innendørs steder for en regnværsdag",
+      "outdoorTerraces": "Uteplasser og terrasser",
+      "photoSpots": "Beste fotosteder når som helst på dagen",
+      "architectureBuildings": "Bygninger verdt å se for arkitekturen",
+      "localFood": "Beste lokale mat — ikke turistfeller"
+    }
+  },
+  "categoryFilters": {
+    "all": "Alle",
+    "museums": "Museer",
+    "landmarks": "Landemerker",
+    "culture": "Kultur",
+    "walks": "Turer",
+    "beaches": "Strender",
+    "cafes": "Kafeer",
+    "food": "Mat",
+    "views": "Utsikt",
+    "nature": "Natur",
+    "shopping": "Shopping"
+  },
+  "explore": {
+    "placesFallback": "Steder",
+    "reset": "Nullstill",
+    "openNow": "Åpent nå",
+    "sections": {
+      "openRightNow": "Åpent akkurat nå",
+      "featuredPlaces": "Utvalgte steder",
+      "rainyDayPicks": "Regnværsdag-utvalg",
+      "allPlaces": "Alle steder"
+    },
+    "emptyText": "Ingen steder samsvarer. Prøv et annet søk eller filter.",
+    "placesFound_one": "{{count}} sted funnet",
+    "placesFound_other": "{{count}} steder funnet"
+  },
+  "map": {
+    "loading": "Laster kart...",
+    "placesCount_one": "{{count}} sted",
+    "placesCount_other": "{{count}} steder"
+  },
+  "saved": {
+    "title": "Samling",
+    "loading": "Laster...",
+    "tabs": {
+      "favorites": "Lagret",
+      "plan": "Plan",
+      "visited": "Besøkt"
+    },
+    "empty": {
+      "favoritesTitle": "Ingen favoritter ennå",
+      "planTitle": "Planen din er tom",
+      "visitedTitle": "Ingen besøkte steder ennå",
+      "favoritesBody": "Åpne et sted og trykk på hjerteikonet for å lagre det her.",
+      "planBody": "Åpne et sted og trykk på «Legg til i plan» for å bygge reiseruten din.",
+      "visitedBody": "Steder du åpner vises her."
+    },
+    "optimize": {
+      "title": "Optimer dagen min med Piri",
+      "sub": "Beste rekkefølge, tider og reisetips for {{count}} steder →",
+      "query": "Jeg planlegger å besøke: {{placeNames}}. Foreslå den beste rekkefølgen å besøke dem i dag, med anslått tid på hvert sted og eventuelle gå- eller transporttips mellom dem."
+    }
+  },
+  "scan": {
+    "inPiri": "◈ I Piri",
+    "viewFullDetails": "Se alle detaljer →",
+    "permission": {
+      "title": "Kameratilgang nødvendig",
+      "body": "Pek kameraet mot et hvilket som helst sted i verden, så forklarer Piri det — tilpasset deg.",
+      "allow": "Tillat kamera"
+    },
+    "looking": "Piri ser...",
+    "scanAgainHeader": "← Skann igjen",
+    "askMore": "Spør Piri om mer →",
+    "askMoreQuery": "Fortell meg mer om {{title}}",
+    "viewDetailsInPiri": "◈ Se alle detaljer i Piri",
+    "scanAnother": "Skann et annet sted",
+    "errorIdentify": "Kunne ikke identifisere dette stedet.",
+    "errorPhoto": "Kunne ikke ta bilde.",
+    "pointAtPlace": "Pek mot et hvilket som helst sted",
+    "gallery": "Galleri",
+    "flip": "Snu",
+    "shareMessage": "{{title}}\n{{subtitle}}\n\n{{explanation}}\n\n— Oppdaget med Piri"
+  },
+  "settings": {
+    "travelerFallback": "Reisende",
+    "faithNote": "Hjelper Piri med å tilpasse forklaringer av hellige og historiske steder.",
+    "currentCity": "Nåværende by",
+    "changeCity": "Endre ›",
+    "savedPlaces": "Lagrede steder",
+    "viewAll": "Se alle →",
+    "stats": {
+      "saved": "lagret",
+      "inPlan": "i plan",
+      "visited": "besøkt"
+    },
+    "clearFavorites": "Fjern favoritter",
+    "clearPlan": "Fjern plan",
+    "clearHistory": "Fjern historikk",
+    "version": "Piri v{{version}}",
+    "adminDevOnly": "Admin (kun dev)",
+    "hoursReview": "Gjennomgå åpningstider",
+    "imageReview": "Gjennomgå bilder",
+    "language": {
+      "label": "Språk",
+      "system": "System",
+      "en": "English",
+      "tr": "Türkçe",
+      "nb": "Norsk"
+    }
+  },
+  "placeDetail": {
+    "errorTitle": "Kunne ikke laste stedet",
+    "actionBar": {
+      "saved": "Lagret",
+      "save": "Lagre",
+      "inPlan": "I plan",
+      "addToPlan": "Legg til i plan",
+      "directions": "Veibeskrivelse"
+    },
+    "shareMessage": "{{name}}\n{{category}} · {{city}}\n\n{{story}}{{wikiNote}}\n\n— Oppdaget med Piri",
+    "shareLearnMore": "\nLes mer: {{url}}",
+    "pirisTake": "Piris vurdering",
+    "about": "Om stedet",
+    "hours": "Åpningstider",
+    "verified": "Verifisert",
+    "estimated": "Anslått",
+    "temporarilyClosed": "Midlertidig stengt",
+    "typicalVisit": "Typisk besøk · {{minutes}} min",
+    "bestTime": "Beste tidspunkt · {{time}}",
+    "vibe": "Stemning",
+    "bestFor": "Best egnet for",
+    "photos": "Bilder",
+    "location": "Beliggenhet",
+    "nearby": "I nærheten",
+    "walkMin": "{{minutes}} min å gå"
+  },
+  "cityPicker": {
+    "status": {
+      "ready": "Klar",
+      "discovering": "Utforsker...",
+      "queued": "I kø",
+      "failed": "Feilet",
+      "discover": "Utforsk"
+    },
+    "title": "Velg en by",
+    "searchPlaceholder": "Søk etter en hvilken som helst by i verden...",
+    "currentlyExploring": "Utforsker nå",
+    "showAll": "Vis alle",
+    "results": "Resultater",
+    "placeCount_one": "{{count}} sted",
+    "placeCount_other": "{{count}} steder",
+    "searchFailed": "Søket mislyktes. Sjekk internettforbindelsen din.",
+    "discoveryFailed": "Utforsking mislyktes",
+    "noResults": "Ingen resultater for «{{query}}»",
+    "noResultsSub": "Prøv en annen stavemåte eller en nærliggende by.",
+    "hintTitle": "Utforsk hvor som helst",
+    "hintBody": "Søk etter en by, så oppdager Piri steder der ved hjelp av globale kartdata. Første utforsking tar 1-2 minutter."
+  },
+  "placeHours": {
+    "status": {
+      "openAllDay": "Åpent hele dagen",
+      "openNow": "Åpent nå",
+      "closedNow": "Stengt nå",
+      "usuallyOpenAllDay": "Vanligvis åpent hele dagen",
+      "likelyOpenNow": "Sannsynligvis åpent nå",
+      "likelyClosedNow": "Sannsynligvis stengt nå",
+      "temporarilyClosed": "Midlertidig stengt"
+    },
+    "detail": {
+      "temporarilyClosed": "Dette stedet er merket som midlertidig stengt akkurat nå.",
+      "verifiedAllDay": "Verifisert offentlig tilgang gjennom hele dagen.",
+      "verifiedOpenUntil": "Verifiserte åpningstider. Åpent til {{time}} i dag.",
+      "verifiedClosedWithNext": "Verifiserte åpningstider. {{nextOpeningText}}",
+      "opensAt": "Åpner {{day}} rundt {{time}}.",
+      "likelyOpensAt": "Åpner sannsynligvis {{day}} rundt {{time}}.",
+      "unclear": "Åpningstiden er uklar akkurat nå.",
+      "likelyOpenUntil": "{{summary}} Åpent til omtrent {{time}} i dag.",
+      "likelyClosedWithNext": "{{summary}} {{nextOpeningText}}"
+    },
+    "note": {
+      "publicOutdoor": "Offentlige utendørssteder er som regel tilgjengelige, men vær og lys spiller inn.",
+      "estimatedNotVerified": "Anslått ut fra stedstype, ikke live verifiserte åpningstider.",
+      "verifiedChecked": "Verifiserte åpningstider sjekket {{date}}.",
+      "verifiedFromSource": "Verifisert fra en lenket kilde.",
+      "lastChecked": "Sist sjekket {{date}}."
+    },
+    "weeklyNote": {
+      "verifiedFromSource": "Verifiserte ukentlige åpningstider fra en lenket kilde.",
+      "estimatedNotVerified": "Anslåtte ukentlige åpningstider ut fra stedstype, ikke live verifiserte data.",
+      "verifiedChecked": "Verifiserte ukentlige åpningstider. Sist sjekket {{date}}."
+    },
+    "profile": {
+      "outdoor": "Vanligvis tilgjengelig hele dagen.",
+      "landmarkDaytime": "Anslått dagtidstilgang for landemerker.",
+      "museum": "Anslåtte museumsåpningstider.",
+      "culture": "Anslåtte åpningstider for kulturelle stopp.",
+      "cafe": "Anslåtte kafeåpningstider.",
+      "restaurant": "Anslåtte restaurantåpningstider.",
+      "shopping": "Anslåtte butikkåpningstider."
+    },
+    "day": {
+      "today": "i dag",
+      "tomorrow": "i morgen",
+      "another": "en annen dag",
+      "sunday": "søndag",
+      "monday": "mandag",
+      "tuesday": "tirsdag",
+      "wednesday": "onsdag",
+      "thursday": "torsdag",
+      "friday": "fredag",
+      "saturday": "lørdag"
+    },
+    "weekdayShort": {
+      "mon": "Man",
+      "tue": "Tir",
+      "wed": "Ons",
+      "thu": "Tor",
+      "fri": "Fre",
+      "sat": "Lør",
+      "sun": "Søn"
+    },
+    "allDay": "Hele dagen",
+    "closed": "Stengt"
+  },
+  "categories": {
+    "landmark": "Landemerke",
+    "museum": "Museum",
+    "culturalSpot": "Kulturelt sted",
+    "squareStreet": "Plass / gate",
+    "beach": "Strand",
+    "walkingArea": "Turområde",
+    "cafe": "Kafé",
+    "restaurant": "Restaurant",
+    "viewpoint": "Utsiktspunkt",
+    "shoppingArea": "Handleområde",
+    "lodging": "Overnatting",
+    "nature": "Natur"
+  },
+  "tags": {
+    "rainyDay": "Regnværsdag",
+    "shortStop": "Kort stopp",
+    "family": "Familie",
+    "budget": "Budsjett",
+    "localFavorite": "Lokal favoritt",
+    "waterfront": "Sjøfront",
+    "photogenic": "Fotogen",
+    "dateNight": "Romantisk kveld",
+    "coffeeBreak": "Kaffepause",
+    "meal": "Måltid"
+  },
+  "components": {
+    "errorBoundary": {
+      "title": "Noe gikk galt",
+      "body": "Appen støtte på en uventet feil. Du kan prøve igjen, eller starte appen på nytt hvis det fortsetter."
+    },
+    "adminGate": {
+      "title": "Admin-tilgang kreves",
+      "body": "Skriv inn ADMIN_API_TOKEN konfigurert på baksiden for å bruke denne skjermen.",
+      "placeholder": "Admin-token",
+      "unlock": "Lås opp"
+    },
+    "placeImage": {
+      "unavailable": "Bilde utilgjengelig",
+      "meta": "Vi viser kun ekte stedsbilder etter at kilden er verifisert."
+    },
+    "placeMiniMap": {
+      "badgeLabel": "Kartforhåndsvisning",
+      "unavailable": "Kartforhåndsvisning utilgjengelig",
+      "zoomIn": "Zoom inn",
+      "zoomOut": "Zoom ut"
+    }
+  },
+  "adminHours": {
+    "errorSavingFallback": "Noe gikk galt under lagring av åpningstider.",
+    "validation": {
+      "formatError": "{{label}}: bruk formatet TT:MM-TT:MM.",
+      "endAfterStart": "{{label}}: sluttid må være etter starttid.",
+      "noOverlap": "{{label}}: tidsintervaller kan ikke overlappe."
+    },
+    "noBusinessStatus": "Ingen forretningsstatus",
+    "hero": {
+      "title": "Gjennomgang av åpningstider",
+      "body1": "Lagre verifiserte åpningstider, kildelenker og midlertidige stenginger uten å redigere seed-data.",
+      "body2": "Google-forhåndsvisning fyller kun ut skjemaet. Ingenting blir live før du inspiserer det og trykker Lagre åpningstider."
+    },
+    "findPlace": "Finn et sted",
+    "searchPlaceholder": "Søk etter stedsnavn eller id…",
+    "refreshPlaces": "Oppdater steder",
+    "loadingPlaces": "Laster steder…",
+    "verifiedHoursLabel": "verifiserte åpningstider",
+    "estimatedHoursLabel": "anslåtte åpningstider",
+    "lastChecked": "Sist sjekket: {{date}}",
+    "close": "Lukk",
+    "editHours": "Rediger åpningstider",
+    "toggles": {
+      "verified": "Verifisert",
+      "alwaysOpen": "Alltid åpent",
+      "temporarilyClosed": "Midlertidig stengt"
+    },
+    "sourceUrlPlaceholder": "Offisiell kilde-URL for åpningstider…",
+    "notePlaceholder": "Valgfri åpningstidsnotat…",
+    "dayInputPlaceholder": "10:00-17:00, 18:00-20:00",
+    "formatHint": "Bruk `TT:MM-TT:MM` og skill flere intervaller med komma. La stå tomt for stengt.",
+    "loadingGoogle": "Laster Google…",
+    "fetchGooglePreview": "Hent Google-forhåndsvisning",
+    "saveHours": "Lagre åpningstider",
+    "googlePreviewTitle": "Google-forhåndsvisning",
+    "googlePreviewBody": "Hent en kandidat fra Google Places, inspiser treffet, og lagre kun hvis det ser riktig ut.",
+    "temporarilyClosedStatus": "midlertidig stengt",
+    "activeStatus": "aktiv",
+    "noWeekdayDescriptions": "Google returnerte ikke strukturerte ukedagsbeskrivelser for dette treffet.",
+    "useThisPreview": "Bruk denne forhåndsvisningen",
+    "noGoogleCandidates": "Ingen Google-kandidater ble funnet for dette stedet ennå.",
+    "ptsSuffix": "{{points}} poeng",
+    "info": {
+      "loadedPreviews": "Lastet {{count}} Google-forhåndsvisningskandidater for {{name}}.",
+      "noPreviewsFound": "Ingen Google-forhåndsvisningskandidater funnet for {{name}}.",
+      "filledFromPreview": "Fylte ut {{name}} med Google-forhåndsvisningsdata. Se gjennom, og lagre deretter.",
+      "savedHours": "Lagret verifiserte åpningstider for {{name}}."
+    }
+  },
+  "adminImages": {
+    "errorFallback": "Noe gikk galt under lasting av bildekandidater.",
+    "filters": {
+      "pending": "Venter",
+      "approved": "Godkjent",
+      "applied": "Brukt",
+      "rejected": "Avvist",
+      "all": "Alle"
+    },
+    "hero": {
+      "title": "Gjennomgang av bilder",
+      "body": "Gjennomgå ventende Wikimedia-kandidater, og godkjenn og bruk ekte bilder på steder."
+    },
+    "coverage": {
+      "title": "Dekning",
+      "places": "steder",
+      "verifiedMainPhotos": "verifiserte hovedbilder",
+      "stillMissing": "mangler fortsatt",
+      "strongPending": "Sterke ventende kandidater i dette filteret: {{count}}"
+    },
+    "actions": {
+      "title": "Handlinger",
+      "refresh": "Oppdater",
+      "discovering": "Utforsker…",
+      "discoverMissing": "Finn manglende",
+      "approveApply": "Godkjenn + bruk",
+      "reject": "Avvis"
+    },
+    "discoverOne": {
+      "title": "Finn bilder for ett sted",
+      "discoverThisPlace": "Finn for dette stedet"
+    },
+    "searchPlacePlaceholder": "Søk etter stedsnavn eller id…",
+    "selectedPlace": "Valgt: {{name}}",
+    "searchCandidates": {
+      "title": "Søk i kandidater",
+      "placeholder": "Filtrer etter stedsnavn, id eller bildetittel…",
+      "showing": "Viser {{shown}} av {{total}} kandidater i dette filteret."
+    },
+    "loadingCandidates": "Laster kandidater…",
+    "noCandidates": "Ingen kandidater i dette filteret ennå.",
+    "candidate": {
+      "statusLine": "{{status}} · sikkerhet {{confidence}} · rangering {{rank}}",
+      "currentImage": "Nåværende bilde: {{status}}{{sourceName}}",
+      "verified": "verifisert",
+      "placeholder": "plassholder",
+      "license": "Lisens: {{license}}",
+      "openSourcePage": "Åpne kildeside"
+    },
+    "reassign": {
+      "title": "Match til et annet sted",
+      "matchToPlace": "Match til sted"
+    },
+    "info": {
+      "discoveredAcross": "Fant {{candidates}} kandidater på tvers av {{places}} steder.",
+      "discoveredFor": "Fant {{count}} kandidater for {{name}}.",
+      "approvedApplied": "Kandidat godkjent og brukt.",
+      "rejected": "Kandidat avvist.",
+      "movedTo": "Kandidat flyttet til {{name}}."
+    }
+  },
+  "hooks": {
+    "loadError": "Noe gikk galt under lasting av data.",
+    "missingPlaceId": "Mangler sted-id."
+  }
+}

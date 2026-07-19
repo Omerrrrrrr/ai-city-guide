@@ -1,6 +1,7 @@
 import React from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
+import { useTranslation } from 'react-i18next';
 
 import { fetchPlace, fetchPlaces } from '@/src/api/places';
 import type { Place } from '@/src/data/places';
@@ -15,12 +16,12 @@ type QueryState<T> = {
   refresh: () => void;
 };
 
-function getErrorMessage(error: unknown) {
+function getErrorMessage(t: (key: string) => string, error: unknown) {
   if (error instanceof Error) {
     return error.message;
   }
 
-  return 'Something went wrong while loading data.';
+  return t('hooks.loadError');
 }
 
 function placeCacheKey(cityName: string | null) {
@@ -45,6 +46,7 @@ async function writePlaceCache(key: string, data: Place[]): Promise<void> {
 }
 
 export function usePlaces(): QueryState<Place[]> {
+  const { t } = useTranslation();
   const [data, setData] = React.useState<Place[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -78,7 +80,7 @@ export function usePlaces(): QueryState<Place[]> {
       } catch (nextError) {
         if (!cancelled) {
           if (!cached) {
-            setError(getErrorMessage(nextError));
+            setError(getErrorMessage(t, nextError));
           }
           // If we have cached data, stay on it silently (already displayed)
         }
@@ -94,7 +96,7 @@ export function usePlaces(): QueryState<Place[]> {
     return () => {
       cancelled = true;
     };
-  }, [reloadKey, cityName]);
+  }, [reloadKey, cityName, t]);
 
   return {
     data,
@@ -106,6 +108,7 @@ export function usePlaces(): QueryState<Place[]> {
 }
 
 export function usePlace(id?: string): QueryState<Place> {
+  const { t } = useTranslation();
   const [data, setData] = React.useState<Place | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(Boolean(id));
@@ -117,7 +120,7 @@ export function usePlace(id?: string): QueryState<Place> {
 
     if (!id) {
       setData(null);
-      setError('Missing place id.');
+      setError(t('hooks.missingPlaceId'));
       setIsLoading(false);
       return () => {
         cancelled = true;
@@ -136,7 +139,7 @@ export function usePlace(id?: string): QueryState<Place> {
         }
       } catch (nextError) {
         if (!cancelled) {
-          setError(getErrorMessage(nextError));
+          setError(getErrorMessage(t, nextError));
         }
       } finally {
         if (!cancelled) {
@@ -150,7 +153,7 @@ export function usePlace(id?: string): QueryState<Place> {
     return () => {
       cancelled = true;
     };
-  }, [id, reloadKey]);
+  }, [id, reloadKey, t]);
 
   return {
     data,

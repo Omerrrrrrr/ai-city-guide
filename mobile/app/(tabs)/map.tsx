@@ -12,10 +12,12 @@ import {
 import MapView, { Marker, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PlaceImage } from '@/components/place-image';
 import { ThemedText } from '@/components/themed-text';
+import { CATEGORY_FILTERS } from '@/src/constants/category-filters';
 import type { Place, PlaceCategory } from '@/src/data/places';
 import { usePlaces } from '@/src/hooks/use-places';
 import { getPlaceOpenStatus } from '@/src/utils/place-hours';
@@ -32,20 +34,15 @@ const KRISTIANSAND: Region = {
   longitudeDelta: 0.05,
 };
 
-const CATEGORY_FILTERS: { id: PlaceCategory | 'all'; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'museum', label: '🏛️ Museums' },
-  { id: 'landmark', label: '🗿 Landmarks' },
-  { id: 'cafe', label: '☕ Cafes' },
-  { id: 'restaurant', label: '🍽️ Food' },
-  { id: 'beach', label: '🏖️ Beaches' },
-  { id: 'viewpoint', label: '🌅 Views' },
-  { id: 'nature', label: '🌿 Nature' },
+const MAP_CATEGORY_IDS: (PlaceCategory | 'all')[] = [
+  'all', 'museum', 'landmark', 'cafe', 'restaurant', 'beach', 'viewpoint', 'nature',
 ];
+const MAP_CATEGORY_FILTERS = CATEGORY_FILTERS.filter((c) => MAP_CATEGORY_IDS.includes(c.id));
 
 export default function MapScreen() {
   const colorScheme = useColorScheme();
   const dark = colorScheme === 'dark';
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const mapRef = React.useRef<MapView>(null);
@@ -114,7 +111,7 @@ export default function MapScreen() {
     return (
       <View style={[styles.fullCenter, { backgroundColor: dark ? '#0A0F1E' : '#F4F5F9' }]}>
         <ActivityIndicator size="large" color={NAVY} />
-        <ThemedText style={styles.loadingText}>Loading map...</ThemedText>
+        <ThemedText style={styles.loadingText}>{t('map.loading')}</ThemedText>
       </View>
     );
   }
@@ -127,7 +124,7 @@ export default function MapScreen() {
     );
   }
 
-  const selectedStatus = selectedPlace ? getPlaceOpenStatus(selectedPlace) : null;
+  const selectedStatus = selectedPlace ? getPlaceOpenStatus(selectedPlace, t) : null;
   const selectedOpen = selectedStatus?.state === 'open' || selectedStatus?.state === 'all-day';
 
   return (
@@ -168,7 +165,9 @@ export default function MapScreen() {
       <SafeAreaView style={styles.topOverlay} pointerEvents="box-none">
         <View style={[styles.countPill, { marginTop: 10 }]}>
           <Text style={styles.countPillText}>
-            {filteredPlaces.length} {activeCategory === 'all' ? 'places' : activeCategory}
+            {activeCategory === 'all'
+              ? t('map.placesCount', { count: filteredPlaces.length })
+              : `${filteredPlaces.length} ${t(MAP_CATEGORY_FILTERS.find((c) => c.id === activeCategory)?.labelKey ?? 'categoryFilters.all')}`}
           </Text>
         </View>
         <ScrollView
@@ -176,7 +175,7 @@ export default function MapScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.categoryRow}
           pointerEvents="auto">
-          {CATEGORY_FILTERS.map((c) => {
+          {MAP_CATEGORY_FILTERS.map((c) => {
             const active = activeCategory === c.id;
             return (
               <Pressable
@@ -184,7 +183,7 @@ export default function MapScreen() {
                 onPress={() => { setActiveCategory(c.id); setSelectedPlace(null); }}
                 style={[styles.categoryChip, active && styles.categoryChipActive]}>
                 <Text style={[styles.categoryChipText, active && styles.categoryChipTextActive]}>
-                  {c.label}
+                  {c.emoji ? `${c.emoji} ` : ''}{t(c.labelKey)}
                 </Text>
               </Pressable>
             );
@@ -209,7 +208,7 @@ export default function MapScreen() {
             <View style={styles.bottomCardBody}>
               <ThemedText numberOfLines={1} style={styles.bottomCardName}>{selectedPlace.name}</ThemedText>
               <ThemedText numberOfLines={1} style={styles.bottomCardMeta}>
-                {CATEGORY_EMOJI[selectedPlace.category] ?? '📍'} {formatCategory(selectedPlace.category)}
+                {CATEGORY_EMOJI[selectedPlace.category] ?? '📍'} {formatCategory(selectedPlace.category, t)}
                 {selectedPlace.tags[0] ? ` · ${selectedPlace.tags[0]}` : ''}
               </ThemedText>
               {selectedStatus && (

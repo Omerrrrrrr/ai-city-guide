@@ -11,6 +11,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import * as Haptics from 'expo-haptics';
@@ -54,6 +55,7 @@ export default function PlaceDetailScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const dark = colorScheme === 'dark';
+  const { t } = useTranslation();
 
   const { data: place, error, isLoading, refresh } = usePlace(id);
   const { data: nearbyPlaces } = useNearbyPlaces(id);
@@ -103,18 +105,18 @@ export default function PlaceDetailScreen() {
             <ThemedText style={styles.backBtnText}>←</ThemedText>
           </Pressable>
         </View>
-        <ThemedText style={styles.errorTitle}>Couldn't load place</ThemedText>
+        <ThemedText style={styles.errorTitle}>{t('placeDetail.errorTitle')}</ThemedText>
         {error ? <ThemedText style={styles.errorBody}>{error}</ThemedText> : null}
         <Pressable style={styles.retryBtn} onPress={refresh}>
-          <ThemedText style={styles.retryBtnText} lightColor="#fff" darkColor="#fff">Try again</ThemedText>
+          <ThemedText style={styles.retryBtnText} lightColor="#fff" darkColor="#fff">{t('common.tryAgain')}</ThemedText>
         </Pressable>
       </View>
     );
   }
 
   const directionsUrl = getDirectionsUrl(place);
-  const openStatus = getPlaceOpenStatus(place);
-  const weeklyHours = getWeeklyHoursSchedule(place);
+  const openStatus = getPlaceOpenStatus(place, t);
+  const weeklyHours = getWeeklyHoursSchedule(place, t);
   const isOpen = openStatus.state === 'open' || openStatus.state === 'all-day';
   const mapNearbyPlaces = nearbyPlaces?.filter((n) => n.location).slice(0, 5) ?? [];
   const saved = isFavorite(place.id);
@@ -186,7 +188,7 @@ export default function PlaceDetailScreen() {
               {place.name}
             </ThemedText>
             <ThemedText style={styles.heroCategory} lightColor="rgba(255,255,255,0.75)" darkColor="rgba(255,255,255,0.75)">
-              {CATEGORY_EMOJI[place.category] ?? '📍'} {formatCategory(place.category)}
+              {CATEGORY_EMOJI[place.category] ?? '📍'} {formatCategory(place.category, t)}
               {place.verifiedFacts?.address ? ` · ${place.verifiedFacts.address}` : ''}
             </ThemedText>
           </View>
@@ -198,14 +200,14 @@ export default function PlaceDetailScreen() {
             style={({ pressed }) => [styles.actionBarBtn, pressed && { opacity: 0.7 }]}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); toggleFavorite(place.id); }}>
             <ThemedText style={styles.actionBarIcon}>{saved ? '♥' : '♡'}</ThemedText>
-            <ThemedText style={styles.actionBarLabel}>{saved ? 'Saved' : 'Save'}</ThemedText>
+            <ThemedText style={styles.actionBarLabel}>{saved ? t('placeDetail.actionBar.saved') : t('placeDetail.actionBar.save')}</ThemedText>
           </Pressable>
           <View style={styles.actionBarDivider} />
           <Pressable
             style={({ pressed }) => [styles.actionBarBtn, pressed && { opacity: 0.7 }]}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); togglePlan(place.id); }}>
             <ThemedText style={styles.actionBarIcon}>{inPlan ? '✓' : '📋'}</ThemedText>
-            <ThemedText style={styles.actionBarLabel}>{inPlan ? 'In plan' : 'Add to plan'}</ThemedText>
+            <ThemedText style={styles.actionBarLabel}>{inPlan ? t('placeDetail.actionBar.inPlan') : t('placeDetail.actionBar.addToPlan')}</ThemedText>
           </Pressable>
           <View style={styles.actionBarDivider} />
           <Pressable
@@ -213,20 +215,26 @@ export default function PlaceDetailScreen() {
             disabled={!directionsUrl}
             onPress={() => directionsUrl && Linking.openURL(directionsUrl).catch(() => {})}>
             <ThemedText style={styles.actionBarIcon}>↗</ThemedText>
-            <ThemedText style={styles.actionBarLabel}>Directions</ThemedText>
+            <ThemedText style={styles.actionBarLabel}>{t('placeDetail.actionBar.directions')}</ThemedText>
           </Pressable>
           <View style={styles.actionBarDivider} />
           <Pressable
             style={({ pressed }) => [styles.actionBarBtn, pressed && { opacity: 0.7 }]}
             onPress={() => {
-              const wikiNote = place.wiki?.pageUrl ? `\nLearn more: ${place.wiki.pageUrl}` : '';
+              const wikiNote = place.wiki?.pageUrl ? t('placeDetail.shareLearnMore', { url: place.wiki.pageUrl }) : '';
               Share.share({
                 title: place.name,
-                message: `${place.name}\n${formatCategory(place.category)} · ${place.city}\n\n${place.shortStory || place.description}${wikiNote}\n\n— Discovered with Piri`,
+                message: t('placeDetail.shareMessage', {
+                  name: place.name,
+                  category: formatCategory(place.category, t),
+                  city: place.city,
+                  story: place.shortStory || place.description,
+                  wikiNote,
+                }),
               });
             }}>
             <ThemedText style={styles.actionBarIcon}>⬆</ThemedText>
-            <ThemedText style={styles.actionBarLabel}>Share</ThemedText>
+            <ThemedText style={styles.actionBarLabel}>{t('common.share')}</ThemedText>
           </Pressable>
         </ThemedView>
 
@@ -241,7 +249,7 @@ export default function PlaceDetailScreen() {
                   <ThemedText style={styles.pirisLogoText} lightColor={GOLD} darkColor={GOLD}>◈</ThemedText>
                 </View>
                 <ThemedText style={styles.pirisTitle} lightColor="#fff" darkColor="#fff">
-                  Piri's Take
+                  {t('placeDetail.pirisTake')}
                 </ThemedText>
               </View>
 
@@ -289,7 +297,7 @@ export default function PlaceDetailScreen() {
 
           {/* About */}
           <ThemedView style={[styles.card, { backgroundColor: cardBg }]}>
-            <ThemedText style={styles.sectionLabel}>About</ThemedText>
+            <ThemedText style={styles.sectionLabel}>{t('placeDetail.about')}</ThemedText>
             <ThemedText style={styles.bodyText}>{place.description}</ThemedText>
             {place.shortStory && place.shortStory !== place.description && (
               <View style={styles.storyBlock}>
@@ -307,10 +315,10 @@ export default function PlaceDetailScreen() {
           {/* Tags */}
           {place.tags.length > 0 && (
             <View style={styles.tagsRow}>
-              {place.tags.map((t) => (
-                <Link key={t} href={{ pathname: '/explore', params: { tag: t } }} asChild>
+              {place.tags.map((tag) => (
+                <Link key={tag} href={{ pathname: '/explore', params: { tag } }} asChild>
                   <Pressable style={({ pressed }) => [styles.tagChip, pressed && { opacity: 0.7 }]}>
-                    <ThemedText style={styles.tagText}>{t}</ThemedText>
+                    <ThemedText style={styles.tagText}>{tag}</ThemedText>
                   </Pressable>
                 </Link>
               ))}
@@ -320,10 +328,10 @@ export default function PlaceDetailScreen() {
           {/* Hours */}
           <ThemedView style={[styles.card, { backgroundColor: cardBg }]}>
             <View style={styles.cardHeaderRow}>
-              <ThemedText style={styles.sectionLabel}>Hours</ThemedText>
+              <ThemedText style={styles.sectionLabel}>{t('placeDetail.hours')}</ThemedText>
               <View style={[styles.hoursBadge, weeklyHours.verified ? styles.hoursBadgeVerified : styles.hoursBadgeEst]}>
                 <ThemedText style={[styles.hoursBadgeText, weeklyHours.verified ? styles.hoursBadgeTextVerified : styles.hoursBadgeTextEst]}>
-                  {weeklyHours.verified ? 'Verified' : 'Estimated'}
+                  {weeklyHours.verified ? t('placeDetail.verified') : t('placeDetail.estimated')}
                 </ThemedText>
               </View>
             </View>
@@ -333,7 +341,7 @@ export default function PlaceDetailScreen() {
 
             {place.visitInfo?.temporarilyClosed && (
               <View style={styles.warningBlock}>
-                <ThemedText style={styles.warningText}>Temporarily closed</ThemedText>
+                <ThemedText style={styles.warningText}>{t('placeDetail.temporarilyClosed')}</ThemedText>
               </View>
             )}
 
@@ -352,24 +360,24 @@ export default function PlaceDetailScreen() {
 
             {place.visitInfo?.durationMinutes ? (
               <ThemedText style={styles.visitHint}>
-                Typical visit · {place.visitInfo.durationMinutes} min
+                {t('placeDetail.typicalVisit', { minutes: place.visitInfo.durationMinutes })}
               </ThemedText>
             ) : null}
             {place.visitInfo?.bestTime ? (
-              <ThemedText style={styles.visitHint}>Best time · {place.visitInfo.bestTime}</ThemedText>
+              <ThemedText style={styles.visitHint}>{t('placeDetail.bestTime', { time: place.visitInfo.bestTime })}</ThemedText>
             ) : null}
           </ThemedView>
 
           {/* Local vibe */}
           {(place.localVibe?.mood || place.localVibe?.bestFor) ? (
             <ThemedView style={[styles.card, { backgroundColor: cardBg }]}>
-              <ThemedText style={styles.sectionLabel}>Vibe</ThemedText>
+              <ThemedText style={styles.sectionLabel}>{t('placeDetail.vibe')}</ThemedText>
               {place.localVibe.mood ? (
                 <ThemedText style={styles.bodyText}>{place.localVibe.mood}</ThemedText>
               ) : null}
               {place.localVibe.bestFor ? (
                 <View style={styles.bestForRow}>
-                  <ThemedText style={styles.bestForLabel}>Best for</ThemedText>
+                  <ThemedText style={styles.bestForLabel}>{t('placeDetail.bestFor')}</ThemedText>
                   <ThemedText style={styles.bestForValue}>{place.localVibe.bestFor}</ThemedText>
                 </View>
               ) : null}
@@ -379,7 +387,7 @@ export default function PlaceDetailScreen() {
           {/* Photo gallery (if multiple verified photos) */}
           {verifiedGallery.length > 1 && (
             <View>
-              <ThemedText style={styles.sectionLabel}>Photos</ThemedText>
+              <ThemedText style={styles.sectionLabel}>{t('placeDetail.photos')}</ThemedText>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -398,7 +406,7 @@ export default function PlaceDetailScreen() {
 
           {/* Map + Nearby */}
           <ThemedView style={[styles.card, { backgroundColor: cardBg }]}>
-            <ThemedText style={styles.sectionLabel}>Location</ThemedText>
+            <ThemedText style={styles.sectionLabel}>{t('placeDetail.location')}</ThemedText>
             {place.verifiedFacts?.address ? (
               <ThemedText style={styles.addressText}>{place.verifiedFacts.address}</ThemedText>
             ) : null}
@@ -415,7 +423,7 @@ export default function PlaceDetailScreen() {
                 style={({ pressed }) => [styles.directionsBtn, pressed && { opacity: 0.85 }]}
                 onPress={() => Linking.openURL(directionsUrl!).catch(() => {})}>
                 <ThemedText style={styles.directionsBtnText} lightColor="#fff" darkColor="#fff">
-                  Open in Maps
+                  {t('common.openInMaps')}
                 </ThemedText>
               </Pressable>
             ) : null}
@@ -424,13 +432,13 @@ export default function PlaceDetailScreen() {
           {/* Nearby places */}
           {nearbyPlaces && nearbyPlaces.length > 0 && (
             <View>
-              <ThemedText style={styles.sectionLabel}>Nearby</ThemedText>
+              <ThemedText style={styles.sectionLabel}>{t('placeDetail.nearby')}</ThemedText>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.nearbyRow}>
                 {nearbyPlaces.map((nearby) => {
-                  const ns = getPlaceOpenStatus(nearby);
+                  const ns = getPlaceOpenStatus(nearby, t);
                   const nOpen = ns.state === 'open' || ns.state === 'all-day';
                   return (
                     <Link key={nearby.id} href={{ pathname: '/place/[id]', params: { id: nearby.id } }} asChild>
@@ -439,13 +447,13 @@ export default function PlaceDetailScreen() {
                         <View style={styles.nearbyBody}>
                           <ThemedText numberOfLines={2} style={styles.nearbyName}>{nearby.name}</ThemedText>
                           <ThemedText style={styles.nearbyCategory}>
-                            {CATEGORY_EMOJI[nearby.category] ?? '📍'} {formatCategory(nearby.category)}
+                            {CATEGORY_EMOJI[nearby.category] ?? '📍'} {formatCategory(nearby.category, t)}
                           </ThemedText>
                           <ThemedText style={[styles.nearbyStatus, nOpen ? styles.nearbyStatusOpen : styles.nearbyStatusClosed]}>
                             {ns.shortLabel}
                           </ThemedText>
                           <ThemedText style={styles.nearbyDist}>
-                            {getWalkMinutes(nearby.distanceKm)} min walk
+                            {t('placeDetail.walkMin', { minutes: getWalkMinutes(nearby.distanceKm) })}
                           </ThemedText>
                         </View>
                       </Pressable>

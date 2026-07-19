@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -37,17 +38,15 @@ export class ErrorBoundary extends React.Component<Props, State> {
 }
 
 function ErrorFallback({ onRetry }: { onRetry: () => void }) {
+  const { t } = useTranslation();
   return (
     <ThemedView style={styles.container}>
-      <ThemedText type="subtitle">Something went wrong</ThemedText>
-      <ThemedText style={styles.text}>
-        The app hit an unexpected error. You can try again, or restart the app if it keeps
-        happening.
-      </ThemedText>
+      <ThemedText type="subtitle">{t('components.errorBoundary.title')}</ThemedText>
+      <ThemedText style={styles.text}>{t('components.errorBoundary.body')}</ThemedText>
       <Pressable
         onPress={onRetry}
         style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}>
-        <ThemedText style={styles.buttonText}>Try again</ThemedText>
+        <ThemedText style={styles.buttonText}>{t('common.tryAgain')}</ThemedText>
       </Pressable>
     </ThemedView>
   );

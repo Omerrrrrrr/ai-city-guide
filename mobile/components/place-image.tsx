@@ -1,5 +1,6 @@
 import { Image, type ImageContentFit } from 'expo-image';
 import { StyleSheet, type ImageStyle, type StyleProp, type ViewStyle } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -18,6 +19,7 @@ export function PlaceImage({
   contentFit = 'cover',
   compact = false,
 }: PlaceImageProps) {
+  const { t } = useTranslation();
   const canDisplayImage = place.image.verified && Boolean(place.imageUrl);
 
   if (canDisplayImage) {
@@ -29,11 +31,9 @@ export function PlaceImage({
       lightColor="#F3EFE6"
       darkColor="#1E1E1E"
       style={[styles.placeholder, compact && styles.compactPlaceholder, style as StyleProp<ViewStyle>]}>
-      <ThemedText style={[styles.label, compact && styles.labelCompact]}>Photo unavailable</ThemedText>
+      <ThemedText style={[styles.label, compact && styles.labelCompact]}>{t('components.placeImage.unavailable')}</ThemedText>
       {!compact ? (
-        <ThemedText style={styles.meta}>
-          We only show real place photos after the source is verified.
-        </ThemedText>
+        <ThemedText style={styles.meta}>{t('components.placeImage.meta')}</ThemedText>
       ) : null}
     </ThemedView>
   );

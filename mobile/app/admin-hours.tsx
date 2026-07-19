@@ -1,6 +1,8 @@
 import { Stack } from 'expo-router';
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import type { TFunction } from 'i18next';
+import { useTranslation } from 'react-i18next';
 
 import { AdminGate } from '@/components/admin-gate';
 import { ThemedText } from '@/components/themed-text';
@@ -19,14 +21,14 @@ import type {
 } from '@/src/data/places';
 import { getPlaceOpenStatus } from '@/src/utils/place-hours';
 
-const DAY_FIELDS: { key: OpeningHoursDayKey; label: string }[] = [
-  { key: '1', label: 'Mon' },
-  { key: '2', label: 'Tue' },
-  { key: '3', label: 'Wed' },
-  { key: '4', label: 'Thu' },
-  { key: '5', label: 'Fri' },
-  { key: '6', label: 'Sat' },
-  { key: '0', label: 'Sun' },
+const DAY_FIELDS: { key: OpeningHoursDayKey; labelKey: string }[] = [
+  { key: '1', labelKey: 'placeHours.weekdayShort.mon' },
+  { key: '2', labelKey: 'placeHours.weekdayShort.tue' },
+  { key: '3', labelKey: 'placeHours.weekdayShort.wed' },
+  { key: '4', labelKey: 'placeHours.weekdayShort.thu' },
+  { key: '5', labelKey: 'placeHours.weekdayShort.fri' },
+  { key: '6', labelKey: 'placeHours.weekdayShort.sat' },
+  { key: '0', labelKey: 'placeHours.weekdayShort.sun' },
 ];
 
 type HoursFormState = {
@@ -38,9 +40,9 @@ type HoursFormState = {
   dayInputs: Record<OpeningHoursDayKey, string>;
 };
 
-function getErrorMessage(error: unknown) {
+function getErrorMessage(t: TFunction, error: unknown) {
   if (error instanceof Error) return error.message;
-  return 'Something went wrong while saving hours.';
+  return t('adminHours.errorSavingFallback') as string;
 }
 
 function serializeRanges(ranges: OpeningHoursRange[] | undefined) {
@@ -126,7 +128,7 @@ function toMinutes(time: string) {
   return hour * 60 + minute;
 }
 
-function parseDayInput(label: string, value: string): OpeningHoursRange[] {
+function parseDayInput(t: TFunction, label: string, value: string): OpeningHoursRange[] {
   const trimmed = value.trim();
   if (!trimmed || trimmed.toLowerCase() === 'closed') return [];
 
@@ -137,14 +139,14 @@ function parseDayInput(label: string, value: string): OpeningHoursRange[] {
     .map((entry) => {
       const match = entry.match(/^([01]\d|2[0-3]):([0-5]\d)\s*-\s*([01]\d|2[0-3]):([0-5]\d)$/);
       if (!match) {
-        throw new Error(`${label}: use HH:MM-HH:MM format.`);
+        throw new Error(t('adminHours.validation.formatError', { label }) as string);
       }
 
       const start = `${match[1]}:${match[2]}`;
       const end = `${match[3]}:${match[4]}`;
 
       if (toMinutes(end) <= toMinutes(start)) {
-        throw new Error(`${label}: end must be later than start.`);
+        throw new Error(t('adminHours.validation.endAfterStart', { label }) as string);
       }
 
       return { start, end };
@@ -153,7 +155,7 @@ function parseDayInput(label: string, value: string): OpeningHoursRange[] {
 
   for (let index = 0; index < ranges.length - 1; index += 1) {
     if (toMinutes(ranges[index].end) > toMinutes(ranges[index + 1].start)) {
-      throw new Error(`${label}: ranges cannot overlap.`);
+      throw new Error(t('adminHours.validation.noOverlap', { label }) as string);
     }
   }
 
@@ -165,8 +167,8 @@ function formatCheckedAt(value?: string) {
   return new Date(value).toLocaleDateString('en-GB');
 }
 
-function formatBusinessStatus(status?: string) {
-  if (!status) return 'No business status';
+function formatBusinessStatus(t: TFunction, status?: string) {
+  if (!status) return t('adminHours.noBusinessStatus') as string;
 
   return status
     .toLowerCase()
@@ -184,6 +186,7 @@ export default function AdminHoursScreen() {
 }
 
 function AdminHoursScreenContent() {
+  const { t } = useTranslation();
   const [places, setPlaces] = React.useState<Place[]>([]);
   const [search, setSearch] = React.useState('');
   const [expandedPlaceId, setExpandedPlaceId] = React.useState<string | null>(null);
@@ -203,11 +206,11 @@ function AdminHoursScreenContent() {
       const next = await fetchPlaces();
       setPlaces(next);
     } catch (nextError) {
-      setError(getErrorMessage(nextError));
+      setError(getErrorMessage(t, nextError));
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   React.useEffect(() => {
     void loadPlaces();
@@ -255,12 +258,12 @@ function AdminHoursScreenContent() {
       }));
 
       if (response.previews.length > 0) {
-        setInfo(`Loaded ${response.previews.length} Google preview candidates for ${place.name}.`);
+        setInfo(t('adminHours.info.loadedPreviews', { count: response.previews.length, name: place.name }));
       } else {
-        setInfo(`No Google preview candidates found for ${place.name}.`);
+        setInfo(t('adminHours.info.noPreviewsFound', { name: place.name }));
       }
     } catch (nextError) {
-      setError(getErrorMessage(nextError));
+      setError(getErrorMessage(t, nextError));
     } finally {
       setPreviewLoadingPlaceId(null);
     }
@@ -272,7 +275,7 @@ function AdminHoursScreenContent() {
       [place.id]: createFormStateWithPreview(state[place.id] ?? createFormState(place), preview),
     }));
     setError(null);
-    setInfo(`Filled ${place.name} with Google preview data. Review it, then save.`);
+    setInfo(t('adminHours.info.filledFromPreview', { name: place.name }));
   }
 
   async function handleSave(place: Place) {
@@ -286,7 +289,7 @@ function AdminHoursScreenContent() {
     try {
       const days = DAY_FIELDS.reduce<Record<OpeningHoursDayKey, OpeningHoursRange[]>>(
         (accumulator, field) => {
-          accumulator[field.key] = form.alwaysOpen ? [] : parseDayInput(field.label, form.dayInputs[field.key]);
+          accumulator[field.key] = form.alwaysOpen ? [] : parseDayInput(t, t(field.labelKey), form.dayInputs[field.key]);
           return accumulator;
         },
         createEmptyDayRanges()
@@ -309,9 +312,9 @@ function AdminHoursScreenContent() {
         ...state,
         [place.id]: createFormState(response.place),
       }));
-      setInfo(`Saved verified hours for ${response.place.name}.`);
+      setInfo(t('adminHours.info.savedHours', { name: response.place.name }));
     } catch (nextError) {
-      setError(getErrorMessage(nextError));
+      setError(getErrorMessage(t, nextError));
     } finally {
       setActivePlaceId(null);
     }
@@ -319,26 +322,20 @@ function AdminHoursScreenContent() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Hours Review' }} />
+      <Stack.Screen options={{ title: t('adminHours.hero.title') }} />
       <ScrollView contentContainerStyle={styles.container}>
         <ThemedView style={styles.hero}>
-          <ThemedText type="title">Hours Review</ThemedText>
-          <ThemedText style={styles.body}>
-            Save verified opening hours, source links, and temporary closures without editing seed
-            data.
-          </ThemedText>
-          <ThemedText style={styles.body}>
-            Google preview only prefills the form. Nothing becomes live until you inspect it and
-            press Save Hours.
-          </ThemedText>
+          <ThemedText type="title">{t('adminHours.hero.title')}</ThemedText>
+          <ThemedText style={styles.body}>{t('adminHours.hero.body1')}</ThemedText>
+          <ThemedText style={styles.body}>{t('adminHours.hero.body2')}</ThemedText>
         </ThemedView>
 
         <ThemedView style={styles.card}>
-          <ThemedText type="subtitle">Find a Place</ThemedText>
+          <ThemedText type="subtitle">{t('adminHours.findPlace')}</ThemedText>
           <TextInput
             value={search}
             onChangeText={setSearch}
-            placeholder="Search by place name or id…"
+            placeholder={t('adminHours.searchPlaceholder')}
             placeholderTextColor="rgba(127,127,127,0.7)"
             autoCapitalize="none"
             autoCorrect={false}
@@ -347,16 +344,16 @@ function AdminHoursScreenContent() {
           <Pressable
             onPress={() => void loadPlaces()}
             style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}>
-            <ThemedText style={styles.buttonText}>Refresh Places</ThemedText>
+            <ThemedText style={styles.buttonText}>{t('adminHours.refreshPlaces')}</ThemedText>
           </Pressable>
           {info ? <ThemedText style={styles.successText}>{info}</ThemedText> : null}
           {error ? <ThemedText style={styles.errorText}>{error}</ThemedText> : null}
         </ThemedView>
 
-        {isLoading ? <ThemedText style={styles.body}>Loading places…</ThemedText> : null}
+        {isLoading ? <ThemedText style={styles.body}>{t('adminHours.loadingPlaces')}</ThemedText> : null}
 
         {filteredPlaces.map((place) => {
-          const status = getPlaceOpenStatus(place);
+          const status = getPlaceOpenStatus(place, t);
           const isExpanded = expandedPlaceId === place.id;
           const form = forms[place.id] ?? createFormState(place);
           const previews = googlePreviews[place.id];
@@ -369,11 +366,11 @@ function AdminHoursScreenContent() {
                   <ThemedText type="subtitle">{place.name}</ThemedText>
                   <ThemedText style={styles.meta}>{place.id}</ThemedText>
                   <ThemedText style={styles.meta}>
-                    {status.shortLabel} · {status.verified ? 'verified hours' : 'estimated hours'}
+                    {status.shortLabel} · {status.verified ? t('adminHours.verifiedHoursLabel') : t('adminHours.estimatedHoursLabel')}
                   </ThemedText>
                   {place.visitInfo?.hoursLastCheckedAt ? (
                     <ThemedText style={styles.meta}>
-                      Last checked: {formatCheckedAt(place.visitInfo.hoursLastCheckedAt)}
+                      {t('adminHours.lastChecked', { date: formatCheckedAt(place.visitInfo.hoursLastCheckedAt) })}
                     </ThemedText>
                   ) : null}
                 </View>
@@ -383,7 +380,7 @@ function AdminHoursScreenContent() {
                     setExpandedPlaceId(isExpanded ? null : place.id);
                   }}
                   style={({ pressed }) => [styles.buttonSmall, pressed && styles.buttonPressed]}>
-                  <ThemedText style={styles.buttonText}>{isExpanded ? 'Close' : 'Edit Hours'}</ThemedText>
+                  <ThemedText style={styles.buttonText}>{isExpanded ? t('adminHours.close') : t('adminHours.editHours')}</ThemedText>
                 </Pressable>
               </View>
 
@@ -399,7 +396,7 @@ function AdminHoursScreenContent() {
                         form.hoursVerified && styles.toggleChipSelected,
                         pressed && styles.buttonPressed,
                       ]}>
-                      <ThemedText style={styles.filterText}>Verified</ThemedText>
+                      <ThemedText style={styles.filterText}>{t('adminHours.toggles.verified')}</ThemedText>
                     </Pressable>
                     <Pressable
                       onPress={() =>
@@ -410,7 +407,7 @@ function AdminHoursScreenContent() {
                         form.alwaysOpen && styles.toggleChipSelected,
                         pressed && styles.buttonPressed,
                       ]}>
-                      <ThemedText style={styles.filterText}>Always Open</ThemedText>
+                      <ThemedText style={styles.filterText}>{t('adminHours.toggles.alwaysOpen')}</ThemedText>
                     </Pressable>
                     <Pressable
                       onPress={() =>
@@ -424,7 +421,7 @@ function AdminHoursScreenContent() {
                         form.temporarilyClosed && styles.toggleChipDanger,
                         pressed && styles.buttonPressed,
                       ]}>
-                      <ThemedText style={styles.filterText}>Temporarily Closed</ThemedText>
+                      <ThemedText style={styles.filterText}>{t('adminHours.toggles.temporarilyClosed')}</ThemedText>
                     </Pressable>
                   </View>
 
@@ -433,7 +430,7 @@ function AdminHoursScreenContent() {
                     onChangeText={(value) =>
                       updateForm(place.id, (state) => ({ ...state, hoursSourceUrl: value }))
                     }
-                    placeholder="Official hours source URL…"
+                    placeholder={t('adminHours.sourceUrlPlaceholder')}
                     placeholderTextColor="rgba(127,127,127,0.7)"
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -445,7 +442,7 @@ function AdminHoursScreenContent() {
                     onChangeText={(value) =>
                       updateForm(place.id, (state) => ({ ...state, hoursNote: value }))
                     }
-                    placeholder="Optional hours note…"
+                    placeholder={t('adminHours.notePlaceholder')}
                     placeholderTextColor="rgba(127,127,127,0.7)"
                     multiline
                     style={[styles.input, styles.noteInput]}
@@ -455,7 +452,7 @@ function AdminHoursScreenContent() {
                     <View style={styles.dayList}>
                       {DAY_FIELDS.map((field) => (
                         <View key={field.key} style={styles.dayRow}>
-                          <ThemedText style={styles.dayLabel}>{field.label}</ThemedText>
+                          <ThemedText style={styles.dayLabel}>{t(field.labelKey)}</ThemedText>
                           <TextInput
                             value={form.dayInputs[field.key]}
                             onChangeText={(value) =>
@@ -464,7 +461,7 @@ function AdminHoursScreenContent() {
                                 dayInputs: { ...state.dayInputs, [field.key]: value },
                               }))
                             }
-                            placeholder="10:00-17:00, 18:00-20:00"
+                            placeholder={t('adminHours.dayInputPlaceholder')}
                             placeholderTextColor="rgba(127,127,127,0.7)"
                             autoCapitalize="none"
                             autoCorrect={false}
@@ -475,10 +472,7 @@ function AdminHoursScreenContent() {
                     </View>
                   ) : null}
 
-                  <ThemedText style={styles.meta}>
-                    Use `HH:MM-HH:MM` and separate multiple windows with commas. Leave blank for
-                    closed.
-                  </ThemedText>
+                  <ThemedText style={styles.meta}>{t('adminHours.formatHint')}</ThemedText>
 
                   <View style={styles.actionsRow}>
                     <Pressable
@@ -490,7 +484,7 @@ function AdminHoursScreenContent() {
                         pressed && previewLoadingPlaceId !== place.id && styles.buttonPressed,
                       ]}>
                       <ThemedText style={styles.buttonText}>
-                        {previewLoadingPlaceId === place.id ? 'Loading Google…' : 'Fetch Google Preview'}
+                        {previewLoadingPlaceId === place.id ? t('adminHours.loadingGoogle') : t('adminHours.fetchGooglePreview')}
                       </ThemedText>
                     </Pressable>
 
@@ -503,18 +497,15 @@ function AdminHoursScreenContent() {
                         pressed && activePlaceId !== place.id && styles.buttonPressed,
                       ]}>
                       <ThemedText style={styles.buttonText}>
-                        {activePlaceId === place.id ? 'Saving…' : 'Save Hours'}
+                        {activePlaceId === place.id ? t('common.saving') : t('adminHours.saveHours')}
                       </ThemedText>
                     </Pressable>
                   </View>
 
                   {hasLoadedGooglePreview ? (
                     <View style={styles.previewSection}>
-                      <ThemedText type="subtitle">Google Preview</ThemedText>
-                      <ThemedText style={styles.meta}>
-                        Pull a candidate from Google Places, inspect the match, then save only if it
-                        looks right.
-                      </ThemedText>
+                      <ThemedText type="subtitle">{t('adminHours.googlePreviewTitle')}</ThemedText>
+                      <ThemedText style={styles.meta}>{t('adminHours.googlePreviewBody')}</ThemedText>
 
                       {previews?.length ? (
                         previews.map((preview) => (
@@ -527,13 +518,13 @@ function AdminHoursScreenContent() {
                                 ) : null}
                               </View>
                               <ThemedText style={styles.previewScore}>
-                                {Math.round(preview.confidence)} pts
+                                {t('adminHours.ptsSuffix', { points: Math.round(preview.confidence) })}
                               </ThemedText>
                             </View>
 
                             <ThemedText style={styles.meta}>
-                              {formatBusinessStatus(preview.businessStatus)} ·{' '}
-                              {preview.temporarilyClosed ? 'temporarily closed' : 'active'}
+                              {formatBusinessStatus(t, preview.businessStatus)} ·{' '}
+                              {preview.temporarilyClosed ? t('adminHours.temporarilyClosedStatus') : t('adminHours.activeStatus')}
                             </ThemedText>
                             <ThemedText style={styles.meta}>{preview.matchReason}</ThemedText>
 
@@ -546,9 +537,7 @@ function AdminHoursScreenContent() {
                                 ))}
                               </View>
                             ) : (
-                              <ThemedText style={styles.meta}>
-                                Google did not return structured weekday descriptions for this match.
-                              </ThemedText>
+                              <ThemedText style={styles.meta}>{t('adminHours.noWeekdayDescriptions')}</ThemedText>
                             )}
 
                             <Pressable
@@ -558,14 +547,12 @@ function AdminHoursScreenContent() {
                                 styles.previewUseButton,
                                 pressed && styles.buttonPressed,
                               ]}>
-                              <ThemedText style={styles.buttonText}>Use This Preview</ThemedText>
+                              <ThemedText style={styles.buttonText}>{t('adminHours.useThisPreview')}</ThemedText>
                             </Pressable>
                           </View>
                         ))
                       ) : (
-                        <ThemedText style={styles.meta}>
-                          No Google candidates were found for this place yet.
-                        </ThemedText>
+                        <ThemedText style={styles.meta}>{t('adminHours.noGoogleCandidates')}</ThemedText>
                       )}
                     </View>
                   ) : null}

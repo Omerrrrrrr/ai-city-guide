@@ -1,3 +1,6 @@
+import type { TFunction } from 'i18next';
+
+import i18n from '@/src/i18n';
 import type { Place, PlaceCategory } from '@/src/data/places';
 import { getPlaceOpenStatus } from '@/src/utils/place-hours';
 
@@ -84,6 +87,29 @@ export const CURATED_TAGS = [
   'coffee break',
   'meal',
 ] as const;
+
+const TAG_LABEL_KEYS: Record<string, string> = {
+  'rainy day': 'tags.rainyDay',
+  'short stop': 'tags.shortStop',
+  family: 'tags.family',
+  budget: 'tags.budget',
+  'local favorite': 'tags.localFavorite',
+  waterfront: 'tags.waterfront',
+  photogenic: 'tags.photogenic',
+  'date night': 'tags.dateNight',
+  'coffee break': 'tags.coffeeBreak',
+  meal: 'tags.meal',
+};
+
+function defaultT(key: string, options?: Record<string, unknown>) {
+  return i18n.t(key, options as any) as string;
+}
+
+export function formatTag(tag: string, t: TFunction = defaultT as TFunction): string {
+  const key = TAG_LABEL_KEYS[tag];
+  if (key) return t(key) as string;
+  return tag.split(' ').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
+}
 
 function compareTags(left: string, right: string) {
   const leftIndex = CURATED_TAGS.indexOf(left as (typeof CURATED_TAGS)[number]);

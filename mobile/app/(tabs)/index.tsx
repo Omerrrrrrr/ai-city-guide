@@ -9,6 +9,8 @@ import {
   useColorScheme,
 } from 'react-native';
 import { Link, useRouter } from 'expo-router';
+import type { TFunction } from 'i18next';
+import { useTranslation } from 'react-i18next';
 
 import { PlaceImage } from '@/components/place-image';
 import { FeaturedCardSkeleton, PlaceRowSkeleton } from '@/components/skeleton';
@@ -30,31 +32,35 @@ import { CATEGORY_EMOJI, categoryEmoji, formatCategory } from '@/src/utils/categ
 const NAVY = '#0F1C3F';
 const GOLD = '#D4A843';
 
-const INTENTS = [
-  { label: 'Open Now', params: { openNow: 'true' } },
-  { label: 'Rainy Day', params: { tag: 'rainy day' } },
-  { label: 'Photo Spots', params: { tag: 'photogenic' } },
-  { label: 'Family', params: { tag: 'family' } },
-  { label: 'Local Picks', params: { tag: 'local favorite' } },
-  { label: 'Quick Stop', params: { tag: 'short stop' } },
-];
-
-function greeting(name: string) {
-  const h = new Date().getHours();
-  const time = h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening';
-  return `Good ${time}${name ? `, ${name}` : ''}`;
+function useIntents() {
+  const { t } = useTranslation();
+  return [
+    { key: 'openNow', label: t('home.intents.openNow'), params: { openNow: 'true' } },
+    { key: 'rainyDay', label: t('home.intents.rainyDay'), params: { tag: 'rainy day' } },
+    { key: 'photoSpots', label: t('home.intents.photoSpots'), params: { tag: 'photogenic' } },
+    { key: 'family', label: t('home.intents.family'), params: { tag: 'family' } },
+    { key: 'localPicks', label: t('home.intents.localPicks'), params: { tag: 'local favorite' } },
+    { key: 'quickStop', label: t('home.intents.quickStop'), params: { tag: 'short stop' } },
+  ];
 }
 
-function weatherBannerMessage(w: Weather): string {
+function greeting(t: TFunction, name: string) {
+  const h = new Date().getHours();
+  const key = h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening';
+  const base = t(`home.greeting.${key}`);
+  return name ? t('home.greeting.withName', { greeting: base, name }) : base;
+}
+
+function weatherBannerMessage(t: TFunction, w: Weather): string {
   const { condition, temp } = w;
   if (condition === 'rainy' || condition === 'stormy') {
-    return `It's raining — perfect day for cozy cafes and indoor spots.`;
+    return t('home.weatherBanner.rainy');
   }
-  if (condition === 'snowy') return `Snow outside — let's find you somewhere warm.`;
-  if (condition === 'sunny' && temp > 22) return `Beautiful day — explore terraces and outdoor spots.`;
-  if (condition === 'sunny' && temp > 16) return `Great weather for a walk — see what's open nearby.`;
-  if (condition === 'foggy') return `Mysterious day — great for hidden gems and quiet corners.`;
-  return `${w.description} in ${w.city} — here's what's on today.`;
+  if (condition === 'snowy') return t('home.weatherBanner.snowy');
+  if (condition === 'sunny' && temp > 22) return t('home.weatherBanner.sunnyHot');
+  if (condition === 'sunny' && temp > 16) return t('home.weatherBanner.sunnyMild');
+  if (condition === 'foggy') return t('home.weatherBanner.foggy');
+  return t('home.weatherBanner.fallback', { description: w.description, city: w.city });
 }
 
 function WeatherPill({ weather }: { weather: NonNullable<ReturnType<typeof useWeather>['weather']> }) {
@@ -74,7 +80,8 @@ function WeatherPill({ weather }: { weather: NonNullable<ReturnType<typeof useWe
 }
 
 function StatusBadge({ place }: { place: Place }) {
-  const status = getPlaceOpenStatus(place);
+  const { t } = useTranslation();
+  const status = getPlaceOpenStatus(place, t);
   const open = status.state === 'open' || status.state === 'all-day';
   return (
     <View style={[styles.badge, open ? styles.badgeOpen : styles.badgeClosed]}>
@@ -86,6 +93,7 @@ function StatusBadge({ place }: { place: Place }) {
 }
 
 function FeaturedCard({ place }: { place: Place }) {
+  const { t } = useTranslation();
   return (
     <Link href={{ pathname: '/place/[id]', params: { id: place.id } }} asChild>
       <Pressable style={({ pressed }) => [styles.featCard, pressed && styles.pressed]}>
@@ -95,7 +103,7 @@ function FeaturedCard({ place }: { place: Place }) {
             <StatusBadge place={place} />
             <ThemedText numberOfLines={2} style={styles.featName}>{place.name}</ThemedText>
             <ThemedText numberOfLines={1} style={styles.featMeta}>
-              {categoryEmoji(place.category)} {formatCategory(place.category)}
+              {categoryEmoji(place.category)} {formatCategory(place.category, t)}
             </ThemedText>
           </View>
         </ThemedView>
@@ -105,6 +113,7 @@ function FeaturedCard({ place }: { place: Place }) {
 }
 
 function PlaceRow({ place }: { place: Place }) {
+  const { t } = useTranslation();
   return (
     <Link href={{ pathname: '/place/[id]', params: { id: place.id } }} asChild>
       <Pressable style={({ pressed }) => [pressed && styles.pressed]}>
@@ -113,7 +122,7 @@ function PlaceRow({ place }: { place: Place }) {
           <View style={styles.rowBody}>
             <ThemedText numberOfLines={1} style={styles.rowName}>{place.name}</ThemedText>
             <ThemedText numberOfLines={1} style={styles.rowMeta}>
-              {categoryEmoji(place.category)} {formatCategory(place.category)}{place.tags[0] ? ` · ${place.tags[0]}` : ''}
+              {categoryEmoji(place.category)} {formatCategory(place.category, t)}{place.tags[0] ? ` · ${place.tags[0]}` : ''}
             </ThemedText>
           </View>
           <StatusBadge place={place} />
@@ -125,6 +134,7 @@ function PlaceRow({ place }: { place: Place }) {
 
 function Section({ title, places, seeAllParams }: { title: string; places: Place[]; seeAllParams?: Record<string, string> }) {
   const router = useRouter();
+  const { t } = useTranslation();
   if (!places.length) return null;
   return (
     <View style={styles.section}>
@@ -134,7 +144,7 @@ function Section({ title, places, seeAllParams }: { title: string; places: Place
           <Pressable
             onPress={() => router.push({ pathname: '/explore', params: seeAllParams })}
             style={({ pressed }) => pressed && { opacity: 0.6 }}>
-            <ThemedText style={styles.seeAll}>See all ›</ThemedText>
+            <ThemedText style={styles.seeAll}>{t('common.seeAll')}</ThemedText>
           </Pressable>
         )}
       </View>
@@ -145,16 +155,17 @@ function Section({ title, places, seeAllParams }: { title: string; places: Place
 
 function ProfileNudge() {
   const router = useRouter();
+  const { t } = useTranslation();
   return (
     <Pressable
       style={({ pressed }) => [styles.profileNudge, pressed && styles.pressed]}
       onPress={() => router.push('/(tabs)/settings')}>
       <View style={styles.profileNudgeLeft}>
         <ThemedText style={styles.profileNudgeTitle} lightColor="#fff" darkColor="#fff">
-          Personalize Piri
+          {t('home.profileNudge.title')}
         </ThemedText>
         <ThemedText style={styles.profileNudgeBody} lightColor="rgba(255,255,255,0.65)" darkColor="rgba(255,255,255,0.65)">
-          Tell us who you are — same place explained differently to an architect, a Muslim, a historian.
+          {t('home.profileNudge.body')}
         </ThemedText>
       </View>
       <ThemedText style={styles.profileNudgeArrow} lightColor={GOLD} darkColor={GOLD}>›</ThemedText>
@@ -163,20 +174,21 @@ function ProfileNudge() {
 }
 
 function DiscoveryBanner({ cityName }: { cityName: string }) {
+  const { t } = useTranslation();
   const [dots, setDots] = React.useState('');
   React.useEffect(() => {
-    const t = setInterval(() => setDots((d) => (d.length >= 3 ? '' : d + '.')), 600);
-    return () => clearInterval(t);
+    const interval = setInterval(() => setDots((d) => (d.length >= 3 ? '' : d + '.')), 600);
+    return () => clearInterval(interval);
   }, []);
   return (
     <View style={styles.discoveryBanner}>
       <ThemedText style={styles.discoveryEmoji}>◈</ThemedText>
       <View style={{ flex: 1 }}>
         <ThemedText style={styles.discoveryTitle} lightColor="#fff" darkColor="#fff">
-          Discovering {cityName}{dots}
+          {t('home.discovery.title', { cityName, dots })}
         </ThemedText>
         <ThemedText style={styles.discoveryBody} lightColor="rgba(255,255,255,0.6)" darkColor="rgba(255,255,255,0.6)">
-          Piri is mapping places using global data. This takes 1–2 minutes.
+          {t('home.discovery.body')}
         </ThemedText>
       </View>
     </View>
@@ -187,6 +199,8 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const dark = colorScheme === 'dark';
   const router = useRouter();
+  const { t } = useTranslation();
+  const intents = useIntents();
   const [refreshing, setRefreshing] = React.useState(false);
   const { data: places, isLoading, isStale, error: placesError, refresh: refreshPlaces } = usePlaces();
   const { name, profession, interests, faith } = useUserProfile();
@@ -238,13 +252,13 @@ export default function HomeScreen() {
             <View>
               <ThemedText style={styles.wordmark} lightColor={GOLD} darkColor={GOLD}>PIRI</ThemedText>
               <ThemedText style={styles.greetText} lightColor="rgba(255,255,255,0.75)" darkColor="rgba(255,255,255,0.75)">
-                {greeting(name)}
+                {greeting(t, name)}
               </ThemedText>
               <Pressable
                 onPress={() => router.push('/city-picker' as never)}
                 style={({ pressed }) => [styles.cityPill, pressed && { opacity: 0.7 }]}>
                 <ThemedText style={styles.cityPillText} lightColor="rgba(255,255,255,0.55)" darkColor="rgba(255,255,255,0.55)">
-                  {cityName ? `📍 ${cityName}` : '🌍 Everywhere'} ›
+                  {cityName ? t('home.cityPill', { cityName }) : t('common.everywhere')} ›
                 </ThemedText>
               </Pressable>
             </View>
@@ -254,7 +268,7 @@ export default function HomeScreen() {
             style={styles.headerSearch}
             onPress={() => router.push('/explore' as never)}>
             <ThemedText style={styles.headerSearchText} lightColor="rgba(255,255,255,0.5)" darkColor="rgba(255,255,255,0.5)">
-              Search places...
+              {t('common.searchPlaces')}
             </ThemedText>
           </Pressable>
         </View>
@@ -281,11 +295,11 @@ export default function HomeScreen() {
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.intentRow}>
-          {INTENTS.map((intent) => {
+          {intents.map((intent) => {
             const isRainyHighlight =
-              intent.label === 'Rainy Day' && weather && isIndoorWeather(weather.condition);
+              intent.key === 'rainyDay' && weather && isIndoorWeather(weather.condition);
             return (
-              <Link key={intent.label} href={{ pathname: '/explore', params: intent.params }} asChild>
+              <Link key={intent.key} href={{ pathname: '/explore', params: intent.params }} asChild>
                 <Pressable
                   style={({ pressed }) => [
                     styles.intentChip,
@@ -305,7 +319,7 @@ export default function HomeScreen() {
         {/* Stale cache indicator */}
         {isStale && !isLoading && (
           <View style={styles.staleBanner}>
-            <ThemedText style={styles.staleBannerText}>Showing cached data — refreshing…</ThemedText>
+            <ThemedText style={styles.staleBannerText}>{t('home.staleBanner')}</ThemedText>
           </View>
         )}
 
@@ -313,13 +327,13 @@ export default function HomeScreen() {
         {placesError && !isLoading && (
           <View style={styles.errorBanner}>
             <ThemedText style={styles.errorBannerText} lightColor="rgba(255,255,255,0.8)" darkColor="rgba(255,255,255,0.8)">
-              Couldn't reach the server. Check your connection.
+              {t('home.error')}
             </ThemedText>
             <Pressable
               onPress={refreshPlaces}
               style={({ pressed }) => [styles.errorBannerBtn, pressed && { opacity: 0.7 }]}>
               <ThemedText style={styles.errorBannerBtnText} lightColor={GOLD} darkColor={GOLD}>
-                Retry
+                {t('common.retry')}
               </ThemedText>
             </Pressable>
           </View>
@@ -341,10 +355,10 @@ export default function HomeScreen() {
               </ThemedText>
               <View style={{ flex: 1 }}>
                 <ThemedText style={styles.weatherBannerMsg} lightColor="#fff" darkColor="#fff">
-                  {weatherBannerMessage(weather)}
+                  {weatherBannerMessage(t, weather)}
                 </ThemedText>
                 <ThemedText style={styles.weatherBannerCta} lightColor={GOLD} darkColor={GOLD}>
-                  Ask Piri for suggestions →
+                  {t('home.weatherBanner.cta')}
                 </ThemedText>
               </View>
             </View>
@@ -360,15 +374,13 @@ export default function HomeScreen() {
         {!isLoading && cityName && discoveryStatus !== 'discovering' && (places ?? []).length === 0 && (
           <View style={styles.cityEmptyBox}>
             <ThemedText style={styles.cityEmptyEmoji}>🏙️</ThemedText>
-            <ThemedText style={styles.cityEmptyTitle}>No places yet in {cityName}</ThemedText>
-            <ThemedText style={styles.cityEmptyBody}>
-              Discovery may still be processing. Pull to refresh, or try exploring a different city.
-            </ThemedText>
+            <ThemedText style={styles.cityEmptyTitle}>{t('home.cityEmpty.title', { cityName })}</ThemedText>
+            <ThemedText style={styles.cityEmptyBody}>{t('home.cityEmpty.body')}</ThemedText>
             <Pressable
               onPress={() => router.push('/city-picker' as never)}
               style={({ pressed }) => [styles.cityEmptyBtn, pressed && { opacity: 0.8 }]}>
               <ThemedText style={styles.cityEmptyBtnText} lightColor={NAVY} darkColor={NAVY}>
-                Pick a different city
+                {t('home.cityEmpty.button')}
               </ThemedText>
             </Pressable>
           </View>
@@ -377,7 +389,7 @@ export default function HomeScreen() {
         {/* Featured horizontal scroll */}
         {isLoading ? (
           <View style={styles.section}>
-            <ThemedText style={styles.sectionTitle}>Featured</ThemedText>
+            <ThemedText style={styles.sectionTitle}>{t('home.sections.featured')}</ThemedText>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.featRow}>
               {[1, 2, 3].map((n) => <FeaturedCardSkeleton key={n} />)}
             </ScrollView>
@@ -385,11 +397,11 @@ export default function HomeScreen() {
         ) : featured.length > 0 ? (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <ThemedText style={styles.sectionTitle}>Featured</ThemedText>
+              <ThemedText style={styles.sectionTitle}>{t('home.sections.featured')}</ThemedText>
               <Pressable
                 onPress={() => router.push('/explore' as never)}
                 style={({ pressed }) => pressed && { opacity: 0.6 }}>
-                <ThemedText style={styles.seeAll}>See all ›</ThemedText>
+                <ThemedText style={styles.seeAll}>{t('common.seeAll')}</ThemedText>
               </Pressable>
             </View>
             <ScrollView
@@ -402,11 +414,11 @@ export default function HomeScreen() {
         ) : ranked.length > 0 ? (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <ThemedText style={styles.sectionTitle}>Explore {cityName}</ThemedText>
+              <ThemedText style={styles.sectionTitle}>{t('home.sections.exploreCity', { cityName })}</ThemedText>
               <Pressable
                 onPress={() => router.push('/explore' as never)}
                 style={({ pressed }) => pressed && { opacity: 0.6 }}>
-                <ThemedText style={styles.seeAll}>See all ›</ThemedText>
+                <ThemedText style={styles.seeAll}>{t('common.seeAll')}</ThemedText>
               </Pressable>
             </View>
             <ScrollView
@@ -422,11 +434,11 @@ export default function HomeScreen() {
         {recentlyViewed.length > 0 && !isLoading && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <ThemedText style={styles.sectionTitle}>Recently Viewed</ThemedText>
+              <ThemedText style={styles.sectionTitle}>{t('home.sections.recentlyViewed')}</ThemedText>
               <Pressable
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); clearHistory(); }}
                 style={({ pressed }) => pressed && { opacity: 0.6 }}>
-                <ThemedText style={styles.seeAll}>Clear</ThemedText>
+                <ThemedText style={styles.seeAll}>{t('common.clear')}</ThemedText>
               </Pressable>
             </View>
             <ScrollView
@@ -448,7 +460,7 @@ export default function HomeScreen() {
         {/* Near You */}
         {nearbyUser.length > 0 && (
           <View style={styles.section}>
-            <ThemedText style={styles.sectionTitle}>Near You</ThemedText>
+            <ThemedText style={styles.sectionTitle}>{t('home.sections.nearYou')}</ThemedText>
             {nearbyUser.map((p) => (
               <Link key={p.id} href={{ pathname: '/place/[id]', params: { id: p.id } }} asChild>
                 <Pressable style={({ pressed }) => [pressed && styles.pressed]}>
@@ -459,8 +471,8 @@ export default function HomeScreen() {
                       <ThemedText numberOfLines={1} style={styles.rowMeta}>
                         {categoryEmoji(p.category)}{' '}
                         {p.distanceKm < 1
-                          ? `${Math.round(p.distanceKm * 1000)} m away`
-                          : `${p.distanceKm.toFixed(1)} km away`}
+                          ? t('home.distance.meters', { value: Math.round(p.distanceKm * 1000) })
+                          : t('home.distance.km', { value: p.distanceKm.toFixed(1) })}
                       </ThemedText>
                     </View>
                     <StatusBadge place={p} />
@@ -473,18 +485,18 @@ export default function HomeScreen() {
 
         {isLoading ? (
           <View style={styles.section}>
-            <ThemedText style={styles.sectionTitle}>Open Right Now</ThemedText>
+            <ThemedText style={styles.sectionTitle}>{t('home.sections.openRightNow')}</ThemedText>
             {[1, 2, 3].map((n) => <PlaceRowSkeleton key={n} />)}
           </View>
         ) : (
-          <Section title="Open Right Now" places={openNow} seeAllParams={{ openNow: 'true' }} />
+          <Section title={t('home.sections.openRightNow')} places={openNow} seeAllParams={{ openNow: 'true' }} />
         )}
         <Section
-          title={hasProfile ? 'For You' : 'Local Favorites'}
+          title={hasProfile ? t('home.sections.forYou') : t('home.sections.localFavorites')}
           places={localFavs}
           seeAllParams={{ tag: 'local favorite' }}
         />
-        <Section title="Rainy Day" places={rainy} seeAllParams={{ tag: 'rainy day' }} />
+        <Section title={t('home.sections.rainyDay')} places={rainy} seeAllParams={{ tag: 'rainy day' }} />
 
         {/* Ask AI banner */}
         <Pressable
@@ -492,10 +504,10 @@ export default function HomeScreen() {
           onPress={() => router.push('/ai')}>
           <View>
             <ThemedText style={styles.aiBannerTitle} lightColor="#fff" darkColor="#fff">
-              Ask Piri anything
+              {t('home.aiBanner.title')}
             </ThemedText>
             <ThemedText style={styles.aiBannerSub} lightColor="rgba(255,255,255,0.7)" darkColor="rgba(255,255,255,0.7)">
-              Tell me what you feel like — I'll find the perfect spot.
+              {t('home.aiBanner.sub')}
             </ThemedText>
           </View>
           <ThemedText style={styles.aiBannerArrow} lightColor={GOLD} darkColor={GOLD}>›</ThemedText>

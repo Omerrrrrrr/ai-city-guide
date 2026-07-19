@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, StyleSheet } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
@@ -20,6 +21,7 @@ function ScanTabIcon({ color, focused }: { color: string; focused: boolean }) {
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const { t } = useTranslation();
 
   return (
     <Tabs
@@ -35,36 +37,36 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: t('tabs.home'),
           tabBarIcon: ({ color }) => <IconSymbol size={26} name="house.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="scan"
         options={{
-          title: 'Scan',
+          title: t('tabs.scan'),
           tabBarIcon: ({ color, focused }) => <ScanTabIcon color={color} focused={focused} />,
-          tabBarLabel: 'Scan',
+          tabBarLabel: t('tabs.scan'),
         }}
       />
       <Tabs.Screen
         name="map"
         options={{
-          title: 'Map',
+          title: t('tabs.map'),
           tabBarIcon: ({ color }) => <IconSymbol size={26} name="map.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="ai"
         options={{
-          title: 'Ask Piri',
+          title: t('tabs.ai'),
           tabBarIcon: ({ color }) => <IconSymbol size={26} name="sparkles" color={color} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Profile',
+          title: t('tabs.profile'),
           tabBarIcon: ({ color }) => <IconSymbol size={26} name="person.fill" color={color} />,
         }}
       />

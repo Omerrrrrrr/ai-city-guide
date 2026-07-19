@@ -10,6 +10,8 @@ import {
   useColorScheme,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import type { TFunction } from 'i18next';
+import { useTranslation } from 'react-i18next';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -19,18 +21,19 @@ import { useCityStore } from '@/src/store/city';
 const NAVY = '#0F1C3F';
 const GOLD = '#D4A843';
 
-function statusLabel(status?: string): { text: string; color: string } {
+function statusLabel(t: TFunction, status?: string): { text: string; color: string } {
   switch (status) {
-    case 'ready': return { text: 'Ready', color: '#067647' };
-    case 'discovering': return { text: 'Discovering...', color: GOLD };
-    case 'pending': return { text: 'Queued', color: '#6B7280' };
-    case 'failed': return { text: 'Failed', color: '#B42318' };
-    default: return { text: 'Discover', color: NAVY };
+    case 'ready': return { text: t('cityPicker.status.ready'), color: '#067647' };
+    case 'discovering': return { text: t('cityPicker.status.discovering'), color: GOLD };
+    case 'pending': return { text: t('cityPicker.status.queued'), color: '#6B7280' };
+    case 'failed': return { text: t('cityPicker.status.failed'), color: '#B42318' };
+    default: return { text: t('cityPicker.status.discover'), color: NAVY };
   }
 }
 
 export default function CityPickerScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const dark = useColorScheme() === 'dark';
   const { cityName: currentCity, setCity, clearCity } = useCityStore();
 
@@ -52,7 +55,7 @@ export default function CityPickerScreen() {
         const cities = await searchCities(text);
         setResults(cities);
       } catch {
-        setError('Search failed. Check your connection.');
+        setError(t('cityPicker.searchFailed'));
       } finally {
         setLoading(false);
       }
@@ -76,7 +79,7 @@ export default function CityPickerScreen() {
       setCity(result.id, city.name);
       router.back();
     } catch (e: any) {
-      setError(e.message || 'Discovery failed');
+      setError(e.message || t('cityPicker.discoveryFailed'));
     } finally {
       setDiscovering(null);
     }
@@ -93,17 +96,17 @@ export default function CityPickerScreen() {
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} style={({ pressed }) => pressed && { opacity: 0.7 }}>
             <ThemedText style={styles.cancelBtn} lightColor="rgba(255,255,255,0.7)" darkColor="rgba(255,255,255,0.7)">
-              Cancel
+              {t('common.cancel')}
             </ThemedText>
           </Pressable>
-          <ThemedText style={styles.headerTitle} lightColor="#fff" darkColor="#fff">Choose a city</ThemedText>
+          <ThemedText style={styles.headerTitle} lightColor="#fff" darkColor="#fff">{t('cityPicker.title')}</ThemedText>
           <View style={{ width: 56 }} />
         </View>
         <View style={styles.searchRow}>
           <TextInput
             value={query}
             onChangeText={handleSearch}
-            placeholder="Search any city in the world..."
+            placeholder={t('cityPicker.searchPlaceholder')}
             placeholderTextColor="rgba(255,255,255,0.4)"
             autoFocus
             autoCapitalize="words"
@@ -118,12 +121,12 @@ export default function CityPickerScreen() {
         {/* Current city row */}
         {currentCity && (
           <ThemedView style={styles.section}>
-            <ThemedText style={styles.sectionLabel}>Currently exploring</ThemedText>
+            <ThemedText style={styles.sectionLabel}>{t('cityPicker.currentlyExploring')}</ThemedText>
             <View style={styles.currentRow}>
               <View style={styles.currentDot} />
               <ThemedText style={styles.currentCity}>{currentCity}</ThemedText>
               <Pressable onPress={handleClearCity} style={({ pressed }) => [styles.clearBtn, pressed && { opacity: 0.7 }]}>
-                <ThemedText style={styles.clearBtnText}>Show all</ThemedText>
+                <ThemedText style={styles.clearBtnText}>{t('common.showAll')}</ThemedText>
               </Pressable>
             </View>
           </ThemedView>
@@ -144,10 +147,10 @@ export default function CityPickerScreen() {
 
         {!loading && results.length > 0 && (
           <ThemedView style={styles.section}>
-            <ThemedText style={styles.sectionLabel}>Results</ThemedText>
+            <ThemedText style={styles.sectionLabel}>{t('cityPicker.results')}</ThemedText>
             {results.map((city, idx) => {
               const isDiscovering = discovering === city.name;
-              const badge = statusLabel(city.status);
+              const badge = statusLabel(t, city.status);
               const isReady = city.isKnown && city.status === 'ready';
               return (
                 <Pressable
@@ -161,7 +164,7 @@ export default function CityPickerScreen() {
                       <ThemedText style={styles.countryName}>{city.country}</ThemedText>
                     ) : null}
                     {city.isKnown && city.placeCount ? (
-                      <ThemedText style={styles.placeCount}>{city.placeCount} places</ThemedText>
+                      <ThemedText style={styles.placeCount}>{t('cityPicker.placeCount', { count: city.placeCount })}</ThemedText>
                     ) : null}
                   </View>
                   {isDiscovering ? (
@@ -169,7 +172,7 @@ export default function CityPickerScreen() {
                   ) : (
                     <View style={[styles.badge, isReady ? styles.badgeReady : styles.badgeDiscover]}>
                       <ThemedText style={[styles.badgeText, { color: isReady ? badge.color : '#fff' }]}>
-                        {isReady ? badge.text : 'Discover'}
+                        {isReady ? badge.text : t('cityPicker.status.discover')}
                       </ThemedText>
                     </View>
                   )}
@@ -181,19 +184,15 @@ export default function CityPickerScreen() {
 
         {!loading && !error && query.trim() && results.length === 0 && (
           <View style={styles.centered}>
-            <ThemedText style={styles.noResults}>No results for "{query}"</ThemedText>
-            <ThemedText style={styles.noResultsSub}>
-              Try a different spelling or a nearby city name.
-            </ThemedText>
+            <ThemedText style={styles.noResults}>{t('cityPicker.noResults', { query })}</ThemedText>
+            <ThemedText style={styles.noResultsSub}>{t('cityPicker.noResultsSub')}</ThemedText>
           </View>
         )}
 
         {!query.trim() && (
           <View style={styles.hint}>
-            <ThemedText style={styles.hintTitle}>Explore anywhere</ThemedText>
-            <ThemedText style={styles.hintBody}>
-              Search a city and Piri will discover places there using global map data. First discovery takes 1-2 minutes.
-            </ThemedText>
+            <ThemedText style={styles.hintTitle}>{t('cityPicker.hintTitle')}</ThemedText>
+            <ThemedText style={styles.hintBody}>{t('cityPicker.hintBody')}</ThemedText>
           </View>
         )}
       </ScrollView>

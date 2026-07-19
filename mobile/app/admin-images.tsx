@@ -2,6 +2,8 @@ import { Image } from 'expo-image';
 import { Stack } from 'expo-router';
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import type { TFunction } from 'i18next';
+import { useTranslation } from 'react-i18next';
 
 import { AdminGate } from '@/components/admin-gate';
 import { ExternalLink } from '@/components/external-link';
@@ -19,17 +21,17 @@ import { fetchPlaces } from '@/src/api/places';
 import type { ImageCandidate, ImageCandidateStatus } from '@/src/data/image-candidates';
 import type { Place } from '@/src/data/places';
 
-const FILTERS: { label: string; value: ImageCandidateStatus | 'all' }[] = [
-  { label: 'Pending', value: 'pending' },
-  { label: 'Approved', value: 'approved' },
-  { label: 'Applied', value: 'applied' },
-  { label: 'Rejected', value: 'rejected' },
-  { label: 'All', value: 'all' },
+const FILTERS: { labelKey: string; value: ImageCandidateStatus | 'all' }[] = [
+  { labelKey: 'adminImages.filters.pending', value: 'pending' },
+  { labelKey: 'adminImages.filters.approved', value: 'approved' },
+  { labelKey: 'adminImages.filters.applied', value: 'applied' },
+  { labelKey: 'adminImages.filters.rejected', value: 'rejected' },
+  { labelKey: 'adminImages.filters.all', value: 'all' },
 ];
 
-function getErrorMessage(error: unknown) {
+function getErrorMessage(t: TFunction, error: unknown) {
   if (error instanceof Error) return error.message;
-  return 'Something went wrong while loading image candidates.';
+  return t('adminImages.errorFallback') as string;
 }
 
 export default function AdminImagesScreen() {
@@ -41,6 +43,7 @@ export default function AdminImagesScreen() {
 }
 
 function AdminImagesScreenContent() {
+  const { t } = useTranslation();
   const [statusFilter, setStatusFilter] = React.useState<ImageCandidateStatus | 'all'>('pending');
   const [candidates, setCandidates] = React.useState<ImageCandidate[]>([]);
   const [error, setError] = React.useState<string | null>(null);
@@ -67,11 +70,11 @@ function AdminImagesScreenContent() {
       });
       setCandidates(next);
     } catch (nextError) {
-      setError(getErrorMessage(nextError));
+      setError(getErrorMessage(t, nextError));
     } finally {
       setIsLoading(false);
     }
-  }, [statusFilter]);
+  }, [statusFilter, t]);
 
   React.useEffect(() => {
     void loadCandidates();
@@ -143,12 +146,10 @@ function AdminImagesScreenContent() {
 
     try {
       const result = await discoverImageCandidates({ limit: 4 });
-      setInfo(
-        `Discovered ${result.discoveredCandidates} candidates across ${result.discoveredPlaces} places.`
-      );
+      setInfo(t('adminImages.info.discoveredAcross', { candidates: result.discoveredCandidates, places: result.discoveredPlaces }));
       await loadCandidates();
     } catch (nextError) {
-      setError(getErrorMessage(nextError));
+      setError(getErrorMessage(t, nextError));
     } finally {
       setIsDiscovering(false);
     }
@@ -167,10 +168,10 @@ function AdminImagesScreenContent() {
         limit: 6,
         includeVerified: true,
       });
-      setInfo(`Discovered ${result.discoveredCandidates} candidates for ${selectedDiscoverPlace.name}.`);
+      setInfo(t('adminImages.info.discoveredFor', { count: result.discoveredCandidates, name: selectedDiscoverPlace.name }));
       await loadCandidates();
     } catch (nextError) {
-      setError(getErrorMessage(nextError));
+      setError(getErrorMessage(t, nextError));
     } finally {
       setIsDiscovering(false);
     }
@@ -184,10 +185,10 @@ function AdminImagesScreenContent() {
     try {
       await approveImageCandidate(candidateId);
       await applyImageCandidate(candidateId);
-      setInfo('Candidate approved and applied.');
+      setInfo(t('adminImages.info.approvedApplied'));
       await loadCandidates();
     } catch (nextError) {
-      setError(getErrorMessage(nextError));
+      setError(getErrorMessage(t, nextError));
     } finally {
       setActiveCandidateId(null);
     }
@@ -200,10 +201,10 @@ function AdminImagesScreenContent() {
 
     try {
       await rejectImageCandidate(candidateId);
-      setInfo('Candidate rejected.');
+      setInfo(t('adminImages.info.rejected'));
       await loadCandidates();
     } catch (nextError) {
-      setError(getErrorMessage(nextError));
+      setError(getErrorMessage(t, nextError));
     } finally {
       setActiveCandidateId(null);
     }
@@ -219,12 +220,12 @@ function AdminImagesScreenContent() {
 
     try {
       await reassignImageCandidate(candidateId, selectedPlace.id);
-      setInfo(`Candidate moved to ${selectedPlace.name}.`);
+      setInfo(t('adminImages.info.movedTo', { name: selectedPlace.name }));
       setReassignQueries((state) => ({ ...state, [candidateId]: '' }));
       setSelectedPlacesByCandidate((state) => ({ ...state, [candidateId]: undefined }));
       await loadCandidates();
     } catch (nextError) {
-      setError(getErrorMessage(nextError));
+      setError(getErrorMessage(t, nextError));
     } finally {
       setActiveCandidateId(null);
     }
@@ -232,43 +233,41 @@ function AdminImagesScreenContent() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Image Review' }} />
+      <Stack.Screen options={{ title: t('adminImages.hero.title') }} />
       <ScrollView contentContainerStyle={styles.container}>
         <ThemedView style={styles.hero}>
-          <ThemedText type="title">Image Review</ThemedText>
-          <ThemedText style={styles.body}>
-            Review pending Wikimedia candidates, then approve and apply real photos to places.
-          </ThemedText>
+          <ThemedText type="title">{t('adminImages.hero.title')}</ThemedText>
+          <ThemedText style={styles.body}>{t('adminImages.hero.body')}</ThemedText>
         </ThemedView>
 
         <ThemedView style={styles.card}>
-          <ThemedText type="subtitle">Coverage</ThemedText>
+          <ThemedText type="subtitle">{t('adminImages.coverage.title')}</ThemedText>
           <View style={styles.metricsRow}>
             <View style={styles.metricCard}>
               <ThemedText style={styles.metricValue}>{coverage.totalPlaces}</ThemedText>
-              <ThemedText style={styles.meta}>places</ThemedText>
+              <ThemedText style={styles.meta}>{t('adminImages.coverage.places')}</ThemedText>
             </View>
             <View style={styles.metricCard}>
               <ThemedText style={styles.metricValue}>{coverage.verifiedPlaces}</ThemedText>
-              <ThemedText style={styles.meta}>verified main photos</ThemedText>
+              <ThemedText style={styles.meta}>{t('adminImages.coverage.verifiedMainPhotos')}</ThemedText>
             </View>
             <View style={styles.metricCard}>
               <ThemedText style={styles.metricValue}>{coverage.missingPlaces}</ThemedText>
-              <ThemedText style={styles.meta}>still missing</ThemedText>
+              <ThemedText style={styles.meta}>{t('adminImages.coverage.stillMissing')}</ThemedText>
             </View>
           </View>
           <ThemedText style={styles.meta}>
-            Strong pending candidates in this filter: {coverage.pendingStrong}
+            {t('adminImages.coverage.strongPending', { count: coverage.pendingStrong })}
           </ThemedText>
         </ThemedView>
 
         <ThemedView style={styles.card}>
-          <ThemedText type="subtitle">Actions</ThemedText>
+          <ThemedText type="subtitle">{t('adminImages.actions.title')}</ThemedText>
           <View style={styles.actionsRow}>
             <Pressable
               onPress={() => void loadCandidates()}
               style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}>
-              <ThemedText style={styles.buttonText}>Refresh</ThemedText>
+              <ThemedText style={styles.buttonText}>{t('adminImages.actions.refresh')}</ThemedText>
             </Pressable>
             <Pressable
               onPress={() => void handleDiscoverMissing()}
@@ -279,27 +278,27 @@ function AdminImagesScreenContent() {
                 pressed && !isDiscovering && styles.buttonPressed,
               ]}>
               <ThemedText style={styles.buttonText}>
-                {isDiscovering ? 'Discovering…' : 'Discover Missing'}
+                {isDiscovering ? t('adminImages.actions.discovering') : t('adminImages.actions.discoverMissing')}
               </ThemedText>
             </Pressable>
           </View>
 
           <View style={styles.discoverBlock}>
-            <ThemedText type="defaultSemiBold">Discover for One Place</ThemedText>
+            <ThemedText type="defaultSemiBold">{t('adminImages.discoverOne.title')}</ThemedText>
             <TextInput
               value={discoverQuery}
               onChangeText={(value) => {
                 setDiscoverQuery(value);
                 setSelectedDiscoverPlace(null);
               }}
-              placeholder="Search place name or id…"
+              placeholder={t('adminImages.searchPlacePlaceholder')}
               placeholderTextColor="rgba(127,127,127,0.7)"
               autoCapitalize="none"
               autoCorrect={false}
               style={styles.input}
             />
             {selectedDiscoverPlace ? (
-              <ThemedText style={styles.meta}>Selected: {selectedDiscoverPlace.name}</ThemedText>
+              <ThemedText style={styles.meta}>{t('adminImages.selectedPlace', { name: selectedDiscoverPlace.name })}</ThemedText>
             ) : null}
             {discoverSuggestions.length ? (
               <View style={styles.suggestions}>
@@ -326,7 +325,7 @@ function AdminImagesScreenContent() {
                 pressed && !isDiscovering && selectedDiscoverPlace && styles.buttonPressed,
               ]}>
               <ThemedText style={styles.buttonText}>
-                {isDiscovering ? 'Discovering…' : 'Discover This Place'}
+                {isDiscovering ? t('adminImages.actions.discovering') : t('adminImages.discoverOne.discoverThisPlace')}
               </ThemedText>
             </Pressable>
           </View>
@@ -347,32 +346,32 @@ function AdminImagesScreenContent() {
                   selected && styles.filterChipSelected,
                   pressed && styles.buttonPressed,
                 ]}>
-                <ThemedText style={styles.filterText}>{filter.label}</ThemedText>
+                <ThemedText style={styles.filterText}>{t(filter.labelKey)}</ThemedText>
               </Pressable>
             );
           })}
         </ThemedView>
 
         <ThemedView style={styles.card}>
-          <ThemedText type="subtitle">Search Candidates</ThemedText>
+          <ThemedText type="subtitle">{t('adminImages.searchCandidates.title')}</ThemedText>
           <TextInput
             value={candidateQuery}
             onChangeText={setCandidateQuery}
-            placeholder="Filter by place name, id, or photo title…"
+            placeholder={t('adminImages.searchCandidates.placeholder')}
             placeholderTextColor="rgba(127,127,127,0.7)"
             autoCapitalize="none"
             autoCorrect={false}
             style={styles.input}
           />
           <ThemedText style={styles.meta}>
-            Showing {visibleCandidates.length} of {candidates.length} candidates in this filter.
+            {t('adminImages.searchCandidates.showing', { shown: visibleCandidates.length, total: candidates.length })}
           </ThemedText>
         </ThemedView>
 
-        {isLoading ? <ThemedText style={styles.body}>Loading candidates…</ThemedText> : null}
+        {isLoading ? <ThemedText style={styles.body}>{t('adminImages.loadingCandidates')}</ThemedText> : null}
         {!isLoading && visibleCandidates.length === 0 ? (
           <ThemedView style={styles.card}>
-            <ThemedText style={styles.body}>No candidates in this filter yet.</ThemedText>
+            <ThemedText style={styles.body}>{t('adminImages.noCandidates')}</ThemedText>
           </ThemedView>
         ) : null}
 
@@ -397,7 +396,7 @@ function AdminImagesScreenContent() {
                 <View style={styles.headerText}>
                   <ThemedText type="subtitle">{candidate.placeName}</ThemedText>
                   <ThemedText style={styles.meta}>
-                    {candidate.status} · confidence {candidate.confidence} · rank {candidate.rank}
+                    {t('adminImages.candidate.statusLine', { status: candidate.status, confidence: candidate.confidence, rank: candidate.rank })}
                   </ThemedText>
                 </View>
               </View>
@@ -407,31 +406,31 @@ function AdminImagesScreenContent() {
               <ThemedText style={styles.body}>{candidate.pageTitle}</ThemedText>
               {candidate.notes ? <ThemedText style={styles.meta}>{candidate.notes}</ThemedText> : null}
               <ThemedText style={styles.meta}>
-                Current image: {candidate.currentPlaceImage.verified ? 'verified' : 'placeholder'}
-                {candidate.currentPlaceImage.sourceName
-                  ? ` · ${candidate.currentPlaceImage.sourceName}`
-                  : ''}
+                {t('adminImages.candidate.currentImage', {
+                  status: candidate.currentPlaceImage.verified ? t('adminImages.candidate.verified') : t('adminImages.candidate.placeholder'),
+                  sourceName: candidate.currentPlaceImage.sourceName ? ` · ${candidate.currentPlaceImage.sourceName}` : '',
+                })}
               </ThemedText>
               {candidate.imageLicense ? (
-                <ThemedText style={styles.meta}>License: {candidate.imageLicense}</ThemedText>
+                <ThemedText style={styles.meta}>{t('adminImages.candidate.license', { license: candidate.imageLicense })}</ThemedText>
               ) : null}
               {candidate.imageAttribution ? (
                 <ThemedText style={styles.meta}>{candidate.imageAttribution}</ThemedText>
               ) : null}
 
               <ExternalLink href={candidate.sourceUrl}>
-                <ThemedText type="link">Open source page</ThemedText>
+                <ThemedText type="link">{t('adminImages.candidate.openSourcePage')}</ThemedText>
               </ExternalLink>
 
               <View style={styles.reassignBlock}>
-                <ThemedText type="defaultSemiBold">Match to Another Place</ThemedText>
+                <ThemedText type="defaultSemiBold">{t('adminImages.reassign.title')}</ThemedText>
                 <TextInput
                   value={query}
                   onChangeText={(value) => {
                     setReassignQueries((state) => ({ ...state, [candidate.id]: value }));
                     setSelectedPlacesByCandidate((state) => ({ ...state, [candidate.id]: undefined }));
                   }}
-                  placeholder="Search place name or id…"
+                  placeholder={t('adminImages.searchPlacePlaceholder')}
                   placeholderTextColor="rgba(127,127,127,0.7)"
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -439,7 +438,7 @@ function AdminImagesScreenContent() {
                 />
                 {selectedPlacesByCandidate[candidate.id] ? (
                   <ThemedText style={styles.meta}>
-                    Selected: {selectedPlacesByCandidate[candidate.id]?.name}
+                    {t('adminImages.selectedPlace', { name: selectedPlacesByCandidate[candidate.id]?.name })}
                   </ThemedText>
                 ) : null}
                 {suggestions.length ? (
@@ -470,7 +469,7 @@ function AdminImagesScreenContent() {
                       styles.buttonPressed,
                   ]}>
                   <ThemedText style={styles.buttonText}>
-                    {isBusy ? 'Saving…' : 'Match to Place'}
+                    {isBusy ? t('common.saving') : t('adminImages.reassign.matchToPlace')}
                   </ThemedText>
                 </Pressable>
               </View>
@@ -486,7 +485,7 @@ function AdminImagesScreenContent() {
                     pressed && !isBusy && styles.buttonPressed,
                   ]}>
                   <ThemedText style={styles.primaryButtonText}>
-                    {isBusy ? 'Saving…' : 'Approve + Apply'}
+                    {isBusy ? t('common.saving') : t('adminImages.actions.approveApply')}
                   </ThemedText>
                 </Pressable>
                 <Pressable
@@ -497,7 +496,7 @@ function AdminImagesScreenContent() {
                     isBusy && styles.buttonDisabled,
                     pressed && !isBusy && styles.buttonPressed,
                   ]}>
-                  <ThemedText style={styles.buttonText}>Reject</ThemedText>
+                  <ThemedText style={styles.buttonText}>{t('adminImages.actions.reject')}</ThemedText>
                 </Pressable>
               </View>
             </ThemedView>

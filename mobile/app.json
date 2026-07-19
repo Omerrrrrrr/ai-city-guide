@@ -18,7 +18,10 @@
     },
     "android": {
       "package": "com.piriapp.piri",
-      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -31,6 +34,11 @@
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
+    },
+    "locales": {
+      "en": "./locales/en.json",
+      "tr": "./locales/tr.json",
+      "nb": "./locales/nb.json"
     },
     "plugins": [
       "expo-router",
@@ -46,7 +54,8 @@
           }
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true,

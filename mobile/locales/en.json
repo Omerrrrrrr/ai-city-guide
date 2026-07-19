@@ -1,0 +1,4 @@
+{
+  "NSLocationWhenInUseUsageDescription": "Piri uses your location to show nearby places and give you city-specific recommendations.",
+  "NSCameraUsageDescription": "Piri uses your camera to identify places and give you personalized explanations."
+}

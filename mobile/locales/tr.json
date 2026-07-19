@@ -1,0 +1,4 @@
+{
+  "NSLocationWhenInUseUsageDescription": "Piri, yakındaki yerleri gösterebilmek ve şehre özel öneriler sunabilmek için konumunu kullanır.",
+  "NSCameraUsageDescription": "Piri, yerleri tanımlayabilmek ve sana özel açıklamalar sunabilmek için kameranı kullanır."
+}

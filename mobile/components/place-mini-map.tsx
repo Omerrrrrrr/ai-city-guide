@@ -1,6 +1,7 @@
 import React from 'react';
 import MapView, { Marker, type Region } from 'react-native-maps';
 import { Platform, Pressable, StyleSheet, View, type ViewStyle, type StyleProp } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -65,11 +66,13 @@ function clampRegion(region: Region): Region {
 export const PlaceMiniMap = React.memo(function PlaceMiniMap({
   place,
   relatedPlaces = [],
-  badgeLabel = 'Map preview',
+  badgeLabel,
   interactive = false,
   onInteractionChange,
   style,
 }: PlaceMiniMapProps) {
+  const { t } = useTranslation();
+  const resolvedBadgeLabel = badgeLabel ?? t('components.placeMiniMap.badgeLabel');
   const regionKey = `${place.location?.lat ?? 'missing'}:${place.location?.lng ?? 'missing'}:${relatedPlaces
     .map((relatedPlace) =>
       relatedPlace.location
@@ -95,7 +98,7 @@ export const PlaceMiniMap = React.memo(function PlaceMiniMap({
         lightColor="#EEF2F6"
         darkColor="#1E1E1E"
         style={[styles.fallback, style]}>
-        <ThemedText style={styles.fallbackText}>Map preview unavailable</ThemedText>
+        <ThemedText style={styles.fallbackText}>{t('components.placeMiniMap.unavailable')}</ThemedText>
       </ThemedView>
     );
   }
@@ -164,14 +167,14 @@ export const PlaceMiniMap = React.memo(function PlaceMiniMap({
       </MapView>
 
       <View style={styles.badge}>
-        <ThemedText style={styles.badgeText}>{badgeLabel}</ThemedText>
+        <ThemedText style={styles.badgeText}>{resolvedBadgeLabel}</ThemedText>
       </View>
 
       {interactive ? (
         <View style={styles.zoomControls}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Zoom in"
+            accessibilityLabel={t('components.placeMiniMap.zoomIn')}
             onPress={() => {
               handleZoom(ZOOM_IN_FACTOR);
               onInteractionChange?.(false);
@@ -181,7 +184,7 @@ export const PlaceMiniMap = React.memo(function PlaceMiniMap({
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Zoom out"
+            accessibilityLabel={t('components.placeMiniMap.zoomOut')}
             onPress={() => {
               handleZoom(ZOOM_OUT_FACTOR);
               onInteractionChange?.(false);

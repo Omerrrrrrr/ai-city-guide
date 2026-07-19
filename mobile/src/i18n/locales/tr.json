@@ -1,0 +1,551 @@
+{
+  "common": {
+    "cancel": "Vazgeç",
+    "retry": "Tekrar dene",
+    "tryAgain": "Tekrar dene",
+    "share": "Paylaş",
+    "save": "Kaydet",
+    "saving": "Kaydediliyor…",
+    "done": "Bitti",
+    "continue": "Devam et",
+    "skip": "Atla",
+    "loading": "Yükleniyor…",
+    "searchPlaces": "Yer ara...",
+    "openInMaps": "Haritalarda aç",
+    "showAll": "Tümünü göster",
+    "results": "Sonuçlar",
+    "seeAll": "Tümünü gör ›",
+    "clear": "Temizle",
+    "everywhere": "🌍 Her yer"
+  },
+  "screenTitles": {
+    "manageHours": "Çalışma Saatlerini Yönet",
+    "manageImages": "Görselleri Yönet"
+  },
+  "tabs": {
+    "home": "Ana Sayfa",
+    "scan": "Tara",
+    "map": "Harita",
+    "ai": "Piri'ye Sor",
+    "profile": "Profil"
+  },
+  "profileOptions": {
+    "professions": {
+      "architect": "Mimar",
+      "historian": "Tarihçi",
+      "photographer": "Fotoğrafçı",
+      "artist": "Sanatçı",
+      "engineer": "Mühendis",
+      "doctor": "Doktor",
+      "foodie": "Gurme",
+      "student": "Öğrenci",
+      "writer": "Yazar",
+      "other": "Diğer"
+    },
+    "interests": {
+      "history": "Tarih",
+      "architecture": "Mimari",
+      "art": "Sanat",
+      "religion": "Din",
+      "food": "Yeme & İçme",
+      "nature": "Doğa",
+      "nightlife": "Gece Hayatı",
+      "music": "Müzik",
+      "photography": "Fotoğrafçılık",
+      "sports": "Spor"
+    },
+    "faiths": {
+      "muslim": "Müslüman",
+      "christian": "Hristiyan",
+      "jewish": "Yahudi",
+      "buddhist": "Budist",
+      "hindu": "Hindu",
+      "secular": "Seküler / Dinsiz",
+      "preferNotToSay": "Belirtmek istemiyorum"
+    }
+  },
+  "onboarding": {
+    "wordmark": "PIRI",
+    "tagline": "Dünyayı senin gözlerinden",
+    "welcomeBody": "Birkaç soruyu cevapla, Piri her yeri — her anıtı, camiyi, harabeyi, restoranı — senin bakış açından anlatsın.",
+    "begin": "Başla",
+    "stepOf": "{{step}} / {{total}}",
+    "name": {
+      "title": "Sana nasıl hitap edelim?",
+      "subtitle": "İsteğe bağlı — Piri'nin seninle konuşma şeklini kişiselleştirmek için kullanılır.",
+      "placeholder": "Adın"
+    },
+    "profession": {
+      "title": "Ne iş yapıyorsun?",
+      "subtitle": "Piri açıklamalarını uzmanlığına göre uyarlar. Bir mimar yapıyı duyar; bir tarihçi bağlamı."
+    },
+    "faithInterests": {
+      "title": "Seni biraz daha tanıyalım",
+      "subtitle": "İkisi de isteğe bağlı. Paylaşmak istemediğin bir şeyi atlayabilirsin.",
+      "interestsLabel": "İlgi alanları",
+      "faithLabel": "İnanç & bakış açısı",
+      "faithNote": "Piri'nin kutsal ve tarihi mekânları çerçevelemesine yardımcı olur — bir camii Müslüman birine anlatıldığında, bir mimara anlatılandan farklıdır."
+    }
+  },
+  "home": {
+    "intents": {
+      "openNow": "Şimdi Açık",
+      "rainyDay": "Yağmurlu Gün",
+      "photoSpots": "Fotoğraf Noktaları",
+      "family": "Aile",
+      "localPicks": "Yerel Seçimler",
+      "quickStop": "Kısa Mola"
+    },
+    "greeting": {
+      "morning": "Günaydın",
+      "afternoon": "İyi günler",
+      "evening": "İyi akşamlar",
+      "withName": "{{greeting}}, {{name}}"
+    },
+    "cityPill": "📍 {{cityName}}",
+    "weatherBanner": {
+      "rainy": "Yağmur yağıyor — sıcak kafeler ve kapalı mekânlar için mükemmel bir gün.",
+      "snowy": "Dışarısı karlı — sana sıcak bir yer bulalım.",
+      "sunnyHot": "Harika bir gün — teraslara ve açık alanlara göz at.",
+      "sunnyMild": "Yürüyüş için güzel hava — yakında ne açık bir bak.",
+      "foggy": "Gizemli bir gün — gizli hazineler ve sakin köşeler için ideal.",
+      "fallback": "{{city}}'de {{description}} — bugün neler var bir bak.",
+      "cta": "Piri'den öneri iste →"
+    },
+    "staleBanner": "Önbellek verisi gösteriliyor — yenileniyor…",
+    "error": "Sunucuya ulaşılamadı. Bağlantını kontrol et.",
+    "profileNudge": {
+      "title": "Piri'yi kişiselleştir",
+      "body": "Kim olduğunu bize anlat — aynı mekân bir mimara, bir Müslümana, bir tarihçiye farklı anlatılır."
+    },
+    "discovery": {
+      "title": "{{cityName}} keşfediliyor{{dots}}",
+      "body": "Piri küresel verileri kullanarak mekânları haritalıyor. Bu 1-2 dakika sürer."
+    },
+    "cityEmpty": {
+      "title": "{{cityName}} içinde henüz mekân yok",
+      "body": "Keşif hâlâ işleniyor olabilir. Yenilemek için aşağı çek, ya da farklı bir şehir dene.",
+      "button": "Farklı bir şehir seç"
+    },
+    "sections": {
+      "featured": "Öne Çıkanlar",
+      "exploreCity": "{{cityName}}'i Keşfet",
+      "recentlyViewed": "Son Görüntülenenler",
+      "nearYou": "Yakınında",
+      "openRightNow": "Şu An Açık",
+      "forYou": "Senin İçin",
+      "localFavorites": "Yerel Favoriler",
+      "rainyDay": "Yağmurlu Gün"
+    },
+    "distance": {
+      "meters": "{{value}} m uzaklıkta",
+      "km": "{{value}} km uzaklıkta"
+    },
+    "aiBanner": {
+      "title": "Piri'ye her şeyi sor",
+      "sub": "Ne canın istiyor söyle — sana en uygun yeri bulayım."
+    }
+  },
+  "ai": {
+    "title": "Piri'ye Sor",
+    "headerSub": {
+      "withWeather": "{{emoji}} {{temp}}° · {{city}}",
+      "fallback": "Ne canın istiyor söyle"
+    },
+    "tryAsking": "Şunu dene:",
+    "noMatches": "Bu seferlik eşleşme yok. Daha genel bir soru dene.",
+    "inputPlaceholder": "örn. Sakin ve samimi bir yer...",
+    "ask": "Sor",
+    "errorNotConfigured": "AI önerileri backend'de henüz yapılandırılmadı.",
+    "errorGeneric": "Öneriler alınırken hata oluştu.",
+    "suggestions": {
+      "bestCafes": "Şu an açık en iyi kafeler",
+      "uniqueLocal": "Sadece yerlilerin bildiği özel bir yer",
+      "soloAfternoon": "Yalnız geçirilecek bir öğleden sonra için ideal",
+      "bestView": "Şehrin en güzel manzarası",
+      "cozyRainy": "Yağmurlu gün için sıcak, kapalı mekanlar",
+      "outdoorTerraces": "Açık alanlar ve teraslar",
+      "photoSpots": "Günün her saatinde en iyi fotoğraf noktaları",
+      "architectureBuildings": "Mimarisiyle görülmeye değer binalar",
+      "localFood": "En iyi yerel lezzetler — turist tuzağı değil"
+    }
+  },
+  "categoryFilters": {
+    "all": "Tümü",
+    "museums": "Müzeler",
+    "landmarks": "Simgeler",
+    "culture": "Kültür",
+    "walks": "Yürüyüşler",
+    "beaches": "Plajlar",
+    "cafes": "Kafeler",
+    "food": "Yemek",
+    "views": "Manzaralar",
+    "nature": "Doğa",
+    "shopping": "Alışveriş"
+  },
+  "explore": {
+    "placesFallback": "Yerler",
+    "reset": "Sıfırla",
+    "openNow": "Şimdi açık",
+    "sections": {
+      "openRightNow": "Şu An Açık",
+      "featuredPlaces": "Öne Çıkan Yerler",
+      "rainyDayPicks": "Yağmurlu Gün Seçkisi",
+      "allPlaces": "Tüm Yerler"
+    },
+    "emptyText": "Eşleşen yer yok. Farklı bir arama veya filtre dene.",
+    "placesFound_one": "{{count}} yer bulundu",
+    "placesFound_other": "{{count}} yer bulundu"
+  },
+  "map": {
+    "loading": "Harita yükleniyor...",
+    "placesCount_one": "{{count}} yer",
+    "placesCount_other": "{{count}} yer"
+  },
+  "saved": {
+    "title": "Koleksiyon",
+    "loading": "Yükleniyor...",
+    "tabs": {
+      "favorites": "Kaydedilen",
+      "plan": "Plan",
+      "visited": "Ziyaret Edilen"
+    },
+    "empty": {
+      "favoritesTitle": "Henüz favori yok",
+      "planTitle": "Planın boş",
+      "visitedTitle": "Henüz ziyaret edilen yer yok",
+      "favoritesBody": "Bir yeri aç ve kalp simgesine dokunarak buraya kaydet.",
+      "planBody": "Bir yeri aç ve gezi programını oluşturmak için \"Plana ekle\"ye dokun.",
+      "visitedBody": "Açtığın yerler burada görünecek."
+    },
+    "optimize": {
+      "title": "Piri ile günümü optimize et",
+      "sub": "{{count}} yer için en iyi sıra, zamanlama ve seyahat ipuçları →",
+      "query": "Şunları ziyaret etmeyi planlıyorum: {{placeNames}}. Bugün ziyaret etmek için en iyi sırayı, her birinde tahmini süreyi ve aralarındaki yürüyüş veya ulaşım ipuçlarını öner."
+    }
+  },
+  "scan": {
+    "inPiri": "◈ Piri'de",
+    "viewFullDetails": "Tüm detayları gör →",
+    "permission": {
+      "title": "Kamera erişimi gerekli",
+      "body": "Kameranı dünyanın herhangi bir yerindeki bir mekana doğrult, Piri sana özel anlatsın.",
+      "allow": "Kameraya İzin Ver"
+    },
+    "looking": "Piri bakıyor...",
+    "scanAgainHeader": "← Tekrar tara",
+    "askMore": "Piri'ye daha fazla sor →",
+    "askMoreQuery": "{{title}} hakkında bana daha fazla bilgi ver",
+    "viewDetailsInPiri": "◈ Piri'de tüm detayları gör",
+    "scanAnother": "Başka bir yer tara",
+    "errorIdentify": "Bu yer tanımlanamadı.",
+    "errorPhoto": "Fotoğraf çekilemedi.",
+    "pointAtPlace": "Herhangi bir yere doğrult",
+    "gallery": "Galeri",
+    "flip": "Çevir",
+    "shareMessage": "{{title}}\n{{subtitle}}\n\n{{explanation}}\n\n— Piri ile keşfedildi"
+  },
+  "settings": {
+    "travelerFallback": "Gezgin",
+    "faithNote": "Piri'nin kutsal ve tarihi mekanlara dair açıklamalarını uyarlamasına yardımcı olur.",
+    "currentCity": "Mevcut şehir",
+    "changeCity": "Değiştir ›",
+    "savedPlaces": "Kaydedilen Yerler",
+    "viewAll": "Tümünü gör →",
+    "stats": {
+      "saved": "kaydedilen",
+      "inPlan": "planda",
+      "visited": "ziyaret edilen"
+    },
+    "clearFavorites": "Favorileri Temizle",
+    "clearPlan": "Planı Temizle",
+    "clearHistory": "Geçmişi Temizle",
+    "version": "Piri v{{version}}",
+    "adminDevOnly": "Yönetici (yalnızca dev)",
+    "hoursReview": "Saatleri İncele",
+    "imageReview": "Görselleri İncele",
+    "language": {
+      "label": "Dil",
+      "system": "Sistem",
+      "en": "English",
+      "tr": "Türkçe",
+      "nb": "Norsk"
+    }
+  },
+  "placeDetail": {
+    "errorTitle": "Yer yüklenemedi",
+    "actionBar": {
+      "saved": "Kaydedildi",
+      "save": "Kaydet",
+      "inPlan": "Planda",
+      "addToPlan": "Plana ekle",
+      "directions": "Yol Tarifi"
+    },
+    "shareMessage": "{{name}}\n{{category}} · {{city}}\n\n{{story}}{{wikiNote}}\n\n— Piri ile keşfedildi",
+    "shareLearnMore": "\nDaha fazla bilgi: {{url}}",
+    "pirisTake": "Piri'nin Yorumu",
+    "about": "Hakkında",
+    "hours": "Çalışma Saatleri",
+    "verified": "Doğrulandı",
+    "estimated": "Tahmini",
+    "temporarilyClosed": "Geçici olarak kapalı",
+    "typicalVisit": "Ortalama ziyaret · {{minutes}} dk",
+    "bestTime": "En iyi zaman · {{time}}",
+    "vibe": "Atmosfer",
+    "bestFor": "En uygun",
+    "photos": "Fotoğraflar",
+    "location": "Konum",
+    "nearby": "Yakındaki Yerler",
+    "walkMin": "{{minutes}} dk yürüyüş"
+  },
+  "cityPicker": {
+    "status": {
+      "ready": "Hazır",
+      "discovering": "Keşfediliyor...",
+      "queued": "Sırada",
+      "failed": "Başarısız",
+      "discover": "Keşfet"
+    },
+    "title": "Bir şehir seç",
+    "searchPlaceholder": "Dünyadaki herhangi bir şehri ara...",
+    "currentlyExploring": "Şu an keşfediliyor",
+    "showAll": "Tümünü göster",
+    "results": "Sonuçlar",
+    "placeCount_one": "{{count}} yer",
+    "placeCount_other": "{{count}} yer",
+    "searchFailed": "Arama başarısız oldu. Bağlantını kontrol et.",
+    "discoveryFailed": "Keşif başarısız",
+    "noResults": "\"{{query}}\" için sonuç yok",
+    "noResultsSub": "Farklı bir yazım veya yakın bir şehir adı dene.",
+    "hintTitle": "Her yeri keşfet",
+    "hintBody": "Bir şehir ara, Piri küresel harita verilerini kullanarak oradaki yerleri keşfetsin. İlk keşif 1-2 dakika sürer."
+  },
+  "placeHours": {
+    "status": {
+      "openAllDay": "Tüm gün açık",
+      "openNow": "Şu an açık",
+      "closedNow": "Şu an kapalı",
+      "usuallyOpenAllDay": "Genelde tüm gün açık",
+      "likelyOpenNow": "Muhtemelen şu an açık",
+      "likelyClosedNow": "Muhtemelen şu an kapalı",
+      "temporarilyClosed": "Geçici olarak kapalı"
+    },
+    "detail": {
+      "temporarilyClosed": "Bu yer şu anda geçici olarak kapalı olarak işaretlenmiş.",
+      "verifiedAllDay": "Gün boyunca doğrulanmış halka açık erişim.",
+      "verifiedOpenUntil": "Doğrulanmış saatler. Bugün {{time}}'e kadar açık.",
+      "verifiedClosedWithNext": "Doğrulanmış saatler. {{nextOpeningText}}",
+      "opensAt": "{{day}} {{time}} civarında açılıyor.",
+      "likelyOpensAt": "Muhtemelen {{day}} {{time}} civarında açılıyor.",
+      "unclear": "Açılış saati şu an belirsiz.",
+      "likelyOpenUntil": "{{summary}} Bugün yaklaşık {{time}}'e kadar açık.",
+      "likelyClosedWithNext": "{{summary}} {{nextOpeningText}}"
+    },
+    "note": {
+      "publicOutdoor": "Açık halka açık alanlar genelde erişilebilir, ama hava durumu ve ışık önemli olabilir.",
+      "estimatedNotVerified": "Mekan türüne göre tahmin edildi, canlı doğrulanmış saatler değil.",
+      "verifiedChecked": "Doğrulanmış saatler {{date}} tarihinde kontrol edildi.",
+      "verifiedFromSource": "Bağlantılı bir kaynaktan doğrulandı.",
+      "lastChecked": "En son {{date}} tarihinde kontrol edildi."
+    },
+    "weeklyNote": {
+      "verifiedFromSource": "Haftalık saatler bağlantılı bir kaynaktan doğrulandı.",
+      "estimatedNotVerified": "Haftalık saatler mekan türüne göre tahmin edildi, canlı doğrulanmış veri değil.",
+      "verifiedChecked": "Doğrulanmış haftalık saatler. En son {{date}} tarihinde kontrol edildi."
+    },
+    "profile": {
+      "outdoor": "Genelde tüm gün erişilebilir.",
+      "landmarkDaytime": "Simge yapılar için tahmini gündüz erişimi.",
+      "museum": "Tahmini müze tipi saatler.",
+      "culture": "Kültürel duraklar için tahmini mekan saatleri.",
+      "cafe": "Tahmini kafe saatleri.",
+      "restaurant": "Tahmini restoran saatleri.",
+      "shopping": "Tahmini alışveriş saatleri."
+    },
+    "day": {
+      "today": "bugün",
+      "tomorrow": "yarın",
+      "another": "başka bir gün",
+      "sunday": "Pazar",
+      "monday": "Pazartesi",
+      "tuesday": "Salı",
+      "wednesday": "Çarşamba",
+      "thursday": "Perşembe",
+      "friday": "Cuma",
+      "saturday": "Cumartesi"
+    },
+    "weekdayShort": {
+      "mon": "Pzt",
+      "tue": "Sal",
+      "wed": "Çar",
+      "thu": "Per",
+      "fri": "Cum",
+      "sat": "Cmt",
+      "sun": "Paz"
+    },
+    "allDay": "Tüm gün",
+    "closed": "Kapalı"
+  },
+  "categories": {
+    "landmark": "Simge Yapı",
+    "museum": "Müze",
+    "culturalSpot": "Kültürel Nokta",
+    "squareStreet": "Meydan / Sokak",
+    "beach": "Plaj",
+    "walkingArea": "Yürüyüş Alanı",
+    "cafe": "Kafe",
+    "restaurant": "Restoran",
+    "viewpoint": "Manzara Noktası",
+    "shoppingArea": "Alışveriş Alanı",
+    "lodging": "Konaklama",
+    "nature": "Doğa"
+  },
+  "tags": {
+    "rainyDay": "Yağmurlu Gün",
+    "shortStop": "Kısa Mola",
+    "family": "Aile",
+    "budget": "Bütçe Dostu",
+    "localFavorite": "Yerel Favori",
+    "waterfront": "Sahil",
+    "photogenic": "Fotojenik",
+    "dateNight": "Romantik Akşam",
+    "coffeeBreak": "Kahve Molası",
+    "meal": "Yemek"
+  },
+  "components": {
+    "errorBoundary": {
+      "title": "Bir şeyler ters gitti",
+      "body": "Uygulama beklenmedik bir hatayla karşılaştı. Tekrar deneyebilir veya sorun devam ederse uygulamayı yeniden başlatabilirsin."
+    },
+    "adminGate": {
+      "title": "Yönetici erişimi gerekli",
+      "body": "Bu ekranı kullanmak için backend'de yapılandırılmış ADMIN_API_TOKEN'ı gir.",
+      "placeholder": "Yönetici token'ı",
+      "unlock": "Kilidi Aç"
+    },
+    "placeImage": {
+      "unavailable": "Fotoğraf mevcut değil",
+      "meta": "Kaynağı doğrulandıktan sonra yalnızca gerçek yer fotoğraflarını gösteriyoruz."
+    },
+    "placeMiniMap": {
+      "badgeLabel": "Harita önizlemesi",
+      "unavailable": "Harita önizlemesi mevcut değil",
+      "zoomIn": "Yakınlaştır",
+      "zoomOut": "Uzaklaştır"
+    }
+  },
+  "adminHours": {
+    "errorSavingFallback": "Saatler kaydedilirken bir sorun oluştu.",
+    "validation": {
+      "formatError": "{{label}}: HH:MM-HH:MM biçimini kullan.",
+      "endAfterStart": "{{label}}: bitiş, başlangıçtan sonra olmalı.",
+      "noOverlap": "{{label}}: aralıklar çakışamaz."
+    },
+    "noBusinessStatus": "İşletme durumu yok",
+    "hero": {
+      "title": "Çalışma Saatleri İncelemesi",
+      "body1": "Seed veriyi düzenlemeden doğrulanmış çalışma saatlerini, kaynak linklerini ve geçici kapanışları kaydet.",
+      "body2": "Google önizlemesi sadece formu doldurur. Sen inceleyip Saatleri Kaydet'e basana kadar hiçbir şey canlıya çıkmaz."
+    },
+    "findPlace": "Bir Yer Bul",
+    "searchPlaceholder": "Yer adına veya id'sine göre ara…",
+    "refreshPlaces": "Yerleri Yenile",
+    "loadingPlaces": "Yerler yükleniyor…",
+    "verifiedHoursLabel": "doğrulanmış saatler",
+    "estimatedHoursLabel": "tahmini saatler",
+    "lastChecked": "Son kontrol: {{date}}",
+    "close": "Kapat",
+    "editHours": "Saatleri Düzenle",
+    "toggles": {
+      "verified": "Doğrulandı",
+      "alwaysOpen": "Her Zaman Açık",
+      "temporarilyClosed": "Geçici Olarak Kapalı"
+    },
+    "sourceUrlPlaceholder": "Resmi çalışma saatleri kaynak URL'si…",
+    "notePlaceholder": "İsteğe bağlı saat notu…",
+    "dayInputPlaceholder": "10:00-17:00, 18:00-20:00",
+    "formatHint": "`HH:MM-HH:MM` kullan ve birden fazla aralığı virgülle ayır. Kapalıysa boş bırak.",
+    "loadingGoogle": "Google yükleniyor…",
+    "fetchGooglePreview": "Google Önizlemesi Getir",
+    "saveHours": "Saatleri Kaydet",
+    "googlePreviewTitle": "Google Önizlemesi",
+    "googlePreviewBody": "Google Places'ten bir aday çek, eşleşmeyi incele, sadece doğru görünüyorsa kaydet.",
+    "temporarilyClosedStatus": "geçici olarak kapalı",
+    "activeStatus": "aktif",
+    "noWeekdayDescriptions": "Google bu eşleşme için yapılandırılmış haftalık gün açıklamaları döndürmedi.",
+    "useThisPreview": "Bu Önizlemeyi Kullan",
+    "noGoogleCandidates": "Bu yer için henüz Google adayı bulunamadı.",
+    "ptsSuffix": "{{points}} puan",
+    "info": {
+      "loadedPreviews": "{{name}} için {{count}} Google önizleme adayı yüklendi.",
+      "noPreviewsFound": "{{name}} için Google önizleme adayı bulunamadı.",
+      "filledFromPreview": "{{name}} Google önizleme verisiyle dolduruldu. İncele, sonra kaydet.",
+      "savedHours": "{{name}} için doğrulanmış saatler kaydedildi."
+    }
+  },
+  "adminImages": {
+    "errorFallback": "Görsel adayları yüklenirken bir sorun oluştu.",
+    "filters": {
+      "pending": "Bekleyen",
+      "approved": "Onaylanan",
+      "applied": "Uygulanan",
+      "rejected": "Reddedilen",
+      "all": "Tümü"
+    },
+    "hero": {
+      "title": "Görsel İncelemesi",
+      "body": "Bekleyen Wikimedia adaylarını incele, sonra gerçek fotoğrafları onaylayıp yerlere uygula."
+    },
+    "coverage": {
+      "title": "Kapsama",
+      "places": "yer",
+      "verifiedMainPhotos": "doğrulanmış ana fotoğraf",
+      "stillMissing": "hâlâ eksik",
+      "strongPending": "Bu filtrede güçlü bekleyen adaylar: {{count}}"
+    },
+    "actions": {
+      "title": "Eylemler",
+      "refresh": "Yenile",
+      "discovering": "Keşfediliyor…",
+      "discoverMissing": "Eksikleri Keşfet",
+      "approveApply": "Onayla + Uygula",
+      "reject": "Reddet"
+    },
+    "discoverOne": {
+      "title": "Tek Bir Yer İçin Keşfet",
+      "discoverThisPlace": "Bu Yeri Keşfet"
+    },
+    "searchPlacePlaceholder": "Yer adına veya id'sine göre ara…",
+    "selectedPlace": "Seçilen: {{name}}",
+    "searchCandidates": {
+      "title": "Adayları Ara",
+      "placeholder": "Yer adı, id veya fotoğraf başlığına göre filtrele…",
+      "showing": "Bu filtrede {{total}} adaydan {{shown}} tanesi gösteriliyor."
+    },
+    "loadingCandidates": "Adaylar yükleniyor…",
+    "noCandidates": "Bu filtrede henüz aday yok.",
+    "candidate": {
+      "statusLine": "{{status}} · güven {{confidence}} · sıra {{rank}}",
+      "currentImage": "Mevcut görsel: {{status}}{{sourceName}}",
+      "verified": "doğrulandı",
+      "placeholder": "yer tutucu",
+      "license": "Lisans: {{license}}",
+      "openSourcePage": "Kaynak sayfasını aç"
+    },
+    "reassign": {
+      "title": "Başka Bir Yere Eşleştir",
+      "matchToPlace": "Yere Eşleştir"
+    },
+    "info": {
+      "discoveredAcross": "{{places}} yer genelinde {{candidates}} aday keşfedildi.",
+      "discoveredFor": "{{name}} için {{count}} aday keşfedildi.",
+      "approvedApplied": "Aday onaylandı ve uygulandı.",
+      "rejected": "Aday reddedildi.",
+      "movedTo": "Aday {{name}}'e taşındı."
+    }
+  },
+  "hooks": {
+    "loadError": "Veriler yüklenirken bir sorun oluştu.",
+    "missingPlaceId": "Yer id'si eksik."
+  }
+}

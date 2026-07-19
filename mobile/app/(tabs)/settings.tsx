@@ -2,65 +2,36 @@ import { Link, useRouter } from 'expo-router';
 import Constants from 'expo-constants';
 import * as Haptics from 'expo-haptics';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, TextInput, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { FAITHS, INTERESTS, PROFESSIONS } from '@/src/constants/profile-options';
 import { useSavedPlaces } from '@/src/store/saved-places';
 import { useRecentlyViewed } from '@/src/store/recently-viewed';
 import { useCityStore } from '@/src/store/city';
-import {
-  useUserProfile as useProfile,
-  type Profession,
-  type Interest,
-  type Faith,
-} from '@/src/store/user-profile';
+import { useLanguageStore, type LanguageCode } from '@/src/store/language';
+import { useUserProfile as useProfile, type Interest } from '@/src/store/user-profile';
 
 const NAVY = '#0F1C3F';
 const GOLD = '#D4A843';
 
-const PROFESSIONS: { value: Profession; label: string }[] = [
-  { value: 'architect', label: 'Architect' },
-  { value: 'historian', label: 'Historian' },
-  { value: 'photographer', label: 'Photographer' },
-  { value: 'artist', label: 'Artist' },
-  { value: 'engineer', label: 'Engineer' },
-  { value: 'doctor', label: 'Doctor' },
-  { value: 'foodie', label: 'Foodie' },
-  { value: 'student', label: 'Student' },
-  { value: 'writer', label: 'Writer' },
-  { value: 'other', label: 'Other' },
-];
-
-const INTERESTS: { value: Interest; label: string }[] = [
-  { value: 'history', label: 'History' },
-  { value: 'architecture', label: 'Architecture' },
-  { value: 'art', label: 'Art' },
-  { value: 'religion', label: 'Religion' },
-  { value: 'food', label: 'Food & Drink' },
-  { value: 'nature', label: 'Nature' },
-  { value: 'nightlife', label: 'Nightlife' },
-  { value: 'music', label: 'Music' },
-  { value: 'photography', label: 'Photography' },
-  { value: 'sports', label: 'Sports' },
-];
-
-const FAITHS: { value: Faith; label: string }[] = [
-  { value: 'muslim', label: 'Muslim' },
-  { value: 'christian', label: 'Christian' },
-  { value: 'jewish', label: 'Jewish' },
-  { value: 'buddhist', label: 'Buddhist' },
-  { value: 'hindu', label: 'Hindu' },
-  { value: 'secular', label: 'Secular / Non-religious' },
-  { value: 'prefer_not_to_say', label: 'Prefer not to say' },
+const LANGUAGE_OPTIONS: { code: LanguageCode | null; labelKey: string }[] = [
+  { code: null, labelKey: 'settings.language.system' },
+  { code: 'en', labelKey: 'settings.language.en' },
+  { code: 'tr', labelKey: 'settings.language.tr' },
+  { code: 'nb', labelKey: 'settings.language.nb' },
 ];
 
 export default function ProfileScreen() {
   const dark = useColorScheme() === 'dark';
   const router = useRouter();
+  const { t } = useTranslation();
   const { name, profession, interests, faith, setProfile } = useProfile();
   const { cityName } = useCityStore();
+  const { language, setLanguage } = useLanguageStore();
   const [editingName, setEditingName] = React.useState(false);
   const [nameInput, setNameInput] = React.useState(name);
   const { favoritePlaceIds, planPlaceIds, clearFavorites, clearPlan } = useSavedPlaces();
@@ -77,13 +48,13 @@ export default function ProfileScreen() {
         : [...interests, value],
     });
 
-  const displayName = name.trim() || 'Traveler';
+  const displayName = name.trim() || t('settings.travelerFallback');
   const professionLabel = profession
-    ? PROFESSIONS.find((p) => p.value === profession)?.label
+    ? t(PROFESSIONS.find((p) => p.value === profession)?.labelKey ?? '')
     : null;
   const faithLabel =
     faith && faith !== 'prefer_not_to_say'
-      ? FAITHS.find((f) => f.value === faith)?.label
+      ? t(FAITHS.find((f) => f.value === faith)?.labelKey ?? '')
       : null;
 
   return (
@@ -102,7 +73,7 @@ export default function ProfileScreen() {
                 autoFocus
                 style={styles.nameInput}
                 placeholderTextColor="rgba(255,255,255,0.4)"
-                placeholder="Your name"
+                placeholder={t('onboarding.name.placeholder')}
                 returnKeyType="done"
                 onSubmitEditing={() => {
                   setProfile({ name: nameInput.trim() });
@@ -137,9 +108,9 @@ export default function ProfileScreen() {
 
       {/* Profession */}
       <ThemedView style={styles.card}>
-        <ThemedText style={styles.cardLabel}>What do you do?</ThemedText>
+        <ThemedText style={styles.cardLabel}>{t('onboarding.profession.title')}</ThemedText>
         <View style={styles.chipGrid}>
-          {PROFESSIONS.map(({ value, label }) => {
+          {PROFESSIONS.map(({ value, labelKey }) => {
             const active = profession === value;
             return (
               <Pressable
@@ -147,7 +118,7 @@ export default function ProfileScreen() {
                 style={[styles.chip, active && styles.chipActive]}
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setProfile({ profession: value }); }}>
                 <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>
-                  {label}
+                  {t(labelKey)}
                 </ThemedText>
               </Pressable>
             );
@@ -157,9 +128,9 @@ export default function ProfileScreen() {
 
       {/* Interests */}
       <ThemedView style={styles.card}>
-        <ThemedText style={styles.cardLabel}>Interests</ThemedText>
+        <ThemedText style={styles.cardLabel}>{t('onboarding.faithInterests.interestsLabel')}</ThemedText>
         <View style={styles.chipGrid}>
-          {INTERESTS.map(({ value, label }) => {
+          {INTERESTS.map(({ value, labelKey }) => {
             const active = interests.includes(value);
             return (
               <Pressable
@@ -167,7 +138,7 @@ export default function ProfileScreen() {
                 style={[styles.chip, active && styles.chipActive]}
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); toggleInterest(value); }}>
                 <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>
-                  {label}
+                  {t(labelKey)}
                 </ThemedText>
               </Pressable>
             );
@@ -177,12 +148,10 @@ export default function ProfileScreen() {
 
       {/* Faith */}
       <ThemedView style={styles.card}>
-        <ThemedText style={styles.cardLabel}>Faith & perspective</ThemedText>
-        <ThemedText style={styles.cardNote}>
-          Helps Piri tailor explanations of sacred and historic spaces.
-        </ThemedText>
+        <ThemedText style={styles.cardLabel}>{t('onboarding.faithInterests.faithLabel')}</ThemedText>
+        <ThemedText style={styles.cardNote}>{t('settings.faithNote')}</ThemedText>
         <View style={styles.chipGrid}>
-          {FAITHS.map(({ value, label }) => {
+          {FAITHS.map(({ value, labelKey }) => {
             const active = faith === value;
             return (
               <Pressable
@@ -190,7 +159,27 @@ export default function ProfileScreen() {
                 style={[styles.chip, active && styles.chipActive]}
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setProfile({ faith: value }); }}>
                 <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>
-                  {label}
+                  {t(labelKey)}
+                </ThemedText>
+              </Pressable>
+            );
+          })}
+        </View>
+      </ThemedView>
+
+      {/* Language */}
+      <ThemedView style={styles.card}>
+        <ThemedText style={styles.cardLabel}>{t('settings.language.label')}</ThemedText>
+        <View style={styles.chipGrid}>
+          {LANGUAGE_OPTIONS.map(({ code, labelKey }) => {
+            const active = language === code;
+            return (
+              <Pressable
+                key={code ?? 'system'}
+                style={[styles.chip, active && styles.chipActive]}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setLanguage(code); }}>
+                <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>
+                  {t(labelKey)}
                 </ThemedText>
               </Pressable>
             );
@@ -200,25 +189,25 @@ export default function ProfileScreen() {
 
       {/* Current city */}
       <ThemedView style={styles.card}>
-        <ThemedText style={styles.cardLabel}>Current city</ThemedText>
+        <ThemedText style={styles.cardLabel}>{t('settings.currentCity')}</ThemedText>
         <Pressable
           onPress={() => router.push('/city-picker' as never)}
           style={({ pressed }) => [styles.cityRow, pressed && styles.buttonPressed]}>
           <ThemedText style={styles.cityName}>
-            {cityName ? `📍 ${cityName}` : '🌍 Everywhere'}
+            {cityName ? t('home.cityPill', { cityName }) : t('common.everywhere')}
           </ThemedText>
-          <ThemedText style={styles.cityChevron} lightColor={NAVY} darkColor={GOLD}>Change ›</ThemedText>
+          <ThemedText style={styles.cityChevron} lightColor={NAVY} darkColor={GOLD}>{t('settings.changeCity')}</ThemedText>
         </Pressable>
       </ThemedView>
 
       {/* Saved data */}
       <ThemedView style={styles.card}>
         <View style={styles.cardHeaderRow}>
-          <ThemedText style={styles.cardLabel}>Saved Places</ThemedText>
+          <ThemedText style={styles.cardLabel}>{t('settings.savedPlaces')}</ThemedText>
           <Link href={'/saved' as never} asChild>
             <Pressable style={({ pressed }) => [styles.viewAllBtn, pressed && styles.buttonPressed]}>
               <ThemedText style={styles.viewAllText} lightColor={NAVY} darkColor={GOLD}>
-                View all →
+                {t('settings.viewAll')}
               </ThemedText>
             </Pressable>
           </Link>
@@ -227,19 +216,19 @@ export default function ProfileScreen() {
           <Link href={{ pathname: '/saved', params: { tab: 'favorites' } } as never} asChild>
             <Pressable style={({ pressed }) => [styles.statBtn, pressed && styles.buttonPressed]}>
               <ThemedText style={styles.statNum}>{favoriteCount}</ThemedText>
-              <ThemedText style={styles.statLabel}>saved</ThemedText>
+              <ThemedText style={styles.statLabel}>{t('settings.stats.saved')}</ThemedText>
             </Pressable>
           </Link>
           <Link href={{ pathname: '/saved', params: { tab: 'plan' } } as never} asChild>
             <Pressable style={({ pressed }) => [styles.statBtn, pressed && styles.buttonPressed]}>
               <ThemedText style={styles.statNum}>{planCount}</ThemedText>
-              <ThemedText style={styles.statLabel}>in plan</ThemedText>
+              <ThemedText style={styles.statLabel}>{t('settings.stats.inPlan')}</ThemedText>
             </Pressable>
           </Link>
           <Link href={{ pathname: '/saved', params: { tab: 'visited' } } as never} asChild>
             <Pressable style={({ pressed }) => [styles.statBtn, pressed && styles.buttonPressed]}>
               <ThemedText style={styles.statNum}>{recentCount}</ThemedText>
-              <ThemedText style={styles.statLabel}>visited</ThemedText>
+              <ThemedText style={styles.statLabel}>{t('settings.stats.visited')}</ThemedText>
             </Pressable>
           </Link>
         </View>
@@ -252,7 +241,7 @@ export default function ProfileScreen() {
               favoriteCount === 0 && styles.buttonDisabled,
               pressed && favoriteCount > 0 && styles.buttonPressed,
             ]}>
-            <ThemedText style={styles.buttonText}>Clear Favorites</ThemedText>
+            <ThemedText style={styles.buttonText}>{t('settings.clearFavorites')}</ThemedText>
           </Pressable>
           <Pressable
             onPress={clearPlan}
@@ -262,7 +251,7 @@ export default function ProfileScreen() {
               planCount === 0 && styles.buttonDisabled,
               pressed && planCount > 0 && styles.buttonPressed,
             ]}>
-            <ThemedText style={styles.buttonText}>Clear Plan</ThemedText>
+            <ThemedText style={styles.buttonText}>{t('settings.clearPlan')}</ThemedText>
           </Pressable>
         </View>
         <Pressable
@@ -273,26 +262,26 @@ export default function ProfileScreen() {
             recentCount === 0 && styles.buttonDisabled,
             pressed && recentCount > 0 && styles.buttonPressed,
           ]}>
-          <ThemedText style={styles.buttonText}>Clear History</ThemedText>
+          <ThemedText style={styles.buttonText}>{t('settings.clearHistory')}</ThemedText>
         </Pressable>
       </ThemedView>
 
       {/* App info */}
-      <ThemedText style={styles.versionText}>Piri v{version}</ThemedText>
+      <ThemedText style={styles.versionText}>{t('settings.version', { version })}</ThemedText>
 
       {/* Admin (dev only) */}
       {__DEV__ ? (
         <ThemedView style={styles.card}>
-          <ThemedText style={styles.cardLabel}>Admin (dev only)</ThemedText>
+          <ThemedText style={styles.cardLabel}>{t('settings.adminDevOnly')}</ThemedText>
           <View style={styles.adminActions}>
             <Link href={'/admin-hours' as never} asChild>
               <Pressable style={({ pressed }) => [styles.panelButton, pressed && styles.buttonPressed]}>
-                <ThemedText style={styles.panelButtonText}>Hours Review</ThemedText>
+                <ThemedText style={styles.panelButtonText}>{t('settings.hoursReview')}</ThemedText>
               </Pressable>
             </Link>
             <Link href="/admin-images" asChild>
               <Pressable style={({ pressed }) => [styles.panelButton, pressed && styles.buttonPressed]}>
-                <ThemedText style={styles.panelButtonText}>Image Review</ThemedText>
+                <ThemedText style={styles.panelButtonText}>{t('settings.imageReview')}</ThemedText>
               </Pressable>
             </Link>
           </View>

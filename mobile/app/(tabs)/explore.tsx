@@ -10,15 +10,17 @@ import {
   useColorScheme,
 } from 'react-native';
 import { Link, useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 import { PlaceImage } from '@/components/place-image';
 import { FeaturedCardSkeleton, PlaceRowSkeleton, SkeletonBox } from '@/components/skeleton';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { CATEGORY_FILTERS } from '@/src/constants/category-filters';
 import type { Place, PlaceCategory } from '@/src/data/places';
 import { usePlaces } from '@/src/hooks/use-places';
 import { getPlaceOpenStatus } from '@/src/utils/place-hours';
-import { filterPlaces, getCuratedTags, isHighQualityPlace, sortPlacesForBrowse } from '@/src/utils/place-filters';
+import { filterPlaces, formatTag, getCuratedTags, isHighQualityPlace, sortPlacesForBrowse } from '@/src/utils/place-filters';
 import { useCityStore } from '@/src/store/city';
 import { CATEGORY_EMOJI, formatCategory } from '@/src/utils/categories';
 
@@ -26,7 +28,8 @@ const NAVY = '#0F1C3F';
 const GOLD = '#D4A843';
 
 function PlaceCard({ place, bg }: { place: Place; bg: string }) {
-  const status = getPlaceOpenStatus(place);
+  const { t } = useTranslation();
+  const status = getPlaceOpenStatus(place, t);
   const open = status.state === 'open' || status.state === 'all-day';
   return (
     <Link href={{ pathname: '/place/[id]', params: { id: place.id } }} asChild>
@@ -35,7 +38,7 @@ function PlaceCard({ place, bg }: { place: Place; bg: string }) {
         <View style={styles.cardBody}>
           <View style={[styles.statusDot, open ? styles.dotOpen : styles.dotClosed]} />
           <ThemedText numberOfLines={2} style={styles.cardName}>{place.name}</ThemedText>
-          <ThemedText numberOfLines={1} style={styles.cardMeta}>{CATEGORY_EMOJI[place.category] ?? '📍'} {formatCategory(place.category)}</ThemedText>
+          <ThemedText numberOfLines={1} style={styles.cardMeta}>{CATEGORY_EMOJI[place.category] ?? '📍'} {formatCategory(place.category, t)}</ThemedText>
           {place.shortStory ? (
             <ThemedText numberOfLines={2} style={styles.cardStory}>{place.shortStory}</ThemedText>
           ) : null}
@@ -46,7 +49,8 @@ function PlaceCard({ place, bg }: { place: Place; bg: string }) {
 }
 
 function HeroCard({ place, bg }: { place: Place; bg: string }) {
-  const status = getPlaceOpenStatus(place);
+  const { t } = useTranslation();
+  const status = getPlaceOpenStatus(place, t);
   const open = status.state === 'open' || status.state === 'all-day';
   return (
     <Link href={{ pathname: '/place/[id]', params: { id: place.id } }} asChild>
@@ -62,7 +66,7 @@ function HeroCard({ place, bg }: { place: Place; bg: string }) {
             {place.name}
           </ThemedText>
           <ThemedText numberOfLines={1} style={styles.heroCardMeta} lightColor="rgba(255,255,255,0.7)" darkColor="rgba(255,255,255,0.7)">
-            {CATEGORY_EMOJI[place.category] ?? '📍'} {formatCategory(place.category)} · {place.tags[0]}
+            {CATEGORY_EMOJI[place.category] ?? '📍'} {formatCategory(place.category, t)} · {place.tags[0]}
           </ThemedText>
         </View>
       </Pressable>
@@ -82,27 +86,10 @@ function SectionRow({ title, places, bg }: { title: string; places: Place[]; bg:
   );
 }
 
-const CATEGORIES: { id: PlaceCategory | 'all'; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'museum', label: '🏛️ Museums' },
-  { id: 'landmark', label: '🗿 Landmarks' },
-  { id: 'cultural-spot', label: '🎭 Culture' },
-  { id: 'walking-area', label: '🚶 Walks' },
-  { id: 'beach', label: '🏖️ Beaches' },
-  { id: 'cafe', label: '☕ Cafes' },
-  { id: 'restaurant', label: '🍽️ Food' },
-  { id: 'viewpoint', label: '🌅 Views' },
-  { id: 'nature', label: '🌿 Nature' },
-  { id: 'shopping-area', label: '🛍️ Shopping' },
-];
-
-function formatTag(tag: string) {
-  return tag.split(' ').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
-}
-
 export default function ExploreScreen() {
   const colorScheme = useColorScheme();
   const dark = colorScheme === 'dark';
+  const { t } = useTranslation();
   const [refreshing, setRefreshing] = React.useState(false);
   const params = useLocalSearchParams<{
     q?: string;
@@ -156,14 +143,14 @@ export default function ExploreScreen() {
         <View style={styles.header}>
           <View style={styles.headerTop}>
             <ThemedText style={styles.headerTitle} lightColor="#fff" darkColor="#fff">
-              {cityName ?? 'Places'}
+              {cityName ?? t('explore.placesFallback')}
             </ThemedText>
             {hasFilters ? (
               <Pressable
                 onPress={() => { setQuery(''); setCategory('all'); setTag('all'); setOpenNowOnly(false); }}
                 style={({ pressed }) => pressed && { opacity: 0.7 }}>
                 <ThemedText style={styles.resetText} lightColor="rgba(255,255,255,0.6)" darkColor="rgba(255,255,255,0.6)">
-                  Reset
+                  {t('explore.reset')}
                 </ThemedText>
               </Pressable>
             ) : null}
@@ -172,7 +159,7 @@ export default function ExploreScreen() {
             <TextInput
               value={query}
               onChangeText={setQuery}
-              placeholder="Search places..."
+              placeholder={t('common.searchPlaces')}
               placeholderTextColor="rgba(255,255,255,0.4)"
               autoCapitalize="none"
               autoCorrect={false}
@@ -201,7 +188,7 @@ export default function ExploreScreen() {
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chipRow}>
-          {CATEGORIES.map((c) => {
+          {CATEGORY_FILTERS.map((c) => {
             const active = category === c.id;
             return (
               <Pressable
@@ -209,7 +196,7 @@ export default function ExploreScreen() {
                 onPress={() => setCategory(c.id)}
                 style={[styles.chip, active && styles.chipActive]}>
                 <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>
-                  {c.label}
+                  {c.emoji ? `${c.emoji} ` : ''}{t(c.labelKey)}
                 </ThemedText>
               </Pressable>
             );
@@ -225,18 +212,18 @@ export default function ExploreScreen() {
             onPress={() => setOpenNowOnly((v) => !v)}
             style={[styles.chip, openNowOnly && styles.chipOpenNow]}>
             <ThemedText style={[styles.chipText, openNowOnly && styles.chipTextOpenNow]}>
-              Open now
+              {t('explore.openNow')}
             </ThemedText>
           </Pressable>
-          {curatedTags.map((t) => {
-            const active = tag === t;
+          {curatedTags.map((curatedTag) => {
+            const active = tag === curatedTag;
             return (
               <Pressable
-                key={t}
-                onPress={() => setTag(active ? 'all' : t)}
+                key={curatedTag}
+                onPress={() => setTag(active ? 'all' : curatedTag)}
                 style={[styles.chip, active && styles.chipActive]}>
                 <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>
-                  {formatTag(t)}
+                  {formatTag(curatedTag, t)}
                 </ThemedText>
               </Pressable>
             );
@@ -247,7 +234,7 @@ export default function ExploreScreen() {
         {error ? (
           <View style={[styles.errorBlock, { paddingHorizontal: 20, marginTop: 8 }]}>
             <ThemedText style={styles.errorText}>{error}</ThemedText>
-            <Pressable onPress={refresh}><ThemedText style={styles.retryText}>Retry</ThemedText></Pressable>
+            <Pressable onPress={refresh}><ThemedText style={styles.retryText}>{t('common.retry')}</ThemedText></Pressable>
           </View>
         ) : null}
 
@@ -258,7 +245,7 @@ export default function ExploreScreen() {
               <SkeletonBox height={220} borderRadius={20} />
             </View>
             <View style={styles.sectionBlock}>
-              <ThemedText style={styles.sectionTitle}>Open Right Now</ThemedText>
+              <ThemedText style={styles.sectionTitle}>{t('explore.sections.openRightNow')}</ThemedText>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hScroll}>
                 {[1, 2, 3].map((n) => <FeaturedCardSkeleton key={n} />)}
               </ScrollView>
@@ -281,13 +268,13 @@ export default function ExploreScreen() {
               </View>
             )}
 
-            <SectionRow title="Open Right Now" places={openNowList} bg={cardBg} />
-            <SectionRow title="Featured Places" places={featured.slice(1)} bg={cardBg} />
-            {rainyDay.length > 0 && <SectionRow title="Rainy Day Picks" places={rainyDay} bg={cardBg} />}
+            <SectionRow title={t('explore.sections.openRightNow')} places={openNowList} bg={cardBg} />
+            <SectionRow title={t('explore.sections.featuredPlaces')} places={featured.slice(1)} bg={cardBg} />
+            {rainyDay.length > 0 && <SectionRow title={t('explore.sections.rainyDayPicks')} places={rainyDay} bg={cardBg} />}
 
             {/* All places grid */}
             <View style={styles.content}>
-              <ThemedText style={styles.sectionTitle}>All Places</ThemedText>
+              <ThemedText style={styles.sectionTitle}>{t('explore.sections.allPlaces')}</ThemedText>
               <View style={styles.grid}>
                 {places.map((place) => <PlaceCard key={place.id} place={place} bg={cardBg} />)}
               </View>
@@ -299,15 +286,13 @@ export default function ExploreScreen() {
         {hasFilters && !isLoading && !error && (
           <View style={styles.content}>
             <ThemedText style={styles.countText}>
-              {places.length} place{places.length !== 1 ? 's' : ''} found
+              {t('explore.placesFound', { count: places.length })}
             </ThemedText>
             <View style={styles.grid}>
               {places.map((place) => <PlaceCard key={place.id} place={place} bg={cardBg} />)}
             </View>
             {places.length === 0 && (
-              <ThemedText style={styles.emptyText}>
-                No places match. Try a different search or filter.
-              </ThemedText>
+              <ThemedText style={styles.emptyText}>{t('explore.emptyText')}</ThemedText>
             )}
           </View>
         )}
