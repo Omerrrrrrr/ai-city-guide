@@ -25,6 +25,7 @@ export type RecommendationSignals = {
   prefersNearby: boolean;
   wantsAlternativeToAnchor: boolean;
   anchorPlace?: PlaceRow;
+  userLocation?: { lat: number; lng: number };
 };
 
 export type RankedPlace = {
@@ -169,7 +170,8 @@ function findAnchorPlace(allRows: PlaceRow[], combinedText: string) {
 export function buildRecommendationSignals(
   allRows: PlaceRow[],
   query: string,
-  history: string
+  history: string,
+  userLocation?: { lat: number; lng: number }
 ): RecommendationSignals {
   const combinedText = `${history} ${query}`.trim();
   const normalizedText = normalizeText(combinedText);
@@ -198,15 +200,17 @@ export function buildRecommendationSignals(
     prefersNearby: includesAny(normalizedText, KEYWORDS.nearby),
     wantsAlternativeToAnchor: includesAny(normalizedText, KEYWORDS.alternative),
     anchorPlace: findAnchorPlace(allRows, combinedText),
+    userLocation,
   };
 }
 
 export function rankPlacesForQuery(
   allRows: PlaceRow[],
   query: string,
-  history: string
+  history: string,
+  userLocation?: { lat: number; lng: number }
 ): RankedPlace[] {
-  const signals = buildRecommendationSignals(allRows, query, history);
+  const signals = buildRecommendationSignals(allRows, query, history, userLocation);
   const sourceRows = allRows.filter((row) => !row.temporarilyClosed);
   const candidateRows = sourceRows.length > 0 ? sourceRows : allRows;
 
@@ -332,23 +336,29 @@ export function rankPlacesForQuery(
         reasons.add('budget-friendly');
       }
 
+      // Prefer a named anchor place if the user mentioned one; otherwise fall
+      // back to their live GPS position. Either way this only ever nudges
+      // ranking — it never gates a place in or out on its own.
+      const anchorLat = signals.anchorPlace?.lat ?? signals.userLocation?.lat;
+      const anchorLng = signals.anchorPlace?.lng ?? signals.userLocation?.lng;
+      const anchorLabel = signals.anchorPlace?.name ?? 'your location';
+
       if (
         signals.prefersNearby &&
-        signals.anchorPlace &&
-        signals.anchorPlace.id !== row.id &&
-        signals.anchorPlace.lat != null &&
-        signals.anchorPlace.lng != null &&
+        signals.anchorPlace?.id !== row.id &&
+        anchorLat != null &&
+        anchorLng != null &&
         row.lat != null &&
         row.lng != null
       ) {
-        distanceKm = haversineKm(signals.anchorPlace.lat, signals.anchorPlace.lng, row.lat, row.lng);
+        distanceKm = haversineKm(anchorLat, anchorLng, row.lat, row.lng);
 
         if (distanceKm <= 0.8) {
           score += 10;
-          reasons.add(`very close to ${signals.anchorPlace.name}`);
+          reasons.add(`very close to ${anchorLabel}`);
         } else if (distanceKm <= 1.5) {
           score += 7;
-          reasons.add(`close to ${signals.anchorPlace.name}`);
+          reasons.add(`close to ${anchorLabel}`);
         } else if (distanceKm <= 3) {
           score += 4;
         } else if (distanceKm <= 6) {

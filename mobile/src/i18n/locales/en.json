@@ -156,6 +156,8 @@
     "noMatches": "No matches this turn. Try a broader follow-up.",
     "inputPlaceholder": "e.g. Something cozy and quiet...",
     "ask": "Ask",
+    "attachPhoto": "Attach a photo",
+    "removePhoto": "Remove photo",
     "errorNotConfigured": "AI recommendations are not configured in the backend yet.",
     "errorGeneric": "Error fetching recommendations.",
     "suggestions": {

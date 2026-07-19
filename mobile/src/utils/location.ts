@@ -1,3 +1,16 @@
+import * as Location from 'expo-location';
+
+export async function getCurrentLocation(): Promise<{ lat: number; lng: number } | undefined> {
+  try {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') return undefined;
+    const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+    return { lat: loc.coords.latitude, lng: loc.coords.longitude };
+  } catch {
+    return undefined;
+  }
+}
+
 export function getDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371; // Radius of the earth in km
   const dLat = deg2rad(lat2 - lat1);

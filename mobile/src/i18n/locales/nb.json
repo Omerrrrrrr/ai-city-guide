@@ -156,6 +156,8 @@
     "noMatches": "Ingen treff denne gangen. Prøv et bredere spørsmål.",
     "inputPlaceholder": "f.eks. Noe koselig og rolig...",
     "ask": "Spør",
+    "attachPhoto": "Legg ved et bilde",
+    "removePhoto": "Fjern bildet",
     "errorNotConfigured": "AI-anbefalinger er ikke konfigurert på baksiden ennå.",
     "errorGeneric": "Feil ved henting av anbefalinger.",
     "suggestions": {

@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -11,6 +12,7 @@ import {
   View,
   useColorScheme,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { Link, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
@@ -29,12 +31,16 @@ import { useUserProfile } from '@/src/store/user-profile';
 import { useWeather, weatherEmoji } from '@/src/hooks/use-weather';
 import { useCityStore } from '@/src/store/city';
 import { CATEGORY_EMOJI, formatCategory } from '@/src/utils/categories';
+import { getCurrentLocation } from '@/src/utils/location';
+
+type AttachedImage = { uri: string; base64: string };
 
 type ConversationTurn =
   | {
       id: string;
       role: 'user';
       content: string;
+      imageUri?: string;
     }
   | {
       id: string;
@@ -54,8 +60,10 @@ export default function AiScreen() {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [conversation, setConversation] = React.useState<ConversationTurn[]>([]);
+  const [attachedImage, setAttachedImage] = React.useState<AttachedImage | null>(null);
 
   const autoSubmittedRef = React.useRef(false);
+  const locationRef = React.useRef<{ lat: number; lng: number } | null | undefined>(undefined);
   const { name, profession, interests, faith } = useUserProfile();
   const userProfile = { name, profession, interests, faith };
   const { weather } = useWeather();
@@ -89,24 +97,50 @@ export default function AiScreen() {
     [conversation]
   );
 
+  const handleAttachImage = React.useCallback(async (fromCamera: boolean) => {
+    const picker = fromCamera ? ImagePicker.launchCameraAsync : ImagePicker.launchImageLibraryAsync;
+    const result = await picker({ mediaTypes: ['images'], base64: true, quality: 0.6 });
+    if (!result.canceled && result.assets[0]?.base64) {
+      setAttachedImage({ uri: result.assets[0].uri, base64: result.assets[0].base64 });
+    }
+  }, []);
+
+  const handleRemoveImage = React.useCallback(() => setAttachedImage(null), []);
+
   const handleSearch = React.useCallback(async (overrideQuery?: string) => {
     const nextQuery = (overrideQuery ?? query).trim();
     if (!nextQuery) return;
 
+    const nextImage = overrideQuery ? null : attachedImage;
+
     setLoading(true);
     setError(null);
     setQuery('');
+    setAttachedImage(null);
 
     const userTurn: ConversationTurn = {
       id: `${Date.now()}-user`,
       role: 'user',
       content: nextQuery,
+      imageUri: nextImage?.uri,
     };
 
     setConversation((current) => [...current, userTurn]);
 
     try {
-      const data = await fetchRecommendations(nextQuery, history, userProfile, weather ?? undefined, cityName);
+      if (locationRef.current === undefined) {
+        locationRef.current = (await getCurrentLocation()) ?? null;
+      }
+
+      const data = await fetchRecommendations(
+        nextQuery,
+        history,
+        userProfile,
+        weather ?? undefined,
+        cityName,
+        locationRef.current ?? undefined,
+        nextImage ? { base64: nextImage.base64, mimeType: 'image/jpeg' } : undefined
+      );
       const assistantTurn: ConversationTurn = {
         id: `${Date.now()}-assistant`,
         role: 'assistant',
@@ -134,7 +168,7 @@ export default function AiScreen() {
       setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, history, userProfile, weather, cityName, t]);
+  }, [query, history, userProfile, weather, cityName, attachedImage, t]);
 
   // Auto-submit once if navigated from scan with a pre-filled query
   React.useEffect(() => {
@@ -216,6 +250,9 @@ export default function AiScreen() {
               {conversation.map((turn) =>
                 turn.role === 'user' ? (
                   <View key={turn.id} style={[styles.messageBubble, styles.userBubble]}>
+                    {turn.imageUri ? (
+                      <Image source={{ uri: turn.imageUri }} style={styles.userImage} />
+                    ) : null}
                     <ThemedText style={styles.userText}>{turn.content}</ThemedText>
                   </View>
                 ) : (
@@ -269,7 +306,25 @@ export default function AiScreen() {
 
         {/* Pinned input bar */}
         <SafeAreaView style={[styles.inputBar, { backgroundColor: bgColor }]}>
+          {attachedImage ? (
+            <View style={styles.attachedPreviewRow}>
+              <Image source={{ uri: attachedImage.uri }} style={styles.attachedPreviewImage} />
+              <Pressable
+                onPress={handleRemoveImage}
+                accessibilityLabel={t('ai.removePhoto')}
+                style={({ pressed }) => [styles.attachedPreviewRemove, pressed && { opacity: 0.7 }]}>
+                <ThemedText style={styles.attachedPreviewRemoveText}>×</ThemedText>
+              </Pressable>
+            </View>
+          ) : null}
           <View style={styles.inputRow}>
+            <Pressable
+              onPress={() => handleAttachImage(false)}
+              disabled={loading}
+              accessibilityLabel={t('ai.attachPhoto')}
+              style={({ pressed }) => [styles.attachBtn, pressed && { opacity: 0.7 }, loading && styles.disabled]}>
+              <ThemedText style={styles.attachBtnText}>📷</ThemedText>
+            </Pressable>
             <TextInput
               ref={inputRef}
               style={[styles.input, { color: inputColor, backgroundColor: inputBg }]}
@@ -354,6 +409,42 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     fontSize: 16,
   },
+  attachBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(127,127,127,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachBtnText: {
+    fontSize: 18,
+  },
+  attachedPreviewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    gap: 8,
+  },
+  attachedPreviewImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+  },
+  attachedPreviewRemove: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(127,127,127,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachedPreviewRemoveText: {
+    fontSize: 16,
+    lineHeight: 18,
+  },
   button: {
     height: 48,
     paddingHorizontal: 20,
@@ -406,6 +497,12 @@ const styles = StyleSheet.create({
   typingBubble: {
     alignSelf: 'flex-start',
     paddingHorizontal: 18,
+  },
+  userImage: {
+    width: '100%',
+    height: 140,
+    borderRadius: 12,
+    marginBottom: 8,
   },
   userText: {
     color: '#fff',

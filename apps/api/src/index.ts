@@ -772,6 +772,27 @@ async function buildServer() {
         return reply.code(500).send({ error: 'AI is not configured in the backend' });
       }
 
+      // Location is a disambiguation aid, never the sole source of truth — the
+      // photo itself always decides. We fetch nearby known places once and reuse
+      // the same list both as vision hints and as the preferred fuzzy-match pool.
+      let nearbyPlaces: { id: string; name: string; category: string }[] = [];
+      let allPlacesForMatch: { id: string; name: string }[] = [];
+      if (lat != null && lng != null) {
+        try {
+          const geoRows = await db
+            .select({ id: places.id, name: places.name, category: places.category, lat: places.lat, lng: places.lng })
+            .from(places);
+          allPlacesForMatch = geoRows;
+          nearbyPlaces = geoRows
+            .filter((p) => p.lat != null && p.lng != null)
+            .map((p) => ({ ...p, distanceKm: haversineKm(lat, lng, p.lat!, p.lng!) }))
+            .filter((p) => p.distanceKm <= 0.6)
+            .sort((a, b) => a.distanceKm - b.distanceKm)
+            .slice(0, 6)
+            .map(({ id, name, category }) => ({ id, name, category }));
+        } catch { /* non-critical */ }
+      }
+
       const profileLines: string[] = [];
       if (userProfile?.name) profileLines.push(`Name: ${userProfile.name}`);
       if (userProfile?.profession && userProfile.profession !== 'other') {
@@ -793,9 +814,15 @@ async function buildServer() {
           ? `\n\nUser profile:\n${profileLines.join('\n')}\n\nTailor every sentence to this specific person. An architect should hear about structure and engineering. A Muslim should hear about religious significance. A historian should hear about historical layers. A photographer should hear about light, composition, and visual opportunities. Be specific, not generic.`
           : '';
 
+      const nearbyHint =
+        nearbyPlaces.length > 0
+          ? ` Known nearby places (within ~600m): ${nearbyPlaces
+              .map((p) => `"${p.name}" (${p.category})`)
+              .join(', ')}. If the photo genuinely matches one of these, use its exact name.`
+          : '';
       const locationHint =
         lat != null && lng != null
-          ? `The user is at coordinates ${lat.toFixed(5)}, ${lng.toFixed(5)}. Use this to help identify the place if the image alone is ambiguous.`
+          ? ` The user is near coordinates ${lat.toFixed(5)}, ${lng.toFixed(5)}.${nearbyHint} Treat location only as a hint to disambiguate similar-looking places — the photo is the primary evidence. Never identify a place from location alone; if the image doesn't support a nearby candidate, ignore it and describe what the image actually shows.`
           : '';
 
       try {
@@ -833,17 +860,32 @@ async function buildServer() {
           system: `You are Piri, a deeply knowledgeable personal travel guide. You identify places from photos and explain them in a way that speaks directly to who the user is.${profileContext}`,
         } as any)) as { object: z.infer<typeof identifySchema> };
 
-        // Fuzzy-match the identified title against DB places
+        // Fuzzy-match the identified title against DB places. Nearby places are
+        // checked first (more reliable when GPS is available and multiple places
+        // share similar names across cities), falling back to a global search.
         let matchedPlaceId: string | undefined;
         try {
           const normalise = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
           const needle = normalise(object.title);
-          const allPlaces = await db.select({ id: places.id, name: places.name }).from(places);
-          for (const p of allPlaces) {
+
+          for (const p of nearbyPlaces) {
             const hay = normalise(p.name);
             if (hay === needle || hay.includes(needle) || needle.includes(hay)) {
               matchedPlaceId = p.id;
               break;
+            }
+          }
+
+          if (!matchedPlaceId) {
+            const searchPool = allPlacesForMatch.length > 0
+              ? allPlacesForMatch
+              : await db.select({ id: places.id, name: places.name }).from(places);
+            for (const p of searchPool) {
+              const hay = normalise(p.name);
+              if (hay === needle || hay.includes(needle) || needle.includes(hay)) {
+                matchedPlaceId = p.id;
+                break;
+              }
             }
           }
         } catch { /* non-critical */ }
@@ -974,6 +1016,10 @@ ${personalization}`,
     Body: {
       query: string;
       city?: string;
+      lat?: number;
+      lng?: number;
+      imageBase64?: string;
+      mimeType?: string;
       messages?: Array<{ role: 'user' | 'assistant'; content: string }>;
       userProfile?: {
         name?: string;
@@ -993,6 +1039,10 @@ ${personalization}`,
       .object({
         query: z.string().trim().min(1, 'Query is required'),
         city: z.string().trim().min(1).optional(),
+        lat: z.number().optional(),
+        lng: z.number().optional(),
+        imageBase64: z.string().min(1).optional(),
+        mimeType: z.string().optional().default('image/jpeg'),
         messages: z.array(chatMessageSchema).max(8).optional(),
         userProfile: z
           .object({
@@ -1017,7 +1067,7 @@ ${personalization}`,
       return reply.code(400).send({ error: parsedBody.error.issues[0]?.message ?? 'Invalid request' });
     }
 
-    const { query, city, messages = [], userProfile, weather } = parsedBody.data;
+    const { query, city, lat, lng, imageBase64, mimeType, messages = [], userProfile, weather } = parsedBody.data;
 
     const profileLines: string[] = [];
     if (userProfile?.profession && userProfile.profession !== 'other') {
@@ -1062,7 +1112,8 @@ ${personalization}`,
       .slice(-6)
       .map((message) => `${message.role.toUpperCase()}: ${message.content}`)
       .join('\n');
-    const rankedRows = rankPlacesForQuery(allRows, query, conversationSummary);
+    const userLocation = lat != null && lng != null ? { lat, lng } : undefined;
+    const rankedRows = rankPlacesForQuery(allRows, query, conversationSummary, userLocation);
     const recommendableRows = rankedRows.filter(
       (entry) => entry.qualityScore >= 36 || entry.row.importanceTier === 'hero'
     );
@@ -1091,6 +1142,10 @@ ${personalization}`,
     }));
 
     try {
+      const imageInstructions = imageBase64
+        ? `\n\nThe user attached a photo along with their message. Look at it and answer their question with what the photo actually shows — identify it if that's what they're asking, or use it as context for their question. If it clearly matches a place in your shortlist, include that place in recommendations; don't force a match if it doesn't.`
+        : '';
+
       const { object } = await generateObject({
         model: aiProvider.client.chat(aiProvider.model),
         maxOutputTokens: 420,
@@ -1105,7 +1160,7 @@ ${personalization}`,
         }) as any,
         system: `You are Piri, a personal travel guide.${profileContext}${weatherContext}
 Continue the conversation naturally using the recent chat history when provided.
-Keep answers concise (1–3 sentences) and personalized to the user.
+Keep answers concise (1–3 sentences) and personalized to the user.${imageInstructions}
 
 ${placeContext.length > 0
   ? `You have ${placeContext.length} places in your database for ${cityLabel}. Pick 4 places when possible, 5 when there are several strong matches, 3 when unusually narrow. Return ONLY places from the provided shortlist using exact IDs. Spread picks across different place types.`
@@ -1116,8 +1171,20 @@ Recent conversation:
 ${conversationSummary || 'No prior conversation.'}
 
 ${placeContext.length > 0 ? `Available shortlist:\n${JSON.stringify(placeContext, null, 2)}` : ''}`,
-        prompt: query,
-      });
+        ...(imageBase64
+          ? {
+              messages: [
+                {
+                  role: 'user' as const,
+                  content: [
+                    { type: 'image' as const, image: imageBase64, mimeType },
+                    { type: 'text' as const, text: query },
+                  ],
+                },
+              ],
+            }
+          : { prompt: query }),
+      } as any);
 
       const enrichedRecommendations = ((object as any).recommendations ?? [])
         .filter((rec: { id: string; reason: string }) => placeById.has(rec.id))

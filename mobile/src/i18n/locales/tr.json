@@ -156,6 +156,8 @@
     "noMatches": "Bu seferlik eşleşme yok. Daha genel bir soru dene.",
     "inputPlaceholder": "örn. Sakin ve samimi bir yer...",
     "ask": "Sor",
+    "attachPhoto": "Fotoğraf ekle",
+    "removePhoto": "Fotoğrafı kaldır",
     "errorNotConfigured": "AI önerileri backend'de henüz yapılandırılmadı.",
     "errorGeneric": "Öneriler alınırken hata oluştu.",
     "suggestions": {

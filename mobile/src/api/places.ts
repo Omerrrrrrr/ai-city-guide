@@ -86,12 +86,22 @@ export async function fetchRecommendations(
     city: string;
     description: string;
   },
-  city?: string | null
+  city?: string | null,
+  location?: { lat: number; lng: number } | null,
+  image?: { base64: string; mimeType?: string } | null
 ): Promise<AIRecommendationResponse> {
   const response = await fetch(`${API_BASE_URL}/places/recommend`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, messages, userProfile, weather, ...(city ? { city } : {}) }),
+    body: JSON.stringify({
+      query,
+      messages,
+      userProfile,
+      weather,
+      ...(city ? { city } : {}),
+      ...(location ? { lat: location.lat, lng: location.lng } : {}),
+      ...(image ? { imageBase64: image.base64, mimeType: image.mimeType ?? 'image/jpeg' } : {}),
+    }),
   });
 
   if (!response.ok) {
