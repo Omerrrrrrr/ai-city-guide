@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  Pressable,
   RefreshControl,
   SafeAreaView,
   ScrollView,
@@ -12,6 +11,7 @@ import {
 import { Link, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
+import { AnimatedPressable } from '@/components/animated-pressable';
 import { PlaceImage } from '@/components/place-image';
 import { FeaturedCardSkeleton, PlaceRowSkeleton, SkeletonBox } from '@/components/skeleton';
 import { ThemedText } from '@/components/themed-text';
@@ -33,7 +33,7 @@ function PlaceCard({ place, bg }: { place: Place; bg: string }) {
   const open = status.state === 'open' || status.state === 'all-day';
   return (
     <Link href={{ pathname: '/place/[id]', params: { id: place.id } }} asChild>
-      <Pressable style={({ pressed }) => [styles.card, { backgroundColor: bg }, pressed && { opacity: 0.75 }]}>
+      <AnimatedPressable style={({ pressed }) => [styles.card, { backgroundColor: bg }, pressed && { opacity: 0.75 }]}>
         <PlaceImage place={place} style={styles.cardImage} />
         <View style={styles.cardBody}>
           <View style={[styles.statusDot, open ? styles.dotOpen : styles.dotClosed]} />
@@ -43,7 +43,7 @@ function PlaceCard({ place, bg }: { place: Place; bg: string }) {
             <ThemedText numberOfLines={2} style={styles.cardStory}>{place.shortStory}</ThemedText>
           ) : null}
         </View>
-      </Pressable>
+      </AnimatedPressable>
     </Link>
   );
 }
@@ -54,7 +54,7 @@ function HeroCard({ place, bg }: { place: Place; bg: string }) {
   const open = status.state === 'open' || status.state === 'all-day';
   return (
     <Link href={{ pathname: '/place/[id]', params: { id: place.id } }} asChild>
-      <Pressable style={({ pressed }) => [styles.heroCard, { backgroundColor: bg }, pressed && { opacity: 0.85 }]}>
+      <AnimatedPressable style={({ pressed }) => [styles.heroCard, { backgroundColor: bg }, pressed && { opacity: 0.85 }]}>
         <PlaceImage place={place} style={styles.heroCardImage} />
         <View style={styles.heroCardOverlay}>
           <View style={[styles.heroStatusPill, open ? styles.pillOpen : styles.pillClosed]}>
@@ -69,7 +69,7 @@ function HeroCard({ place, bg }: { place: Place; bg: string }) {
             {CATEGORY_EMOJI[place.category] ?? '📍'} {formatCategory(place.category, t)} · {place.tags[0]}
           </ThemedText>
         </View>
-      </Pressable>
+      </AnimatedPressable>
     </Link>
   );
 }
@@ -146,13 +146,13 @@ export default function ExploreScreen() {
               {cityName ?? t('explore.placesFallback')}
             </ThemedText>
             {hasFilters ? (
-              <Pressable
+              <AnimatedPressable
                 onPress={() => { setQuery(''); setCategory('all'); setTag('all'); setOpenNowOnly(false); }}
                 style={({ pressed }) => pressed && { opacity: 0.7 }}>
                 <ThemedText style={styles.resetText} lightColor="rgba(255,255,255,0.6)" darkColor="rgba(255,255,255,0.6)">
                   {t('explore.reset')}
                 </ThemedText>
-              </Pressable>
+              </AnimatedPressable>
             ) : null}
           </View>
           <View style={styles.searchRow}>
@@ -191,14 +191,14 @@ export default function ExploreScreen() {
           {CATEGORY_FILTERS.map((c) => {
             const active = category === c.id;
             return (
-              <Pressable
+              <AnimatedPressable
                 key={c.id}
                 onPress={() => setCategory(c.id)}
                 style={[styles.chip, active && styles.chipActive]}>
                 <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>
                   {c.emoji ? `${c.emoji} ` : ''}{t(c.labelKey)}
                 </ThemedText>
-              </Pressable>
+              </AnimatedPressable>
             );
           })}
         </ScrollView>
@@ -208,24 +208,24 @@ export default function ExploreScreen() {
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chipRow}>
-          <Pressable
+          <AnimatedPressable
             onPress={() => setOpenNowOnly((v) => !v)}
             style={[styles.chip, openNowOnly && styles.chipOpenNow]}>
             <ThemedText style={[styles.chipText, openNowOnly && styles.chipTextOpenNow]}>
               {t('explore.openNow')}
             </ThemedText>
-          </Pressable>
+          </AnimatedPressable>
           {curatedTags.map((curatedTag) => {
             const active = tag === curatedTag;
             return (
-              <Pressable
+              <AnimatedPressable
                 key={curatedTag}
                 onPress={() => setTag(active ? 'all' : curatedTag)}
                 style={[styles.chip, active && styles.chipActive]}>
                 <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>
                   {formatTag(curatedTag, t)}
                 </ThemedText>
-              </Pressable>
+              </AnimatedPressable>
             );
           })}
         </ScrollView>
@@ -234,7 +234,7 @@ export default function ExploreScreen() {
         {error ? (
           <View style={[styles.errorBlock, { paddingHorizontal: 20, marginTop: 8 }]}>
             <ThemedText style={styles.errorText}>{error}</ThemedText>
-            <Pressable onPress={refresh}><ThemedText style={styles.retryText}>{t('common.retry')}</ThemedText></Pressable>
+            <AnimatedPressable onPress={refresh}><ThemedText style={styles.retryText}>{t('common.retry')}</ThemedText></AnimatedPressable>
           </View>
         ) : null}
 
@@ -402,8 +402,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.3,
     paddingHorizontal: 16,
   },
   hScroll: {
@@ -429,7 +430,7 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '47.5%',
-    borderRadius: 16,
+    borderRadius: 18,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOpacity: 0.06,

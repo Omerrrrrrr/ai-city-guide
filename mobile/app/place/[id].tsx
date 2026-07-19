@@ -2,7 +2,6 @@ import React from 'react';
 import { Stack, Link, useLocalSearchParams, useRouter } from 'expo-router';
 import {
   Linking,
-  Pressable,
   ScrollView,
   Share,
   StyleSheet,
@@ -16,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import * as Haptics from 'expo-haptics';
 
+import { AnimatedPressable } from '@/components/animated-pressable';
 import { PlaceImage } from '@/components/place-image';
 import { PlaceMiniMap } from '@/components/place-mini-map';
 import { PlaceDetailSkeleton, SkeletonBox } from '@/components/skeleton';
@@ -101,15 +101,15 @@ export default function PlaceDetailScreen() {
       <View style={[styles.fullCenter, { backgroundColor: bg }]}>
         <Stack.Screen options={{ headerShown: false }} />
         <View style={[styles.floatingBack, { top: insets.top + 12 }]}>
-          <Pressable onPress={() => router.back()} style={styles.backBtn}>
+          <AnimatedPressable onPress={() => router.back()} style={styles.backBtn}>
             <ThemedText style={styles.backBtnText}>←</ThemedText>
-          </Pressable>
+          </AnimatedPressable>
         </View>
         <ThemedText style={styles.errorTitle}>{t('placeDetail.errorTitle')}</ThemedText>
         {error ? <ThemedText style={styles.errorBody}>{error}</ThemedText> : null}
-        <Pressable style={styles.retryBtn} onPress={refresh}>
+        <AnimatedPressable style={styles.retryBtn} onPress={refresh}>
           <ThemedText style={styles.retryBtnText} lightColor="#fff" darkColor="#fff">{t('common.tryAgain')}</ThemedText>
-        </Pressable>
+        </AnimatedPressable>
       </View>
     );
   }
@@ -147,13 +147,13 @@ export default function PlaceDetailScreen() {
           />
           {/* Floating back + save buttons */}
           <View style={[styles.heroTopBar, { paddingTop: insets.top + 10 }]}>
-            <Pressable
+            <AnimatedPressable
               onPress={() => router.back()}
               style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.7 }]}>
               <ThemedText style={styles.iconBtnText} lightColor="#fff" darkColor="#fff">←</ThemedText>
-            </Pressable>
+            </AnimatedPressable>
             <View style={styles.heroTopRight}>
-              <Pressable
+              <AnimatedPressable
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); toggleFavorite(place.id); }}
                 style={({ pressed }) => [styles.iconBtn, saved && styles.iconBtnActive, pressed && { opacity: 0.7 }]}>
                 <ThemedText
@@ -162,8 +162,8 @@ export default function PlaceDetailScreen() {
                   darkColor={saved ? NAVY : '#fff'}>
                   {saved ? '♥' : '♡'}
                 </ThemedText>
-              </Pressable>
-              <Pressable
+              </AnimatedPressable>
+              <AnimatedPressable
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); togglePlan(place.id); }}
                 style={({ pressed }) => [styles.iconBtn, inPlan && styles.iconBtnPlan, pressed && { opacity: 0.7 }]}>
                 <ThemedText
@@ -172,7 +172,7 @@ export default function PlaceDetailScreen() {
                   darkColor={inPlan ? NAVY : '#fff'}>
                   {inPlan ? '✓' : '+'}
                 </ThemedText>
-              </Pressable>
+              </AnimatedPressable>
             </View>
           </View>
 
@@ -196,29 +196,29 @@ export default function PlaceDetailScreen() {
 
         {/* ── Action bar ── */}
         <ThemedView style={[styles.actionBar, { backgroundColor: cardBg }]}>
-          <Pressable
+          <AnimatedPressable
             style={({ pressed }) => [styles.actionBarBtn, pressed && { opacity: 0.7 }]}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); toggleFavorite(place.id); }}>
             <ThemedText style={styles.actionBarIcon}>{saved ? '♥' : '♡'}</ThemedText>
             <ThemedText style={styles.actionBarLabel}>{saved ? t('placeDetail.actionBar.saved') : t('placeDetail.actionBar.save')}</ThemedText>
-          </Pressable>
+          </AnimatedPressable>
           <View style={styles.actionBarDivider} />
-          <Pressable
+          <AnimatedPressable
             style={({ pressed }) => [styles.actionBarBtn, pressed && { opacity: 0.7 }]}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); togglePlan(place.id); }}>
             <ThemedText style={styles.actionBarIcon}>{inPlan ? '✓' : '📋'}</ThemedText>
             <ThemedText style={styles.actionBarLabel}>{inPlan ? t('placeDetail.actionBar.inPlan') : t('placeDetail.actionBar.addToPlan')}</ThemedText>
-          </Pressable>
+          </AnimatedPressable>
           <View style={styles.actionBarDivider} />
-          <Pressable
+          <AnimatedPressable
             style={({ pressed }) => [styles.actionBarBtn, !directionsUrl && { opacity: 0.4 }, pressed && { opacity: 0.7 }]}
             disabled={!directionsUrl}
             onPress={() => directionsUrl && Linking.openURL(directionsUrl).catch(() => {})}>
             <ThemedText style={styles.actionBarIcon}>↗</ThemedText>
             <ThemedText style={styles.actionBarLabel}>{t('placeDetail.actionBar.directions')}</ThemedText>
-          </Pressable>
+          </AnimatedPressable>
           <View style={styles.actionBarDivider} />
-          <Pressable
+          <AnimatedPressable
             style={({ pressed }) => [styles.actionBarBtn, pressed && { opacity: 0.7 }]}
             onPress={() => {
               const wikiNote = place.wiki?.pageUrl ? t('placeDetail.shareLearnMore', { url: place.wiki.pageUrl }) : '';
@@ -235,7 +235,7 @@ export default function PlaceDetailScreen() {
             }}>
             <ThemedText style={styles.actionBarIcon}>⬆</ThemedText>
             <ThemedText style={styles.actionBarLabel}>{t('common.share')}</ThemedText>
-          </Pressable>
+          </AnimatedPressable>
         </ThemedView>
 
         {/* ── Content ── */}
@@ -317,9 +317,9 @@ export default function PlaceDetailScreen() {
             <View style={styles.tagsRow}>
               {place.tags.map((tag) => (
                 <Link key={tag} href={{ pathname: '/explore', params: { tag } }} asChild>
-                  <Pressable style={({ pressed }) => [styles.tagChip, pressed && { opacity: 0.7 }]}>
+                  <AnimatedPressable style={({ pressed }) => [styles.tagChip, pressed && { opacity: 0.7 }]}>
                     <ThemedText style={styles.tagText}>{tag}</ThemedText>
-                  </Pressable>
+                  </AnimatedPressable>
                 </Link>
               ))}
             </View>
@@ -419,13 +419,13 @@ export default function PlaceDetailScreen() {
               style={styles.miniMap}
             />
             {directionsUrl ? (
-              <Pressable
+              <AnimatedPressable
                 style={({ pressed }) => [styles.directionsBtn, pressed && { opacity: 0.85 }]}
                 onPress={() => Linking.openURL(directionsUrl!).catch(() => {})}>
                 <ThemedText style={styles.directionsBtnText} lightColor="#fff" darkColor="#fff">
                   {t('common.openInMaps')}
                 </ThemedText>
-              </Pressable>
+              </AnimatedPressable>
             ) : null}
           </ThemedView>
 
@@ -442,7 +442,7 @@ export default function PlaceDetailScreen() {
                   const nOpen = ns.state === 'open' || ns.state === 'all-day';
                   return (
                     <Link key={nearby.id} href={{ pathname: '/place/[id]', params: { id: nearby.id } }} asChild>
-                      <Pressable style={({ pressed }) => [styles.nearbyCard, { backgroundColor: cardBg }, pressed && { opacity: 0.75 }]}>
+                      <AnimatedPressable style={({ pressed }) => [styles.nearbyCard, { backgroundColor: cardBg }, pressed && { opacity: 0.75 }]}>
                         <PlaceImage place={nearby} style={styles.nearbyImage} compact />
                         <View style={styles.nearbyBody}>
                           <ThemedText numberOfLines={2} style={styles.nearbyName}>{nearby.name}</ThemedText>
@@ -456,7 +456,7 @@ export default function PlaceDetailScreen() {
                             {t('placeDetail.walkMin', { minutes: getWalkMinutes(nearby.distanceKm) })}
                           </ThemedText>
                         </View>
-                      </Pressable>
+                      </AnimatedPressable>
                     </Link>
                   );
                 })}

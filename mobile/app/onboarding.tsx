@@ -3,7 +3,6 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -16,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 
 import * as Haptics from 'expo-haptics';
 
+import { AnimatedPressable } from '@/components/animated-pressable';
 import { FAITHS, INTERESTS, PROFESSIONS } from '@/src/constants/profile-options';
 import { useUserProfile } from '@/src/store/user-profile';
 import type { Faith, Interest, Profession } from '@/src/store/user-profile';
@@ -62,9 +62,9 @@ export default function OnboardingScreen() {
             <Text style={styles.tagline}>{t('onboarding.tagline')}</Text>
             <Text style={styles.welcomeBody}>{t('onboarding.welcomeBody')}</Text>
           </View>
-          <Pressable style={styles.goldButton} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setStep(1); }}>
+          <AnimatedPressable style={styles.goldButton} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setStep(1); }}>
             <Text style={styles.goldButtonText}>{t('onboarding.begin')}</Text>
-          </Pressable>
+          </AnimatedPressable>
         </SafeAreaView>
       </View>
     );
@@ -105,12 +105,12 @@ export default function OnboardingScreen() {
         </ScrollView>
 
         <View style={styles.footer}>
-          <Pressable style={styles.skipButton} onPress={next}>
+          <AnimatedPressable style={styles.skipButton} onPress={next}>
             <Text style={styles.skipText}>{t('common.skip')}</Text>
-          </Pressable>
-          <Pressable style={styles.continueButton} onPress={next}>
+          </AnimatedPressable>
+          <AnimatedPressable style={styles.continueButton} onPress={next}>
             <Text style={styles.continueText}>{step === TOTAL_STEPS ? t('common.done') : t('common.continue')}</Text>
-          </Pressable>
+          </AnimatedPressable>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -153,13 +153,13 @@ function StepProfession({
         {PROFESSIONS.map(({ value, labelKey, emoji }) => {
           const active = selected === value;
           return (
-            <Pressable
+            <AnimatedPressable
               key={value}
               style={[styles.chip, active && styles.chipActive]}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onSelect(value); }}>
               <Text style={styles.chipEmoji}>{emoji}</Text>
               <Text style={[styles.chipText, active && styles.chipTextActive]}>{t(labelKey)}</Text>
-            </Pressable>
+            </AnimatedPressable>
           );
         })}
       </View>
@@ -189,13 +189,13 @@ function StepFaithInterests({
         {INTERESTS.map(({ value, labelKey, emoji }) => {
           const active = selectedInterests.includes(value);
           return (
-            <Pressable
+            <AnimatedPressable
               key={value}
               style={[styles.chip, active && styles.chipActive]}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onToggleInterest(value); }}>
               <Text style={styles.chipEmoji}>{emoji}</Text>
               <Text style={[styles.chipText, active && styles.chipTextActive]}>{t(labelKey)}</Text>
-            </Pressable>
+            </AnimatedPressable>
           );
         })}
       </View>
@@ -206,12 +206,12 @@ function StepFaithInterests({
         {FAITHS.map(({ value, labelKey }) => {
           const active = selectedFaith === value;
           return (
-            <Pressable
+            <AnimatedPressable
               key={value}
               style={[styles.chip, active && styles.chipActive]}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onSelectFaith(value); }}>
               <Text style={[styles.chipText, active && styles.chipTextActive]}>{t(labelKey)}</Text>
-            </Pressable>
+            </AnimatedPressable>
           );
         })}
       </View>

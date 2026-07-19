@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  Pressable,
   RefreshControl,
   SafeAreaView,
   ScrollView,
@@ -12,6 +11,7 @@ import { Link, useRouter } from 'expo-router';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 
+import { AnimatedPressable } from '@/components/animated-pressable';
 import { PlaceImage } from '@/components/place-image';
 import { FeaturedCardSkeleton, PlaceRowSkeleton } from '@/components/skeleton';
 import { ThemedText } from '@/components/themed-text';
@@ -96,7 +96,7 @@ function FeaturedCard({ place }: { place: Place }) {
   const { t } = useTranslation();
   return (
     <Link href={{ pathname: '/place/[id]', params: { id: place.id } }} asChild>
-      <Pressable style={({ pressed }) => [styles.featCard, pressed && styles.pressed]}>
+      <AnimatedPressable style={({ pressed }) => [styles.featCard, pressed && styles.pressed]}>
         <ThemedView style={styles.featCardInner}>
           <PlaceImage place={place} style={styles.featImage} />
           <View style={styles.featBody}>
@@ -107,7 +107,7 @@ function FeaturedCard({ place }: { place: Place }) {
             </ThemedText>
           </View>
         </ThemedView>
-      </Pressable>
+      </AnimatedPressable>
     </Link>
   );
 }
@@ -116,7 +116,7 @@ function PlaceRow({ place }: { place: Place }) {
   const { t } = useTranslation();
   return (
     <Link href={{ pathname: '/place/[id]', params: { id: place.id } }} asChild>
-      <Pressable style={({ pressed }) => [pressed && styles.pressed]}>
+      <AnimatedPressable style={({ pressed }) => [pressed && styles.pressed]}>
         <ThemedView style={styles.row}>
           <PlaceImage place={place} style={styles.rowThumb} compact />
           <View style={styles.rowBody}>
@@ -127,7 +127,7 @@ function PlaceRow({ place }: { place: Place }) {
           </View>
           <StatusBadge place={place} />
         </ThemedView>
-      </Pressable>
+      </AnimatedPressable>
     </Link>
   );
 }
@@ -141,11 +141,11 @@ function Section({ title, places, seeAllParams }: { title: string; places: Place
       <View style={styles.sectionHeader}>
         <ThemedText style={styles.sectionTitle}>{title}</ThemedText>
         {seeAllParams && (
-          <Pressable
+          <AnimatedPressable
             onPress={() => router.push({ pathname: '/explore', params: seeAllParams })}
             style={({ pressed }) => pressed && { opacity: 0.6 }}>
             <ThemedText style={styles.seeAll}>{t('common.seeAll')}</ThemedText>
-          </Pressable>
+          </AnimatedPressable>
         )}
       </View>
       {places.map((p) => <PlaceRow key={p.id} place={p} />)}
@@ -157,7 +157,7 @@ function ProfileNudge() {
   const router = useRouter();
   const { t } = useTranslation();
   return (
-    <Pressable
+    <AnimatedPressable
       style={({ pressed }) => [styles.profileNudge, pressed && styles.pressed]}
       onPress={() => router.push('/(tabs)/settings')}>
       <View style={styles.profileNudgeLeft}>
@@ -169,7 +169,7 @@ function ProfileNudge() {
         </ThemedText>
       </View>
       <ThemedText style={styles.profileNudgeArrow} lightColor={GOLD} darkColor={GOLD}>›</ThemedText>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
@@ -254,23 +254,23 @@ export default function HomeScreen() {
               <ThemedText style={styles.greetText} lightColor="rgba(255,255,255,0.75)" darkColor="rgba(255,255,255,0.75)">
                 {greeting(t, name)}
               </ThemedText>
-              <Pressable
+              <AnimatedPressable
                 onPress={() => router.push('/city-picker' as never)}
                 style={({ pressed }) => [styles.cityPill, pressed && { opacity: 0.7 }]}>
                 <ThemedText style={styles.cityPillText} lightColor="rgba(255,255,255,0.55)" darkColor="rgba(255,255,255,0.55)">
                   {cityName ? t('home.cityPill', { cityName }) : t('common.everywhere')} ›
                 </ThemedText>
-              </Pressable>
+              </AnimatedPressable>
             </View>
             {weather && <WeatherPill weather={weather} />}
           </View>
-          <Pressable
+          <AnimatedPressable
             style={styles.headerSearch}
             onPress={() => router.push('/explore' as never)}>
             <ThemedText style={styles.headerSearchText} lightColor="rgba(255,255,255,0.5)" darkColor="rgba(255,255,255,0.5)">
               {t('common.searchPlaces')}
             </ThemedText>
-          </Pressable>
+          </AnimatedPressable>
         </View>
       </SafeAreaView>
 
@@ -300,7 +300,7 @@ export default function HomeScreen() {
               intent.key === 'rainyDay' && weather && isIndoorWeather(weather.condition);
             return (
               <Link key={intent.key} href={{ pathname: '/explore', params: intent.params }} asChild>
-                <Pressable
+                <AnimatedPressable
                   style={({ pressed }) => [
                     styles.intentChip,
                     isRainyHighlight && styles.intentChipHighlight,
@@ -310,7 +310,7 @@ export default function HomeScreen() {
                     style={[styles.intentChipText, isRainyHighlight && styles.intentChipTextHighlight]}>
                     {intent.label}
                   </ThemedText>
-                </Pressable>
+                </AnimatedPressable>
               </Link>
             );
           })}
@@ -329,13 +329,13 @@ export default function HomeScreen() {
             <ThemedText style={styles.errorBannerText} lightColor="rgba(255,255,255,0.8)" darkColor="rgba(255,255,255,0.8)">
               {t('home.error')}
             </ThemedText>
-            <Pressable
+            <AnimatedPressable
               onPress={refreshPlaces}
               style={({ pressed }) => [styles.errorBannerBtn, pressed && { opacity: 0.7 }]}>
               <ThemedText style={styles.errorBannerBtnText} lightColor={GOLD} darkColor={GOLD}>
                 {t('common.retry')}
               </ThemedText>
-            </Pressable>
+            </AnimatedPressable>
           </View>
         )}
 
@@ -346,7 +346,7 @@ export default function HomeScreen() {
 
         {/* Weather banner */}
         {weather && (
-          <Pressable
+          <AnimatedPressable
             style={({ pressed }) => [styles.weatherBanner, pressed && styles.pressed]}
             onPress={() => router.push('/ai')}>
             <View style={styles.weatherBannerLeft}>
@@ -362,7 +362,7 @@ export default function HomeScreen() {
                 </ThemedText>
               </View>
             </View>
-          </Pressable>
+          </AnimatedPressable>
         )}
 
         {/* City discovery progress */}
@@ -376,13 +376,13 @@ export default function HomeScreen() {
             <ThemedText style={styles.cityEmptyEmoji}>🏙️</ThemedText>
             <ThemedText style={styles.cityEmptyTitle}>{t('home.cityEmpty.title', { cityName })}</ThemedText>
             <ThemedText style={styles.cityEmptyBody}>{t('home.cityEmpty.body')}</ThemedText>
-            <Pressable
+            <AnimatedPressable
               onPress={() => router.push('/city-picker' as never)}
               style={({ pressed }) => [styles.cityEmptyBtn, pressed && { opacity: 0.8 }]}>
               <ThemedText style={styles.cityEmptyBtnText} lightColor={NAVY} darkColor={NAVY}>
                 {t('home.cityEmpty.button')}
               </ThemedText>
-            </Pressable>
+            </AnimatedPressable>
           </View>
         )}
 
@@ -398,11 +398,11 @@ export default function HomeScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <ThemedText style={styles.sectionTitle}>{t('home.sections.featured')}</ThemedText>
-              <Pressable
+              <AnimatedPressable
                 onPress={() => router.push('/explore' as never)}
                 style={({ pressed }) => pressed && { opacity: 0.6 }}>
                 <ThemedText style={styles.seeAll}>{t('common.seeAll')}</ThemedText>
-              </Pressable>
+              </AnimatedPressable>
             </View>
             <ScrollView
               horizontal
@@ -415,11 +415,11 @@ export default function HomeScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <ThemedText style={styles.sectionTitle}>{t('home.sections.exploreCity', { cityName })}</ThemedText>
-              <Pressable
+              <AnimatedPressable
                 onPress={() => router.push('/explore' as never)}
                 style={({ pressed }) => pressed && { opacity: 0.6 }}>
                 <ThemedText style={styles.seeAll}>{t('common.seeAll')}</ThemedText>
-              </Pressable>
+              </AnimatedPressable>
             </View>
             <ScrollView
               horizontal
@@ -435,11 +435,11 @@ export default function HomeScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <ThemedText style={styles.sectionTitle}>{t('home.sections.recentlyViewed')}</ThemedText>
-              <Pressable
+              <AnimatedPressable
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); clearHistory(); }}
                 style={({ pressed }) => pressed && { opacity: 0.6 }}>
                 <ThemedText style={styles.seeAll}>{t('common.clear')}</ThemedText>
-              </Pressable>
+              </AnimatedPressable>
             </View>
             <ScrollView
               horizontal
@@ -447,10 +447,10 @@ export default function HomeScreen() {
               contentContainerStyle={styles.recentRow}>
               {recentlyViewed.map((p) => (
                 <Link key={p.id} href={{ pathname: '/place/[id]', params: { id: p.id } }} asChild>
-                  <Pressable style={({ pressed }) => [styles.recentCard, pressed && styles.pressed]}>
+                  <AnimatedPressable style={({ pressed }) => [styles.recentCard, pressed && styles.pressed]}>
                     <PlaceImage place={p} style={styles.recentCardImage} />
                     <ThemedText numberOfLines={2} style={styles.recentCardName}>{p.name}</ThemedText>
-                  </Pressable>
+                  </AnimatedPressable>
                 </Link>
               ))}
             </ScrollView>
@@ -463,7 +463,7 @@ export default function HomeScreen() {
             <ThemedText style={styles.sectionTitle}>{t('home.sections.nearYou')}</ThemedText>
             {nearbyUser.map((p) => (
               <Link key={p.id} href={{ pathname: '/place/[id]', params: { id: p.id } }} asChild>
-                <Pressable style={({ pressed }) => [pressed && styles.pressed]}>
+                <AnimatedPressable style={({ pressed }) => [pressed && styles.pressed]}>
                   <ThemedView style={styles.row}>
                     <PlaceImage place={p} style={styles.rowThumb} compact />
                     <View style={styles.rowBody}>
@@ -477,7 +477,7 @@ export default function HomeScreen() {
                     </View>
                     <StatusBadge place={p} />
                   </ThemedView>
-                </Pressable>
+                </AnimatedPressable>
               </Link>
             ))}
           </View>
@@ -499,7 +499,7 @@ export default function HomeScreen() {
         <Section title={t('home.sections.rainyDay')} places={rainy} seeAllParams={{ tag: 'rainy day' }} />
 
         {/* Ask AI banner */}
-        <Pressable
+        <AnimatedPressable
           style={({ pressed }) => [styles.aiBanner, pressed && styles.pressed]}
           onPress={() => router.push('/ai')}>
           <View>
@@ -511,7 +511,7 @@ export default function HomeScreen() {
             </ThemedText>
           </View>
           <ThemedText style={styles.aiBannerArrow} lightColor={GOLD} darkColor={GOLD}>›</ThemedText>
-        </Pressable>
+        </AnimatedPressable>
 
       </ScrollView>
     </View>
@@ -564,9 +564,9 @@ const styles = StyleSheet.create({
     letterSpacing: 6,
   },
   greetText: {
-    fontSize: 14,
-    fontWeight: '400',
-    marginTop: 1,
+    fontSize: 15,
+    fontWeight: '500',
+    marginTop: 2,
   },
   cityPill: {
     marginTop: 4,
@@ -587,16 +587,16 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingBottom: 40,
-    gap: 8,
+    gap: 16,
   },
   intentRow: {
     paddingHorizontal: 20,
     paddingVertical: 14,
-    gap: 8,
+    gap: 10,
   },
   intentChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 50,
     backgroundColor: 'rgba(15,28,63,0.08)',
     borderWidth: 1,
@@ -617,8 +617,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   sectionTitle: {
-    fontSize: 19,
-    fontWeight: '700',
+    fontSize: 21,
+    fontWeight: '800',
+    letterSpacing: -0.3,
   },
   seeAll: {
     fontSize: 14,
@@ -650,7 +651,7 @@ const styles = StyleSheet.create({
   },
   featCard: {
     width: 180,
-    borderRadius: 16,
+    borderRadius: 20,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOpacity: 0.08,
@@ -659,7 +660,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   featCardInner: {
-    borderRadius: 16,
+    borderRadius: 20,
     overflow: 'hidden',
   },
   featImage: {
@@ -683,7 +684,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    borderRadius: 14,
+    borderRadius: 18,
     padding: 12,
     shadowColor: '#000',
     shadowOpacity: 0.05,

@@ -2,7 +2,6 @@ import React from 'react';
 import {
   ActivityIndicator,
   Image,
-  Pressable,
   SafeAreaView,
   ScrollView,
   Share,
@@ -13,15 +12,16 @@ import {
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
-import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
+import { AnimatedPressable } from '@/components/animated-pressable';
 import { PlaceImage } from '@/components/place-image';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { identifyPlace, fetchPlace, type IdentifyResult } from '@/src/api/places';
 import { useUserProfile } from '@/src/store/user-profile';
+import { getCurrentLocation } from '@/src/utils/location';
 import { getPlaceOpenStatus } from '@/src/utils/place-hours';
 import type { Place } from '@/src/data/places';
 
@@ -39,7 +39,7 @@ function MatchedPlaceCard({ place, onPress }: { place: Place; onPress: () => voi
   const status = getPlaceOpenStatus(place, t);
   const open = status.state === 'open' || status.state === 'all-day';
   return (
-    <Pressable
+    <AnimatedPressable
       onPress={onPress}
       style={({ pressed }) => [styles.matchedCard, pressed && { opacity: 0.85 }]}>
       <View style={styles.matchedCardBadge}>
@@ -61,7 +61,7 @@ function MatchedPlaceCard({ place, onPress }: { place: Place; onPress: () => voi
           {t('scan.viewFullDetails')}
         </ThemedText>
       </View>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
@@ -90,21 +90,10 @@ export default function ScanScreen() {
     } catch { /* ignore */ }
   };
 
-  const getLocation = async () => {
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') return undefined;
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      return { lat: loc.coords.latitude, lng: loc.coords.longitude };
-    } catch {
-      return undefined;
-    }
-  };
-
   const processImage = async (base64: string, imageUri: string) => {
     setPendingImageUri(imageUri);
     setState({ kind: 'loading' });
-    const coords = await getLocation();
+    const coords = await getCurrentLocation();
     try {
       const result = await identifyPlace({
         imageBase64: base64,
@@ -169,11 +158,11 @@ export default function ScanScreen() {
           <ThemedText style={styles.permissionBody} lightColor="rgba(255,255,255,0.7)" darkColor="rgba(255,255,255,0.7)">
             {t('scan.permission.body')}
           </ThemedText>
-          <Pressable style={styles.goldButton} onPress={requestPermission}>
+          <AnimatedPressable style={styles.goldButton} onPress={requestPermission}>
             <ThemedText style={styles.goldButtonText} lightColor={NAVY} darkColor={NAVY}>
               {t('scan.permission.allow')}
             </ThemedText>
-          </Pressable>
+          </AnimatedPressable>
         </SafeAreaView>
       </View>
     );
@@ -203,11 +192,11 @@ export default function ScanScreen() {
       <View style={{ flex: 1, backgroundColor: dark ? '#0A0F1E' : '#F4F5F9' }}>
         <SafeAreaView style={{ backgroundColor: NAVY }}>
           <View style={styles.resultHeader}>
-            <Pressable onPress={reset} style={({ pressed }) => pressed && { opacity: 0.7 }}>
+            <AnimatedPressable onPress={reset} style={({ pressed }) => pressed && { opacity: 0.7 }}>
               <ThemedText style={styles.backBtn} lightColor="rgba(255,255,255,0.7)" darkColor="rgba(255,255,255,0.7)">
                 {t('scan.scanAgainHeader')}
               </ThemedText>
-            </Pressable>
+            </AnimatedPressable>
           </View>
         </SafeAreaView>
 
@@ -237,12 +226,12 @@ export default function ScanScreen() {
 
           {/* Actions */}
           <View style={styles.resultActions}>
-            <Pressable
+            <AnimatedPressable
               style={({ pressed }) => [styles.actionBtn, styles.actionBtnSecondary, pressed && { opacity: 0.7 }]}
               onPress={() => handleShare(result)}>
               <ThemedText style={styles.actionBtnText}>{t('common.share')}</ThemedText>
-            </Pressable>
-            <Pressable
+            </AnimatedPressable>
+            <AnimatedPressable
               style={({ pressed }) => [styles.actionBtn, styles.actionBtnPrimary, pressed && { opacity: 0.8 }]}
               onPress={() => {
                 router.navigate({
@@ -253,7 +242,7 @@ export default function ScanScreen() {
               <ThemedText style={styles.actionBtnTextPrimary} lightColor="#fff" darkColor="#fff">
                 {t('scan.askMore')}
               </ThemedText>
-            </Pressable>
+            </AnimatedPressable>
           </View>
 
           {result.matchedPlaceId && (
@@ -263,21 +252,21 @@ export default function ScanScreen() {
                 onPress={() => router.push({ pathname: '/place/[id]', params: { id: matchedPlace.id } })}
               />
             ) : (
-              <Pressable
+              <AnimatedPressable
                 style={({ pressed }) => [styles.matchedPlaceBtn, pressed && { opacity: 0.8 }]}
                 onPress={() => router.push({ pathname: '/place/[id]', params: { id: result.matchedPlaceId! } })}>
                 <ThemedText style={styles.matchedPlaceBtnText} lightColor={GOLD} darkColor={GOLD}>
                   {t('scan.viewDetailsInPiri')}
                 </ThemedText>
-              </Pressable>
+              </AnimatedPressable>
             )
           )}
 
-          <Pressable style={({ pressed }) => [styles.scanAgainBtn, pressed && { opacity: 0.8 }]} onPress={reset}>
+          <AnimatedPressable style={({ pressed }) => [styles.scanAgainBtn, pressed && { opacity: 0.8 }]} onPress={reset}>
             <ThemedText style={styles.scanAgainText} lightColor="rgba(255,255,255,0.7)" darkColor="rgba(255,255,255,0.7)">
               {t('scan.scanAnother')}
             </ThemedText>
-          </Pressable>
+          </AnimatedPressable>
         </ScrollView>
       </View>
     );
@@ -295,11 +284,11 @@ export default function ScanScreen() {
           <ThemedText style={styles.errorText} lightColor="rgba(255,255,255,0.9)" darkColor="rgba(255,255,255,0.9)">
             {state.message}
           </ThemedText>
-          <Pressable style={styles.goldButton} onPress={reset}>
+          <AnimatedPressable style={styles.goldButton} onPress={reset}>
             <ThemedText style={styles.goldButtonText} lightColor={NAVY} darkColor={NAVY}>
               {t('common.tryAgain')}
             </ThemedText>
-          </Pressable>
+          </AnimatedPressable>
         </View>
       </View>
     );
@@ -315,13 +304,13 @@ export default function ScanScreen() {
         {/* Top overlay */}
         <SafeAreaView>
           <View style={styles.topBar}>
-            <Pressable
+            <AnimatedPressable
               onPress={() => setFlash((f) => (f === 'off' ? 'on' : 'off'))}
               style={({ pressed }) => [styles.flashBtn, pressed && { opacity: 0.7 }]}>
               <ThemedText style={[styles.flashBtnText, flash === 'on' && styles.flashBtnTextOn]} lightColor="#fff" darkColor="#fff">
                 ⚡
               </ThemedText>
-            </Pressable>
+            </AnimatedPressable>
             <ThemedText style={styles.topBarText} lightColor="#fff" darkColor="#fff">
               {t('scan.pointAtPlace')}
             </ThemedText>
@@ -339,27 +328,28 @@ export default function ScanScreen() {
 
         {/* Bottom controls */}
         <View style={styles.bottomBar}>
-          <Pressable
+          <AnimatedPressable
             style={({ pressed }) => [styles.sideBtn, pressed && { opacity: 0.7 }]}
             onPress={handleGallery}>
             <ThemedText style={styles.sideBtnText} lightColor="#fff" darkColor="#fff">
               {t('scan.gallery')}
             </ThemedText>
-          </Pressable>
+          </AnimatedPressable>
 
-          <Pressable
-            style={({ pressed }) => [styles.captureBtn, pressed && { transform: [{ scale: 0.95 }] }]}
+          <AnimatedPressable
+            scaleTo={0.88}
+            style={styles.captureBtn}
             onPress={handleCapture}>
             <View style={styles.captureBtnInner} />
-          </Pressable>
+          </AnimatedPressable>
 
-          <Pressable
+          <AnimatedPressable
             style={({ pressed }) => [styles.sideBtn, pressed && { opacity: 0.7 }]}
             onPress={() => setFacing((f) => (f === 'back' ? 'front' : 'back'))}>
             <ThemedText style={styles.sideBtnText} lightColor="#fff" darkColor="#fff">
               {t('scan.flip')}
             </ThemedText>
-          </Pressable>
+          </AnimatedPressable>
         </View>
       </View>
     </View>
