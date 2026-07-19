@@ -1,19 +1,7 @@
-import * as SecureStore from 'expo-secure-store';
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
-const secureStoreStorage = {
-  getItem: async (name: string) => {
-    const value = await SecureStore.getItemAsync(name);
-    return value ?? null;
-  },
-  setItem: async (name: string, value: string) => {
-    await SecureStore.setItemAsync(name, value);
-  },
-  removeItem: async (name: string) => {
-    await SecureStore.deleteItemAsync(name);
-  },
-};
+import { secureStoreStorage } from '@/src/utils/secure-store-adapter';
 
 type SavedPlacesState = {
   favoritePlaceIds: Record<string, true>;

@@ -1,6 +1,64 @@
 import type { Place, PlaceCategory } from '@/src/data/places';
 import { getPlaceOpenStatus } from '@/src/utils/place-hours';
 
+type UserProfile = {
+  profession?: string | null;
+  interests?: string[];
+  faith?: string | null;
+};
+
+function getProfileBoost(place: Place, profile: UserProfile): number {
+  let score = 0;
+  const tags = place.tags;
+  const cat = place.category;
+  const { profession, interests = [], faith } = profile;
+
+  const isInterested = (interest: string) => interests.includes(interest);
+
+  if (profession === 'architect' || isInterested('architecture')) {
+    if (tags.includes('architecture') || cat === 'landmark' || cat === 'museum') score += 6;
+  }
+  if (profession === 'historian' || isInterested('history')) {
+    if (cat === 'museum' || cat === 'cultural-spot' || cat === 'landmark' || tags.includes('history')) score += 6;
+  }
+  if (profession === 'photographer' || isInterested('photography')) {
+    if (tags.includes('photogenic') || cat === 'viewpoint') score += 6;
+  }
+  if (profession === 'foodie' || isInterested('food')) {
+    if (cat === 'cafe' || cat === 'restaurant' || tags.includes('meal') || tags.includes('coffee break')) score += 6;
+  }
+  if (profession === 'artist' || isInterested('art')) {
+    if (tags.includes('art') || cat === 'museum' || cat === 'cultural-spot') score += 5;
+  }
+  if (isInterested('nature')) {
+    if (cat === 'beach' || cat === 'nature' || cat === 'walking-area') score += 5;
+  }
+  if (isInterested('nightlife')) {
+    if (tags.includes('nightlife') || tags.includes('date night')) score += 5;
+  }
+  if (isInterested('religion')) {
+    if (tags.includes('religion') || cat === 'cultural-spot') score += 4;
+  }
+  if (faith && faith !== 'secular' && faith !== 'prefer_not_to_say') {
+    if (tags.includes('religion') || cat === 'cultural-spot') score += 3;
+  }
+
+  return score;
+}
+
+export function sortPlacesForProfile(places: Place[], profile: UserProfile): Place[] {
+  if (!profile.profession && !profile.interests?.length && !profile.faith) {
+    return sortPlacesForBrowse(places);
+  }
+  return [...places].sort((a, b) => {
+    const boostDiff = getProfileBoost(b, profile) - getProfileBoost(a, profile);
+    if (boostDiff !== 0) return boostDiff;
+    const openDiff = getOpenPriority(b) - getOpenPriority(a);
+    if (openDiff !== 0) return openDiff;
+    return getPlaceQualityScore(b) - getPlaceQualityScore(a);
+  });
+}
+
 export type PlaceFilters = {
   query: string;
   category: PlaceCategory | 'all';
@@ -116,7 +174,7 @@ export function getPlaceQualityScore(place: Place) {
 }
 
 export function isHighQualityPlace(place: Place) {
-  return getPlaceQualityScore(place) >= 40;
+  return getPlaceQualityScore(place) >= 24;
 }
 
 export function sortPlacesForBrowse(places: Place[]) {

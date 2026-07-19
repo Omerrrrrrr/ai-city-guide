@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
+import { AdminGate } from '@/components/admin-gate';
 import { ExternalLink } from '@/components/external-link';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -32,6 +33,14 @@ function getErrorMessage(error: unknown) {
 }
 
 export default function AdminImagesScreen() {
+  return (
+    <AdminGate>
+      <AdminImagesScreenContent />
+    </AdminGate>
+  );
+}
+
+function AdminImagesScreenContent() {
   const [statusFilter, setStatusFilter] = React.useState<ImageCandidateStatus | 'all'>('pending');
   const [candidates, setCandidates] = React.useState<ImageCandidate[]>([]);
   const [error, setError] = React.useState<string | null>(null);

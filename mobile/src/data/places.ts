@@ -91,4 +91,6 @@ export type PlaceCategory =
   | 'cafe'
   | 'restaurant'
   | 'viewpoint'
-  | 'shopping-area';
+  | 'shopping-area'
+  | 'lodging'
+  | 'nature';

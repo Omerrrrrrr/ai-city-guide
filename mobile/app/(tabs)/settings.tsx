@@ -1,276 +1,473 @@
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import Constants from 'expo-constants';
+import * as Haptics from 'expo-haptics';
 import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, TextInput, View, useColorScheme } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { fetchAppStatus, type AppStatusResponse } from '@/src/api/app-status';
-import { API_BASE_URL } from '@/src/config/api';
 import { useSavedPlaces } from '@/src/store/saved-places';
+import { useRecentlyViewed } from '@/src/store/recently-viewed';
+import { useCityStore } from '@/src/store/city';
+import {
+  useUserProfile as useProfile,
+  type Profession,
+  type Interest,
+  type Faith,
+} from '@/src/store/user-profile';
 
-type StatusTone = 'neutral' | 'positive' | 'warning';
+const NAVY = '#0F1C3F';
+const GOLD = '#D4A843';
 
-function StatusChip({ label, tone = 'neutral' }: { label: string; tone?: StatusTone }) {
+const PROFESSIONS: { value: Profession; label: string }[] = [
+  { value: 'architect', label: 'Architect' },
+  { value: 'historian', label: 'Historian' },
+  { value: 'photographer', label: 'Photographer' },
+  { value: 'artist', label: 'Artist' },
+  { value: 'engineer', label: 'Engineer' },
+  { value: 'doctor', label: 'Doctor' },
+  { value: 'foodie', label: 'Foodie' },
+  { value: 'student', label: 'Student' },
+  { value: 'writer', label: 'Writer' },
+  { value: 'other', label: 'Other' },
+];
+
+const INTERESTS: { value: Interest; label: string }[] = [
+  { value: 'history', label: 'History' },
+  { value: 'architecture', label: 'Architecture' },
+  { value: 'art', label: 'Art' },
+  { value: 'religion', label: 'Religion' },
+  { value: 'food', label: 'Food & Drink' },
+  { value: 'nature', label: 'Nature' },
+  { value: 'nightlife', label: 'Nightlife' },
+  { value: 'music', label: 'Music' },
+  { value: 'photography', label: 'Photography' },
+  { value: 'sports', label: 'Sports' },
+];
+
+const FAITHS: { value: Faith; label: string }[] = [
+  { value: 'muslim', label: 'Muslim' },
+  { value: 'christian', label: 'Christian' },
+  { value: 'jewish', label: 'Jewish' },
+  { value: 'buddhist', label: 'Buddhist' },
+  { value: 'hindu', label: 'Hindu' },
+  { value: 'secular', label: 'Secular / Non-religious' },
+  { value: 'prefer_not_to_say', label: 'Prefer not to say' },
+];
+
+export default function ProfileScreen() {
+  const dark = useColorScheme() === 'dark';
+  const router = useRouter();
+  const { name, profession, interests, faith, setProfile } = useProfile();
+  const { cityName } = useCityStore();
+  const [editingName, setEditingName] = React.useState(false);
+  const [nameInput, setNameInput] = React.useState(name);
+  const { favoritePlaceIds, planPlaceIds, clearFavorites, clearPlan } = useSavedPlaces();
+  const { viewedIds, clearHistory } = useRecentlyViewed();
+  const favoriteCount = Object.keys(favoritePlaceIds).length;
+  const planCount = planPlaceIds.length;
+  const recentCount = viewedIds.length;
+  const version = Constants.expoConfig?.version ?? '1.0.0';
+
+  const toggleInterest = (value: Interest) =>
+    setProfile({
+      interests: interests.includes(value)
+        ? interests.filter((i) => i !== value)
+        : [...interests, value],
+    });
+
+  const displayName = name.trim() || 'Traveler';
+  const professionLabel = profession
+    ? PROFESSIONS.find((p) => p.value === profession)?.label
+    : null;
+  const faithLabel =
+    faith && faith !== 'prefer_not_to_say'
+      ? FAITHS.find((f) => f.value === faith)?.label
+      : null;
+
   return (
-    <View
-      style={[
-        styles.statusChip,
-        tone === 'positive' && styles.statusChipPositive,
-        tone === 'warning' && styles.statusChipWarning,
-      ]}>
-      <ThemedText style={styles.statusChipText}>{label}</ThemedText>
+    <View style={styles.screenRoot}>
+      {/* Navy header */}
+      <SafeAreaView style={{ backgroundColor: NAVY }}>
+        <View style={styles.navHeader}>
+          <View style={styles.avatar}>
+            <ThemedText style={styles.avatarText}>{displayName[0].toUpperCase()}</ThemedText>
+          </View>
+          <View style={{ flex: 1 }}>
+            {editingName ? (
+              <TextInput
+                value={nameInput}
+                onChangeText={setNameInput}
+                autoFocus
+                style={styles.nameInput}
+                placeholderTextColor="rgba(255,255,255,0.4)"
+                placeholder="Your name"
+                returnKeyType="done"
+                onSubmitEditing={() => {
+                  setProfile({ name: nameInput.trim() });
+                  setEditingName(false);
+                }}
+                onBlur={() => {
+                  setProfile({ name: nameInput.trim() });
+                  setEditingName(false);
+                }}
+              />
+            ) : (
+              <Pressable onPress={() => { setNameInput(name); setEditingName(true); }}>
+                <ThemedText style={styles.displayName} lightColor="#fff" darkColor="#fff">
+                  {displayName}
+                  <ThemedText style={styles.editHint} lightColor="rgba(255,255,255,0.35)" darkColor="rgba(255,255,255,0.35)"> ✎</ThemedText>
+                </ThemedText>
+              </Pressable>
+            )}
+            {(professionLabel || faithLabel) ? (
+              <ThemedText style={styles.subline} lightColor="rgba(255,255,255,0.6)" darkColor="rgba(255,255,255,0.6)">
+                {[professionLabel, faithLabel].filter(Boolean).join(' · ')}
+              </ThemedText>
+            ) : null}
+          </View>
+        </View>
+      </SafeAreaView>
+
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}>
+
+      {/* Profession */}
+      <ThemedView style={styles.card}>
+        <ThemedText style={styles.cardLabel}>What do you do?</ThemedText>
+        <View style={styles.chipGrid}>
+          {PROFESSIONS.map(({ value, label }) => {
+            const active = profession === value;
+            return (
+              <Pressable
+                key={value}
+                style={[styles.chip, active && styles.chipActive]}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setProfile({ profession: value }); }}>
+                <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>
+                  {label}
+                </ThemedText>
+              </Pressable>
+            );
+          })}
+        </View>
+      </ThemedView>
+
+      {/* Interests */}
+      <ThemedView style={styles.card}>
+        <ThemedText style={styles.cardLabel}>Interests</ThemedText>
+        <View style={styles.chipGrid}>
+          {INTERESTS.map(({ value, label }) => {
+            const active = interests.includes(value);
+            return (
+              <Pressable
+                key={value}
+                style={[styles.chip, active && styles.chipActive]}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); toggleInterest(value); }}>
+                <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>
+                  {label}
+                </ThemedText>
+              </Pressable>
+            );
+          })}
+        </View>
+      </ThemedView>
+
+      {/* Faith */}
+      <ThemedView style={styles.card}>
+        <ThemedText style={styles.cardLabel}>Faith & perspective</ThemedText>
+        <ThemedText style={styles.cardNote}>
+          Helps Piri tailor explanations of sacred and historic spaces.
+        </ThemedText>
+        <View style={styles.chipGrid}>
+          {FAITHS.map(({ value, label }) => {
+            const active = faith === value;
+            return (
+              <Pressable
+                key={value}
+                style={[styles.chip, active && styles.chipActive]}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setProfile({ faith: value }); }}>
+                <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>
+                  {label}
+                </ThemedText>
+              </Pressable>
+            );
+          })}
+        </View>
+      </ThemedView>
+
+      {/* Current city */}
+      <ThemedView style={styles.card}>
+        <ThemedText style={styles.cardLabel}>Current city</ThemedText>
+        <Pressable
+          onPress={() => router.push('/city-picker' as never)}
+          style={({ pressed }) => [styles.cityRow, pressed && styles.buttonPressed]}>
+          <ThemedText style={styles.cityName}>
+            {cityName ? `📍 ${cityName}` : '🌍 Everywhere'}
+          </ThemedText>
+          <ThemedText style={styles.cityChevron} lightColor={NAVY} darkColor={GOLD}>Change ›</ThemedText>
+        </Pressable>
+      </ThemedView>
+
+      {/* Saved data */}
+      <ThemedView style={styles.card}>
+        <View style={styles.cardHeaderRow}>
+          <ThemedText style={styles.cardLabel}>Saved Places</ThemedText>
+          <Link href={'/saved' as never} asChild>
+            <Pressable style={({ pressed }) => [styles.viewAllBtn, pressed && styles.buttonPressed]}>
+              <ThemedText style={styles.viewAllText} lightColor={NAVY} darkColor={GOLD}>
+                View all →
+              </ThemedText>
+            </Pressable>
+          </Link>
+        </View>
+        <View style={styles.row}>
+          <Link href={{ pathname: '/saved', params: { tab: 'favorites' } } as never} asChild>
+            <Pressable style={({ pressed }) => [styles.statBtn, pressed && styles.buttonPressed]}>
+              <ThemedText style={styles.statNum}>{favoriteCount}</ThemedText>
+              <ThemedText style={styles.statLabel}>saved</ThemedText>
+            </Pressable>
+          </Link>
+          <Link href={{ pathname: '/saved', params: { tab: 'plan' } } as never} asChild>
+            <Pressable style={({ pressed }) => [styles.statBtn, pressed && styles.buttonPressed]}>
+              <ThemedText style={styles.statNum}>{planCount}</ThemedText>
+              <ThemedText style={styles.statLabel}>in plan</ThemedText>
+            </Pressable>
+          </Link>
+          <Link href={{ pathname: '/saved', params: { tab: 'visited' } } as never} asChild>
+            <Pressable style={({ pressed }) => [styles.statBtn, pressed && styles.buttonPressed]}>
+              <ThemedText style={styles.statNum}>{recentCount}</ThemedText>
+              <ThemedText style={styles.statLabel}>visited</ThemedText>
+            </Pressable>
+          </Link>
+        </View>
+        <View style={styles.actions}>
+          <Pressable
+            onPress={clearFavorites}
+            disabled={favoriteCount === 0}
+            style={({ pressed }) => [
+              styles.button,
+              favoriteCount === 0 && styles.buttonDisabled,
+              pressed && favoriteCount > 0 && styles.buttonPressed,
+            ]}>
+            <ThemedText style={styles.buttonText}>Clear Favorites</ThemedText>
+          </Pressable>
+          <Pressable
+            onPress={clearPlan}
+            disabled={planCount === 0}
+            style={({ pressed }) => [
+              styles.button,
+              planCount === 0 && styles.buttonDisabled,
+              pressed && planCount > 0 && styles.buttonPressed,
+            ]}>
+            <ThemedText style={styles.buttonText}>Clear Plan</ThemedText>
+          </Pressable>
+        </View>
+        <Pressable
+          onPress={clearHistory}
+          disabled={recentCount === 0}
+          style={({ pressed }) => [
+            styles.button,
+            recentCount === 0 && styles.buttonDisabled,
+            pressed && recentCount > 0 && styles.buttonPressed,
+          ]}>
+          <ThemedText style={styles.buttonText}>Clear History</ThemedText>
+        </Pressable>
+      </ThemedView>
+
+      {/* App info */}
+      <ThemedText style={styles.versionText}>Piri v{version}</ThemedText>
+
+      {/* Admin (dev only) */}
+      {__DEV__ ? (
+        <ThemedView style={styles.card}>
+          <ThemedText style={styles.cardLabel}>Admin (dev only)</ThemedText>
+          <View style={styles.adminActions}>
+            <Link href={'/admin-hours' as never} asChild>
+              <Pressable style={({ pressed }) => [styles.panelButton, pressed && styles.buttonPressed]}>
+                <ThemedText style={styles.panelButtonText}>Hours Review</ThemedText>
+              </Pressable>
+            </Link>
+            <Link href="/admin-images" asChild>
+              <Pressable style={({ pressed }) => [styles.panelButton, pressed && styles.buttonPressed]}>
+                <ThemedText style={styles.panelButtonText}>Image Review</ThemedText>
+              </Pressable>
+            </Link>
+          </View>
+        </ThemedView>
+      ) : null}
+    </ScrollView>
     </View>
   );
 }
 
-export default function SettingsScreen() {
-  const { favoritePlaceIds, planPlaceIds, clearFavorites, clearPlan } = useSavedPlaces();
-  const favoriteCount = Object.keys(favoritePlaceIds).length;
-  const planCount = planPlaceIds.length;
-  const version = Constants.expoConfig?.version ?? '1.0.0';
-
-  const [appStatus, setAppStatus] = React.useState<AppStatusResponse | null>(null);
-  const [statusError, setStatusError] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    let active = true;
-
-    void (async () => {
-      try {
-        const nextStatus = await fetchAppStatus();
-        if (!active) return;
-        setAppStatus(nextStatus);
-        setStatusError(null);
-      } catch {
-        if (!active) return;
-        setStatusError('Backend status could not be loaded right now.');
-      }
-    })();
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const isBackendConnected = Boolean(appStatus) && !statusError;
-  const aiEnabled = appStatus?.features.aiRecommendationsEnabled ?? false;
-  const aiProviderLabel =
-    appStatus?.features.aiProvider === 'openai'
-      ? 'OpenAI'
-      : appStatus?.features.aiProvider === 'openrouter'
-        ? 'OpenRouter'
-        : null;
-  const googleHoursEnabled = appStatus?.features.googleHoursPreviewEnabled ?? false;
-
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#E6F2FF', dark: '#0E2438' }}
-      headerImage={<View style={styles.header} />}>
-      <ThemedView style={styles.container}>
-        <ThemedText type="title">Settings</ThemedText>
-
-        <ThemedView style={styles.card}>
-          <ThemedText type="subtitle">App</ThemedText>
-          <ThemedText style={styles.text}>Version {version}</ThemedText>
-          <ThemedText style={styles.text}>
-            Browse places, save favorites, and manage your plan from one app.
-          </ThemedText>
-        </ThemedView>
-
-        <ThemedView style={styles.card}>
-          <View style={styles.cardTopRow}>
-            <ThemedText type="subtitle">Backend</ThemedText>
-            <StatusChip
-              label={
-                statusError
-                  ? 'Status unavailable'
-                  : isBackendConnected
-                    ? 'Connected'
-                    : 'Checking'
-              }
-              tone={statusError ? 'warning' : isBackendConnected ? 'positive' : 'neutral'}
-            />
-          </View>
-          <ThemedText style={styles.label}>API base URL</ThemedText>
-          <ThemedText style={styles.code}>{API_BASE_URL}</ThemedText>
-          <ThemedText style={styles.text}>
-            Override it with `EXPO_PUBLIC_API_URL` in `mobile/.env` when you need a fixed address.
-          </ThemedText>
-          {statusError ? <ThemedText style={styles.warningText}>{statusError}</ThemedText> : null}
-          {appStatus ? (
-            <ThemedText style={styles.text}>
-              AI recommendations: {aiEnabled ? `enabled via ${aiProviderLabel}` : 'disabled'} ·
-              Google hours preview: {googleHoursEnabled ? 'enabled' : 'manual only'}
-            </ThemedText>
-          ) : null}
-        </ThemedView>
-
-        <ThemedView style={styles.card}>
-          <ThemedText type="subtitle">Saved Data</ThemedText>
-          <ThemedText style={styles.text}>Favorites: {favoriteCount}</ThemedText>
-          <ThemedText style={styles.text}>Plan items: {planCount}</ThemedText>
-
-          <View style={styles.actions}>
-            <Pressable
-              onPress={clearFavorites}
-              disabled={favoriteCount === 0}
-              style={({ pressed }) => [
-                styles.button,
-                favoriteCount === 0 && styles.buttonDisabled,
-                pressed && favoriteCount > 0 && styles.buttonPressed,
-              ]}>
-              <ThemedText style={styles.buttonText}>Clear Favorites</ThemedText>
-            </Pressable>
-            <Pressable
-              onPress={clearPlan}
-              disabled={planCount === 0}
-              style={({ pressed }) => [
-                styles.button,
-                planCount === 0 && styles.buttonDisabled,
-                pressed && planCount > 0 && styles.buttonPressed,
-              ]}>
-              <ThemedText style={styles.buttonText}>Clear Plan</ThemedText>
-            </Pressable>
-          </View>
-        </ThemedView>
-
-        <ThemedView style={styles.card}>
-          <View style={styles.cardTopRow}>
-            <ThemedText type="subtitle">AI</ThemedText>
-            <StatusChip
-              label={aiEnabled ? `${aiProviderLabel} ready` : 'Needs backend key'}
-              tone={aiEnabled ? 'positive' : 'warning'}
-            />
-          </View>
-          <ThemedText style={styles.text}>
-            {aiEnabled
-              ? `Ask AI is active and the backend is returning recommendations through ${aiProviderLabel}.`
-              : 'Ask AI screen is wired, but recommendations stay disabled until the backend key is configured.'}
-          </ThemedText>
-          <ThemedText style={styles.text}>
-            {aiEnabled
-              ? 'You can use the Ask AI tab directly.'
-              : 'Set `OPENAI_API_KEY` or `OPENROUTER_API_KEY` in `apps/api/.env`, then restart the API.'}
-          </ThemedText>
-        </ThemedView>
-
-        <ThemedView style={styles.card}>
-          <View style={styles.cardTopRow}>
-            <ThemedText type="subtitle">Admin</ThemedText>
-            <StatusChip
-              label={googleHoursEnabled ? 'Google hours ready' : 'Hours review manual'}
-              tone={googleHoursEnabled ? 'positive' : 'neutral'}
-            />
-          </View>
-          <ThemedText style={styles.text}>
-            Review pending image candidates and manage verified place photos without using the
-            terminal.
-          </ThemedText>
-          <ThemedText style={styles.text}>
-            Hours Review {googleHoursEnabled ? 'can prefill from Google Places.' : 'currently works in manual mode.'}
-          </ThemedText>
-
-          <View style={styles.adminActions}>
-            <Link href={'/admin-hours' as any} asChild>
-              <Pressable
-                style={({ pressed }) => [styles.panelButton, pressed && styles.buttonPressed]}>
-                <ThemedText style={styles.panelButtonText}>Open Hours Review</ThemedText>
-              </Pressable>
-            </Link>
-            <Link href="/admin-images" asChild>
-              <Pressable
-                style={({ pressed }) => [styles.panelButton, pressed && styles.buttonPressed]}>
-                <ThemedText style={styles.panelButtonText}>Open Image Review</ThemedText>
-              </Pressable>
-            </Link>
-          </View>
-        </ThemedView>
-      </ThemedView>
-    </ParallaxScrollView>
-  );
-}
-
 const styles = StyleSheet.create({
-  header: {
-    height: 178,
+  screenRoot: {
+    flex: 1,
   },
-  container: {
-    gap: 12,
+  navHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 16,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  content: {
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    gap: 14,
+  },
+  avatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    color: GOLD,
+    fontSize: 24,
+    fontWeight: '700',
+  },
+  displayName: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  editHint: {
+    fontSize: 16,
+    fontWeight: '400',
+  },
+  nameInput: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#fff',
+    borderBottomWidth: 1.5,
+    borderBottomColor: GOLD,
+    paddingVertical: 2,
+    minWidth: 120,
+  },
+  subline: {
+    fontSize: 14,
+    marginTop: 2,
+  },
+  cityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  cityName: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  cityChevron: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  viewAllBtn: {
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  viewAllText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   card: {
-    gap: 10,
+    gap: 12,
     padding: 16,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: 'rgba(127,127,127,0.18)',
   },
-  cardTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  label: {
+  cardLabel: {
     fontSize: 13,
-    lineHeight: 18,
-    opacity: 0.72,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    opacity: 0.5,
   },
-  code: {
+  cardNote: {
     fontSize: 14,
+    opacity: 0.6,
     lineHeight: 20,
-    fontFamily: 'monospace',
+    marginTop: -4,
   },
-  text: {
-    opacity: 0.8,
-    lineHeight: 22,
+  chipGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
-  warningText: {
-    color: '#B54708',
-    lineHeight: 20,
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 50,
+    borderWidth: 1.5,
+    borderColor: 'rgba(127,127,127,0.24)',
   },
-  statusChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
+  chipActive: {
+    backgroundColor: NAVY,
+    borderColor: NAVY,
+  },
+  chipText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  chipTextActive: {
+    color: '#FFFFFF',
+  },
+  row: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  statBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(15,28,63,0.05)',
+    gap: 2,
     borderWidth: 1,
-    borderColor: 'rgba(127,127,127,0.18)',
-    backgroundColor: 'rgba(127,127,127,0.06)',
+    borderColor: 'rgba(127,127,127,0.12)',
   },
-  statusChipPositive: {
-    borderColor: 'rgba(18,183,106,0.24)',
-    backgroundColor: 'rgba(18,183,106,0.1)',
+  statNum: {
+    fontSize: 22,
+    fontWeight: '700',
+    lineHeight: 26,
   },
-  statusChipWarning: {
-    borderColor: 'rgba(245,158,11,0.24)',
-    backgroundColor: 'rgba(245,158,11,0.12)',
-  },
-  statusChipText: {
+  statLabel: {
     fontSize: 12,
-    lineHeight: 16,
+    opacity: 0.5,
+    fontWeight: '500',
   },
   actions: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 4,
   },
   adminActions: {
     gap: 10,
-    marginTop: 4,
   },
   button: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: 11,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(127,127,127,0.24)',
   },
   panelButton: {
     alignItems: 'center',
-    justifyContent: 'center',
     paddingVertical: 14,
     borderRadius: 14,
     borderWidth: 1,
@@ -279,17 +476,20 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontSize: 14,
-    lineHeight: 18,
   },
   panelButtonText: {
     fontSize: 15,
-    lineHeight: 20,
     fontWeight: '600',
   },
   buttonDisabled: {
-    opacity: 0.45,
+    opacity: 0.35,
   },
   buttonPressed: {
-    opacity: 0.72,
+    opacity: 0.7,
+  },
+  versionText: {
+    textAlign: 'center',
+    fontSize: 13,
+    opacity: 0.35,
   },
 });

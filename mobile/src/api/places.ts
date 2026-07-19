@@ -23,8 +23,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
-export function fetchPlaces() {
-  return request<Place[]>('/places');
+export function fetchPlaces(city?: string | null) {
+  const qs = city ? `?city=${encodeURIComponent(city)}` : '';
+  return request<Place[]>(`/places${qs}`);
 }
 
 export function fetchPlace(id: string) {
@@ -72,19 +73,101 @@ export function lookupPlaceInfo(lat: number, lng: number) {
 
 export async function fetchRecommendations(
   query: string,
-  messages: AIConversationMessage[] = []
+  messages: AIConversationMessage[] = [],
+  userProfile?: {
+    name?: string;
+    profession?: string | null;
+    interests?: string[];
+    faith?: string | null;
+  },
+  weather?: {
+    condition: string;
+    temp: number;
+    city: string;
+    description: string;
+  },
+  city?: string | null
 ): Promise<AIRecommendationResponse> {
   const response = await fetch(`${API_BASE_URL}/places/recommend`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ query, messages }),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, messages, userProfile, weather, ...(city ? { city } : {}) }),
   });
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
     throw new Error(err.error || 'Failed to fetch recommendations');
+  }
+
+  return await response.json();
+}
+
+export type ExplainResult = {
+  headline: string;
+  body: string;
+  highlights: string[];
+};
+
+const explainCache = new Map<string, ExplainResult>();
+
+export async function explainPlace(
+  placeId: string,
+  userProfile?: {
+    name?: string;
+    profession?: string | null;
+    interests?: string[];
+    faith?: string | null;
+  }
+): Promise<ExplainResult> {
+  const cacheKey = `${placeId}:${userProfile?.profession ?? ''}:${(userProfile?.interests ?? []).join(',')}:${userProfile?.faith ?? ''}`;
+  const cached = explainCache.get(cacheKey);
+  if (cached) return cached;
+
+  const response = await fetch(`${API_BASE_URL}/places/explain`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ placeId, userProfile }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error((err as any).error || 'Failed to explain place');
+  }
+
+  const result = (await response.json()) as ExplainResult;
+  explainCache.set(cacheKey, result);
+  return result;
+}
+
+export type IdentifyResult = {
+  title: string;
+  subtitle: string;
+  explanation: string;
+  highlights: string[];
+  matchedPlaceId?: string;
+};
+
+export async function identifyPlace(payload: {
+  imageBase64: string;
+  mimeType?: string;
+  lat?: number;
+  lng?: number;
+  userProfile?: {
+    name?: string;
+    profession?: string | null;
+    interests?: string[];
+    faith?: string | null;
+  };
+}): Promise<IdentifyResult> {
+  const response = await fetch(`${API_BASE_URL}/places/identify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to identify place');
   }
 
   return await response.json();

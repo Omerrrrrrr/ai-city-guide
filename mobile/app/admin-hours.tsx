@@ -2,6 +2,7 @@ import { Stack } from 'expo-router';
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
+import { AdminGate } from '@/components/admin-gate';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { fetchPlaces } from '@/src/api/places';
@@ -175,6 +176,14 @@ function formatBusinessStatus(status?: string) {
 }
 
 export default function AdminHoursScreen() {
+  return (
+    <AdminGate>
+      <AdminHoursScreenContent />
+    </AdminGate>
+  );
+}
+
+function AdminHoursScreenContent() {
   const [places, setPlaces] = React.useState<Place[]>([]);
   const [search, setSearch] = React.useState('');
   const [expandedPlaceId, setExpandedPlaceId] = React.useState<string | null>(null);

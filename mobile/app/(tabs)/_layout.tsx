@@ -1,10 +1,22 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
+import { View, StyleSheet } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+
+const NAVY = '#0F1C3F';
+const GOLD = '#D4A843';
+
+function ScanTabIcon({ color, focused }: { color: string; focused: boolean }) {
+  return (
+    <View style={[styles.scanIcon, focused && styles.scanIconActive]}>
+      <IconSymbol size={22} name="camera.fill" color={focused ? NAVY : color} />
+    </View>
+  );
+}
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -15,49 +27,70 @@ export default function TabLayout() {
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
         tabBarButton: HapticTab,
+        tabBarStyle: {
+          backgroundColor: colorScheme === 'dark' ? '#0A0F1E' : '#fff',
+          borderTopColor: 'rgba(127,127,127,0.12)',
+        },
       }}>
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={26} name="house.fill" color={color} />,
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="scan"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: 'Scan',
+          tabBarIcon: ({ color, focused }) => <ScanTabIcon color={color} focused={focused} />,
+          tabBarLabel: 'Scan',
         }}
       />
       <Tabs.Screen
         name="map"
         options={{
           title: 'Map',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="map.fill" color={color} />,
+          tabBarIcon: ({ color }) => <IconSymbol size={26} name="map.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="ai"
         options={{
-          title: 'Ask AI',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="sparkles" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="saved"
-        options={{
-          title: 'Saved',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="bookmark.fill" color={color} />,
+          title: 'Ask Piri',
+          tabBarIcon: ({ color }) => <IconSymbol size={26} name="sparkles" color={color} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Settings',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="gearshape.fill" color={color} />,
+          title: 'Profile',
+          tabBarIcon: ({ color }) => <IconSymbol size={26} name="person.fill" color={color} />,
         }}
+      />
+      {/* Hidden from tab bar but accessible as routes */}
+      <Tabs.Screen
+        name="explore"
+        options={{ href: null }}
+      />
+      <Tabs.Screen
+        name="saved"
+        options={{ href: null }}
       />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  scanIcon: {
+    width: 44,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(15,28,63,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scanIconActive: {
+    backgroundColor: GOLD,
+  },
+});

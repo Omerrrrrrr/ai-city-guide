@@ -1,17 +1,35 @@
 import React from 'react';
-import { Link, Stack, useLocalSearchParams } from 'expo-router';
-import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Stack, Link, useLocalSearchParams, useRouter } from 'expo-router';
+import {
+  Linking,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  View,
+  useColorScheme,
+  type ViewStyle,
+} from 'react-native';
 import { Image } from 'expo-image';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ExternalLink } from '@/components/external-link';
+import * as Haptics from 'expo-haptics';
+
 import { PlaceImage } from '@/components/place-image';
 import { PlaceMiniMap } from '@/components/place-mini-map';
+import { PlaceDetailSkeleton, SkeletonBox } from '@/components/skeleton';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { usePlace, useNearbyPlaces } from '@/src/hooks/use-places';
 import { useSavedPlaces } from '@/src/store/saved-places';
-import type { PlaceGalleryImage } from '@/src/data/places';
+import { useRecentlyViewed } from '@/src/store/recently-viewed';
+import { explainPlace, type ExplainResult } from '@/src/api/places';
+import { useUserProfile } from '@/src/store/user-profile';
 import { getPlaceOpenStatus, getWeeklyHoursSchedule } from '@/src/utils/place-hours';
+import { CATEGORY_EMOJI, formatCategory } from '@/src/utils/categories';
+
+const NAVY = '#0F1C3F';
+const GOLD = '#D4A843';
 
 function getDirectionsUrl(place: {
   location?: { lat: number; lng: number };
@@ -20,13 +38,9 @@ function getDirectionsUrl(place: {
   if (place.location) {
     return `https://www.google.com/maps/search/?api=1&query=${place.location.lat},${place.location.lng}`;
   }
-
   if (place.verifiedFacts?.address) {
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-      place.verifiedFacts.address
-    )}`;
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.verifiedFacts.address)}`;
   }
-
   return null;
 }
 
@@ -34,795 +48,738 @@ function getWalkMinutes(distanceKm: number) {
   return Math.max(1, Math.round((distanceKm / 4.8) * 60));
 }
 
-type DetailPhoto = {
-  id: string;
-  imageUrl: string;
-  sourceUrl?: string;
-  sourceName?: string;
-  license?: string;
-  attribution?: string;
-  verified: boolean;
-  type: string;
-  status: 'primary' | PlaceGalleryImage['status'];
-  confidence?: number;
-  pageTitle?: string;
-  notes?: string;
-};
-
-function canDisplayPhoto(photo: DetailPhoto) {
-  return photo.status !== 'primary' || photo.verified;
-}
-
-function getPhotoStatusLabel(photo: DetailPhoto) {
-  if (photo.status === 'primary') {
-    return photo.verified ? 'Verified main photo' : 'Photo unavailable';
-  }
-
-  if (photo.verified || photo.status === 'applied') {
-    return 'Verified gallery photo';
-  }
-
-  if (photo.status === 'approved') {
-    return 'Approved candidate';
-  }
-
-  return 'Review candidate';
-}
-
 export default function PlaceDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const colorScheme = useColorScheme();
+  const dark = colorScheme === 'dark';
 
   const { data: place, error, isLoading, refresh } = usePlace(id);
   const { data: nearbyPlaces } = useNearbyPlaces(id);
   const { isFavorite, toggleFavorite, isInPlan, togglePlan } = useSavedPlaces();
+  const { markViewed } = useRecentlyViewed();
+  const { name: userName, profession, interests, faith } = useUserProfile();
   const [isMapInteracting, setIsMapInteracting] = React.useState(false);
-  const [selectedPhotoId, setSelectedPhotoId] = React.useState<string | null>(null);
-
-  const photoGallery = React.useMemo<DetailPhoto[]>(() => {
-    if (!place) return [];
-
-    const primaryPhoto: DetailPhoto = {
-      id: `primary:${place.id}`,
-      imageUrl: place.imageUrl,
-      sourceUrl: place.image.sourceUrl,
-      sourceName: place.image.sourceName,
-      license: place.image.license,
-      attribution: place.image.attribution,
-      verified: place.image.verified,
-      type: place.image.type,
-      status: 'primary',
-    };
-
-    return [primaryPhoto, ...(place.gallery ?? [])];
-  }, [place]);
+  const [piriseTake, setPirisTake] = React.useState<ExplainResult | null>(null);
+  const [pirisLoading, setPirisLoading] = React.useState(false);
 
   React.useEffect(() => {
-    const defaultPhoto =
-      photoGallery.find((photo) => photo.status === 'primary' && photo.verified) ??
-      photoGallery.find((photo) => photo.status !== 'primary') ??
-      photoGallery[0];
+    if (id) markViewed(id);
+  }, [id]);
 
-    setSelectedPhotoId(defaultPhoto?.id ?? null);
-  }, [photoGallery]);
+  React.useEffect(() => {
+    if (!id || !place) return;
+    let cancelled = false;
+    setPirisLoading(true);
+    explainPlace(id, { name: userName, profession, interests, faith })
+      .then((result) => { if (!cancelled) setPirisTake(result); })
+      .catch(() => { /* silently fail — non-critical */ })
+      .finally(() => { if (!cancelled) setPirisLoading(false); });
+    return () => { cancelled = true; };
+  }, [id, place?.id, profession, faith, interests?.join(',')]);
 
+
+  const bg = dark ? '#0A0F1E' : '#F4F5F9';
+  const cardBg = dark ? '#1A2744' : '#fff';
+
+  // ── Loading ───────────────────────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <ThemedView style={styles.centered}>
-        <Stack.Screen options={{ title: 'Place' }} />
-        <ThemedText type="subtitle">Loading place…</ThemedText>
-      </ThemedView>
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <PlaceDetailSkeleton insetTop={insets.top} />
+      </>
     );
   }
 
-  if (error) {
+  // ── Error ─────────────────────────────────────────────────────────────────────
+  if (error || !place) {
     return (
-      <ThemedView style={styles.centered}>
-        <Stack.Screen options={{ title: 'Place' }} />
-        <ThemedText type="subtitle">Could not load place</ThemedText>
-        <ThemedText style={styles.body}>{error}</ThemedText>
-        <Pressable onPress={refresh} style={({ pressed }) => [styles.actionButton, pressed && styles.actionButtonPressed]}>
-          <ThemedText style={styles.actionButtonText}>Retry</ThemedText>
+      <View style={[styles.fullCenter, { backgroundColor: bg }]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={[styles.floatingBack, { top: insets.top + 12 }]}>
+          <Pressable onPress={() => router.back()} style={styles.backBtn}>
+            <ThemedText style={styles.backBtnText}>←</ThemedText>
+          </Pressable>
+        </View>
+        <ThemedText style={styles.errorTitle}>Couldn't load place</ThemedText>
+        {error ? <ThemedText style={styles.errorBody}>{error}</ThemedText> : null}
+        <Pressable style={styles.retryBtn} onPress={refresh}>
+          <ThemedText style={styles.retryBtnText} lightColor="#fff" darkColor="#fff">Try again</ThemedText>
         </Pressable>
-      </ThemedView>
-    );
-  }
-
-  if (!place) {
-    return (
-      <ThemedView style={styles.centered}>
-        <Stack.Screen options={{ title: 'Place' }} />
-        <ThemedText type="subtitle">Place not found</ThemedText>
-      </ThemedView>
+      </View>
     );
   }
 
   const directionsUrl = getDirectionsUrl(place);
-  const mapNearbyPlaces = nearbyPlaces?.filter((nearby) => nearby.location).slice(0, 3) ?? [];
   const openStatus = getPlaceOpenStatus(place);
   const weeklyHours = getWeeklyHoursSchedule(place);
-  const selectedPhoto = photoGallery.find((photo) => photo.id === selectedPhotoId) ?? photoGallery[0];
+  const isOpen = openStatus.state === 'open' || openStatus.state === 'all-day';
+  const mapNearbyPlaces = nearbyPlaces?.filter((n) => n.location).slice(0, 5) ?? [];
+  const saved = isFavorite(place.id);
+  const inPlan = isInPlan(place.id);
+
+  // Pick best photo
+  const galleryPhotos = place.gallery ?? [];
+  const verifiedGallery = galleryPhotos.filter((p) => p.verified || p.status === 'applied');
+  const heroUrl = place.image.verified
+    ? place.imageUrl
+    : verifiedGallery[0]?.imageUrl ?? place.imageUrl;
 
   return (
     <>
-      <Stack.Screen options={{ title: place.name }} />
-      <ScrollView contentContainerStyle={styles.container} scrollEnabled={!isMapInteracting}>
-        {selectedPhoto && canDisplayPhoto(selectedPhoto) ? (
-          <Image source={{ uri: selectedPhoto.imageUrl }} style={styles.image} contentFit="cover" />
-        ) : (
-          <PlaceImage place={place} style={styles.image} />
-        )}
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScrollView
+        style={{ flex: 1, backgroundColor: bg }}
+        scrollEnabled={!isMapInteracting}
+        showsVerticalScrollIndicator={false}>
 
-        <ThemedView style={styles.content}>
-          <View style={styles.headerRow}>
-            <ThemedText type="title" style={styles.title}>
-              {place.name}
-            </ThemedText>
-            <View style={styles.actions}>
+        {/* ── Hero image ── */}
+        <View style={styles.heroContainer}>
+          <Image
+            source={{ uri: heroUrl }}
+            style={styles.heroImage}
+            contentFit="cover"
+            transition={300}
+          />
+          {/* Floating back + save buttons */}
+          <View style={[styles.heroTopBar, { paddingTop: insets.top + 10 }]}>
+            <Pressable
+              onPress={() => router.back()}
+              style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.7 }]}>
+              <ThemedText style={styles.iconBtnText} lightColor="#fff" darkColor="#fff">←</ThemedText>
+            </Pressable>
+            <View style={styles.heroTopRight}>
               <Pressable
-                accessibilityRole="button"
-                onPress={() => toggleFavorite(place.id)}
-                style={({ pressed }) => [styles.actionButton, pressed && styles.actionButtonPressed]}>
-                <ThemedText style={styles.actionButtonText}>
-                  {isFavorite(place.id) ? 'Saved' : 'Save'}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); toggleFavorite(place.id); }}
+                style={({ pressed }) => [styles.iconBtn, saved && styles.iconBtnActive, pressed && { opacity: 0.7 }]}>
+                <ThemedText
+                  style={styles.iconBtnText}
+                  lightColor={saved ? NAVY : '#fff'}
+                  darkColor={saved ? NAVY : '#fff'}>
+                  {saved ? '♥' : '♡'}
                 </ThemedText>
               </Pressable>
               <Pressable
-                accessibilityRole="button"
-                onPress={() => togglePlan(place.id)}
-                style={({ pressed }) => [styles.actionButton, pressed && styles.actionButtonPressed]}>
-                <ThemedText style={styles.actionButtonText}>
-                  {isInPlan(place.id) ? 'In plan' : 'Add to plan'}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); togglePlan(place.id); }}
+                style={({ pressed }) => [styles.iconBtn, inPlan && styles.iconBtnPlan, pressed && { opacity: 0.7 }]}>
+                <ThemedText
+                  style={styles.iconBtnText}
+                  lightColor={inPlan ? NAVY : '#fff'}
+                  darkColor={inPlan ? NAVY : '#fff'}>
+                  {inPlan ? '✓' : '+'}
                 </ThemedText>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                disabled={!directionsUrl}
-                onPress={() => {
-                  if (!directionsUrl) return;
-                  void Linking.openURL(directionsUrl);
-                }}
-                style={({ pressed }) => [
-                  styles.actionButton,
-                  !directionsUrl && styles.actionButtonDisabled,
-                  pressed && directionsUrl && styles.actionButtonPressed,
-                ]}>
-                <ThemedText style={styles.actionButtonText}>Directions</ThemedText>
               </Pressable>
             </View>
           </View>
 
-          <View style={styles.section}>
-            <ThemedText type="subtitle">Description</ThemedText>
-            <ThemedText style={styles.body}>{place.description}</ThemedText>
-          </View>
-
-          {place.wiki?.summary ? (
-            <View style={styles.section}>
-              <ThemedText type="subtitle">Wikipedia</ThemedText>
-              <ThemedText style={styles.body}>{place.wiki.summary}</ThemedText>
-              {place.wiki.pageUrl ? (
-                <ExternalLink href={place.wiki.pageUrl}>
-                  <ThemedText type="link">View on Wikipedia</ThemedText>
-                </ExternalLink>
-              ) : null}
-            </View>
-          ) : place.wiki?.status === 'not-found' ? (
-            <View style={styles.section}>
-              <ThemedText type="subtitle">Wikipedia</ThemedText>
-              <ThemedText style={styles.body}>No enriched info yet.</ThemedText>
-            </View>
-          ) : null}
-
-          <View style={styles.section}>
-            <ThemedText type="subtitle">Photo</ThemedText>
-            {selectedPhoto?.status === 'primary' && place.image.verified ? (
-              <>
-                <ThemedText style={styles.body}>Verified {place.image.type} photo</ThemedText>
-                {place.image.sourceName ? (
-                  <ThemedText style={styles.body}>Source: {place.image.sourceName}</ThemedText>
-                ) : null}
-                {place.image.license ? (
-                  <ThemedText style={styles.body}>License: {place.image.license}</ThemedText>
-                ) : null}
-                {place.image.attribution ? (
-                  <ThemedText style={styles.body}>{place.image.attribution}</ThemedText>
-                ) : null}
-              </>
-            ) : selectedPhoto ? (
-              <>
-                <ThemedText style={styles.body}>
-                  {getPhotoStatusLabel(selectedPhoto)} · {selectedPhoto.type}
-                  {selectedPhoto.confidence != null ? ` · confidence ${selectedPhoto.confidence}` : ''}
-                </ThemedText>
-                {selectedPhoto.sourceName ? (
-                  <ThemedText style={styles.body}>Source: {selectedPhoto.sourceName}</ThemedText>
-                ) : null}
-                {selectedPhoto.license ? (
-                  <ThemedText style={styles.body}>License: {selectedPhoto.license}</ThemedText>
-                ) : null}
-                {selectedPhoto.attribution ? (
-                  <ThemedText style={styles.body}>{selectedPhoto.attribution}</ThemedText>
-                ) : null}
-                {selectedPhoto.notes ? (
-                  <ThemedText style={styles.helperText}>{selectedPhoto.notes}</ThemedText>
-                ) : null}
-                {selectedPhoto.pageTitle ? (
-                  <ThemedText style={styles.helperText}>{selectedPhoto.pageTitle}</ThemedText>
-                ) : null}
-              </>
-            ) : (
-              <ThemedText style={styles.body}>
-                Photo unavailable while we verify a real image source for this place.
-              </ThemedText>
-            )}
-            {selectedPhoto?.sourceUrl ? (
-              <ExternalLink href={selectedPhoto.sourceUrl}>
-                <ThemedText type="link">Photo source</ThemedText>
-              </ExternalLink>
-            ) : null}
-            {photoGallery.length > 1 ? (
-              <View style={styles.photoGalleryBlock}>
-                <ThemedText style={styles.helperText}>
-                  More photos from the same place. Tap a thumbnail to switch the main image.
-                </ThemedText>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.photoGalleryScroller}>
-                  {photoGallery.map((photo) => (
-                    <Pressable
-                      key={photo.id}
-                      onPress={() => setSelectedPhotoId(photo.id)}
-                      style={({ pressed }) => [
-                        styles.photoThumbCard,
-                        selectedPhoto?.id === photo.id && styles.photoThumbCardSelected,
-                        pressed && styles.pressed,
-                      ]}>
-                      {canDisplayPhoto(photo) ? (
-                        <Image source={{ uri: photo.imageUrl }} style={styles.photoThumb} contentFit="cover" />
-                      ) : (
-                        <PlaceImage
-                          place={{
-                            name: place.name,
-                            imageUrl: place.imageUrl,
-                            image: place.image,
-                          }}
-                          style={styles.photoThumb}
-                          compact
-                        />
-                      )}
-                      <View style={styles.photoThumbFooter}>
-                        <ThemedText
-                          numberOfLines={1}
-                          style={[
-                            styles.photoThumbLabel,
-                            selectedPhoto?.id === photo.id && styles.photoThumbLabelSelected,
-                          ]}>
-                          {photo.status === 'primary' ? 'Main' : photo.verified ? 'Verified' : 'Candidate'}
-                        </ThemedText>
-                      </View>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-              </View>
-            ) : null}
-          </View>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.tagsRow}>
-            {place.tags.map((t) => (
-              <Link key={t} href={{ pathname: '/explore', params: { tag: t } }} asChild>
-                <Pressable style={({ pressed }) => [styles.tagChip, pressed && styles.pressed]}>
-                  <ThemedText style={styles.tagText}>{t}</ThemedText>
-                </Pressable>
-              </Link>
-            ))}
-          </ScrollView>
-
-          <View style={styles.section}>
-            <ThemedText type="subtitle">Verified Facts</ThemedText>
-            <ThemedText style={styles.body}>
-              {place.verifiedFacts?.type}
-              {place.verifiedFacts?.address ? ` · ${place.verifiedFacts.address}` : ''}
-            </ThemedText>
-            {place.verifiedFacts?.priceLevel ? (
-              <ThemedText style={styles.body}>Price level: {place.verifiedFacts.priceLevel}</ThemedText>
-            ) : null}
-            {place.verifiedFacts?.sourceUrl ? (
-              <ExternalLink href={place.verifiedFacts.sourceUrl as unknown as string}>
-                <ThemedText type="link">Source</ThemedText>
-              </ExternalLink>
-            ) : null}
-          </View>
-
-          <View style={styles.section}>
-            <ThemedText type="subtitle">Visit Info</ThemedText>
-            <View
-              style={[
-                styles.statusBadge,
-                openStatus.state === 'open' || openStatus.state === 'all-day'
-                  ? styles.statusBadgeOpen
-                  : styles.statusBadgeClosed,
-              ]}>
+          {/* Name overlay at bottom of image */}
+          <View style={styles.heroBottom}>
+            <View style={[styles.statusPill, isOpen ? styles.statusPillOpen : styles.statusPillClosed]}>
               <ThemedText
-                style={[
-                  styles.statusBadgeText,
-                  openStatus.state === 'open' || openStatus.state === 'all-day'
-                    ? styles.statusBadgeTextOpen
-                    : styles.statusBadgeTextClosed,
-                ]}>
+                style={[styles.statusPillText, isOpen ? styles.statusPillTextOpen : styles.statusPillTextClosed]}>
                 {openStatus.shortLabel}
               </ThemedText>
             </View>
-            <ThemedText style={styles.body}>{openStatus.detail}</ThemedText>
-            {openStatus.note ? <ThemedText style={styles.helperText}>{openStatus.note}</ThemedText> : null}
-            {place.visitInfo?.temporarilyClosed ? (
-              <ThemedText style={styles.warningText}>
-                This place is marked as temporarily closed right now.
+            <ThemedText style={styles.heroName} lightColor="#fff" darkColor="#fff">
+              {place.name}
+            </ThemedText>
+            <ThemedText style={styles.heroCategory} lightColor="rgba(255,255,255,0.75)" darkColor="rgba(255,255,255,0.75)">
+              {CATEGORY_EMOJI[place.category] ?? '📍'} {formatCategory(place.category)}
+              {place.verifiedFacts?.address ? ` · ${place.verifiedFacts.address}` : ''}
+            </ThemedText>
+          </View>
+        </View>
+
+        {/* ── Action bar ── */}
+        <ThemedView style={[styles.actionBar, { backgroundColor: cardBg }]}>
+          <Pressable
+            style={({ pressed }) => [styles.actionBarBtn, pressed && { opacity: 0.7 }]}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); toggleFavorite(place.id); }}>
+            <ThemedText style={styles.actionBarIcon}>{saved ? '♥' : '♡'}</ThemedText>
+            <ThemedText style={styles.actionBarLabel}>{saved ? 'Saved' : 'Save'}</ThemedText>
+          </Pressable>
+          <View style={styles.actionBarDivider} />
+          <Pressable
+            style={({ pressed }) => [styles.actionBarBtn, pressed && { opacity: 0.7 }]}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); togglePlan(place.id); }}>
+            <ThemedText style={styles.actionBarIcon}>{inPlan ? '✓' : '📋'}</ThemedText>
+            <ThemedText style={styles.actionBarLabel}>{inPlan ? 'In plan' : 'Add to plan'}</ThemedText>
+          </Pressable>
+          <View style={styles.actionBarDivider} />
+          <Pressable
+            style={({ pressed }) => [styles.actionBarBtn, !directionsUrl && { opacity: 0.4 }, pressed && { opacity: 0.7 }]}
+            disabled={!directionsUrl}
+            onPress={() => directionsUrl && Linking.openURL(directionsUrl).catch(() => {})}>
+            <ThemedText style={styles.actionBarIcon}>↗</ThemedText>
+            <ThemedText style={styles.actionBarLabel}>Directions</ThemedText>
+          </Pressable>
+          <View style={styles.actionBarDivider} />
+          <Pressable
+            style={({ pressed }) => [styles.actionBarBtn, pressed && { opacity: 0.7 }]}
+            onPress={() => {
+              const wikiNote = place.wiki?.pageUrl ? `\nLearn more: ${place.wiki.pageUrl}` : '';
+              Share.share({
+                title: place.name,
+                message: `${place.name}\n${formatCategory(place.category)} · ${place.city}\n\n${place.shortStory || place.description}${wikiNote}\n\n— Discovered with Piri`,
+              });
+            }}>
+            <ThemedText style={styles.actionBarIcon}>⬆</ThemedText>
+            <ThemedText style={styles.actionBarLabel}>Share</ThemedText>
+          </Pressable>
+        </ThemedView>
+
+        {/* ── Content ── */}
+        <View style={styles.content}>
+
+          {/* Piri's Take */}
+          {(pirisLoading || piriseTake) && (
+            <View style={styles.pirisCard}>
+              <View style={styles.pirisHeader}>
+                <View style={styles.pirisLogo}>
+                  <ThemedText style={styles.pirisLogoText} lightColor={GOLD} darkColor={GOLD}>◈</ThemedText>
+                </View>
+                <ThemedText style={styles.pirisTitle} lightColor="#fff" darkColor="#fff">
+                  Piri's Take
+                </ThemedText>
+              </View>
+
+              {pirisLoading && (
+                <View style={{ gap: 10, marginTop: 4 }}>
+                  <SkeletonBox height={16} width="65%" borderRadius={6} />
+                  <SkeletonBox height={13} width="100%" borderRadius={5} />
+                  <SkeletonBox height={13} width="85%" borderRadius={5} />
+                  <SkeletonBox height={13} width="90%" borderRadius={5} />
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                    <SkeletonBox width={7} height={7} borderRadius={4} />
+                    <SkeletonBox height={12} width="75%" borderRadius={5} />
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <SkeletonBox width={7} height={7} borderRadius={4} />
+                    <SkeletonBox height={12} width="60%" borderRadius={5} />
+                  </View>
+                </View>
+              )}
+              {piriseTake && !pirisLoading && (
+                <>
+                  <ThemedText style={styles.pirisHeadline} lightColor={GOLD} darkColor={GOLD}>
+                    {piriseTake.headline}
+                  </ThemedText>
+                  <ThemedText style={styles.pirisBody} lightColor="rgba(255,255,255,0.85)" darkColor="rgba(255,255,255,0.85)">
+                    {piriseTake.body}
+                  </ThemedText>
+                  {piriseTake.highlights.length > 0 && (
+                    <View style={styles.pirisHighlights}>
+                      {piriseTake.highlights.map((h, i) => (
+                        <View key={i} style={styles.pirisHighlightRow}>
+                          <View style={styles.pirisHighlightDot} />
+                          <ThemedText style={styles.pirisHighlightText} lightColor="rgba(255,255,255,0.8)" darkColor="rgba(255,255,255,0.8)">
+                            {h}
+                          </ThemedText>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </>
+              )}
+
+            </View>
+          )}
+
+          {/* About */}
+          <ThemedView style={[styles.card, { backgroundColor: cardBg }]}>
+            <ThemedText style={styles.sectionLabel}>About</ThemedText>
+            <ThemedText style={styles.bodyText}>{place.description}</ThemedText>
+            {place.shortStory && place.shortStory !== place.description && (
+              <View style={styles.storyBlock}>
+                <View style={styles.storyLine} />
+                <ThemedText style={styles.storyText}>{place.shortStory}</ThemedText>
+              </View>
+            )}
+            {place.wiki?.summary ? (
+              <ThemedText style={[styles.bodyText, { marginTop: 10, opacity: 0.75, fontSize: 14 }]}>
+                {place.wiki.summary}
               </ThemedText>
             ) : null}
+          </ThemedView>
+
+          {/* Tags */}
+          {place.tags.length > 0 && (
+            <View style={styles.tagsRow}>
+              {place.tags.map((t) => (
+                <Link key={t} href={{ pathname: '/explore', params: { tag: t } }} asChild>
+                  <Pressable style={({ pressed }) => [styles.tagChip, pressed && { opacity: 0.7 }]}>
+                    <ThemedText style={styles.tagText}>{t}</ThemedText>
+                  </Pressable>
+                </Link>
+              ))}
+            </View>
+          )}
+
+          {/* Hours */}
+          <ThemedView style={[styles.card, { backgroundColor: cardBg }]}>
+            <View style={styles.cardHeaderRow}>
+              <ThemedText style={styles.sectionLabel}>Hours</ThemedText>
+              <View style={[styles.hoursBadge, weeklyHours.verified ? styles.hoursBadgeVerified : styles.hoursBadgeEst]}>
+                <ThemedText style={[styles.hoursBadgeText, weeklyHours.verified ? styles.hoursBadgeTextVerified : styles.hoursBadgeTextEst]}>
+                  {weeklyHours.verified ? 'Verified' : 'Estimated'}
+                </ThemedText>
+              </View>
+            </View>
+
+            <ThemedText style={styles.openDetail}>{openStatus.detail}</ThemedText>
+            {openStatus.note ? <ThemedText style={styles.openNote}>{openStatus.note}</ThemedText> : null}
+
+            {place.visitInfo?.temporarilyClosed && (
+              <View style={styles.warningBlock}>
+                <ThemedText style={styles.warningText}>Temporarily closed</ThemedText>
+              </View>
+            )}
+
+            <View style={styles.hoursGrid}>
+              {weeklyHours.rows.map((row) => (
+                <View key={row.label} style={[styles.hoursRow, row.isToday && styles.hoursRowToday]}>
+                  <ThemedText style={[styles.hoursDay, row.isToday && styles.hoursDayToday]}>
+                    {row.label}
+                  </ThemedText>
+                  <ThemedText style={[styles.hoursValue, row.isToday && styles.hoursValueToday]}>
+                    {row.hoursText}
+                  </ThemedText>
+                </View>
+              ))}
+            </View>
+
             {place.visitInfo?.durationMinutes ? (
-              <ThemedText style={styles.body}>
-                Typical visit: about {place.visitInfo.durationMinutes} minutes
+              <ThemedText style={styles.visitHint}>
+                Typical visit · {place.visitInfo.durationMinutes} min
               </ThemedText>
             ) : null}
             {place.visitInfo?.bestTime ? (
-              <ThemedText style={styles.body}>Best time: {place.visitInfo.bestTime}</ThemedText>
+              <ThemedText style={styles.visitHint}>Best time · {place.visitInfo.bestTime}</ThemedText>
             ) : null}
-            {place.visitInfo?.seasonality ? (
-              <ThemedText style={styles.body}>Seasonality: {place.visitInfo.seasonality}</ThemedText>
-            ) : null}
-            {place.visitInfo?.hoursNote ? (
-              <ThemedText style={styles.body}>Hours note: {place.visitInfo.hoursNote}</ThemedText>
-            ) : null}
+          </ThemedView>
 
-            <View style={styles.weeklyHoursBlock}>
-              <View style={styles.weeklyHoursHeader}>
-                <ThemedText style={styles.weeklyHoursTitle}>Week at a glance</ThemedText>
-                <View
-                  style={[
-                    styles.weeklyHoursBadge,
-                    weeklyHours.verified ? styles.weeklyHoursBadgeVerified : styles.weeklyHoursBadgeEstimated,
-                  ]}>
-                  <ThemedText
-                    style={[
-                      styles.weeklyHoursBadgeText,
-                      weeklyHours.verified
-                        ? styles.weeklyHoursBadgeTextVerified
-                        : styles.weeklyHoursBadgeTextEstimated,
-                    ]}>
-                    {weeklyHours.verified ? 'Verified' : 'Estimated'}
-                  </ThemedText>
+          {/* Local vibe */}
+          {(place.localVibe?.mood || place.localVibe?.bestFor) ? (
+            <ThemedView style={[styles.card, { backgroundColor: cardBg }]}>
+              <ThemedText style={styles.sectionLabel}>Vibe</ThemedText>
+              {place.localVibe.mood ? (
+                <ThemedText style={styles.bodyText}>{place.localVibe.mood}</ThemedText>
+              ) : null}
+              {place.localVibe.bestFor ? (
+                <View style={styles.bestForRow}>
+                  <ThemedText style={styles.bestForLabel}>Best for</ThemedText>
+                  <ThemedText style={styles.bestForValue}>{place.localVibe.bestFor}</ThemedText>
                 </View>
-              </View>
-              <View style={styles.weeklyHoursList}>
-                {weeklyHours.rows.map((row) => (
-                  <View
-                    key={row.label}
-                    style={[styles.weeklyHoursRow, row.isToday && styles.weeklyHoursRowToday]}>
-                    <ThemedText
-                      style={[styles.weeklyHoursDay, row.isToday && styles.weeklyHoursDayToday]}>
-                      {row.label}
-                    </ThemedText>
-                    <ThemedText
-                      style={[styles.weeklyHoursValue, row.isToday && styles.weeklyHoursValueToday]}>
-                      {row.hoursText}
-                    </ThemedText>
-                  </View>
+              ) : null}
+            </ThemedView>
+          ) : null}
+
+          {/* Photo gallery (if multiple verified photos) */}
+          {verifiedGallery.length > 1 && (
+            <View>
+              <ThemedText style={styles.sectionLabel}>Photos</ThemedText>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.galleryRow}>
+                {verifiedGallery.map((photo, i) => (
+                  <Image
+                    key={photo.id ?? i}
+                    source={{ uri: photo.imageUrl }}
+                    style={styles.galleryThumb}
+                    contentFit="cover"
+                  />
                 ))}
-              </View>
-              <ThemedText style={styles.helperText}>{weeklyHours.note}</ThemedText>
+              </ScrollView>
             </View>
-          </View>
+          )}
 
-          <View style={styles.section}>
-            <ThemedText type="subtitle">Local Vibe</ThemedText>
-            {place.localVibe?.mood ? (
-              <ThemedText style={styles.body}>{place.localVibe.mood}</ThemedText>
-            ) : null}
-            {place.localVibe?.bestFor ? (
-              <ThemedText style={styles.body}>Best for: {place.localVibe.bestFor}</ThemedText>
-            ) : null}
-          </View>
-
-          <View style={styles.section}>
-            <ThemedText type="subtitle">Short story</ThemedText>
-            <ThemedText style={styles.body}>{place.shortStory}</ThemedText>
-          </View>
-
-          <View style={styles.section}>
-            <ThemedText type="subtitle">Map</ThemedText>
+          {/* Map + Nearby */}
+          <ThemedView style={[styles.card, { backgroundColor: cardBg }]}>
+            <ThemedText style={styles.sectionLabel}>Location</ThemedText>
             {place.verifiedFacts?.address ? (
-              <ThemedText style={styles.body}>{place.verifiedFacts.address}</ThemedText>
-            ) : (
-              <ThemedText style={styles.body}>See where this place sits in Kristiansand.</ThemedText>
-            )}
-            {mapNearbyPlaces.length > 0 ? (
-              <ThemedText style={styles.mapHintText}>
-                Blue pins show the closest nearby places. Pinch or use + / - to zoom.
-              </ThemedText>
+              <ThemedText style={styles.addressText}>{place.verifiedFacts.address}</ThemedText>
             ) : null}
             <PlaceMiniMap
               place={place}
               relatedPlaces={mapNearbyPlaces}
-              badgeLabel={mapNearbyPlaces.length > 0 ? 'Nearby on map' : 'Map preview'}
+              badgeLabel=""
               interactive
               onInteractionChange={setIsMapInteracting}
-              style={styles.detailMap}
+              style={styles.miniMap}
             />
-            {nearbyPlaces && nearbyPlaces.length > 0 ? (
+            {directionsUrl ? (
+              <Pressable
+                style={({ pressed }) => [styles.directionsBtn, pressed && { opacity: 0.85 }]}
+                onPress={() => Linking.openURL(directionsUrl!).catch(() => {})}>
+                <ThemedText style={styles.directionsBtnText} lightColor="#fff" darkColor="#fff">
+                  Open in Maps
+                </ThemedText>
+              </Pressable>
+            ) : null}
+          </ThemedView>
+
+          {/* Nearby places */}
+          {nearbyPlaces && nearbyPlaces.length > 0 && (
+            <View>
+              <ThemedText style={styles.sectionLabel}>Nearby</ThemedText>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.nearbyScroller}>
+                contentContainerStyle={styles.nearbyRow}>
                 {nearbyPlaces.map((nearby) => {
-                  const routeUrl = getDirectionsUrl(nearby);
-                  const nearbyStatus = getPlaceOpenStatus(nearby);
+                  const ns = getPlaceOpenStatus(nearby);
+                  const nOpen = ns.state === 'open' || ns.state === 'all-day';
                   return (
-                    <View key={nearby.id} style={styles.nearbyCard}>
-                      <Link href={{ pathname: '/place/[id]', params: { id: nearby.id } }} asChild>
-                        <Pressable style={({ pressed }) => [styles.nearbyCardTap, pressed && styles.pressed]}>
-                          <PlaceImage place={nearby} style={styles.nearbyThumb} compact />
-                          <View style={styles.nearbyText}>
-                            <ThemedText numberOfLines={2} style={styles.nearbyTitle}>
-                              {nearby.name}
-                            </ThemedText>
-                            <ThemedText numberOfLines={1} style={styles.nearbyMeta}>
-                              {getWalkMinutes(nearby.distanceKm)} min walk · {nearby.distanceKm.toFixed(1)} km
-                            </ThemedText>
-                            <ThemedText numberOfLines={1} style={styles.nearbyTag}>
-                              {nearby.tags[0]}
-                            </ThemedText>
-                            <ThemedText
-                              numberOfLines={1}
-                              style={[
-                                styles.nearbyStatus,
-                                nearbyStatus.state === 'open' || nearbyStatus.state === 'all-day'
-                                  ? styles.nearbyStatusOpen
-                                  : styles.nearbyStatusClosed,
-                              ]}>
-                              {nearbyStatus.shortLabel}
-                            </ThemedText>
-                          </View>
-                        </Pressable>
-                      </Link>
-                      <View style={styles.nearbyActions}>
-                        <Pressable
-                          accessibilityRole="button"
-                          disabled={!routeUrl}
-                          onPress={() => {
-                            if (!routeUrl) return;
-                            void Linking.openURL(routeUrl);
-                          }}
-                          style={({ pressed }) => [
-                            styles.nearbyRouteButton,
-                            !routeUrl && styles.nearbyRouteButtonDisabled,
-                            pressed && routeUrl && styles.pressed,
-                          ]}>
-                          <ThemedText style={styles.nearbyRouteButtonText}>Route</ThemedText>
-                        </Pressable>
-                      </View>
-                    </View>
+                    <Link key={nearby.id} href={{ pathname: '/place/[id]', params: { id: nearby.id } }} asChild>
+                      <Pressable style={({ pressed }) => [styles.nearbyCard, { backgroundColor: cardBg }, pressed && { opacity: 0.75 }]}>
+                        <PlaceImage place={nearby} style={styles.nearbyImage} compact />
+                        <View style={styles.nearbyBody}>
+                          <ThemedText numberOfLines={2} style={styles.nearbyName}>{nearby.name}</ThemedText>
+                          <ThemedText style={styles.nearbyCategory}>
+                            {CATEGORY_EMOJI[nearby.category] ?? '📍'} {formatCategory(nearby.category)}
+                          </ThemedText>
+                          <ThemedText style={[styles.nearbyStatus, nOpen ? styles.nearbyStatusOpen : styles.nearbyStatusClosed]}>
+                            {ns.shortLabel}
+                          </ThemedText>
+                          <ThemedText style={styles.nearbyDist}>
+                            {getWalkMinutes(nearby.distanceKm)} min walk
+                          </ThemedText>
+                        </View>
+                      </Pressable>
+                    </Link>
                   );
                 })}
               </ScrollView>
-            ) : null}
-          </View>
-        </ThemedView>
+            </View>
+          )}
+
+        </View>
+
+        {/* Bottom safe area */}
+        <View style={{ height: Math.max(insets.bottom, 24) }} />
       </ScrollView>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    paddingBottom: 32,
-  },
-  image: {
-    width: '100%',
-    height: 260,
-  },
-  content: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
+  fullCenter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 16,
+    padding: 32,
   },
-  headerRow: {
+  errorTitle: { fontSize: 20, fontWeight: '700' },
+  errorBody: { fontSize: 15, opacity: 0.6, textAlign: 'center', lineHeight: 22 },
+  retryBtn: {
+    backgroundColor: NAVY,
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    borderRadius: 14,
+  },
+  retryBtnText: { fontSize: 16, fontWeight: '700' },
+  floatingBack: { position: 'absolute', left: 20 },
+  backBtn: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  backBtnText: { fontSize: 20, color: '#fff' },
+
+  // Hero
+  heroContainer: { position: 'relative' },
+  heroImage: { width: '100%', height: 340 },
+  heroTopBar: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
+    paddingHorizontal: 16,
   },
-  title: {
-    flex: 1,
+  heroTopRight: {
+    flexDirection: 'row',
+    gap: 10,
   },
-  actions: {
+  iconBtn: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  iconBtnActive: { backgroundColor: GOLD },
+  iconBtnPlan: { backgroundColor: GOLD },
+  iconBtnText: { fontSize: 18, fontWeight: '600' },
+  heroBottom: {
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
+    padding: 20,
+    paddingBottom: 24,
+    backgroundColor: 'rgba(0,0,0,0.48)',
+    gap: 4,
+  },
+  statusPill: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 50,
+    marginBottom: 4,
+  },
+  statusPillOpen: { backgroundColor: 'rgba(18,183,106,0.25)', borderWidth: 1, borderColor: 'rgba(18,183,106,0.5)' },
+  statusPillClosed: { backgroundColor: 'rgba(217,45,32,0.2)', borderWidth: 1, borderColor: 'rgba(217,45,32,0.4)' },
+  statusPillText: { fontSize: 11, fontWeight: '700' },
+  statusPillTextOpen: { color: '#6EFAB0' },
+  statusPillTextClosed: { color: '#FFA5A0' },
+  heroName: { fontSize: 28, fontWeight: '800', lineHeight: 34 },
+  heroCategory: { fontSize: 14, marginTop: 2 },
+
+  // Action bar
+  actionBar: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    marginHorizontal: 16,
+    marginTop: -1,
+    borderRadius: 18,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+    marginBottom: 4,
+    transform: [{ translateY: -20 }],
+  },
+  actionBarBtn: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+  },
+  actionBarIcon: { fontSize: 20 },
+  actionBarLabel: { fontSize: 12, fontWeight: '600', opacity: 0.7 },
+  actionBarDivider: { width: 1, height: 32, backgroundColor: 'rgba(127,127,127,0.15)' },
+
+  // Content
+  content: {
+    paddingHorizontal: 16,
+    gap: 16,
+    marginTop: -12,
+  },
+
+  // Piri's Take
+  pirisCard: {
+    backgroundColor: NAVY,
+    borderRadius: 20,
+    padding: 20,
+    gap: 12,
+    shadowColor: NAVY,
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
+  },
+  pirisHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  pirisLogo: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(212,168,67,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(212,168,67,0.3)',
+  },
+  pirisLogoText: { fontSize: 16 },
+  pirisTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  pirisHeadline: {
+    fontSize: 18,
+    fontWeight: '700',
+    lineHeight: 26,
+  },
+  pirisBody: {
+    fontSize: 15,
+    lineHeight: 24,
+  },
+  pirisHighlights: { gap: 8, marginTop: 4 },
+  pirisHighlightRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  pirisHighlightDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: GOLD,
+    marginTop: 9,
+  },
+  pirisHighlightText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  card: {
+    borderRadius: 20,
+    padding: 20,
+    gap: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    opacity: 0.4,
+  },
+  bodyText: { fontSize: 16, lineHeight: 26 },
+  storyBlock: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 4,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(127,127,127,0.12)',
+  },
+  storyLine: {
+    width: 3,
+    borderRadius: 2,
+    backgroundColor: GOLD,
+  },
+  storyText: { flex: 1, fontSize: 15, lineHeight: 24, fontStyle: 'italic', opacity: 0.85 },
+
+  // Tags
+  tagsRow: {
+    flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-  },
-  actionButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(127,127,127,0.35)',
-  },
-  actionButtonPressed: {
-    opacity: 0.7,
-  },
-  actionButtonText: {
-    fontSize: 14,
-    lineHeight: 18,
-  },
-  actionButtonDisabled: {
-    opacity: 0.45,
-  },
-  section: {
-    gap: 8,
-  },
-  tagsRow: {
-    paddingVertical: 2,
-    gap: 8,
-    paddingRight: 16,
+    paddingHorizontal: 4,
   },
   tagChip: {
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(127,127,127,0.25)',
-  },
-  tagText: {
-    fontSize: 14,
-    lineHeight: 18,
-  },
-  body: {
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  helperText: {
-    fontSize: 14,
-    lineHeight: 19,
-    opacity: 0.72,
-  },
-  warningText: {
-    color: '#B42318',
-    fontSize: 15,
-    lineHeight: 21,
-  },
-  photoGalleryBlock: {
-    gap: 10,
-    marginTop: 4,
-  },
-  photoGalleryScroller: {
-    gap: 10,
-    paddingRight: 16,
-  },
-  photoThumbCard: {
-    width: 122,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(127,127,127,0.18)',
-    overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.72)',
-  },
-  photoThumbCardSelected: {
-    borderColor: 'rgba(14, 36, 56, 0.3)',
-  },
-  photoThumb: {
-    width: '100%',
-    height: 86,
-    backgroundColor: 'rgba(127,127,127,0.15)',
-  },
-  photoThumbFooter: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  photoThumbLabel: {
-    fontSize: 12,
-    lineHeight: 16,
-    opacity: 0.82,
-  },
-  photoThumbLabelSelected: {
-    fontWeight: '700',
-    opacity: 1,
-  },
-  weeklyHoursBlock: {
-    gap: 10,
-    marginTop: 4,
-  },
-  weeklyHoursHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  weeklyHoursTitle: {
-    fontSize: 15,
-    lineHeight: 20,
-    fontWeight: '700',
-  },
-  weeklyHoursBadge: {
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  weeklyHoursBadgeVerified: {
-    backgroundColor: 'rgba(18, 183, 106, 0.1)',
-    borderColor: 'rgba(18, 183, 106, 0.2)',
-  },
-  weeklyHoursBadgeEstimated: {
-    backgroundColor: 'rgba(14, 36, 56, 0.06)',
-    borderColor: 'rgba(14, 36, 56, 0.14)',
-  },
-  weeklyHoursBadgeText: {
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: '700',
-  },
-  weeklyHoursBadgeTextVerified: {
-    color: '#067647',
-  },
-  weeklyHoursBadgeTextEstimated: {
-    color: '#1D2939',
-  },
-  weeklyHoursList: {
-    gap: 8,
-  },
-  weeklyHoursRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(127,127,127,0.16)',
-    backgroundColor: 'rgba(127,127,127,0.03)',
-  },
-  weeklyHoursRowToday: {
-    borderColor: 'rgba(14, 36, 56, 0.18)',
-    backgroundColor: 'rgba(14, 36, 56, 0.06)',
-  },
-  weeklyHoursDay: {
-    fontSize: 14,
-    lineHeight: 18,
-    opacity: 0.78,
-  },
-  weeklyHoursDayToday: {
-    fontWeight: '700',
-    opacity: 1,
-  },
-  weeklyHoursValue: {
-    flex: 1,
-    textAlign: 'right',
-    fontSize: 14,
-    lineHeight: 18,
-    opacity: 0.9,
-  },
-  weeklyHoursValueToday: {
-    fontWeight: '700',
-  },
-  statusBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
     paddingVertical: 7,
-    borderRadius: 999,
+    borderRadius: 50,
+    backgroundColor: 'rgba(15,28,63,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(15,28,63,0.12)',
+  },
+  tagText: { fontSize: 13, fontWeight: '500' },
+
+  // Hours
+  hoursBadge: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 50,
     borderWidth: 1,
   },
-  statusBadgeOpen: {
-    backgroundColor: 'rgba(18, 183, 106, 0.1)',
-    borderColor: 'rgba(18, 183, 106, 0.2)',
+  hoursBadgeVerified: {
+    backgroundColor: 'rgba(18,183,106,0.08)',
+    borderColor: 'rgba(18,183,106,0.2)',
   },
-  statusBadgeClosed: {
-    backgroundColor: 'rgba(217, 45, 32, 0.08)',
-    borderColor: 'rgba(217, 45, 32, 0.18)',
-  },
-  statusBadgeText: {
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '700',
-  },
-  statusBadgeTextOpen: {
-    color: '#067647',
-  },
-  statusBadgeTextClosed: {
-    color: '#B42318',
-  },
-  detailMap: {
-    marginTop: 4,
-    height: 180,
-    borderRadius: 16,
-    borderWidth: 1,
+  hoursBadgeEst: {
+    backgroundColor: 'rgba(127,127,127,0.08)',
     borderColor: 'rgba(127,127,127,0.2)',
   },
-  mapHintText: {
-    fontSize: 14,
-    lineHeight: 19,
-    opacity: 0.72,
-  },
-  nearbyScroller: {
-    gap: 10,
-    paddingRight: 16,
-  },
-  nearbyCard: {
-    width: 180,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(127,127,127,0.2)',
-    overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.72)',
-  },
-  nearbyCardTap: {
-    backgroundColor: 'transparent',
-  },
-  nearbyThumb: {
-    width: '100%',
-    height: 88,
-    backgroundColor: 'rgba(127,127,127,0.15)',
-  },
-  nearbyText: {
-    gap: 4,
-    padding: 10,
-  },
-  nearbyTitle: {
-    fontSize: 15,
-    fontWeight: 'bold',
-  },
-  nearbyMeta: {
-    fontSize: 13,
-    opacity: 0.7,
-  },
-  nearbyTag: {
-    fontSize: 12,
-    lineHeight: 16,
-    opacity: 0.62,
-  },
-  nearbyStatus: {
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '700',
-  },
-  nearbyStatusOpen: {
-    color: '#067647',
-  },
-  nearbyStatusClosed: {
-    color: '#B42318',
-  },
-  nearbyActions: {
-    paddingHorizontal: 10,
-    paddingBottom: 10,
-  },
-  nearbyRouteButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
+  hoursBadgeText: { fontSize: 11, fontWeight: '700' },
+  hoursBadgeTextVerified: { color: '#067647' },
+  hoursBadgeTextEst: { opacity: 0.6 },
+  openDetail: { fontSize: 15, fontWeight: '600', lineHeight: 22 },
+  openNote: { fontSize: 14, opacity: 0.6, lineHeight: 20 },
+  warningBlock: {
+    backgroundColor: 'rgba(217,45,32,0.08)',
+    borderRadius: 10,
+    paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 999,
+  },
+  warningText: { color: '#B42318', fontWeight: '600', fontSize: 14 },
+  hoursGrid: { gap: 4 },
+  hoursRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(127,127,127,0.25)',
-    backgroundColor: 'rgba(14,36,56,0.04)',
+    borderColor: 'rgba(127,127,127,0.1)',
   },
-  nearbyRouteButtonDisabled: {
-    opacity: 0.45,
+  hoursRowToday: {
+    backgroundColor: 'rgba(15,28,63,0.06)',
+    borderColor: 'rgba(15,28,63,0.15)',
   },
-  nearbyRouteButtonText: {
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '700',
-  },
-  pressed: {
-    opacity: 0.7,
-  },
-  centered: {
-    flex: 1,
+  hoursDay: { fontSize: 14, opacity: 0.7 },
+  hoursDayToday: { fontWeight: '700', opacity: 1 },
+  hoursValue: { fontSize: 14, opacity: 0.85 },
+  hoursValueToday: { fontWeight: '700' },
+  visitHint: { fontSize: 13, opacity: 0.55 },
+
+  // Vibe
+  bestForRow: {
+    flexDirection: 'row',
+    gap: 8,
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
+    marginTop: 4,
   },
+  bestForLabel: { fontSize: 13, opacity: 0.5, fontWeight: '500' },
+  bestForValue: { fontSize: 14, fontWeight: '600' },
+
+  // Gallery
+  galleryRow: { gap: 10, paddingTop: 8, paddingBottom: 4 },
+  galleryThumb: {
+    width: 140, height: 100,
+    borderRadius: 12,
+  },
+
+  // Location
+  addressText: { fontSize: 14, opacity: 0.65, lineHeight: 20 },
+  miniMap: { height: 180, borderRadius: 16, marginTop: 4 },
+  directionsBtn: {
+    backgroundColor: NAVY,
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  directionsBtnText: { fontSize: 15, fontWeight: '700' },
+
+  // Nearby
+  nearbyRow: { gap: 12, paddingTop: 8, paddingBottom: 4 },
+  nearbyCard: {
+    width: 140,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+  },
+  nearbyImage: { width: '100%', height: 90 },
+  nearbyBody: { padding: 10, gap: 4 },
+  nearbyName: { fontSize: 13, fontWeight: '700', lineHeight: 18 },
+  nearbyCategory: { fontSize: 11, opacity: 0.5 },
+  nearbyStatus: { fontSize: 11, fontWeight: '700' },
+  nearbyStatusOpen: { color: '#067647' },
+  nearbyStatusClosed: { color: '#B42318' },
+  nearbyDist: { fontSize: 11, opacity: 0.5 },
 });

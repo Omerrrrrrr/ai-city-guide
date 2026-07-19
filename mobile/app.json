@@ -1,17 +1,24 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "Piri",
+    "slug": "piri",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobile",
+    "scheme": "piri",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.piriapp.piri",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Piri uses your location to show nearby places and give you city-specific recommendations.",
+        "NSCameraUsageDescription": "Piri uses your camera to identify places and give you personalized explanations."
+      }
     },
     "android": {
+      "package": "com.piriapp.piri",
+      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

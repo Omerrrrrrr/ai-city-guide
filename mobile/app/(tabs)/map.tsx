@@ -1,417 +1,347 @@
 import React from 'react';
-import { ActivityIndicator, StyleSheet, View, Text, TextInput, Pressable } from 'react-native';
-import MapView, { Marker, Callout } from 'react-native-maps';
+import {
+  ActivityIndicator,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useColorScheme,
+} from 'react-native';
+import MapView, { Marker, Region } from 'react-native-maps';
+import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { PlaceImage } from '@/components/place-image';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import type { Place, PlaceCategory } from '@/src/data/places';
 import { usePlaces } from '@/src/hooks/use-places';
-import { createPlace, lookupPlaceInfo, type PlaceLookupResult } from '@/src/api/places';
+import { getPlaceOpenStatus } from '@/src/utils/place-hours';
+import { useCityStore } from '@/src/store/city';
+import { CATEGORY_EMOJI, formatCategory } from '@/src/utils/categories';
 
-async function reverseGeocode(latitude: number, longitude: number) {
-  try {
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&addressdetails=1`
-    );
+const NAVY = '#0F1C3F';
+const GOLD = '#D4A843';
 
-    if (!response.ok) {
-      throw new Error('Reverse geocode failed');
-    }
+const KRISTIANSAND: Region = {
+  latitude: 58.146,
+  longitude: 7.995,
+  latitudeDelta: 0.05,
+  longitudeDelta: 0.05,
+};
 
-    const data = await response.json();
-    const address = data.address ?? {};
-    return {
-      name: data.name ?? '',
-      city:
-        address.city || address.town || address.village || address.hamlet || address.county || '',
-      country: address.country || '',
-      displayName: data.display_name ?? '',
-    };
-  } catch {
-    return {
-      name: '',
-      city: '',
-      country: '',
-      displayName: '',
-    };
-  }
-}
+const CATEGORY_FILTERS: { id: PlaceCategory | 'all'; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'museum', label: '🏛️ Museums' },
+  { id: 'landmark', label: '🗿 Landmarks' },
+  { id: 'cafe', label: '☕ Cafes' },
+  { id: 'restaurant', label: '🍽️ Food' },
+  { id: 'beach', label: '🏖️ Beaches' },
+  { id: 'viewpoint', label: '🌅 Views' },
+  { id: 'nature', label: '🌿 Nature' },
+];
 
 export default function MapScreen() {
-  const { data: places, error, isLoading, refresh } = usePlaces();
+  const colorScheme = useColorScheme();
+  const dark = colorScheme === 'dark';
+  const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [draftCoordinate, setDraftCoordinate] = React.useState<{ latitude: number; longitude: number } | null>(null);
-  const [draftName, setDraftName] = React.useState('');
-  const [draftCategory, setDraftCategory] = React.useState('landmark');
-  const [draftCity, setDraftCity] = React.useState('');
-  const [draftCountry, setDraftCountry] = React.useState('');
-  const [draftDescription, setDraftDescription] = React.useState('');
-  const [draftError, setDraftError] = React.useState<string | null>(null);
-  const [isSavingDraft, setIsSavingDraft] = React.useState(false);
-  const [draftHidden, setDraftHidden] = React.useState(false);
-  const [lookupInfo, setLookupInfo] = React.useState<PlaceLookupResult | null>(null);
-  const [lookupError, setLookupError] = React.useState<string | null>(null);
-  const [isLookingUp, setIsLookingUp] = React.useState(false);
+  const mapRef = React.useRef<MapView>(null);
 
-  if (isLoading) {
+  const { data: places, error, isLoading } = usePlaces();
+  const { cityId } = useCityStore();
+  const [locationReady, setLocationReady] = React.useState(false);
+  const [region, setRegion] = React.useState<Region>(KRISTIANSAND);
+  const [selectedPlace, setSelectedPlace] = React.useState<Place | null>(null);
+  const [activeCategory, setActiveCategory] = React.useState<PlaceCategory | 'all'>('all');
+
+  React.useEffect(() => {
+    void (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') { setLocationReady(true); return; }
+      try {
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        setRegion({
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05,
+        });
+      } catch { /* keep default */ }
+      finally { setLocationReady(true); }
+    })();
+  }, []);
+
+  // Center map once when we first get places for a city.
+  // Depends on both cityId and whether places have loaded, because places are
+  // empty when cityId first changes (discovery still running) and only arrive later.
+  const centeredForCityRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!places?.length || !mapRef.current) return;
+    if (centeredForCityRef.current === cityId) return;
+    const withLoc = places.filter((p) => p.location);
+    if (!withLoc.length) return;
+    centeredForCityRef.current = cityId ?? null;
+    const avgLat = withLoc.reduce((s, p) => s + p.location!.lat, 0) / withLoc.length;
+    const avgLng = withLoc.reduce((s, p) => s + p.location!.lng, 0) / withLoc.length;
+    setSelectedPlace(null);
+    mapRef.current.animateToRegion({ latitude: avgLat, longitude: avgLng, latitudeDelta: 0.06, longitudeDelta: 0.06 }, 800);
+  }, [cityId, places]);
+
+  const goToMyLocation = async () => {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') return;
+    try {
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      mapRef.current?.animateToRegion({
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
+        latitudeDelta: 0.02,
+        longitudeDelta: 0.02,
+      }, 600);
+    } catch { /* ignore */ }
+  };
+
+  const filteredPlaces = React.useMemo(() => {
+    const withLocation = (places ?? []).filter((p) => p.location);
+    if (activeCategory === 'all') return withLocation;
+    return withLocation.filter((p) => p.category === activeCategory);
+  }, [places, activeCategory]);
+
+  if (isLoading || !locationReady) {
     return (
-      <ThemedView style={styles.centered}>
-        <ThemedText>Loading map...</ThemedText>
-      </ThemedView>
+      <View style={[styles.fullCenter, { backgroundColor: dark ? '#0A0F1E' : '#F4F5F9' }]}>
+        <ActivityIndicator size="large" color={NAVY} />
+        <ThemedText style={styles.loadingText}>Loading map...</ThemedText>
+      </View>
     );
   }
-
-  const handleMapLongPress = async (event: any) => {
-    const coordinate = event.nativeEvent.coordinate;
-    setDraftCoordinate(coordinate);
-    setDraftName('');
-    setDraftCity('');
-    setDraftCountry('');
-    setDraftDescription('');
-    setDraftCategory('landmark');
-    setDraftError(null);
-    setDraftHidden(false);
-
-    const locationInfo = await reverseGeocode(coordinate.latitude, coordinate.longitude);
-    setDraftCity((current) => current || locationInfo.city);
-    setDraftCountry((current) => current || locationInfo.country);
-    setDraftName((current) => current || locationInfo.name || `Place near ${locationInfo.city || 'selected location'}`);
-    setDraftDescription((current) =>
-      current || locationInfo.displayName || 'Describe this new location.'
-    );
-  };
-
-  const handleMapPress = async (event: any) => {
-    const coordinate = event.nativeEvent.coordinate;
-    setLookupInfo(null);
-    setLookupError(null);
-    setIsLookingUp(true);
-    setDraftCoordinate(null);
-
-    try {
-      const info = await lookupPlaceInfo(coordinate.latitude, coordinate.longitude);
-      setLookupInfo(info);
-    } catch (error: any) {
-      setLookupError(error?.message ?? 'Lookup failed for this location.');
-    } finally {
-      setIsLookingUp(false);
-    }
-  };
-
-  const handleSaveDraft = async () => {
-    if (!draftCoordinate) return;
-
-    setDraftError(null);
-    setIsSavingDraft(true);
-
-    try {
-      await createPlace({
-        name: draftName,
-        category: draftCategory,
-        city: draftCity,
-        country: draftCountry || undefined,
-        description: draftDescription,
-        lat: draftCoordinate.latitude,
-        lng: draftCoordinate.longitude,
-        tags: [draftCategory, draftCity, draftCountry].filter(Boolean).join(','),
-      });
-      setDraftCoordinate(null);
-      refresh();
-    } catch (error: any) {
-      setDraftError(error?.message ?? 'Failed to save place');
-    } finally {
-      setIsSavingDraft(false);
-    }
-  };
 
   if (error) {
     return (
-      <ThemedView style={styles.centered}>
+      <View style={[styles.fullCenter, { backgroundColor: dark ? '#0A0F1E' : '#F4F5F9' }]}>
         <ThemedText style={styles.errorText}>{error}</ThemedText>
-      </ThemedView>
+      </View>
     );
   }
+
+  const selectedStatus = selectedPlace ? getPlaceOpenStatus(selectedPlace) : null;
+  const selectedOpen = selectedStatus?.state === 'open' || selectedStatus?.state === 'all-day';
 
   return (
     <View style={styles.container}>
       <MapView
+        ref={mapRef}
         style={styles.map}
-        initialRegion={{
-          latitude: 58.146,
-          longitude: 7.995,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
-        }}
+        initialRegion={region}
         showsUserLocation
-        onPress={handleMapPress}
-        onLongPress={handleMapLongPress}
-      >
-        {places?.map((place) => {
-          if (!place.location) return null;
+        showsMyLocationButton={false}
+        showsCompass={false}
+        onPress={() => setSelectedPlace(null)}>
+        {filteredPlaces.map((place) => {
+          const isSelected = selectedPlace?.id === place.id;
           return (
             <Marker
               key={place.id}
-              coordinate={{ latitude: place.location.lat, longitude: place.location.lng }}
-              onPress={() => router.push(`/place/${place.id}`)}
-              onCalloutPress={() => router.push(`/place/${place.id}`)}
-            >
-              <Callout tooltip={false}>
-                <Pressable
-                  onPress={() => router.push(`/place/${place.id}`)}
-                  style={styles.callout}
-                >
-                  <Text style={styles.calloutTitle}>{place.name}</Text>
-                  <Text style={styles.calloutDesc}>{place.tags.slice(0, 3).join(', ')}</Text>
-                  <Text style={styles.calloutAction}>Tap for details ›</Text>
-                </Pressable>
-              </Callout>
+              coordinate={{ latitude: place.location!.lat, longitude: place.location!.lng }}
+              onPress={(e) => {
+                e.stopPropagation();
+                setSelectedPlace(place);
+                mapRef.current?.animateToRegion({
+                  latitude: place.location!.lat - 0.005,
+                  longitude: place.location!.lng,
+                  latitudeDelta: 0.025,
+                  longitudeDelta: 0.025,
+                }, 400);
+              }}>
+              <View style={[styles.pin, isSelected && styles.pinSelected]}>
+                <View style={[styles.pinDot, isSelected && styles.pinDotSelected]} />
+              </View>
             </Marker>
           );
         })}
-        {draftCoordinate ? (
-          <Marker
-            coordinate={draftCoordinate}
-            pinColor="#10B981"
-            title="New place"
-            onPress={() => setDraftHidden(false)}
-          >
-            <Callout tooltip={false}>
-              <Pressable onPress={() => setDraftHidden(false)} style={styles.callout}>
-                <Text style={styles.calloutTitle}>New place draft</Text>
-                <Text style={styles.calloutDesc}>
-                  {draftHidden ? 'Tap to continue editing.' : 'Fill the form below to save it.'}
-                </Text>
-              </Pressable>
-            </Callout>
-          </Marker>
-        ) : null}
       </MapView>
 
-      {lookupInfo || lookupError || isLookingUp ? (
-        <ThemedView style={styles.lookupPanel}>
-          <ThemedText type="subtitle">Location lookup</ThemedText>
-          {isLookingUp ? (
-            <View style={styles.lookupSpinner}>
-              <ActivityIndicator size="small" />
-              <ThemedText>Looking up location...</ThemedText>
-            </View>
-          ) : lookupError ? (
-            <ThemedText style={styles.errorText}>{lookupError}</ThemedText>
-          ) : lookupInfo ? (
-            <>
-              <Text style={styles.lookupTitle}>{lookupInfo.name || lookupInfo.displayName || 'Unknown location'}</Text>
-              <Text style={styles.lookupMeta}>{[lookupInfo.city, lookupInfo.country].filter(Boolean).join(', ')}</Text>
-              <Text style={styles.lookupSummary}>
-                {lookupInfo.enrichment.summary ?? lookupInfo.displayName ?? 'No summary available.'}
-              </Text>
-              <Text style={styles.lookupHint}>
-                This is exploration mode: tap anywhere for info. The AI and featured sections reserve only higher-quality recommendations.
-              </Text>
-            </>
-          ) : null}
-        </ThemedView>
-      ) : null}
+      {/* Top: category chips + count pill */}
+      <SafeAreaView style={styles.topOverlay} pointerEvents="box-none">
+        <View style={[styles.countPill, { marginTop: 10 }]}>
+          <Text style={styles.countPillText}>
+            {filteredPlaces.length} {activeCategory === 'all' ? 'places' : activeCategory}
+          </Text>
+        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoryRow}
+          pointerEvents="auto">
+          {CATEGORY_FILTERS.map((c) => {
+            const active = activeCategory === c.id;
+            return (
+              <Pressable
+                key={c.id}
+                onPress={() => { setActiveCategory(c.id); setSelectedPlace(null); }}
+                style={[styles.categoryChip, active && styles.categoryChipActive]}>
+                <Text style={[styles.categoryChipText, active && styles.categoryChipTextActive]}>
+                  {c.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </SafeAreaView>
 
-      {draftCoordinate && !draftHidden ? (
-        <ThemedView style={styles.draftPanel}>
-          <ThemedText type="subtitle">Save new place</ThemedText>
-          <TextInput
-            value={draftName}
-            onChangeText={setDraftName}
-            placeholder="Place name"
-            style={styles.input}
-          />
-          <TextInput
-            value={draftCity}
-            onChangeText={setDraftCity}
-            placeholder="City"
-            style={styles.input}
-          />
-          <TextInput
-            value={draftCountry}
-            onChangeText={setDraftCountry}
-            placeholder="Country"
-            style={styles.input}
-          />
-          <TextInput
-            value={draftCategory}
-            onChangeText={setDraftCategory}
-            placeholder="Category"
-            style={styles.input}
-          />
-          <TextInput
-            value={draftDescription}
-            onChangeText={setDraftDescription}
-            placeholder="Description"
-            style={[styles.input, styles.multilineInput]}
-            multiline
-          />
-          {draftError ? <ThemedText style={styles.errorText}>{draftError}</ThemedText> : null}
-          <View style={styles.draftActions}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setDraftCoordinate(null)}
-              style={({ pressed }) => [styles.actionButton, pressed && styles.actionButtonPressed]}
-            >
-              <ThemedText style={styles.actionButtonText}>Cancel</ThemedText>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setDraftHidden(true)}
-              style={({ pressed }) => [styles.actionButton, pressed && styles.actionButtonPressed]}
-            >
-              <ThemedText style={styles.actionButtonText}>Ask later</ThemedText>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              disabled={!draftName.trim() || !draftCity.trim() || !draftDescription.trim() || isSavingDraft}
-              onPress={handleSaveDraft}
-              style={({ pressed }) => [
-                styles.actionButton,
-                styles.saveButton,
-                (pressed || isSavingDraft) && styles.actionButtonPressed,
-                (!draftName.trim() || !draftCity.trim() || !draftDescription.trim() || isSavingDraft) && styles.actionButtonDisabled,
-              ]}
-            >
-              <ThemedText style={styles.actionButtonText}>
-                {isSavingDraft ? 'Saving…' : 'Save place'}
+      {/* My location button */}
+      <Pressable
+        style={({ pressed }) => [styles.locationBtn, { bottom: insets.bottom + (selectedPlace ? 190 : 40) }, pressed && { opacity: 0.8 }]}
+        onPress={goToMyLocation}>
+        <Text style={styles.locationBtnText}>◎</Text>
+      </Pressable>
+
+      {/* Selected place card */}
+      {selectedPlace && (
+        <View style={[styles.bottomCard, { paddingBottom: insets.bottom + 12, backgroundColor: dark ? '#1A2744' : '#fff' }]}>
+          <Pressable
+            style={({ pressed }) => [styles.bottomCardInner, pressed && { opacity: 0.92 }]}
+            onPress={() => router.push(`/place/${selectedPlace.id}`)}>
+            <PlaceImage place={selectedPlace} style={styles.bottomCardImage} />
+            <View style={styles.bottomCardBody}>
+              <ThemedText numberOfLines={1} style={styles.bottomCardName}>{selectedPlace.name}</ThemedText>
+              <ThemedText numberOfLines={1} style={styles.bottomCardMeta}>
+                {CATEGORY_EMOJI[selectedPlace.category] ?? '📍'} {formatCategory(selectedPlace.category)}
+                {selectedPlace.tags[0] ? ` · ${selectedPlace.tags[0]}` : ''}
               </ThemedText>
-            </Pressable>
-          </View>
-        </ThemedView>
-      ) : null}
+              {selectedStatus && (
+                <View style={[styles.bottomCardBadge, selectedOpen ? styles.badgeOpen : styles.badgeClosed]}>
+                  <ThemedText style={[styles.bottomCardBadgeText, selectedOpen ? styles.badgeTextOpen : styles.badgeTextClosed]}>
+                    {selectedStatus.shortLabel}
+                  </ThemedText>
+                </View>
+              )}
+            </View>
+            <View style={styles.bottomCardChev}>
+              <ThemedText style={styles.bottomCardChevText}>›</ThemedText>
+            </View>
+          </Pressable>
+          <Pressable
+            style={styles.dismissBtn}
+            onPress={() => setSelectedPlace(null)}>
+            <Text style={styles.dismissBtnText}>×</Text>
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  container: { flex: 1 },
+  map: { flex: 1 },
+  fullCenter: {
+    flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12,
   },
-  map: {
-    width: '100%',
-    height: '100%',
+  loadingText: { opacity: 0.6 },
+  errorText: { color: '#B42318', textAlign: 'center', paddingHorizontal: 32 },
+
+  // Pin
+  pin: {
+    width: 24, height: 24, borderRadius: 12,
+    backgroundColor: NAVY,
+    borderWidth: 2.5, borderColor: '#fff',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 }, elevation: 4,
   },
-  centered: {
-    flex: 1,
+  pinSelected: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: GOLD, borderColor: '#fff', borderWidth: 3,
+    shadowOpacity: 0.35, shadowRadius: 6,
+  },
+  pinDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: GOLD },
+  pinDotSelected: { backgroundColor: NAVY },
+
+  // Top overlay
+  topOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0,
     alignItems: 'center',
-    justifyContent: 'center',
+    pointerEvents: 'box-none',
+  } as any,
+  countPill: {
+    backgroundColor: NAVY,
+    paddingHorizontal: 16, paddingVertical: 8,
+    borderRadius: 50,
+    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
-  errorText: {
-    color: '#B42318',
+  countPillText: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  categoryRow: { paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
+  categoryChip: {
+    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 50,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderWidth: 1, borderColor: 'rgba(0,0,0,0.1)',
+    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 }, elevation: 2,
   },
-  callout: {
-    padding: 8,
-    minWidth: 160,
-    alignItems: 'center',
-  },
-  calloutTitle: {
-    fontWeight: 'bold',
-    marginBottom: 4,
-    color: '#000',
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  calloutDesc: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  calloutAction: {
-    fontSize: 12,
-    color: '#007AFF',
-    marginTop: 4,
-  },
-  draftPanel: {
-    position: 'absolute',
-    left: 12,
-    right: 12,
-    bottom: 24,
-    padding: 14,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 6,
-    gap: 10,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: 'rgba(127,127,127,0.24)',
-    borderRadius: 12,
-    padding: 10,
-    fontSize: 14,
+  categoryChipActive: { backgroundColor: NAVY, borderColor: NAVY },
+  categoryChipText: { fontSize: 13, fontWeight: '600', color: '#333' },
+  categoryChipTextActive: { color: '#fff' },
+
+  // Location button
+  locationBtn: {
+    position: 'absolute', right: 16,
+    width: 48, height: 48, borderRadius: 24,
     backgroundColor: '#fff',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
-  multilineInput: {
-    minHeight: 80,
-    textAlignVertical: 'top',
+  locationBtnText: { fontSize: 22, color: NAVY },
+
+  // Bottom card
+  bottomCard: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: 16, paddingTop: 16,
+    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 20,
+    shadowOffset: { width: 0, height: -4 }, elevation: 10,
   },
-  draftActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
+  bottomCardInner: {
+    flexDirection: 'row', alignItems: 'center',
+    gap: 14,
   },
-  actionButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#111827',
+  bottomCardImage: { width: 72, height: 72, borderRadius: 12 },
+  bottomCardBody: { flex: 1, gap: 5 },
+  bottomCardName: { fontSize: 17, fontWeight: '700' },
+  bottomCardMeta: { fontSize: 13, opacity: 0.55 },
+  bottomCardBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8, paddingVertical: 3,
+    borderRadius: 50, borderWidth: 1,
   },
-  saveButton: {
-    backgroundColor: '#0A84FF',
+  badgeOpen: {
+    backgroundColor: 'rgba(18,183,106,0.08)',
+    borderColor: 'rgba(18,183,106,0.2)',
   },
-  actionButtonPressed: {
-    opacity: 0.75,
+  badgeClosed: {
+    backgroundColor: 'rgba(217,45,32,0.06)',
+    borderColor: 'rgba(217,45,32,0.15)',
   },
-  actionButtonDisabled: {
-    opacity: 0.5,
+  bottomCardBadgeText: { fontSize: 11, fontWeight: '700' },
+  badgeTextOpen: { color: '#067647' },
+  badgeTextClosed: { color: '#B42318' },
+  bottomCardChev: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: NAVY,
+    alignItems: 'center', justifyContent: 'center',
   },
-  actionButtonText: {
-    color: '#fff',
-    fontWeight: '700',
+  bottomCardChevText: { color: '#fff', fontSize: 20, fontWeight: '300' },
+  dismissBtn: {
+    position: 'absolute', top: 12, right: 16,
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.08)',
+    alignItems: 'center', justifyContent: 'center',
   },
-  lookupPanel: {
-    position: 'absolute',
-    left: 12,
-    right: 12,
-    top: 24,
-    padding: 14,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 6,
-    gap: 8,
-  },
-  lookupSpinner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  lookupTitle: {
-    fontWeight: '700',
-    fontSize: 16,
-    marginTop: 8,
-  },
-  lookupMeta: {
-    color: '#4B5563',
-    marginTop: 4,
-  },
-  lookupSummary: {
-    marginTop: 8,
-    color: '#111827',
-  },
-  lookupHint: {
-    marginTop: 10,
-    color: '#6B7280',
-    fontSize: 13,
-  },
+  dismissBtnText: { fontSize: 18, color: '#666', lineHeight: 22 },
 });

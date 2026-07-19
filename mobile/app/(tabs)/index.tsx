@@ -1,447 +1,905 @@
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
-import { Link, useRouter } from 'expo-router';
 import React from 'react';
+import {
+  Pressable,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  View,
+  useColorScheme,
+} from 'react-native';
+import { Link, useRouter } from 'expo-router';
 
-import ParallaxScrollView from '@/components/parallax-scroll-view';
+import { PlaceImage } from '@/components/place-image';
+import { FeaturedCardSkeleton, PlaceRowSkeleton } from '@/components/skeleton';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import type { Place } from '@/src/data/places';
-import { usePlaces } from '@/src/hooks/use-places';
-import {
-  sortPlacesForBrowse,
-  isHighQualityPlace,
-} from '@/src/utils/place-filters';
+import { usePlaces, useNearbyUserPlaces } from '@/src/hooks/use-places';
+import { useWeather, weatherEmoji, isIndoorWeather, type Weather } from '@/src/hooks/use-weather';
+import { isHighQualityPlace, sortPlacesForBrowse, sortPlacesForProfile } from '@/src/utils/place-filters';
 import { getPlaceOpenStatus } from '@/src/utils/place-hours';
+import { useUserProfile } from '@/src/store/user-profile';
+import { useRecentlyViewed } from '@/src/store/recently-viewed';
+import { useCityStore } from '@/src/store/city';
+import * as Haptics from 'expo-haptics';
+import { useCityStatus } from '@/src/hooks/use-city-status';
+import { useAutoCity } from '@/src/hooks/use-auto-city';
+import { CATEGORY_EMOJI, categoryEmoji, formatCategory } from '@/src/utils/categories';
 
-const INTENTS: { title: string; params: { category?: string; tag?: string; q?: string; openNow?: string } }[] = [
-  { title: 'Open Now', params: { openNow: 'true' } },
-  { title: 'Quick Walk', params: { category: 'walking-area', tag: 'short stop' } },
-  { title: 'Rainy Day', params: { tag: 'rainy day' } },
-  { title: 'Photo Spots', params: { tag: 'photogenic' } },
-  { title: 'Family Time', params: { tag: 'family' } },
-  { title: 'Local Picks', params: { tag: 'local favorite' } },
+const NAVY = '#0F1C3F';
+const GOLD = '#D4A843';
+
+const INTENTS = [
+  { label: 'Open Now', params: { openNow: 'true' } },
+  { label: 'Rainy Day', params: { tag: 'rainy day' } },
+  { label: 'Photo Spots', params: { tag: 'photogenic' } },
+  { label: 'Family', params: { tag: 'family' } },
+  { label: 'Local Picks', params: { tag: 'local favorite' } },
+  { label: 'Quick Stop', params: { tag: 'short stop' } },
 ];
 
-function formatCategory(category: Place['category']) {
-  return category.replace('-', ' ');
+function greeting(name: string) {
+  const h = new Date().getHours();
+  const time = h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening';
+  return `Good ${time}${name ? `, ${name}` : ''}`;
 }
 
-function formatTag(tag: string) {
-  return tag
-    .split(' ')
-    .map((word) => word.slice(0, 1).toUpperCase() + word.slice(1))
-    .join(' ');
+function weatherBannerMessage(w: Weather): string {
+  const { condition, temp } = w;
+  if (condition === 'rainy' || condition === 'stormy') {
+    return `It's raining — perfect day for cozy cafes and indoor spots.`;
+  }
+  if (condition === 'snowy') return `Snow outside — let's find you somewhere warm.`;
+  if (condition === 'sunny' && temp > 22) return `Beautiful day — explore terraces and outdoor spots.`;
+  if (condition === 'sunny' && temp > 16) return `Great weather for a walk — see what's open nearby.`;
+  if (condition === 'foggy') return `Mysterious day — great for hidden gems and quiet corners.`;
+  return `${w.description} in ${w.city} — here's what's on today.`;
 }
 
-function PlaceSection({
-  title,
-  caption,
-  places,
-}: {
-  title: string;
-  caption: string;
-  places: Place[];
-}) {
-  if (!places.length) return null;
-
+function WeatherPill({ weather }: { weather: NonNullable<ReturnType<typeof useWeather>['weather']> }) {
   return (
-    <ThemedView style={styles.subsection}>
-      <View style={styles.subsectionHeader}>
-        <ThemedText type="subtitle">{title}</ThemedText>
-        <ThemedText style={styles.meta}>{caption}</ThemedText>
+    <View style={styles.weatherPill}>
+      <ThemedText style={styles.weatherEmoji}>
+        {weatherEmoji(weather.condition)}
+      </ThemedText>
+      <ThemedText style={styles.weatherTemp} lightColor="rgba(255,255,255,0.9)" darkColor="rgba(255,255,255,0.9)">
+        {weather.temp}°
+      </ThemedText>
+      <ThemedText style={styles.weatherCity} lightColor="rgba(255,255,255,0.55)" darkColor="rgba(255,255,255,0.55)">
+        {weather.city}
+      </ThemedText>
+    </View>
+  );
+}
+
+function StatusBadge({ place }: { place: Place }) {
+  const status = getPlaceOpenStatus(place);
+  const open = status.state === 'open' || status.state === 'all-day';
+  return (
+    <View style={[styles.badge, open ? styles.badgeOpen : styles.badgeClosed]}>
+      <ThemedText style={[styles.badgeText, open ? styles.badgeTextOpen : styles.badgeTextClosed]}>
+        {status.shortLabel}
+      </ThemedText>
+    </View>
+  );
+}
+
+function FeaturedCard({ place }: { place: Place }) {
+  return (
+    <Link href={{ pathname: '/place/[id]', params: { id: place.id } }} asChild>
+      <Pressable style={({ pressed }) => [styles.featCard, pressed && styles.pressed]}>
+        <ThemedView style={styles.featCardInner}>
+          <PlaceImage place={place} style={styles.featImage} />
+          <View style={styles.featBody}>
+            <StatusBadge place={place} />
+            <ThemedText numberOfLines={2} style={styles.featName}>{place.name}</ThemedText>
+            <ThemedText numberOfLines={1} style={styles.featMeta}>
+              {categoryEmoji(place.category)} {formatCategory(place.category)}
+            </ThemedText>
+          </View>
+        </ThemedView>
+      </Pressable>
+    </Link>
+  );
+}
+
+function PlaceRow({ place }: { place: Place }) {
+  return (
+    <Link href={{ pathname: '/place/[id]', params: { id: place.id } }} asChild>
+      <Pressable style={({ pressed }) => [pressed && styles.pressed]}>
+        <ThemedView style={styles.row}>
+          <PlaceImage place={place} style={styles.rowThumb} compact />
+          <View style={styles.rowBody}>
+            <ThemedText numberOfLines={1} style={styles.rowName}>{place.name}</ThemedText>
+            <ThemedText numberOfLines={1} style={styles.rowMeta}>
+              {categoryEmoji(place.category)} {formatCategory(place.category)}{place.tags[0] ? ` · ${place.tags[0]}` : ''}
+            </ThemedText>
+          </View>
+          <StatusBadge place={place} />
+        </ThemedView>
+      </Pressable>
+    </Link>
+  );
+}
+
+function Section({ title, places, seeAllParams }: { title: string; places: Place[]; seeAllParams?: Record<string, string> }) {
+  const router = useRouter();
+  if (!places.length) return null;
+  return (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <ThemedText style={styles.sectionTitle}>{title}</ThemedText>
+        {seeAllParams && (
+          <Pressable
+            onPress={() => router.push({ pathname: '/explore', params: seeAllParams })}
+            style={({ pressed }) => pressed && { opacity: 0.6 }}>
+            <ThemedText style={styles.seeAll}>See all ›</ThemedText>
+          </Pressable>
+        )}
       </View>
+      {places.map((p) => <PlaceRow key={p.id} place={p} />)}
+    </View>
+  );
+}
 
-      {places.map((place) => (
-        (() => {
-          const status = getPlaceOpenStatus(place);
-          const isOpenNow = status.state === 'open' || status.state === 'all-day';
+function ProfileNudge() {
+  const router = useRouter();
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.profileNudge, pressed && styles.pressed]}
+      onPress={() => router.push('/(tabs)/settings')}>
+      <View style={styles.profileNudgeLeft}>
+        <ThemedText style={styles.profileNudgeTitle} lightColor="#fff" darkColor="#fff">
+          Personalize Piri
+        </ThemedText>
+        <ThemedText style={styles.profileNudgeBody} lightColor="rgba(255,255,255,0.65)" darkColor="rgba(255,255,255,0.65)">
+          Tell us who you are — same place explained differently to an architect, a Muslim, a historian.
+        </ThemedText>
+      </View>
+      <ThemedText style={styles.profileNudgeArrow} lightColor={GOLD} darkColor={GOLD}>›</ThemedText>
+    </Pressable>
+  );
+}
 
-          return (
-            <Link key={place.id} href={{ pathname: '/place/[id]', params: { id: place.id } }} asChild>
-              <Pressable style={({ pressed }) => [styles.featureRow, pressed && styles.pressed]}>
-                <View style={styles.featureText}>
-                  <View style={styles.featureTopRow}>
-                    <ThemedText style={styles.placeName}>{place.name}</ThemedText>
-                    <View
-                      style={[
-                        styles.statusPill,
-                        isOpenNow ? styles.statusPillOpen : styles.statusPillClosed,
-                      ]}>
-                      <ThemedText
-                        style={[
-                          styles.statusPillText,
-                          isOpenNow ? styles.statusPillTextOpen : styles.statusPillTextClosed,
-                        ]}>
-                        {status.shortLabel}
-                      </ThemedText>
-                    </View>
-                  </View>
-                  <ThemedText style={styles.meta}>
-                    {formatCategory(place.category)} · {place.tags.slice(0, 3).map(formatTag).join(', ')}
-                  </ThemedText>
-                </View>
-                <ThemedText style={styles.chev}>›</ThemedText>
-              </Pressable>
-            </Link>
-          );
-        })()
-      ))}
-    </ThemedView>
+function DiscoveryBanner({ cityName }: { cityName: string }) {
+  const [dots, setDots] = React.useState('');
+  React.useEffect(() => {
+    const t = setInterval(() => setDots((d) => (d.length >= 3 ? '' : d + '.')), 600);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <View style={styles.discoveryBanner}>
+      <ThemedText style={styles.discoveryEmoji}>◈</ThemedText>
+      <View style={{ flex: 1 }}>
+        <ThemedText style={styles.discoveryTitle} lightColor="#fff" darkColor="#fff">
+          Discovering {cityName}{dots}
+        </ThemedText>
+        <ThemedText style={styles.discoveryBody} lightColor="rgba(255,255,255,0.6)" darkColor="rgba(255,255,255,0.6)">
+          Piri is mapping places using global data. This takes 1–2 minutes.
+        </ThemedText>
+      </View>
+    </View>
   );
 }
 
 export default function HomeScreen() {
+  const colorScheme = useColorScheme();
+  const dark = colorScheme === 'dark';
   const router = useRouter();
-  const [query, setQuery] = React.useState('');
-  const { data: places, error, isLoading, refresh } = usePlaces();
-  const totalPlaces = places?.length ?? 0;
-  const rankedPlaces = React.useMemo(() => sortPlacesForBrowse(places ?? []), [places]);
-  const foodStops =
-    places?.filter((place) => place.category === 'cafe' || place.category === 'restaurant').length ??
-    0;
-  const indoorOptions =
-    places?.filter((place) => place.tags.includes('rainy day')).length ?? 0;
-  const openNowCount = (places ?? []).filter((place) => {
-    const status = getPlaceOpenStatus(place);
-    return status.state === 'open' || status.state === 'all-day';
-  }).length;
-  const recommendedPlaces = rankedPlaces.filter(isHighQualityPlace).slice(0, 4);
-  const featuredPlaces =
-    recommendedPlaces.length > 0
-      ? recommendedPlaces
-      : rankedPlaces.filter((place) => place.importanceTier === 'hero').slice(0, 4);
-  const openNowPlaces = rankedPlaces.filter((place) => {
-    const status = getPlaceOpenStatus(place);
-    return status.state === 'open' || status.state === 'all-day';
-  }).slice(0, 4);
-  const verifiedNowPlaces = rankedPlaces.filter((place) => {
-    const status = getPlaceOpenStatus(place);
-    return status.verified && (status.state === 'open' || status.state === 'all-day');
-  }).slice(0, 4);
-  const rainyDayPlaces = rankedPlaces.filter((place) => place.tags.includes('rainy day')).slice(0, 4);
-  const familyPicks = rankedPlaces.filter((place) => place.tags.includes('family')).slice(0, 4);
-  const shortStops = rankedPlaces.filter((place) => place.tags.includes('short stop')).slice(0, 4);
-  const coffeeBreaks = rankedPlaces
-    .filter((place) => place.tags.includes('coffee break') || place.category === 'cafe')
-    .slice(0, 4);
-  const waterfrontMood = rankedPlaces.filter((place) => place.tags.includes('waterfront')).slice(0, 4);
-  const localFavorites = rankedPlaces.filter((place) => place.tags.includes('local favorite')).slice(0, 4);
+  const [refreshing, setRefreshing] = React.useState(false);
+  const { data: places, isLoading, isStale, error: placesError, refresh: refreshPlaces } = usePlaces();
+  const { name, profession, interests, faith } = useUserProfile();
+  const { weather } = useWeather();
+  const nearbyUser = useNearbyUserPlaces(5);
+  const { viewedIds, clearHistory } = useRecentlyViewed();
+  const { cityName } = useCityStore();
+  const { status: discoveryStatus } = useCityStatus(() => refreshPlaces());
+  useAutoCity();
+
+  const recentlyViewed = React.useMemo(
+    () => viewedIds.map((vid) => places?.find((p) => p.id === vid)).filter(Boolean) as Place[],
+    [viewedIds, places]
+  );
+
+  const profile = { profession, interests, faith };
+  const hasProfile = !!(profession || interests?.length || faith);
+
+  const ranked = React.useMemo(
+    () => hasProfile ? sortPlacesForProfile(places ?? [], profile) : sortPlacesForBrowse(places ?? []),
+    [places, profession, interests?.join(','), faith]
+  );
+  const featured = React.useMemo(
+    () => ranked.filter(isHighQualityPlace).slice(0, 8),
+    [ranked]
+  );
+  const openNow = React.useMemo(
+    () => ranked.filter((p) => {
+      const s = getPlaceOpenStatus(p);
+      return s.state === 'open' || s.state === 'all-day';
+    }).slice(0, 5),
+    [ranked]
+  );
+  const localFavs = React.useMemo(
+    () => ranked.filter((p) => p.tags.includes('local favorite')).slice(0, 5),
+    [ranked]
+  );
+  const rainy = React.useMemo(
+    () => ranked.filter((p) => p.tags.includes('rainy day')).slice(0, 4),
+    [ranked]
+  );
 
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D9F1EA', dark: '#12332E' }}
-      headerImage={
-        <View style={styles.heroArt}>
-          <View style={styles.heroGlow} />
-          <View style={styles.heroCard}>
-            <ThemedText type="defaultSemiBold" lightColor="#F7FFFC" darkColor="#F7FFFC">
-              Kristiansand
-            </ThemedText>
-            <ThemedText style={styles.heroHeadline} lightColor="#F7FFFC" darkColor="#F7FFFC">
-              Coastal walks, museums, and local favorites in one place.
-            </ThemedText>
-          </View>
-          <View style={[styles.heroBadge, styles.heroBadgeLeft]}>
-            <ThemedText style={styles.heroBadgeText} lightColor="#12332E" darkColor="#12332E">
-              {totalPlaces ? `${totalPlaces} places` : 'Live API'}
-            </ThemedText>
-          </View>
-          <View style={[styles.heroBadge, styles.heroBadgeRight]}>
-            <ThemedText style={styles.heroBadgeText} lightColor="#12332E" darkColor="#12332E">
-              {openNowCount ? `${openNowCount} open now` : 'AI + Map'}
-            </ThemedText>
-          </View>
-        </View>
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">AI City Guide</ThemedText>
-        <ThemedText style={styles.lead}>
-          Search places, browse stronger local coverage, and use the app like a real city companion
-          instead of a tiny demo.
-        </ThemedText>
-      </ThemedView>
-
-      <ThemedView style={styles.sectionContainer}>
-        <ThemedText type="subtitle">Start Exploring</ThemedText>
-
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Search places…"
-          placeholderTextColor="rgba(127,127,127,0.7)"
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="search"
-          onSubmitEditing={() => router.push({ pathname: '/explore', params: { q: query } })}
-          style={styles.searchInput}
-        />
-
-        <ThemedView style={styles.intentRow}>
-          {INTENTS.map((intent) => (
-            <Link key={intent.title} href={{ pathname: '/explore', params: intent.params }} asChild>
-              <Pressable style={({ pressed }) => [styles.intentChip, pressed && styles.pressed]}>
-                <ThemedText style={styles.intentText}>{intent.title}</ThemedText>
+    <View style={{ flex: 1, backgroundColor: dark ? '#0A0F1E' : '#F4F5F9' }}>
+      {/* Header */}
+      <SafeAreaView style={{ backgroundColor: NAVY }}>
+        <View style={styles.header}>
+          <View style={styles.headerTop}>
+            <View>
+              <ThemedText style={styles.wordmark} lightColor={GOLD} darkColor={GOLD}>PIRI</ThemedText>
+              <ThemedText style={styles.greetText} lightColor="rgba(255,255,255,0.75)" darkColor="rgba(255,255,255,0.75)">
+                {greeting(name)}
+              </ThemedText>
+              <Pressable
+                onPress={() => router.push('/city-picker' as never)}
+                style={({ pressed }) => [styles.cityPill, pressed && { opacity: 0.7 }]}>
+                <ThemedText style={styles.cityPillText} lightColor="rgba(255,255,255,0.55)" darkColor="rgba(255,255,255,0.55)">
+                  {cityName ? `📍 ${cityName}` : '🌍 Everywhere'} ›
+                </ThemedText>
               </Pressable>
-            </Link>
-          ))}
-        </ThemedView>
+            </View>
+            {weather && <WeatherPill weather={weather} />}
+          </View>
+          <Pressable
+            style={styles.headerSearch}
+            onPress={() => router.push('/explore' as never)}>
+            <ThemedText style={styles.headerSearchText} lightColor="rgba(255,255,255,0.5)" darkColor="rgba(255,255,255,0.5)">
+              Search places...
+            </ThemedText>
+          </Pressable>
+        </View>
+      </SafeAreaView>
 
-        <ThemedText type="subtitle">Featured</ThemedText>
-        {isLoading ? <ThemedText style={styles.meta}>Loading places…</ThemedText> : null}
-        {error ? (
-          <View style={styles.statusBlock}>
-            <ThemedText style={styles.errorText}>{error}</ThemedText>
-            <Pressable onPress={refresh} style={({ pressed }) => pressed && styles.pressed}>
-              <ThemedText type="link">Retry</ThemedText>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={async () => {
+              setRefreshing(true);
+              await refreshPlaces();
+              setRefreshing(false);
+            }}
+            tintColor={GOLD}
+            colors={[GOLD]}
+          />
+        }>
+
+        {/* Intent chips */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.intentRow}>
+          {INTENTS.map((intent) => {
+            const isRainyHighlight =
+              intent.label === 'Rainy Day' && weather && isIndoorWeather(weather.condition);
+            return (
+              <Link key={intent.label} href={{ pathname: '/explore', params: intent.params }} asChild>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.intentChip,
+                    isRainyHighlight && styles.intentChipHighlight,
+                    pressed && styles.pressed,
+                  ]}>
+                  <ThemedText
+                    style={[styles.intentChipText, isRainyHighlight && styles.intentChipTextHighlight]}>
+                    {intent.label}
+                  </ThemedText>
+                </Pressable>
+              </Link>
+            );
+          })}
+        </ScrollView>
+
+        {/* Stale cache indicator */}
+        {isStale && !isLoading && (
+          <View style={styles.staleBanner}>
+            <ThemedText style={styles.staleBannerText}>Showing cached data — refreshing…</ThemedText>
+          </View>
+        )}
+
+        {/* Error state */}
+        {placesError && !isLoading && (
+          <View style={styles.errorBanner}>
+            <ThemedText style={styles.errorBannerText} lightColor="rgba(255,255,255,0.8)" darkColor="rgba(255,255,255,0.8)">
+              Couldn't reach the server. Check your connection.
+            </ThemedText>
+            <Pressable
+              onPress={refreshPlaces}
+              style={({ pressed }) => [styles.errorBannerBtn, pressed && { opacity: 0.7 }]}>
+              <ThemedText style={styles.errorBannerBtnText} lightColor={GOLD} darkColor={GOLD}>
+                Retry
+              </ThemedText>
             </Pressable>
           </View>
+        )}
+
+        {/* Profile nudge — only if no profile set */}
+        {!hasProfile && !isLoading && (places ?? []).length > 0 && (
+          <ProfileNudge />
+        )}
+
+        {/* Weather banner */}
+        {weather && (
+          <Pressable
+            style={({ pressed }) => [styles.weatherBanner, pressed && styles.pressed]}
+            onPress={() => router.push('/ai')}>
+            <View style={styles.weatherBannerLeft}>
+              <ThemedText style={styles.weatherBannerEmoji}>
+                {weatherEmoji(weather.condition)}
+              </ThemedText>
+              <View style={{ flex: 1 }}>
+                <ThemedText style={styles.weatherBannerMsg} lightColor="#fff" darkColor="#fff">
+                  {weatherBannerMessage(weather)}
+                </ThemedText>
+                <ThemedText style={styles.weatherBannerCta} lightColor={GOLD} darkColor={GOLD}>
+                  Ask Piri for suggestions →
+                </ThemedText>
+              </View>
+            </View>
+          </Pressable>
+        )}
+
+        {/* City discovery progress */}
+        {discoveryStatus === 'discovering' && !isLoading && (places ?? []).length === 0 && cityName && (
+          <DiscoveryBanner cityName={cityName} />
+        )}
+
+        {/* City selected but empty (discovery done, 0 results) */}
+        {!isLoading && cityName && discoveryStatus !== 'discovering' && (places ?? []).length === 0 && (
+          <View style={styles.cityEmptyBox}>
+            <ThemedText style={styles.cityEmptyEmoji}>🏙️</ThemedText>
+            <ThemedText style={styles.cityEmptyTitle}>No places yet in {cityName}</ThemedText>
+            <ThemedText style={styles.cityEmptyBody}>
+              Discovery may still be processing. Pull to refresh, or try exploring a different city.
+            </ThemedText>
+            <Pressable
+              onPress={() => router.push('/city-picker' as never)}
+              style={({ pressed }) => [styles.cityEmptyBtn, pressed && { opacity: 0.8 }]}>
+              <ThemedText style={styles.cityEmptyBtnText} lightColor={NAVY} darkColor={NAVY}>
+                Pick a different city
+              </ThemedText>
+            </Pressable>
+          </View>
+        )}
+
+        {/* Featured horizontal scroll */}
+        {isLoading ? (
+          <View style={styles.section}>
+            <ThemedText style={styles.sectionTitle}>Featured</ThemedText>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.featRow}>
+              {[1, 2, 3].map((n) => <FeaturedCardSkeleton key={n} />)}
+            </ScrollView>
+          </View>
+        ) : featured.length > 0 ? (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <ThemedText style={styles.sectionTitle}>Featured</ThemedText>
+              <Pressable
+                onPress={() => router.push('/explore' as never)}
+                style={({ pressed }) => pressed && { opacity: 0.6 }}>
+                <ThemedText style={styles.seeAll}>See all ›</ThemedText>
+              </Pressable>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.featRow}>
+              {featured.map((p) => <FeaturedCard key={p.id} place={p} />)}
+            </ScrollView>
+          </View>
+        ) : ranked.length > 0 ? (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <ThemedText style={styles.sectionTitle}>Explore {cityName}</ThemedText>
+              <Pressable
+                onPress={() => router.push('/explore' as never)}
+                style={({ pressed }) => pressed && { opacity: 0.6 }}>
+                <ThemedText style={styles.seeAll}>See all ›</ThemedText>
+              </Pressable>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.featRow}>
+              {ranked.slice(0, 8).map((p) => <FeaturedCard key={p.id} place={p} />)}
+            </ScrollView>
+          </View>
         ) : null}
 
-        {places?.length ? (
-          <ThemedView style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <ThemedText style={styles.statValue}>{totalPlaces}</ThemedText>
-              <ThemedText style={styles.meta}>places live</ThemedText>
+        {/* Recently Viewed — horizontal mini scroll */}
+        {recentlyViewed.length > 0 && !isLoading && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <ThemedText style={styles.sectionTitle}>Recently Viewed</ThemedText>
+              <Pressable
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); clearHistory(); }}
+                style={({ pressed }) => pressed && { opacity: 0.6 }}>
+                <ThemedText style={styles.seeAll}>Clear</ThemedText>
+              </Pressable>
             </View>
-            <View style={styles.statCard}>
-              <ThemedText style={styles.statValue}>{foodStops}</ThemedText>
-              <ThemedText style={styles.meta}>food stops</ThemedText>
-            </View>
-            <View style={styles.statCard}>
-              <ThemedText style={styles.statValue}>{indoorOptions}</ThemedText>
-              <ThemedText style={styles.meta}>rainy-day picks</ThemedText>
-            </View>
-          </ThemedView>
-        ) : null}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.recentRow}>
+              {recentlyViewed.map((p) => (
+                <Link key={p.id} href={{ pathname: '/place/[id]', params: { id: p.id } }} asChild>
+                  <Pressable style={({ pressed }) => [styles.recentCard, pressed && styles.pressed]}>
+                    <PlaceImage place={p} style={styles.recentCardImage} />
+                    <ThemedText numberOfLines={2} style={styles.recentCardName}>{p.name}</ThemedText>
+                  </Pressable>
+                </Link>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
-        <PlaceSection
-          title="Open Right Now"
-          caption="Useful places you can likely go to without waiting."
-          places={openNowPlaces}
+        {/* Near You */}
+        {nearbyUser.length > 0 && (
+          <View style={styles.section}>
+            <ThemedText style={styles.sectionTitle}>Near You</ThemedText>
+            {nearbyUser.map((p) => (
+              <Link key={p.id} href={{ pathname: '/place/[id]', params: { id: p.id } }} asChild>
+                <Pressable style={({ pressed }) => [pressed && styles.pressed]}>
+                  <ThemedView style={styles.row}>
+                    <PlaceImage place={p} style={styles.rowThumb} compact />
+                    <View style={styles.rowBody}>
+                      <ThemedText numberOfLines={1} style={styles.rowName}>{p.name}</ThemedText>
+                      <ThemedText numberOfLines={1} style={styles.rowMeta}>
+                        {categoryEmoji(p.category)}{' '}
+                        {p.distanceKm < 1
+                          ? `${Math.round(p.distanceKm * 1000)} m away`
+                          : `${p.distanceKm.toFixed(1)} km away`}
+                      </ThemedText>
+                    </View>
+                    <StatusBadge place={p} />
+                  </ThemedView>
+                </Pressable>
+              </Link>
+            ))}
+          </View>
+        )}
+
+        {isLoading ? (
+          <View style={styles.section}>
+            <ThemedText style={styles.sectionTitle}>Open Right Now</ThemedText>
+            {[1, 2, 3].map((n) => <PlaceRowSkeleton key={n} />)}
+          </View>
+        ) : (
+          <Section title="Open Right Now" places={openNow} seeAllParams={{ openNow: 'true' }} />
+        )}
+        <Section
+          title={hasProfile ? 'For You' : 'Local Favorites'}
+          places={localFavs}
+          seeAllParams={{ tag: 'local favorite' }}
         />
-        <PlaceSection
-          title="Verified Hours"
-          caption="Places with verified hours that are open right now."
-          places={verifiedNowPlaces}
-        />
-        <PlaceSection
-          title="Featured Picks"
-          caption="Curated recommendations selected for quality, verification, and local value."
-          places={featuredPlaces}
-        />
-        <PlaceSection
-          title="Rainy Day"
-          caption="Indoor places when the weather turns."
-          places={rainyDayPlaces}
-        />
-        <PlaceSection
-          title="Family Picks"
-          caption="Easier choices when you want low-friction family options."
-          places={familyPicks}
-        />
-        <PlaceSection
-          title="Short Stops"
-          caption="Useful places when you only have 30 to 45 minutes."
-          places={shortStops}
-        />
-        <PlaceSection
-          title="Coffee Breaks"
-          caption="Short, useful stops that make the city feel lived in."
-          places={coffeeBreaks}
-        />
-        <PlaceSection
-          title="Waterfront Mood"
-          caption="Harbor edges, sea views, and coastal air."
-          places={waterfrontMood}
-        />
-        <PlaceSection
-          title="Local Favorites"
-          caption="Places that feel less generic and more lived-in."
-          places={localFavorites}
-        />
-      </ThemedView>
-    </ParallaxScrollView>
+        <Section title="Rainy Day" places={rainy} seeAllParams={{ tag: 'rainy day' }} />
+
+        {/* Ask AI banner */}
+        <Pressable
+          style={({ pressed }) => [styles.aiBanner, pressed && styles.pressed]}
+          onPress={() => router.push('/ai')}>
+          <View>
+            <ThemedText style={styles.aiBannerTitle} lightColor="#fff" darkColor="#fff">
+              Ask Piri anything
+            </ThemedText>
+            <ThemedText style={styles.aiBannerSub} lightColor="rgba(255,255,255,0.7)" darkColor="rgba(255,255,255,0.7)">
+              Tell me what you feel like — I'll find the perfect spot.
+            </ThemedText>
+          </View>
+          <ThemedText style={styles.aiBannerArrow} lightColor={GOLD} darkColor={GOLD}>›</ThemedText>
+        </Pressable>
+
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    gap: 10,
-    marginBottom: 16,
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 16,
+    gap: 14,
   },
-  lead: {
-    opacity: 0.78,
-    lineHeight: 22,
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
   },
-  sectionContainer: {
-    gap: 10,
+  weatherPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
-  subsection: {
-    gap: 10,
-    marginTop: 8,
-  },
-  subsectionHeader: {
-    gap: 2,
-  },
-  searchInput: {
-    borderWidth: 1,
-    borderColor: 'rgba(127,127,127,0.25)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+  weatherEmoji: {
     fontSize: 16,
   },
+  weatherTemp: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  weatherCity: {
+    fontSize: 13,
+    fontWeight: '400',
+  },
+  intentChipHighlight: {
+    backgroundColor: NAVY,
+    borderColor: GOLD,
+  },
+  intentChipTextHighlight: {
+    color: GOLD,
+    fontWeight: '700',
+  },
+  wordmark: {
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: 6,
+  },
+  greetText: {
+    fontSize: 14,
+    fontWeight: '400',
+    marginTop: 1,
+  },
+  cityPill: {
+    marginTop: 4,
+    alignSelf: 'flex-start',
+  },
+  cityPillText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  headerSearch: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+  },
+  headerSearchText: {
+    fontSize: 15,
+  },
+  content: {
+    paddingBottom: 40,
+    gap: 8,
+  },
   intentRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     gap: 8,
   },
   intentChip: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 999,
+    borderRadius: 50,
+    backgroundColor: 'rgba(15,28,63,0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(127,127,127,0.25)',
+    borderColor: 'rgba(15,28,63,0.12)',
   },
-  intentText: {
+  intentChipText: {
     fontSize: 14,
-    lineHeight: 18,
+    fontWeight: '500',
   },
-  featureRow: {
+  section: {
+    paddingHorizontal: 20,
+    gap: 12,
+    marginTop: 8,
+  },
+  sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(127,127,127,0.2)',
   },
-  featureText: {
-    flex: 1,
-    gap: 4,
+  sectionTitle: {
+    fontSize: 19,
+    fontWeight: '700',
   },
-  featureTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  seeAll: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: GOLD,
   },
-  statsRow: {
-    flexDirection: 'row',
+  recentRow: {
     gap: 10,
+    paddingRight: 20,
   },
-  statCard: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: 'rgba(127,127,127,0.2)',
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    gap: 4,
-  },
-  statValue: {
-    fontSize: 24,
-    lineHeight: 28,
-    fontWeight: '700',
-  },
-  placeName: {
-    fontSize: 16,
-    lineHeight: 22,
-    flex: 1,
-  },
-  meta: {
-    opacity: 0.75,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  statusPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  statusPillOpen: {
-    backgroundColor: 'rgba(18, 183, 106, 0.1)',
-    borderColor: 'rgba(18, 183, 106, 0.2)',
-  },
-  statusPillClosed: {
-    backgroundColor: 'rgba(217, 45, 32, 0.08)',
-    borderColor: 'rgba(217, 45, 32, 0.16)',
-  },
-  statusPillText: {
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: '700',
-  },
-  statusPillTextOpen: {
-    color: '#067647',
-  },
-  statusPillTextClosed: {
-    color: '#B42318',
-  },
-  statusBlock: {
+  recentCard: {
+    width: 100,
     gap: 6,
   },
-  errorText: {
-    color: '#B42318',
+  recentCardImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 12,
+  },
+  recentCardName: {
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 16,
+    opacity: 0.85,
+  },
+  featRow: {
+    gap: 12,
+    paddingRight: 20,
+  },
+  featCard: {
+    width: 180,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  featCardInner: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  featImage: {
+    width: '100%',
+    height: 130,
+  },
+  featBody: {
+    padding: 12,
+    gap: 6,
+  },
+  featName: {
+    fontSize: 15,
+    fontWeight: '700',
     lineHeight: 20,
   },
-  chev: {
-    fontSize: 22,
-    lineHeight: 22,
-    opacity: 0.6,
+  featMeta: {
+    fontSize: 13,
+    opacity: 0.55,
   },
-  pressed: {
-    opacity: 0.7,
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 14,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
-  heroArt: {
+  rowThumb: {
+    width: 60,
+    height: 60,
+    borderRadius: 10,
+  },
+  rowBody: {
     flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 28,
+    gap: 4,
   },
-  heroGlow: {
-    position: 'absolute',
-    top: 28,
-    right: 32,
-    width: 180,
-    height: 180,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+  rowName: {
+    fontSize: 15,
+    fontWeight: '600',
   },
-  heroCard: {
-    maxWidth: 260,
-    padding: 18,
-    borderRadius: 22,
-    backgroundColor: 'rgba(7, 51, 44, 0.78)',
+  rowMeta: {
+    fontSize: 13,
+    opacity: 0.55,
+  },
+  badge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 50,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    gap: 8,
   },
-  heroHeadline: {
-    fontSize: 24,
-    lineHeight: 30,
+  badgeOpen: {
+    backgroundColor: 'rgba(18,183,106,0.08)',
+    borderColor: 'rgba(18,183,106,0.2)',
+  },
+  badgeClosed: {
+    backgroundColor: 'rgba(217,45,32,0.06)',
+    borderColor: 'rgba(217,45,32,0.15)',
+  },
+  badgeText: {
+    fontSize: 11,
     fontWeight: '700',
   },
-  heroBadge: {
-    position: 'absolute',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: '#F4FFF9',
+  badgeTextOpen: {
+    color: '#067647',
   },
-  heroBadgeLeft: {
-    left: 24,
-    bottom: 30,
+  badgeTextClosed: {
+    color: '#B42318',
   },
-  heroBadgeRight: {
-    right: 24,
-    bottom: 72,
+  profileNudge: {
+    marginHorizontal: 20,
+    marginTop: 4,
+    backgroundColor: 'rgba(15,28,63,0.7)',
+    borderRadius: 18,
+    padding: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(212,168,67,0.2)',
   },
-  heroBadgeText: {
+  profileNudgeLeft: {
+    flex: 1,
+    gap: 4,
+  },
+  profileNudgeTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  profileNudgeBody: {
     fontSize: 13,
-    lineHeight: 16,
+    lineHeight: 19,
+  },
+  profileNudgeArrow: {
+    fontSize: 24,
+    fontWeight: '300',
+  },
+  discoveryBanner: {
+    marginHorizontal: 20,
+    marginTop: 8,
+    marginBottom: 8,
+    backgroundColor: NAVY,
+    borderRadius: 18,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 14,
+    borderWidth: 1,
+    borderColor: `rgba(212,168,67,0.25)`,
+  },
+  discoveryEmoji: {
+    fontSize: 28,
+    color: GOLD,
+    marginTop: 2,
+  },
+  discoveryTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  discoveryBody: {
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  weatherBanner: {
+    marginHorizontal: 20,
+    marginTop: 8,
+    backgroundColor: 'rgba(15,28,63,0.85)',
+    borderRadius: 18,
+    padding: 16,
+  },
+  weatherBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  weatherBannerEmoji: {
+    fontSize: 28,
+    marginTop: 2,
+  },
+  weatherBannerMsg: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  weatherBannerCta: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  aiBanner: {
+    marginHorizontal: 20,
+    marginTop: 16,
+    backgroundColor: NAVY,
+    borderRadius: 18,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  aiBannerTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  aiBannerSub: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  aiBannerArrow: {
+    fontSize: 28,
+    fontWeight: '300',
+  },
+  pressed: {
+    opacity: 0.75,
+  },
+  staleBanner: {
+    marginHorizontal: 20,
+    marginTop: 4,
+    backgroundColor: 'rgba(127,127,127,0.08)',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+  },
+  staleBannerText: {
+    fontSize: 12,
+    opacity: 0.5,
+    fontWeight: '500',
+  },
+  errorBanner: {
+    marginHorizontal: 20,
+    marginTop: 4,
+    backgroundColor: 'rgba(180,35,24,0.1)',
+    borderRadius: 14,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: 'rgba(180,35,24,0.2)',
+  },
+  errorBannerText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  errorBannerBtn: {
+    paddingLeft: 12,
+  },
+  errorBannerBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  cityEmptyBox: {
+    marginHorizontal: 20,
+    marginTop: 8,
+    padding: 28,
+    borderRadius: 20,
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(127,127,127,0.15)',
+  },
+  cityEmptyEmoji: {
+    fontSize: 40,
+    opacity: 0.5,
+  },
+  cityEmptyTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  cityEmptyBody: {
+    fontSize: 14,
+    opacity: 0.55,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  cityEmptyBtn: {
+    marginTop: 6,
+    backgroundColor: GOLD,
+    borderRadius: 12,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+  },
+  cityEmptyBtnText: {
+    fontSize: 15,
     fontWeight: '700',
   },
 });

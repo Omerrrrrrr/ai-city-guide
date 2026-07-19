@@ -4,12 +4,17 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  SafeAreaView,
   ScrollView,
   StyleSheet,
   TextInput,
   View,
+  useColorScheme,
 } from 'react-native';
-import { Link } from 'expo-router';
+import { Link, useLocalSearchParams } from 'expo-router';
+
+const NAVY = '#0F1C3F';
+const GOLD = '#D4A843';
 
 import { PlaceImage } from '@/components/place-image';
 import { ThemedText } from '@/components/themed-text';
@@ -19,6 +24,10 @@ import {
   type AIRecommendation,
   fetchRecommendations,
 } from '@/src/api/places';
+import { useUserProfile } from '@/src/store/user-profile';
+import { useWeather, weatherEmoji } from '@/src/hooks/use-weather';
+import { useCityStore } from '@/src/store/city';
+import { CATEGORY_EMOJI, formatCategory } from '@/src/utils/categories';
 
 type ConversationTurn =
   | {
@@ -34,11 +43,40 @@ type ConversationTurn =
     };
 
 export default function AiScreen() {
+  const colorScheme = useColorScheme();
+  const dark = colorScheme === 'dark';
+  const params = useLocalSearchParams<{ q?: string }>();
   const scrollRef = React.useRef<ScrollView>(null);
-  const [query, setQuery] = React.useState('');
+  const inputRef = React.useRef<TextInput>(null);
+  const [query, setQuery] = React.useState(params.q ?? '');
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [conversation, setConversation] = React.useState<ConversationTurn[]>([]);
+
+  const autoSubmittedRef = React.useRef(false);
+  const { name, profession, interests, faith } = useUserProfile();
+  const userProfile = { name, profession, interests, faith };
+  const { weather } = useWeather();
+  const { cityName } = useCityStore();
+
+  const suggestions = React.useMemo(() => {
+    const base = [
+      'Best cafes open right now',
+      'Something unique only locals know',
+      'Perfect for a solo afternoon',
+      'Best view in the city',
+    ];
+    if (weather?.condition === 'rainy' || weather?.condition === 'stormy') {
+      return ['Cozy indoor places for a rainy day', ...base.slice(0, 3)];
+    }
+    if (weather?.condition === 'sunny' && (weather?.temp ?? 0) > 18) {
+      return ['Outdoor spots and terraces', ...base.slice(0, 3)];
+    }
+    if (profession === 'photographer') return ['Best photo spots at any time of day', ...base.slice(0, 3)];
+    if (profession === 'architect') return ['Buildings worth seeing for the architecture', ...base.slice(0, 3)];
+    if (profession === 'foodie') return ['Best local food — not tourist traps', ...base.slice(0, 3)];
+    return base;
+  }, [weather?.condition, weather?.temp, profession]);
 
   const history = React.useMemo<AIConversationMessage[]>(
     () =>
@@ -49,8 +87,8 @@ export default function AiScreen() {
     [conversation]
   );
 
-  const handleSearch = async () => {
-    const nextQuery = query.trim();
+  const handleSearch = React.useCallback(async (overrideQuery?: string) => {
+    const nextQuery = (overrideQuery ?? query).trim();
     if (!nextQuery) return;
 
     setLoading(true);
@@ -66,7 +104,7 @@ export default function AiScreen() {
     setConversation((current) => [...current, userTurn]);
 
     try {
-      const data = await fetchRecommendations(nextQuery, history);
+      const data = await fetchRecommendations(nextQuery, history, userProfile, weather ?? undefined, cityName);
       const assistantTurn: ConversationTurn = {
         id: `${Date.now()}-assistant`,
         role: 'assistant',
@@ -93,14 +131,56 @@ export default function AiScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, history, userProfile, weather, cityName]);
+
+  // Auto-submit once if navigated from scan with a pre-filled query
+  React.useEffect(() => {
+    if (params.q && !autoSubmittedRef.current) {
+      autoSubmittedRef.current = true;
+      const t = setTimeout(() => handleSearch(), 300);
+      return () => clearTimeout(t);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const bgColor = dark ? '#0A0F1E' : '#F4F5F9';
+  const inputBg = dark ? '#1A2340' : '#fff';
+  const inputColor = dark ? '#fff' : '#000';
 
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView style={[styles.container, { backgroundColor: bgColor }]}>
+      {/* Navy header */}
+      <SafeAreaView style={{ backgroundColor: NAVY }}>
+        <View style={styles.header}>
+          <View style={{ flex: 1 }}>
+            <ThemedText style={styles.headerTitle} lightColor={GOLD} darkColor={GOLD}>
+              Ask Piri
+            </ThemedText>
+            <ThemedText style={styles.headerSub} lightColor="rgba(255,255,255,0.65)" darkColor="rgba(255,255,255,0.65)">
+              {weather
+                ? `${weatherEmoji(weather.condition)} ${weather.temp}° · ${cityName ?? 'Everywhere'}`
+                : cityName ?? 'Tell me what you feel like'}
+            </ThemedText>
+          </View>
+          {conversation.length > 0 && (
+            <Pressable
+              onPress={() => { setConversation([]); setError(null); }}
+              style={({ pressed }) => [styles.clearBtn, pressed && { opacity: 0.6 }]}>
+              <ThemedText style={styles.clearBtnText} lightColor="rgba(255,255,255,0.55)" darkColor="rgba(255,255,255,0.55)">
+                Clear
+              </ThemedText>
+            </Pressable>
+          )}
+        </View>
+      </SafeAreaView>
+
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
-        keyboardVerticalOffset={90}>
+        keyboardVerticalOffset={0}>
+
+        {/* Conversation scroll area */}
         <ScrollView
           ref={scrollRef}
           contentContainerStyle={styles.scrollContent}
@@ -108,18 +188,6 @@ export default function AiScreen() {
           onContentSizeChange={() => {
             scrollRef.current?.scrollToEnd({ animated: true });
           }}>
-          <View style={styles.header}>
-            <ThemedText type="title">Ask AI</ThemedText>
-            <ThemedText style={styles.subtitle}>
-              Describe what you feel like doing, who you are with, or your vibe today.
-            </ThemedText>
-            <ThemedText style={styles.note}>
-              AI recommendations only surface the strongest, higher-confidence options. Use the Map tab for open-ended exploration of any location.
-            </ThemedText>
-            <ThemedText style={styles.note}>
-              Ask follow-up questions naturally. The recent conversation is now sent back to the backend each turn.
-            </ThemedText>
-          </View>
 
           {error && (
             <View style={styles.errorBox}>
@@ -129,9 +197,17 @@ export default function AiScreen() {
 
           {conversation.length === 0 ? (
             <View style={styles.emptyBox}>
-              <ThemedText style={styles.emptyText}>
-                Try a natural prompt like “I am in a museum now, where should I go next?”
-              </ThemedText>
+              <ThemedText style={styles.emptyHint}>Try asking:</ThemedText>
+              <View style={styles.suggestionGrid}>
+                {suggestions.map((s) => (
+                  <Pressable
+                    key={s}
+                    style={({ pressed }) => [styles.suggestionChip, pressed && { opacity: 0.7 }]}
+                    onPress={() => handleSearch(s)}>
+                    <ThemedText style={styles.suggestionText}>{s}</ThemedText>
+                  </Pressable>
+                ))}
+              </View>
             </View>
           ) : (
             <View style={styles.conversation}>
@@ -158,7 +234,8 @@ export default function AiScreen() {
                               <View style={styles.cardContent}>
                                 <ThemedText style={styles.cardTitle}>{place.name}</ThemedText>
                                 <ThemedText style={styles.cardTags}>
-                                  {place.tags.slice(0, 3).join(' · ')}
+                                  {CATEGORY_EMOJI[place.category] ?? '📍'} {formatCategory(place.category)}
+                                  {place.tags[0] ? ` · ${place.tags[0]}` : ''}
                                 </ThemedText>
                                 <View style={styles.reasonBox}>
                                   <ThemedText style={styles.sparkle}>✨</ThemedText>
@@ -179,35 +256,43 @@ export default function AiScreen() {
                   </View>
                 )
               )}
+
+              {/* Typing indicator */}
+              {loading && (
+                <View style={[styles.messageBubble, styles.assistantBubble, styles.typingBubble]}>
+                  <ActivityIndicator size="small" color={GOLD} />
+                </View>
+              )}
             </View>
           )}
+        </ScrollView>
 
-          <View style={styles.searchContainer}>
+        {/* Pinned input bar */}
+        <SafeAreaView style={[styles.inputBar, { backgroundColor: bgColor }]}>
+          <View style={styles.inputRow}>
             <TextInput
-              style={styles.input}
-              placeholder="e.g. I am in a museum now, where next?"
-              placeholderTextColor="#999"
+              ref={inputRef}
+              style={[styles.input, { color: inputColor, backgroundColor: inputBg }]}
+              placeholder="e.g. Something cozy and quiet..."
+              placeholderTextColor={dark ? 'rgba(255,255,255,0.4)' : '#999'}
               value={query}
               onChangeText={setQuery}
-              onSubmitEditing={handleSearch}
+              onSubmitEditing={() => handleSearch()}
               returnKeyType="send"
+              editable={!loading}
             />
             <Pressable
-              onPress={handleSearch}
+              onPress={() => handleSearch()}
               disabled={loading || !query.trim()}
               style={({ pressed }) => [
                 styles.button,
                 pressed && styles.pressed,
                 (loading || !query.trim()) && styles.disabled,
               ]}>
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <ThemedText style={styles.buttonText}>Ask</ThemedText>
-              )}
+              <ThemedText style={styles.buttonText} lightColor="#fff" darkColor="#fff">Ask</ThemedText>
             </Pressable>
           </View>
-        </ScrollView>
+        </SafeAreaView>
       </KeyboardAvoidingView>
     </ThemedView>
   );
@@ -217,33 +302,48 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 16,
+  },
+  headerTitle: {
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  headerSub: {
+    fontSize: 14,
+    marginTop: 4,
+    lineHeight: 20,
+  },
+  clearBtn: {
+    paddingHorizontal: 4,
+    paddingVertical: 6,
+  },
+  clearBtnText: {
+    fontSize: 15,
+  },
   keyboardView: {
     flex: 1,
   },
   scrollContent: {
     padding: 16,
-    paddingTop: 60,
-    paddingBottom: 40,
+    paddingTop: 20,
+    paddingBottom: 16,
+    flexGrow: 1,
   },
-  header: {
-    marginBottom: 24,
+  inputBar: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(127,127,127,0.2)',
   },
-  subtitle: {
-    marginTop: 8,
-    opacity: 0.7,
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  note: {
-    marginTop: 10,
-    fontSize: 14,
-    lineHeight: 20,
-    opacity: 0.78,
-  },
-  searchContainer: {
+  inputRow: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
   input: {
     flex: 1,
@@ -253,19 +353,16 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     paddingHorizontal: 16,
     fontSize: 16,
-    color: '#000',
-    backgroundColor: '#fff',
   },
   button: {
     height: 48,
     paddingHorizontal: 20,
-    backgroundColor: '#000',
+    backgroundColor: NAVY,
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
   },
   buttonText: {
-    color: '#fff',
     fontWeight: '600',
     fontSize: 16,
   },
@@ -300,11 +397,15 @@ const styles = StyleSheet.create({
   },
   userBubble: {
     alignSelf: 'flex-end',
-    backgroundColor: '#0D5A50',
+    backgroundColor: NAVY,
     maxWidth: '88%',
   },
   assistantBubble: {
     backgroundColor: 'rgba(127,127,127,0.12)',
+  },
+  typingBubble: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 18,
   },
   userText: {
     color: '#fff',
@@ -340,7 +441,9 @@ const styles = StyleSheet.create({
   },
   reasonBox: {
     flexDirection: 'row',
-    backgroundColor: '#E7F7F2',
+    backgroundColor: 'rgba(212,168,67,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(212,168,67,0.25)',
     padding: 12,
     borderRadius: 12,
     marginTop: 8,
@@ -351,15 +454,39 @@ const styles = StyleSheet.create({
   },
   reasonText: {
     flex: 1,
-    color: '#0D5A50',
+    color: '#9B7A1A',
     fontSize: 14,
     lineHeight: 20,
     fontWeight: '500',
   },
   emptyBox: {
-    alignItems: 'center',
-    paddingVertical: 36,
-    paddingHorizontal: 12,
+    paddingVertical: 24,
+    gap: 16,
+  },
+  emptyHint: {
+    fontSize: 13,
+    fontWeight: '600',
+    opacity: 0.5,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  suggestionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  suggestionChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(15,28,63,0.15)',
+    backgroundColor: 'rgba(15,28,63,0.05)',
+  },
+  suggestionText: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '500',
   },
   emptyBoxInline: {
     paddingHorizontal: 4,

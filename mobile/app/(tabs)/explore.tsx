@@ -1,612 +1,507 @@
 import React from 'react';
+import {
+  Pressable,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+  useColorScheme,
+} from 'react-native';
 import { Link, useLocalSearchParams } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { PlaceImage } from '@/components/place-image';
-import { PlaceMiniMap } from '@/components/place-mini-map';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
+import { FeaturedCardSkeleton, PlaceRowSkeleton, SkeletonBox } from '@/components/skeleton';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import type { PlaceCategory } from '@/src/data/places';
+import type { Place, PlaceCategory } from '@/src/data/places';
 import { usePlaces } from '@/src/hooks/use-places';
 import { getPlaceOpenStatus } from '@/src/utils/place-hours';
-import { filterPlaces, getAllTags, getCuratedTags, sortPlacesForBrowse } from '@/src/utils/place-filters';
+import { filterPlaces, getCuratedTags, isHighQualityPlace, sortPlacesForBrowse } from '@/src/utils/place-filters';
+import { useCityStore } from '@/src/store/city';
+import { CATEGORY_EMOJI, formatCategory } from '@/src/utils/categories';
+
+const NAVY = '#0F1C3F';
+const GOLD = '#D4A843';
+
+function PlaceCard({ place, bg }: { place: Place; bg: string }) {
+  const status = getPlaceOpenStatus(place);
+  const open = status.state === 'open' || status.state === 'all-day';
+  return (
+    <Link href={{ pathname: '/place/[id]', params: { id: place.id } }} asChild>
+      <Pressable style={({ pressed }) => [styles.card, { backgroundColor: bg }, pressed && { opacity: 0.75 }]}>
+        <PlaceImage place={place} style={styles.cardImage} />
+        <View style={styles.cardBody}>
+          <View style={[styles.statusDot, open ? styles.dotOpen : styles.dotClosed]} />
+          <ThemedText numberOfLines={2} style={styles.cardName}>{place.name}</ThemedText>
+          <ThemedText numberOfLines={1} style={styles.cardMeta}>{CATEGORY_EMOJI[place.category] ?? '📍'} {formatCategory(place.category)}</ThemedText>
+          {place.shortStory ? (
+            <ThemedText numberOfLines={2} style={styles.cardStory}>{place.shortStory}</ThemedText>
+          ) : null}
+        </View>
+      </Pressable>
+    </Link>
+  );
+}
+
+function HeroCard({ place, bg }: { place: Place; bg: string }) {
+  const status = getPlaceOpenStatus(place);
+  const open = status.state === 'open' || status.state === 'all-day';
+  return (
+    <Link href={{ pathname: '/place/[id]', params: { id: place.id } }} asChild>
+      <Pressable style={({ pressed }) => [styles.heroCard, { backgroundColor: bg }, pressed && { opacity: 0.85 }]}>
+        <PlaceImage place={place} style={styles.heroCardImage} />
+        <View style={styles.heroCardOverlay}>
+          <View style={[styles.heroStatusPill, open ? styles.pillOpen : styles.pillClosed]}>
+            <ThemedText style={[styles.heroStatusText, open ? styles.pillTextOpen : styles.pillTextClosed]}>
+              {status.shortLabel}
+            </ThemedText>
+          </View>
+          <ThemedText numberOfLines={2} style={styles.heroCardName} lightColor="#fff" darkColor="#fff">
+            {place.name}
+          </ThemedText>
+          <ThemedText numberOfLines={1} style={styles.heroCardMeta} lightColor="rgba(255,255,255,0.7)" darkColor="rgba(255,255,255,0.7)">
+            {CATEGORY_EMOJI[place.category] ?? '📍'} {formatCategory(place.category)} · {place.tags[0]}
+          </ThemedText>
+        </View>
+      </Pressable>
+    </Link>
+  );
+}
+
+function SectionRow({ title, places, bg }: { title: string; places: Place[]; bg: string }) {
+  if (!places.length) return null;
+  return (
+    <View style={styles.sectionBlock}>
+      <ThemedText style={styles.sectionTitle}>{title}</ThemedText>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hScroll}>
+        {places.map((p) => <PlaceCard key={p.id} place={p} bg={bg} />)}
+      </ScrollView>
+    </View>
+  );
+}
 
 const CATEGORIES: { id: PlaceCategory | 'all'; label: string }[] = [
   { id: 'all', label: 'All' },
-  { id: 'museum', label: 'Museums' },
-  { id: 'landmark', label: 'Landmarks' },
-  { id: 'cultural-spot', label: 'Culture' },
-  { id: 'walking-area', label: 'Walks' },
-  { id: 'beach', label: 'Beaches' },
-  { id: 'square-street', label: 'Areas' },
-  { id: 'shopping-area', label: 'Shopping' },
-  { id: 'viewpoint', label: 'Views' },
-  { id: 'cafe', label: 'Cafes' },
-  { id: 'restaurant', label: 'Food' },
+  { id: 'museum', label: '🏛️ Museums' },
+  { id: 'landmark', label: '🗿 Landmarks' },
+  { id: 'cultural-spot', label: '🎭 Culture' },
+  { id: 'walking-area', label: '🚶 Walks' },
+  { id: 'beach', label: '🏖️ Beaches' },
+  { id: 'cafe', label: '☕ Cafes' },
+  { id: 'restaurant', label: '🍽️ Food' },
+  { id: 'viewpoint', label: '🌅 Views' },
+  { id: 'nature', label: '🌿 Nature' },
+  { id: 'shopping-area', label: '🛍️ Shopping' },
 ];
 
-function formatCategory(category: string) {
-  return category
-    .split('-')
-    .map((p) => p.slice(0, 1).toUpperCase() + p.slice(1))
-    .join(' ');
-}
-
 function formatTag(tag: string) {
-  return tag
-    .split(' ')
-    .map((word) => word.slice(0, 1).toUpperCase() + word.slice(1))
-    .join(' ');
+  return tag.split(' ').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
 }
 
 export default function ExploreScreen() {
+  const colorScheme = useColorScheme();
+  const dark = colorScheme === 'dark';
+  const [refreshing, setRefreshing] = React.useState(false);
   const params = useLocalSearchParams<{
     q?: string;
     category?: PlaceCategory | 'all';
-    tag?: string | 'all';
+    tag?: string;
     openNow?: string;
   }>();
 
   const [query, setQuery] = React.useState(params.q ?? '');
   const [category, setCategory] = React.useState<PlaceCategory | 'all'>(params.category ?? 'all');
-  const [tag, setTag] = React.useState<string | 'all'>(params.tag ?? 'all');
+  const [tag, setTag] = React.useState<string>(params.tag ?? 'all');
   const [openNowOnly, setOpenNowOnly] = React.useState(params.openNow === 'true');
-  const { data: allPlaces, error, isLoading, refresh } = usePlaces();
+
+  const { data: allPlaces, isLoading, error, refresh } = usePlaces();
+  const { cityName } = useCityStore();
 
   React.useEffect(() => {
-    if (typeof params.q === 'string') setQuery(params.q);
-    if (typeof params.category === 'string') setCategory(params.category as PlaceCategory | 'all');
-    if (typeof params.tag === 'string') setTag(params.tag as string | 'all');
-    if (typeof params.openNow === 'string') setOpenNowOnly(params.openNow === 'true');
+    if (params.q) setQuery(params.q);
+    if (params.category) setCategory(params.category as PlaceCategory | 'all');
+    if (params.tag) setTag(params.tag);
+    if (params.openNow) setOpenNowOnly(params.openNow === 'true');
   }, [params.q, params.category, params.tag, params.openNow]);
 
-  const tags = React.useMemo(() => getAllTags(allPlaces ?? []), [allPlaces]);
   const curatedTags = React.useMemo(() => getCuratedTags(allPlaces ?? []), [allPlaces]);
-  const extraTags = React.useMemo(() => {
-    const curatedSet = new Set<string>(curatedTags);
-    return tags.filter((candidate) => !curatedSet.has(candidate));
-  }, [tags, curatedTags]);
   const places = React.useMemo(
     () => sortPlacesForBrowse(filterPlaces(allPlaces ?? [], { query, category, tag, openNow: openNowOnly })),
-    [allPlaces, query, category, openNowOnly, tag]
-  );
-  const openNowCount = React.useMemo(
-    () =>
-      places.filter((place) => {
-        const status = getPlaceOpenStatus(place);
-        return status.state === 'open' || status.state === 'all-day';
-      }).length,
-    [places]
-  );
-  const photoPlaces = React.useMemo(
-    () =>
-      [...places]
-        .filter((place) => place.image.verified)
-        .slice(0, 8),
-    [places]
+    [allPlaces, query, category, tag, openNowOnly]
   );
 
-  const hasFilters = query.trim().length > 0 || category !== 'all' || tag !== 'all' || openNowOnly;
+  const hasFilters = !!(query.trim() || category !== 'all' || tag !== 'all' || openNowOnly);
+
+  const featured = React.useMemo(
+    () => sortPlacesForBrowse(allPlaces ?? []).filter(isHighQualityPlace).slice(0, 6),
+    [allPlaces]
+  );
+  const openNowList = React.useMemo(
+    () => (allPlaces ?? []).filter((p) => { const s = getPlaceOpenStatus(p); return s.state === 'open' || s.state === 'all-day'; }).slice(0, 8),
+    [allPlaces]
+  );
+  const rainyDay = React.useMemo(
+    () => (allPlaces ?? []).filter((p) => p.tags.includes('rainy day')).slice(0, 6),
+    [allPlaces]
+  );
+
+  const cardBg = dark ? '#1A2744' : '#fff';
 
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D', dark: '#353636' }}
-      headerImage={<View style={styles.header} />}>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Explore</ThemedText>
-        <ThemedText style={styles.subtitle}>
-          Browse all matching places. Stronger, higher-quality options are sorted first, while the map lets you explore any location.
-        </ThemedText>
-        {hasFilters ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => {
-              setQuery('');
-              setCategory('all');
-              setTag('all');
-              setOpenNowOnly(false);
+    <View style={{ flex: 1, backgroundColor: dark ? '#0A0F1E' : '#F4F5F9' }}>
+      {/* Header */}
+      <SafeAreaView style={{ backgroundColor: NAVY }}>
+        <View style={styles.header}>
+          <View style={styles.headerTop}>
+            <ThemedText style={styles.headerTitle} lightColor="#fff" darkColor="#fff">
+              {cityName ?? 'Places'}
+            </ThemedText>
+            {hasFilters ? (
+              <Pressable
+                onPress={() => { setQuery(''); setCategory('all'); setTag('all'); setOpenNowOnly(false); }}
+                style={({ pressed }) => pressed && { opacity: 0.7 }}>
+                <ThemedText style={styles.resetText} lightColor="rgba(255,255,255,0.6)" darkColor="rgba(255,255,255,0.6)">
+                  Reset
+                </ThemedText>
+              </Pressable>
+            ) : null}
+          </View>
+          <View style={styles.searchRow}>
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search places..."
+              placeholderTextColor="rgba(255,255,255,0.4)"
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={styles.searchInput}
+            />
+          </View>
+        </View>
+      </SafeAreaView>
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={async () => {
+              setRefreshing(true);
+              await refresh();
+              setRefreshing(false);
             }}
-            style={({ pressed }) => pressed && styles.pressed}>
-            <ThemedText type="link">Reset</ThemedText>
-          </Pressable>
-        ) : null}
-      </ThemedView>
+            tintColor={GOLD}
+            colors={[GOLD]}
+          />
+        }>
+        {/* Category chips */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipRow}>
+          {CATEGORIES.map((c) => {
+            const active = category === c.id;
+            return (
+              <Pressable
+                key={c.id}
+                onPress={() => setCategory(c.id)}
+                style={[styles.chip, active && styles.chipActive]}>
+                <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>
+                  {c.label}
+                </ThemedText>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
 
-      <ThemedView style={styles.searchWrap}>
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Search places, tags…"
-          placeholderTextColor="rgba(127,127,127,0.7)"
-          autoCapitalize="none"
-          autoCorrect={false}
-          style={styles.searchInput}
-        />
-      </ThemedView>
-
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-        <Pressable
-          onPress={() => setOpenNowOnly(false)}
-          style={({ pressed }) => [
-            styles.chip,
-            !openNowOnly && styles.chipActive,
-            pressed && styles.chipPressed,
-          ]}>
-          <ThemedText style={styles.chipText}>All hours</ThemedText>
-        </Pressable>
-        <Pressable
-          onPress={() => setOpenNowOnly((value) => !value)}
-          style={({ pressed }) => [
-            styles.chip,
-            styles.chipStrong,
-            openNowOnly && styles.chipOpenNow,
-            pressed && styles.chipPressed,
-          ]}>
-          <ThemedText style={[styles.chipText, openNowOnly && styles.chipOpenNowText]}>Open now</ThemedText>
-        </Pressable>
-      </ScrollView>
-
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-        {CATEGORIES.map((c) => (
+        {/* Tag + open now row */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipRow}>
           <Pressable
-            key={c.id}
-            onPress={() => setCategory(c.id)}
-            style={({ pressed }) => [
-              styles.chip,
-              category === c.id && styles.chipActive,
-              pressed && styles.chipPressed,
-            ]}>
-            <ThemedText style={styles.chipText}>{c.label}</ThemedText>
-          </Pressable>
-        ))}
-      </ScrollView>
-
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-        <Pressable
-          onPress={() => setTag('all')}
-          style={({ pressed }) => [
-            styles.chip,
-            tag === 'all' && styles.chipActive,
-            pressed && styles.chipPressed,
-          ]}>
-          <ThemedText style={styles.chipText}>All use cases</ThemedText>
-        </Pressable>
-        {curatedTags.map((t) => (
-          <Pressable
-            key={`curated-${t}`}
-            onPress={() => setTag(t)}
-            style={({ pressed }) => [
-              styles.chip,
-              styles.chipStrong,
-              tag === t && styles.chipActive,
-              pressed && styles.chipPressed,
-            ]}>
-            <ThemedText style={styles.chipText}>{formatTag(t)}</ThemedText>
-          </Pressable>
-        ))}
-      </ScrollView>
-
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-        <Pressable
-          onPress={() => setTag('all')}
-          style={({ pressed }) => [
-            styles.chip,
-            pressed && styles.chipPressed,
-          ]}>
-          <ThemedText style={styles.chipText}>More tags</ThemedText>
-        </Pressable>
-        {extraTags.map((t) => (
-          <Pressable
-            key={t}
-            onPress={() => setTag(t)}
-            style={({ pressed }) => [
-              styles.chip,
-              tag === t && styles.chipActive,
-              pressed && styles.chipPressed,
-            ]}>
-            <ThemedText style={styles.chipText}>{formatTag(t)}</ThemedText>
-          </Pressable>
-        ))}
-      </ScrollView>
-
-      <ThemedView style={styles.list}>
-        {!isLoading && !error && places.length > 0 ? (
-          <ThemedView style={styles.summaryCard}>
-            <ThemedText style={styles.summaryTitle}>Browse Snapshot</ThemedText>
-            <ThemedText style={styles.summaryText}>
-              {openNowCount} open now · {photoPlaces.length} verified photo picks · sorted with
-              open places first
+            onPress={() => setOpenNowOnly((v) => !v)}
+            style={[styles.chip, openNowOnly && styles.chipOpenNow]}>
+            <ThemedText style={[styles.chipText, openNowOnly && styles.chipTextOpenNow]}>
+              Open now
             </ThemedText>
-          </ThemedView>
-        ) : null}
+          </Pressable>
+          {curatedTags.map((t) => {
+            const active = tag === t;
+            return (
+              <Pressable
+                key={t}
+                onPress={() => setTag(active ? 'all' : t)}
+                style={[styles.chip, active && styles.chipActive]}>
+                <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>
+                  {formatTag(t)}
+                </ThemedText>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
 
-        {isLoading ? <ThemedText style={styles.empty}>Loading places…</ThemedText> : null}
+        {/* Error */}
         {error ? (
-          <View style={styles.statusBlock}>
+          <View style={[styles.errorBlock, { paddingHorizontal: 20, marginTop: 8 }]}>
             <ThemedText style={styles.errorText}>{error}</ThemedText>
-            <Pressable onPress={refresh} style={({ pressed }) => pressed && styles.pressed}>
-              <ThemedText type="link">Retry</ThemedText>
-            </Pressable>
+            <Pressable onPress={refresh}><ThemedText style={styles.retryText}>Retry</ThemedText></Pressable>
           </View>
         ) : null}
 
-        {!isLoading && !error && photoPlaces.length > 0 ? (
-          <ThemedView style={styles.sectionBlock}>
-            <View style={styles.sectionHeader}>
-              <ThemedText type="subtitle">Photo Picks</ThemedText>
-              <ThemedText style={styles.sectionMeta}>
-                {photoPlaces.length} verified {photoPlaces.length === 1 ? 'photo' : 'photos'}
-              </ThemedText>
+        {/* Loading skeleton */}
+        {isLoading && !error && (
+          <>
+            <View style={styles.heroSection}>
+              <SkeletonBox height={220} borderRadius={20} />
             </View>
-            <View style={styles.photoGrid}>
-              {photoPlaces.map((place) => (
-                (() => {
-                  const openStatus = getPlaceOpenStatus(place);
-                  const isOpenNow = openStatus.state === 'open' || openStatus.state === 'all-day';
-
-                  return (
-                    <Link key={`photo-${place.id}`} href={{ pathname: '/place/[id]', params: { id: place.id } }} asChild>
-                      <Pressable style={({ pressed }) => [styles.photoCard, pressed && styles.rowPressed]}>
-                        <PlaceImage place={place} style={styles.photoCardImage} />
-                        <View style={styles.photoCardBody}>
-                          <View
-                            style={[
-                              styles.cardStatusBadge,
-                              isOpenNow ? styles.cardStatusBadgeOpen : styles.cardStatusBadgeClosed,
-                            ]}>
-                            <ThemedText
-                              style={[
-                                styles.cardStatusText,
-                                isOpenNow ? styles.cardStatusTextOpen : styles.cardStatusTextClosed,
-                              ]}>
-                              {openStatus.shortLabel}
-                            </ThemedText>
-                          </View>
-                          <ThemedText numberOfLines={1} style={styles.photoCardTitle}>
-                            {place.name}
-                          </ThemedText>
-                          <ThemedText numberOfLines={1} style={styles.photoCardMeta}>
-                            {formatCategory(place.category)}
-                          </ThemedText>
-                          <ThemedText numberOfLines={2} style={styles.photoCardStory}>
-                            {place.shortStory}
-                          </ThemedText>
-                        </View>
-                      </Pressable>
-                    </Link>
-                  );
-                })()
-              ))}
+            <View style={styles.sectionBlock}>
+              <ThemedText style={styles.sectionTitle}>Open Right Now</ThemedText>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hScroll}>
+                {[1, 2, 3].map((n) => <FeaturedCardSkeleton key={n} />)}
+              </ScrollView>
             </View>
-          </ThemedView>
-        ) : null}
+            <View style={styles.content}>
+              <View style={styles.grid}>
+                {[1, 2, 3, 4].map((n) => <PlaceRowSkeleton key={n} />)}
+              </View>
+            </View>
+          </>
+        )}
 
-        {!isLoading && !error && places.length > 0 ? (
-          <View style={styles.sectionHeader}>
-            <ThemedText type="subtitle">All Matches</ThemedText>
-            <ThemedText style={styles.sectionMeta}>
-              {places.length} place{places.length === 1 ? '' : 's'}
+        {/* No-filter browsing: sections */}
+        {!hasFilters && !isLoading && !error && (
+          <>
+            {/* Featured hero card */}
+            {featured[0] && (
+              <View style={styles.heroSection}>
+                <HeroCard place={featured[0]} bg={cardBg} />
+              </View>
+            )}
+
+            <SectionRow title="Open Right Now" places={openNowList} bg={cardBg} />
+            <SectionRow title="Featured Places" places={featured.slice(1)} bg={cardBg} />
+            {rainyDay.length > 0 && <SectionRow title="Rainy Day Picks" places={rainyDay} bg={cardBg} />}
+
+            {/* All places grid */}
+            <View style={styles.content}>
+              <ThemedText style={styles.sectionTitle}>All Places</ThemedText>
+              <View style={styles.grid}>
+                {places.map((place) => <PlaceCard key={place.id} place={place} bg={cardBg} />)}
+              </View>
+            </View>
+          </>
+        )}
+
+        {/* Filtered results: flat grid */}
+        {hasFilters && !isLoading && !error && (
+          <View style={styles.content}>
+            <ThemedText style={styles.countText}>
+              {places.length} place{places.length !== 1 ? 's' : ''} found
             </ThemedText>
+            <View style={styles.grid}>
+              {places.map((place) => <PlaceCard key={place.id} place={place} bg={cardBg} />)}
+            </View>
+            {places.length === 0 && (
+              <ThemedText style={styles.emptyText}>
+                No places match. Try a different search or filter.
+              </ThemedText>
+            )}
           </View>
-        ) : null}
-
-        {places.length > 0 ? (
-          <View style={styles.matchGrid}>
-            {places.map((place) => (
-              (() => {
-                const openStatus = getPlaceOpenStatus(place);
-                const isOpenNow = openStatus.state === 'open' || openStatus.state === 'all-day';
-
-                return (
-                  <View key={place.id} style={styles.matchCard}>
-                    <Link href={{ pathname: '/place/[id]', params: { id: place.id } }} asChild>
-                      <Pressable style={({ pressed }) => [styles.matchCardTap, pressed && styles.rowPressed]}>
-                        <PlaceImage place={place} style={styles.matchCardImage} compact />
-                        <View style={styles.matchCardBody}>
-                          <View
-                            style={[
-                              styles.cardStatusBadge,
-                              isOpenNow ? styles.cardStatusBadgeOpen : styles.cardStatusBadgeClosed,
-                            ]}>
-                            <ThemedText
-                              style={[
-                                styles.cardStatusText,
-                                isOpenNow ? styles.cardStatusTextOpen : styles.cardStatusTextClosed,
-                              ]}>
-                              {openStatus.shortLabel}
-                            </ThemedText>
-                          </View>
-                          <ThemedText numberOfLines={2} style={styles.matchCardTitle}>
-                            {place.name}
-                          </ThemedText>
-                          <ThemedText numberOfLines={1} style={styles.matchCardMeta}>
-                            {formatCategory(place.category)}
-                          </ThemedText>
-                          <ThemedText numberOfLines={3} style={styles.matchCardStory}>
-                            {place.shortStory}
-                          </ThemedText>
-                          <ThemedText numberOfLines={2} style={styles.matchCardTags}>
-                            {place.tags.slice(0, 3).map(formatTag).join(', ')}
-                          </ThemedText>
-                          <PlaceMiniMap place={place} style={styles.matchCardMap} />
-                        </View>
-                      </Pressable>
-                    </Link>
-                  </View>
-                );
-              })()
-            ))}
-          </View>
-        ) : null}
-
-        {!isLoading && !error && places.length === 0 ? (
-          <ThemedText style={styles.empty}>No matches. Try a different search or filter.</ThemedText>
-        ) : null}
-      </ThemedView>
-    </ParallaxScrollView>
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   header: {
-    height: 178,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 16,
+    gap: 12,
   },
-  titleContainer: {
+  headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 8,
-    marginBottom: 12,
   },
-  subtitle: {
-    opacity: 0.78,
-    lineHeight: 20,
-    marginTop: 2,
-  },
-  searchWrap: {
-    marginBottom: 12,
-  },
-  searchInput: {
-    borderWidth: 1,
-    borderColor: 'rgba(127,127,127,0.25)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-  },
-  chips: {
-    paddingVertical: 6,
-    gap: 8,
-    paddingRight: 16,
-  },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(127,127,127,0.25)',
-  },
-  chipActive: {
-    borderColor: 'rgba(127,127,127,0.6)',
-  },
-  chipStrong: {
-    backgroundColor: 'rgba(14,36,56,0.04)',
-  },
-  chipOpenNow: {
-    backgroundColor: 'rgba(18, 183, 106, 0.1)',
-    borderColor: 'rgba(18, 183, 106, 0.24)',
-  },
-  chipOpenNowText: {
-    color: '#067647',
+  headerTitle: {
+    fontSize: 26,
     fontWeight: '700',
   },
-  chipPressed: {
-    opacity: 0.7,
+  resetText: {
+    fontSize: 15,
+  },
+  searchRow: {},
+  searchInput: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    fontSize: 15,
+    color: '#fff',
+  },
+  chipRow: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 50,
+    backgroundColor: 'rgba(15,28,63,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(15,28,63,0.12)',
+  },
+  chipActive: {
+    backgroundColor: '#0F1C3F',
+    borderColor: '#0F1C3F',
+  },
+  chipOpenNow: {
+    backgroundColor: 'rgba(18,183,106,0.1)',
+    borderColor: 'rgba(18,183,106,0.25)',
   },
   chipText: {
     fontSize: 14,
-    lineHeight: 18,
+    fontWeight: '500',
   },
-  list: {
-    marginTop: 8,
-    gap: 10,
+  chipTextActive: {
+    color: '#fff',
   },
-  summaryCard: {
-    gap: 4,
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(127,127,127,0.18)',
-    backgroundColor: 'rgba(14,36,56,0.04)',
-  },
-  summaryTitle: {
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: '700',
-  },
-  summaryText: {
-    fontSize: 13,
-    lineHeight: 18,
-    opacity: 0.78,
-  },
-  sectionBlock: {
-    gap: 12,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  sectionMeta: {
-    fontSize: 13,
-    lineHeight: 18,
-    opacity: 0.72,
-  },
-  photoGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  photoCard: {
-    width: '48%',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(127,127,127,0.2)',
-    overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.72)',
-  },
-  photoCardImage: {
-    width: '100%',
-    height: 120,
-    backgroundColor: 'rgba(127,127,127,0.15)',
-  },
-  photoCardBody: {
-    gap: 4,
-    padding: 12,
-  },
-  cardStatusBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  cardStatusBadgeOpen: {
-    backgroundColor: 'rgba(18, 183, 106, 0.1)',
-    borderColor: 'rgba(18, 183, 106, 0.2)',
-  },
-  cardStatusBadgeClosed: {
-    backgroundColor: 'rgba(217, 45, 32, 0.08)',
-    borderColor: 'rgba(217, 45, 32, 0.18)',
-  },
-  cardStatusText: {
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: '700',
-  },
-  cardStatusTextOpen: {
+  chipTextOpenNow: {
     color: '#067647',
-  },
-  cardStatusTextClosed: {
-    color: '#B42318',
-  },
-  photoCardTitle: {
-    fontSize: 15,
-    lineHeight: 20,
     fontWeight: '700',
   },
-  photoCardMeta: {
-    fontSize: 12,
-    lineHeight: 16,
-    opacity: 0.7,
+  heroSection: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
   },
-  photoCardStory: {
+  heroCard: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    height: 220,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 5,
+  },
+  heroCardImage: { width: '100%', height: '100%' },
+  heroCardOverlay: {
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
+    padding: 16,
+    paddingBottom: 18,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    gap: 4,
+  },
+  heroStatusPill: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8, paddingVertical: 3,
+    borderRadius: 50, borderWidth: 1,
+    marginBottom: 4,
+  },
+  pillOpen: { backgroundColor: 'rgba(18,183,106,0.25)', borderColor: 'rgba(18,183,106,0.5)' },
+  pillClosed: { backgroundColor: 'rgba(217,45,32,0.2)', borderColor: 'rgba(217,45,32,0.4)' },
+  heroStatusText: { fontSize: 10, fontWeight: '700' },
+  pillTextOpen: { color: '#6EFAB0' },
+  pillTextClosed: { color: '#FFA5A0' },
+  heroCardName: { fontSize: 22, fontWeight: '800', lineHeight: 28 },
+  heroCardMeta: { fontSize: 13 },
+  sectionBlock: {
+    paddingTop: 12,
+    gap: 8,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    paddingHorizontal: 16,
+  },
+  hScroll: {
+    paddingHorizontal: 16,
+    gap: 12,
+    paddingBottom: 4,
+  },
+  content: {
+    paddingHorizontal: 16,
+    paddingBottom: 40,
+    gap: 12,
+    paddingTop: 16,
+  },
+  countText: {
     fontSize: 13,
-    lineHeight: 18,
-    opacity: 0.82,
+    opacity: 0.5,
+    fontWeight: '500',
   },
-  matchGrid: {
+  grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-  },
-  matchCard: {
-    width: '48%',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(127,127,127,0.2)',
-    overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.72)',
-  },
-  matchCardTap: {
-    backgroundColor: 'transparent',
-  },
-  matchCardImage: {
-    width: '100%',
-    height: 132,
-    backgroundColor: 'rgba(127,127,127,0.15)',
-  },
-  matchCardMap: {
-    width: '100%',
-    height: 104,
-  },
-  matchCardBody: {
-    gap: 4,
-    padding: 12,
-  },
-  matchCardTitle: {
-    fontSize: 15,
-    lineHeight: 20,
-    fontWeight: '700',
-  },
-  matchCardMeta: {
-    opacity: 0.72,
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  matchCardStory: {
-    opacity: 0.86,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  matchCardTags: {
-    opacity: 0.78,
-    fontSize: 13,
-    lineHeight: 18,
-    marginBottom: 6,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(127,127,127,0.2)',
   },
-  thumb: {
-    width: 64,
-    height: 64,
-    borderRadius: 10,
-    backgroundColor: 'rgba(127,127,127,0.15)',
+  card: {
+    width: '47.5%',
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
   },
-  rowPressed: {
+  cardImage: {
+    width: '100%',
+    height: 130,
+  },
+  cardBody: {
+    padding: 12,
+    gap: 5,
+  },
+  statusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  dotOpen: {
+    backgroundColor: '#12B76A',
+  },
+  dotClosed: {
+    backgroundColor: '#D92D20',
+  },
+  cardName: {
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 20,
+  },
+  cardMeta: {
+    fontSize: 12,
+    opacity: 0.5,
+  },
+  cardStory: {
+    fontSize: 12,
     opacity: 0.7,
+    lineHeight: 17,
   },
-  rowText: {
-    flex: 1,
-    gap: 4,
+  statusText: {
+    opacity: 0.5,
+    paddingVertical: 8,
   },
-  rowTitle: {
-    fontSize: 16,
+  emptyText: {
+    opacity: 0.5,
     lineHeight: 22,
+    paddingVertical: 8,
   },
-  rowMeta: {
-    opacity: 0.75,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  chev: {
-    fontSize: 22,
-    lineHeight: 22,
-    opacity: 0.6,
-  },
-  empty: {
-    opacity: 0.75,
-    lineHeight: 22,
-  },
-  statusBlock: {
+  errorBlock: {
     gap: 6,
   },
   errorText: {
     color: '#B42318',
-    lineHeight: 20,
   },
-  pressed: {
-    opacity: 0.7,
+  retryText: {
+    color: '#0F1C3F',
+    fontWeight: '600',
   },
 });
