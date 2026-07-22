@@ -204,6 +204,22 @@ function getAiProviderConfig():
   return null;
 }
 
+// Piri's on-demand AI responses (place explanations, scan identification,
+// chat) are generated fresh per request, so they can honor the user's
+// current app language directly in the prompt — unlike the place data
+// itself (description, shortStory), which is generated once at discovery
+// time and stored in English only.
+function languageInstruction(locale?: string): string {
+  switch (locale) {
+    case 'tr':
+      return '\n\nRespond in Turkish (Türkçe). Write naturally as a native Turkish speaker would — not a literal translation.';
+    case 'nb':
+      return '\n\nRespond in Norwegian Bokmål (norsk). Write naturally as a native Norwegian speaker would — not a literal translation.';
+    default:
+      return '';
+  }
+}
+
 async function buildServer() {
   const app = Fastify({ logger: true });
 
@@ -749,6 +765,7 @@ async function buildServer() {
       mimeType?: string;
       lat?: number;
       lng?: number;
+      locale?: string;
       userProfile?: {
         name?: string;
         profession?: string;
@@ -766,6 +783,7 @@ async function buildServer() {
           mimeType: z.string().optional().default('image/jpeg'),
           lat: z.number().optional(),
           lng: z.number().optional(),
+          locale: z.string().trim().min(2).max(8).optional(),
           userProfile: z
             .object({
               name: z.string().optional(),
@@ -781,7 +799,7 @@ async function buildServer() {
         return reply.code(400).send({ error: 'Invalid request body' });
       }
 
-      const { imageBase64, mimeType, lat, lng, userProfile } = parsedBody.data;
+      const { imageBase64, mimeType, lat, lng, locale, userProfile } = parsedBody.data;
       const aiProvider = getAiProviderConfig();
 
       if (!aiProvider) {
@@ -873,7 +891,7 @@ async function buildServer() {
               ],
             },
           ],
-          system: `You are Piri, a deeply knowledgeable personal travel guide. You identify places from photos and explain them in a way that speaks directly to who the user is.${profileContext}`,
+          system: `You are Piri, a deeply knowledgeable personal travel guide. You identify places from photos and explain them in a way that speaks directly to who the user is.${profileContext}${languageInstruction(locale)}`,
         } as any)) as { object: z.infer<typeof identifySchema> };
 
         // Fuzzy-match the identified title against DB places. Nearby places are
@@ -918,6 +936,7 @@ async function buildServer() {
   app.post<{
     Body: {
       placeId: string;
+      locale?: string;
       userProfile?: {
         name?: string;
         profession?: string;
@@ -932,6 +951,7 @@ async function buildServer() {
       const parsed = z
         .object({
           placeId: z.string().min(1),
+          locale: z.string().trim().min(2).max(8).optional(),
           userProfile: z
             .object({
               name: z.string().optional(),
@@ -947,7 +967,7 @@ async function buildServer() {
         return reply.code(400).send({ error: 'Invalid request' });
       }
 
-      const { placeId, userProfile } = parsed.data;
+      const { placeId, locale, userProfile } = parsed.data;
       const aiProvider = getAiProviderConfig();
       if (!aiProvider) {
         return reply.code(503).send({ error: 'AI not configured' });
@@ -1015,7 +1035,7 @@ async function buildServer() {
           }),
           system: `You are Piri, a deeply knowledgeable personal travel guide. Your job is to explain a place in a way that speaks directly to who the user is — their profession, interests, and worldview.${profileContext}
 
-${personalization}`,
+${personalization}${languageInstruction(locale)}`,
           prompt: `Explain this place:\n\n${placeContext}`,
         } as any);
 
@@ -1036,6 +1056,7 @@ ${personalization}`,
       lng?: number;
       imageBase64?: string;
       mimeType?: string;
+      locale?: string;
       messages?: Array<{ role: 'user' | 'assistant'; content: string }>;
       userProfile?: {
         name?: string;
@@ -1059,6 +1080,7 @@ ${personalization}`,
         lng: z.number().optional(),
         imageBase64: z.string().min(1).optional(),
         mimeType: z.string().optional().default('image/jpeg'),
+        locale: z.string().trim().min(2).max(8).optional(),
         messages: z.array(chatMessageSchema).max(8).optional(),
         userProfile: z
           .object({
@@ -1083,7 +1105,7 @@ ${personalization}`,
       return reply.code(400).send({ error: parsedBody.error.issues[0]?.message ?? 'Invalid request' });
     }
 
-    const { query, city, lat, lng, imageBase64, mimeType, messages = [], userProfile, weather } = parsedBody.data;
+    const { query, city, lat, lng, imageBase64, mimeType, locale, messages = [], userProfile, weather } = parsedBody.data;
 
     const profileLines: string[] = [];
     if (userProfile?.profession && userProfile.profession !== 'other') {
@@ -1176,7 +1198,7 @@ ${personalization}`,
         }) as any,
         system: `You are Piri, a personal travel guide.${profileContext}${weatherContext}
 Continue the conversation naturally using the recent chat history when provided.
-Keep answers concise (1–3 sentences) and personalized to the user.${imageInstructions}
+Keep answers concise (1–3 sentences) and personalized to the user.${imageInstructions}${languageInstruction(locale)}
 
 ${placeContext.length > 0
   ? `You have ${placeContext.length} places in your database for ${cityLabel}. Pick 4 places when possible, 5 when there are several strong matches, 3 when unusually narrow. Return ONLY places from the provided shortlist using exact IDs. Spread picks across different place types.`

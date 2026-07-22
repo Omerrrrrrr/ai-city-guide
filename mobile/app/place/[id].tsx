@@ -55,7 +55,7 @@ export default function PlaceDetailScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const dark = colorScheme === 'dark';
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const { data: place, error, isLoading, refresh } = usePlace(id);
   const { data: nearbyPlaces } = useNearbyPlaces(id);
@@ -74,12 +74,12 @@ export default function PlaceDetailScreen() {
     if (!id || !place) return;
     let cancelled = false;
     setPirisLoading(true);
-    explainPlace(id, { name: userName, profession, interests, faith })
+    explainPlace(id, { name: userName, profession, interests, faith }, i18n.language)
       .then((result) => { if (!cancelled) setPirisTake(result); })
       .catch(() => { /* silently fail — non-critical */ })
       .finally(() => { if (!cancelled) setPirisLoading(false); });
     return () => { cancelled = true; };
-  }, [id, place?.id, profession, faith, interests?.join(',')]);
+  }, [id, place?.id, profession, faith, interests?.join(','), i18n.language]);
 
 
   const bg = dark ? '#0A0F1E' : '#F4F5F9';

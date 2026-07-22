@@ -88,7 +88,8 @@ export async function fetchRecommendations(
   },
   city?: string | null,
   location?: { lat: number; lng: number } | null,
-  image?: { base64: string; mimeType?: string } | null
+  image?: { base64: string; mimeType?: string } | null,
+  locale?: string
 ): Promise<AIRecommendationResponse> {
   const response = await fetch(`${API_BASE_URL}/places/recommend`, {
     method: 'POST',
@@ -101,6 +102,7 @@ export async function fetchRecommendations(
       ...(city ? { city } : {}),
       ...(location ? { lat: location.lat, lng: location.lng } : {}),
       ...(image ? { imageBase64: image.base64, mimeType: image.mimeType ?? 'image/jpeg' } : {}),
+      ...(locale ? { locale } : {}),
     }),
   });
 
@@ -127,16 +129,17 @@ export async function explainPlace(
     profession?: string | null;
     interests?: string[];
     faith?: string | null;
-  }
+  },
+  locale?: string
 ): Promise<ExplainResult> {
-  const cacheKey = `${placeId}:${userProfile?.profession ?? ''}:${(userProfile?.interests ?? []).join(',')}:${userProfile?.faith ?? ''}`;
+  const cacheKey = `${placeId}:${userProfile?.profession ?? ''}:${(userProfile?.interests ?? []).join(',')}:${userProfile?.faith ?? ''}:${locale ?? ''}`;
   const cached = explainCache.get(cacheKey);
   if (cached) return cached;
 
   const response = await fetch(`${API_BASE_URL}/places/explain`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ placeId, userProfile }),
+    body: JSON.stringify({ placeId, userProfile, locale }),
   });
 
   if (!response.ok) {
@@ -162,6 +165,7 @@ export async function identifyPlace(payload: {
   mimeType?: string;
   lat?: number;
   lng?: number;
+  locale?: string;
   userProfile?: {
     name?: string;
     profession?: string | null;

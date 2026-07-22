@@ -69,7 +69,7 @@ export default function ScanScreen() {
   const colorScheme = useColorScheme();
   const dark = colorScheme === 'dark';
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = React.useState<'back' | 'front'>('back');
   const [flash, setFlash] = React.useState<'off' | 'on'>('off');
@@ -100,6 +100,7 @@ export default function ScanScreen() {
         mimeType: 'image/jpeg',
         lat: coords?.lat,
         lng: coords?.lng,
+        locale: i18n.language,
         userProfile,
       });
       setState({ kind: 'result', result, imageUri });

@@ -52,7 +52,7 @@ type ConversationTurn =
 export default function AiScreen() {
   const colorScheme = useColorScheme();
   const dark = colorScheme === 'dark';
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const params = useLocalSearchParams<{ q?: string }>();
   const scrollRef = React.useRef<ScrollView>(null);
   const inputRef = React.useRef<TextInput>(null);
@@ -139,7 +139,8 @@ export default function AiScreen() {
         weather ?? undefined,
         cityName,
         locationRef.current ?? undefined,
-        nextImage ? { base64: nextImage.base64, mimeType: 'image/jpeg' } : undefined
+        nextImage ? { base64: nextImage.base64, mimeType: 'image/jpeg' } : undefined,
+        i18n.language
       );
       const assistantTurn: ConversationTurn = {
         id: `${Date.now()}-assistant`,
@@ -168,7 +169,7 @@ export default function AiScreen() {
       setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, history, userProfile, weather, cityName, attachedImage, t]);
+  }, [query, history, userProfile, weather, cityName, attachedImage, t, i18n.language]);
 
   // Auto-submit once if navigated from scan with a pre-filled query
   React.useEffect(() => {

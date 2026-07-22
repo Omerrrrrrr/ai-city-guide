@@ -18,11 +18,11 @@ import { useUserProfile as useProfile, type Interest } from '@/src/store/user-pr
 const NAVY = '#0F1C3F';
 const GOLD = '#D4A843';
 
-const LANGUAGE_OPTIONS: { code: LanguageCode | null; labelKey: string }[] = [
-  { code: null, labelKey: 'settings.language.system' },
-  { code: 'en', labelKey: 'settings.language.en' },
-  { code: 'tr', labelKey: 'settings.language.tr' },
-  { code: 'nb', labelKey: 'settings.language.nb' },
+const LANGUAGE_OPTIONS: { code: LanguageCode | null; emoji: string; labelKey: string }[] = [
+  { code: null, emoji: '🌐', labelKey: 'settings.language.system' },
+  { code: 'en', emoji: '🇬🇧', labelKey: 'settings.language.en' },
+  { code: 'tr', emoji: '🇹🇷', labelKey: 'settings.language.tr' },
+  { code: 'nb', emoji: '🇳🇴', labelKey: 'settings.language.nb' },
 ];
 
 export default function ProfileScreen() {
@@ -106,6 +106,27 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
 
+      {/* Language */}
+      <ThemedView style={styles.card}>
+        <ThemedText style={styles.cardLabel}>{t('settings.language.label')}</ThemedText>
+        <View style={styles.chipGrid}>
+          {LANGUAGE_OPTIONS.map(({ code, emoji, labelKey }) => {
+            const active = language === code;
+            return (
+              <Pressable
+                key={code ?? 'system'}
+                style={[styles.chip, active && styles.chipActive]}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setLanguage(code); }}>
+                <ThemedText style={styles.chipEmoji}>{emoji}</ThemedText>
+                <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>
+                  {t(labelKey)}
+                </ThemedText>
+              </Pressable>
+            );
+          })}
+        </View>
+      </ThemedView>
+
       {/* Profession */}
       <ThemedView style={styles.card}>
         <ThemedText style={styles.cardLabel}>{t('onboarding.profession.title')}</ThemedText>
@@ -158,26 +179,6 @@ export default function ProfileScreen() {
                 key={value}
                 style={[styles.chip, active && styles.chipActive]}
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setProfile({ faith: value }); }}>
-                <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>
-                  {t(labelKey)}
-                </ThemedText>
-              </Pressable>
-            );
-          })}
-        </View>
-      </ThemedView>
-
-      {/* Language */}
-      <ThemedView style={styles.card}>
-        <ThemedText style={styles.cardLabel}>{t('settings.language.label')}</ThemedText>
-        <View style={styles.chipGrid}>
-          {LANGUAGE_OPTIONS.map(({ code, labelKey }) => {
-            const active = language === code;
-            return (
-              <Pressable
-                key={code ?? 'system'}
-                style={[styles.chip, active && styles.chipActive]}
-                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setLanguage(code); }}>
                 <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>
                   {t(labelKey)}
                 </ThemedText>
@@ -399,6 +400,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 50,
@@ -408,6 +412,9 @@ const styles = StyleSheet.create({
   chipActive: {
     backgroundColor: NAVY,
     borderColor: NAVY,
+  },
+  chipEmoji: {
+    fontSize: 15,
   },
   chipText: {
     fontSize: 14,
