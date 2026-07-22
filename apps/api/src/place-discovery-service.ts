@@ -59,6 +59,20 @@ const NON_TOURIST_LEAF_CATEGORIES = new Set([
   'real_estate',
 ]);
 
+// The 'shopping' top category is dominated by generic retail (clothing,
+// electronics, hardware, pet supplies...) that nobody plans a visit around.
+// Blocklisting every mundane shop type would be an endless, leaky list, so
+// instead we only admit shopping leaf categories that look genuinely
+// visit-worthy — markets, souvenir/gift shops, notable malls, bookstores,
+// craft/antique shops.
+export const TOURIST_WORTHY_SHOPPING_KEYWORDS = [
+  'market', 'flea', 'mall', 'souvenir', 'gift', 'book', 'craft', 'antique', 'boutique',
+];
+
+function isTouristWorthyShopping(leafCategory: string) {
+  return TOURIST_WORTHY_SHOPPING_KEYWORDS.some((keyword) => leafCategory.includes(keyword));
+}
+
 let duckDbConnectionPromise: Promise<import('@duckdb/node-api').DuckDBConnection> | null = null;
 
 async function getDuckDbConnection() {
@@ -183,6 +197,7 @@ export function filterAndMapOvertureRows(rows: Record<string, unknown>[]): Overt
       if (!VISITOR_RELEVANT_TOP_CATEGORIES.has(String(row.top_category))) return false;
       const leaf = String(row.category ?? '').toLowerCase();
       if (NON_TOURIST_LEAF_CATEGORIES.has(leaf)) return false;
+      if (String(row.top_category) === 'shopping' && !isTouristWorthyShopping(leaf)) return false;
       return true;
     })
     .map((row) => ({

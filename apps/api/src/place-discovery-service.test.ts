@@ -91,6 +91,23 @@ test('filterAndMapOvertureRows keeps visitor-relevant categories and drops munda
   );
 });
 
+test('filterAndMapOvertureRows keeps only tourist-worthy shopping leaf categories', () => {
+  const rows = [
+    overtureRow({ id: 'clothing-1', top_category: 'shopping', category: 'clothing_store', name: 'Generic Clothing Co' }),
+    overtureRow({ id: 'hardware-1', top_category: 'shopping', category: 'hardware_store', name: 'Local Hardware' }),
+    overtureRow({ id: 'market-1', top_category: 'shopping', category: 'flea_market', name: 'Old Town Market' }),
+    overtureRow({ id: 'gift-1', top_category: 'shopping', category: 'gift_shop', name: 'Souvenir Corner' }),
+    overtureRow({ id: 'bookstore-1', top_category: 'shopping', category: 'bookstore', name: 'Historic Bookshop' }),
+  ];
+
+  const result = filterAndMapOvertureRows(rows);
+
+  assert.deepEqual(
+    result.map((candidate) => candidate.overtureId).sort(),
+    ['bookstore-1', 'gift-1', 'market-1']
+  );
+});
+
 test('filterAndMapOvertureRows unwraps DuckDB list values for websites and phones', () => {
   const result = filterAndMapOvertureRows([overtureRow()]);
   assert.deepEqual(result[0].websites, ['https://example.com']);

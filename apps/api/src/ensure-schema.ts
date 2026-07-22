@@ -1,7 +1,8 @@
-import { inArray, sql } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 
 import { db } from './db';
 import { places } from './schema';
+import { TOURIST_WORTHY_SHOPPING_KEYWORDS } from './place-discovery-service';
 
 export async function ensureSchema() {
   await db.execute(sql`
@@ -192,5 +193,24 @@ export async function ensureSchema() {
 
   if (toDelete.length > 0) {
     await db.delete(places).where(inArray(places.id, toDelete));
+  }
+
+  // Retroactively remove already-discovered "shopping-area" places that
+  // aren't genuinely tourist-worthy (generic clothing/electronics/hardware
+  // stores etc. that slipped through before the discovery pipeline's
+  // shopping filter was tightened to an allowlist).
+  const shoppingPlaces = await db
+    .select({ id: places.id, tags: places.tags })
+    .from(places)
+    .where(eq(places.category, 'shopping-area'));
+  const nonTouristShoppingIds = shoppingPlaces
+    .filter((p) => {
+      const firstTag = p.tags.split(',')[0]?.trim().toLowerCase() ?? '';
+      return !TOURIST_WORTHY_SHOPPING_KEYWORDS.some((keyword) => firstTag.includes(keyword));
+    })
+    .map((p) => p.id);
+
+  if (nonTouristShoppingIds.length > 0) {
+    await db.delete(places).where(inArray(places.id, nonTouristShoppingIds));
   }
 }
