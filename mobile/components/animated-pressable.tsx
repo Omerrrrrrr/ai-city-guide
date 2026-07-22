@@ -21,29 +21,37 @@ type AnimatedPressableProps = Omit<PressableProps, 'style'> & {
  *
  * Forwards its ref so it works as the direct child of expo-router's
  * `<Link asChild>`, same as a plain Pressable would.
+ *
+ * Resolves a function `style` (Pressable's `{ pressed }` callback pattern)
+ * to a plain array before handing it to the Reanimated-wrapped component —
+ * passing a function straight through to `Animated.createAnimatedComponent`
+ * silently drops the resolved style (it expects an object/array, not a
+ * callback), which made every pressed-dependent style vanish invisibly.
  */
 export const AnimatedPressable = React.forwardRef<React.ComponentRef<typeof Pressable>, AnimatedPressableProps>(
   function AnimatedPressable({ scaleTo = 0.96, style, onPressIn, onPressOut, children, ...rest }, ref) {
     const scale = useSharedValue(1);
+    const [pressed, setPressed] = React.useState(false);
     const animatedStyle = useAnimatedStyle(() => ({
       transform: [{ scale: scale.value }],
     }));
+
+    const resolvedStyle = typeof style === 'function' ? style({ pressed }) : style;
 
     return (
       <AnimatedPressableBase
         ref={ref}
         onPressIn={(e) => {
           scale.value = withSpring(scaleTo, { damping: 16, stiffness: 280 });
+          setPressed(true);
           onPressIn?.(e);
         }}
         onPressOut={(e) => {
           scale.value = withSpring(1, { damping: 14, stiffness: 220 });
+          setPressed(false);
           onPressOut?.(e);
         }}
-        style={(state: PressState) => [
-          animatedStyle,
-          typeof style === 'function' ? style(state) : style,
-        ]}
+        style={[animatedStyle, resolvedStyle]}
         {...rest}>
         {children}
       </AnimatedPressableBase>

@@ -55,16 +55,21 @@ export default function OnboardingScreen() {
   if (step === 0) {
     return (
       <View style={styles.welcome}>
-        <SafeAreaView style={styles.welcomeInner}>
-          <View style={styles.welcomeContent}>
-            <Text style={styles.compass}>◈</Text>
-            <Text style={styles.wordmark}>{t('onboarding.wordmark')}</Text>
-            <Text style={styles.tagline}>{t('onboarding.tagline')}</Text>
-            <Text style={styles.welcomeBody}>{t('onboarding.welcomeBody')}</Text>
-          </View>
-          <AnimatedPressable style={styles.goldButton} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setStep(1); }}>
-            <Text style={styles.goldButtonText}>{t('onboarding.begin')}</Text>
-          </AnimatedPressable>
+        <SafeAreaView style={styles.welcomeSafeArea}>
+          <ScrollView
+            style={styles.welcomeScroll}
+            contentContainerStyle={styles.welcomeScrollContent}
+            showsVerticalScrollIndicator={false}>
+            <View style={styles.welcomeContent}>
+              <Text style={styles.compass}>◈</Text>
+              <Text style={styles.wordmark}>{t('onboarding.wordmark')}</Text>
+              <Text style={styles.tagline}>{t('onboarding.tagline')}</Text>
+              <Text style={styles.welcomeBody}>{t('onboarding.welcomeBody')}</Text>
+            </View>
+            <AnimatedPressable style={styles.goldButton} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setStep(1); }}>
+              <Text style={styles.goldButtonText}>{t('onboarding.begin')}</Text>
+            </AnimatedPressable>
+          </ScrollView>
         </SafeAreaView>
       </View>
     );
@@ -225,15 +230,21 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: NAVY,
   },
-  welcomeInner: {
+  welcomeSafeArea: {
     flex: 1,
+  },
+  welcomeScroll: {
+    flex: 1,
+  },
+  welcomeScrollContent: {
+    flexGrow: 1,
     paddingHorizontal: 32,
     paddingBottom: 40,
     justifyContent: 'space-between',
   },
   welcomeContent: {
-    flex: 1,
     justifyContent: 'center',
+    paddingVertical: 32,
   },
   compass: {
     fontSize: 48,
