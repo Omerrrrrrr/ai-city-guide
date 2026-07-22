@@ -133,12 +133,16 @@ async function reverseGeocode(latitude: number, longitude: number) {
 }
 
 async function geocodeCityName(query: string) {
+  // No featureType filter: Nominatim's "city" feature type only matches
+  // OSM's largest place=city tag, excluding smaller (but very real, and
+  // often exactly what a traveler wants — e.g. "Søgne" near Kristiansand)
+  // towns/villages/hamlets entirely. dedupe trims near-identical results.
   const params = new URLSearchParams({
     format: 'jsonv2',
     q: query,
-    featureType: 'city',
     addressdetails: '1',
     limit: '5',
+    dedupe: '1',
   });
 
   const response = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
@@ -153,20 +157,35 @@ async function geocodeCityName(query: string) {
   }
 
   const results = (await response.json()) as Array<{
+    name?: string;
     display_name: string;
     lat: string;
     lon: string;
-    address?: { city?: string; town?: string; village?: string; country?: string };
+    category?: string;
+    addresstype?: string;
+    address?: { country?: string };
   }>;
 
-  return results.map((result) => ({
-    name:
-      result.address?.city || result.address?.town || result.address?.village || result.display_name.split(',')[0],
-    country: result.address?.country ?? '',
-    displayName: result.display_name,
-    lat: Number(result.lat),
-    lng: Number(result.lon),
-  }));
+  // Without a featureType filter, Nominatim also returns non-settlement
+  // matches (towers, shops, admin boundaries...) whose name happens to
+  // match the query. Keep only actual populated places.
+  const SETTLEMENT_ADDRESS_TYPES = new Set([
+    'city', 'town', 'village', 'hamlet', 'municipality', 'suburb', 'city_district',
+  ]);
+
+  return results
+    .filter((result) => result.category === 'place' || SETTLEMENT_ADDRESS_TYPES.has(result.addresstype ?? ''))
+    .map((result) => ({
+      // Nominatim's top-level `name` is the exact matched entity — e.g.
+      // searching "Søgne" (a hamlet inside the village of Høllen, inside
+      // Kristiansand municipality) should show "Søgne", not a broader
+      // enclosing place pulled from the address hierarchy.
+      name: result.name || result.display_name.split(',')[0],
+      country: result.address?.country ?? '',
+      displayName: result.display_name,
+      lat: Number(result.lat),
+      lng: Number(result.lon),
+    }));
 }
 
 type AiProviderName = 'openai' | 'openrouter';
@@ -273,8 +292,8 @@ async function buildServer() {
     Querystring: { q?: string; query?: string };
   }>('/cities', async (request, reply) => {
     const query = (request.query?.q ?? request.query?.query)?.trim();
-    if (!query || query.length < 2) {
-      return reply.code(400).send({ error: 'A query of at least 2 characters is required.' });
+    if (!query || query.length < 3) {
+      return reply.code(400).send({ error: 'A query of at least 3 characters is required.' });
     }
 
     const knownCities = await db.select().from(cities).where(ilike(cities.name, `%${query}%`)).limit(5);
@@ -364,7 +383,7 @@ async function buildServer() {
         country: country ?? null,
         centerLat: lat,
         centerLng: lng,
-        radiusKm: radiusKm ?? 8,
+        radiusKm: radiusKm ?? 12,
         status: 'pending',
       });
     }

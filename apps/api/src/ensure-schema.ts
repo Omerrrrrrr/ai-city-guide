@@ -1,7 +1,7 @@
-import { eq, inArray, sql } from 'drizzle-orm';
+import { eq, inArray, lt, sql } from 'drizzle-orm';
 
 import { db } from './db';
-import { places } from './schema';
+import { cities, places } from './schema';
 import { TOURIST_WORTHY_SHOPPING_KEYWORDS } from './place-discovery-service';
 
 export async function ensureSchema() {
@@ -138,7 +138,7 @@ export async function ensureSchema() {
       "country" varchar(64),
       "center_lat" double precision NOT NULL,
       "center_lng" double precision NOT NULL,
-      "radius_km" double precision NOT NULL DEFAULT 6,
+      "radius_km" double precision NOT NULL DEFAULT 12,
       "status" varchar(32) NOT NULL DEFAULT 'pending',
       "place_count" integer NOT NULL DEFAULT 0,
       "error_message" text,
@@ -213,4 +213,10 @@ export async function ensureSchema() {
   if (nonTouristShoppingIds.length > 0) {
     await db.delete(places).where(inArray(places.id, nonTouristShoppingIds));
   }
+
+  // Cities discovered before the default catchment radius was widened to
+  // 12km are stuck on their old, narrower radius — bump the stored value so
+  // the next rediscovery (manual or triggered from the app) actually covers
+  // more ground instead of silently reusing the old small radius.
+  await db.update(cities).set({ radiusKm: 12 }).where(lt(cities.radiusKm, 12));
 }

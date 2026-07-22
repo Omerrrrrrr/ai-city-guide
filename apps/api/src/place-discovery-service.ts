@@ -135,10 +135,10 @@ export function mapToAppCategory(candidate: { category: string; topCategory: str
     case 'geographic_entities':
       if (/beach/.test(leaf)) return 'beach';
       if (/viewpoint|overlook|scenic/.test(leaf)) return 'viewpoint';
-      if (/island|park|forest|mountain|lake|nature|garden/.test(leaf)) return 'nature';
+      if (/island|park|forest|mountain|lake|nature|garden|reserve|hiking|trail|waterfall|coast|cliff|wood|wetland|valley|hill|peak/.test(leaf)) return 'nature';
       return 'walking-area';
     case 'sports_and_recreation':
-      return /park|trail|garden/.test(leaf) ? 'nature' : 'walking-area';
+      return /park|trail|garden|hiking|nature|reserve|outdoor/.test(leaf) ? 'nature' : 'walking-area';
     case 'travel_and_transportation':
       return 'landmark';
     default:
@@ -278,7 +278,7 @@ export type DiscoverPlacesForCityInput = {
 };
 
 export async function discoverPlacesForCity(input: DiscoverPlacesForCityInput) {
-  const radiusKm = input.radiusKm ?? 6;
+  const radiusKm = input.radiusKm ?? 12;
 
   await db.update(cities).set({ status: 'discovering' }).where(eq(cities.id, input.cityId));
 

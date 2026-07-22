@@ -74,7 +74,7 @@ export const cities = pgTable('cities', {
   country: varchar('country', { length: 64 }),
   centerLat: doublePrecision('center_lat').notNull(),
   centerLng: doublePrecision('center_lng').notNull(),
-  radiusKm: doublePrecision('radius_km').notNull().default(6),
+  radiusKm: doublePrecision('radius_km').notNull().default(12),
   status: varchar('status', { length: 32 }).notNull().default('pending'),
   placeCount: integer('place_count').notNull().default(0),
   errorMessage: text('error_message'),

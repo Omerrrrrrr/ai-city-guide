@@ -49,7 +49,10 @@ export default function CityPickerScreen() {
     setQuery(text);
     setError(null);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!text.trim()) { setResults([]); return; }
+    // Nominatim's usage policy prohibits autocomplete/type-ahead search — wait
+    // for a real, mostly-typed name before firing a geocode request, both to
+    // respect that and to avoid matching a garbage fragment to the wrong place.
+    if (text.trim().length < 3) { setResults([]); return; }
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
       try {
