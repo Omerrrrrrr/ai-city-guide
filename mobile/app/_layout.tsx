@@ -8,6 +8,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import '@/src/i18n';
 import { useSyncLanguage } from '@/src/hooks/use-sync-language';
+import { useNotificationTapHandler } from '@/src/hooks/use-push-notifications';
 
 export const unstable_settings = {
   anchor: 'index',
@@ -17,6 +18,7 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const { t } = useTranslation();
   useSyncLanguage();
+  useNotificationTapHandler();
 
   return (
     <ErrorBoundary>

@@ -81,6 +81,15 @@ export const cities = pgTable('cities', {
   discoveredAt: varchar('discovered_at', { length: 64 }),
 });
 
+export const pushSubscriptions = pgTable('push_subscriptions', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  cityId: varchar('city_id', { length: 96 }).notNull(),
+  expoPushToken: varchar('expo_push_token', { length: 255 }).notNull(),
+  locale: varchar('locale', { length: 8 }).notNull().default('en'),
+  createdAt: varchar('created_at', { length: 64 }).notNull(),
+});
+
 export type PlaceRow = typeof places.$inferSelect;
 export type PlaceImageCandidateRow = typeof placeImageCandidates.$inferSelect;
 export type CityRow = typeof cities.$inferSelect;
+export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;

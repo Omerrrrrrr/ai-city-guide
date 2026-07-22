@@ -11,6 +11,7 @@ import { previewGoogleHoursForPlace } from './google-places-hours';
 import { computeNameSimilarity, enrichPlaceWithWikipedia, normalizeText, type AiProviderConfig } from './wiki-enrichment';
 import { createSlug } from './slug';
 import { haversineKm } from './geo';
+import { notifyCityDiscoveryFailed, notifyCityDiscoveryReady } from './push-notifications';
 
 const OVERTURE_RELEASE = process.env.OVERTURE_RELEASE?.trim() || '2026-06-17.0';
 const MAX_CANDIDATES_PER_CITY = 60;
@@ -410,6 +411,10 @@ export async function discoverPlacesForCity(input: DiscoverPlacesForCityInput) {
       .set({ status: 'ready', placeCount: insertedCount, discoveredAt: new Date().toISOString(), errorMessage: null })
       .where(eq(cities.id, input.cityId));
 
+    notifyCityDiscoveryReady(input.cityId, input.cityName, insertedCount).catch((err) =>
+      console.error(`Push notification failed for ${input.cityId}:`, err)
+    );
+
     // Specific per-place image pass runs in background after city is marked ready.
     retryImagesForCity(input.cityId).catch((err) =>
       console.error(`Specific image pass failed for ${input.cityId}:`, err)
@@ -421,6 +426,9 @@ export async function discoverPlacesForCity(input: DiscoverPlacesForCityInput) {
       .update(cities)
       .set({ status: 'failed', errorMessage: error?.message ?? 'Unknown discovery error' })
       .where(eq(cities.id, input.cityId));
+    notifyCityDiscoveryFailed(input.cityId, input.cityName).catch((err) =>
+      console.error(`Push notification failed for ${input.cityId}:`, err)
+    );
     throw error;
   }
 }

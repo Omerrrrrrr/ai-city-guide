@@ -30,6 +30,7 @@ import { enrichPlaceWithWikipedia, type AiProviderConfig } from './wiki-enrichme
 import { toPlaceDto } from './place-dto';
 import { createSlug } from './slug';
 import { discoverPlacesForCity, retryImagesForCity } from './place-discovery-service';
+import { subscribeToCityDiscovery } from './push-notifications';
 import { haversineKm } from './geo';
 import { places, cities } from './schema';
 
@@ -295,7 +296,7 @@ async function buildServer() {
   });
 
   app.post<{
-    Body: { name: string; country?: string; lat: number; lng: number; radiusKm?: number };
+    Body: { name: string; country?: string; lat: number; lng: number; radiusKm?: number; pushToken?: string; locale?: string };
   }>('/cities/discover', async (request, reply) => {
     const parsedBody = z
       .object({
@@ -304,6 +305,8 @@ async function buildServer() {
         lat: z.number().min(-90).max(90),
         lng: z.number().min(-180).max(180),
         radiusKm: z.number().min(1).max(25).optional(),
+        pushToken: z.string().trim().min(1).optional(),
+        locale: z.string().trim().min(2).max(8).optional(),
       })
       .safeParse(request.body ?? {});
 
@@ -311,7 +314,7 @@ async function buildServer() {
       return reply.code(400).send({ error: parsedBody.error.issues[0]?.message ?? 'Invalid request' });
     }
 
-    const { name, country, lat, lng, radiusKm } = parsedBody.data;
+    const { name, country, lat, lng, radiusKm, pushToken, locale } = parsedBody.data;
 
     const nearbyExisting = await db.select().from(cities);
     // Use 8 km to de-duplicate queries for the same city (e.g. slightly
@@ -321,10 +324,17 @@ async function buildServer() {
       (city) => haversineKm(lat, lng, city.centerLat, city.centerLng) <= 8
     );
 
-    if (existing) {
-      if (existing.status === 'ready' || existing.status === 'discovering') {
-        return reply.code(200).send(existing);
+    if (existing?.status === 'ready') {
+      return reply.code(200).send(existing);
+    }
+
+    if (existing?.status === 'discovering') {
+      if (pushToken) {
+        subscribeToCityDiscovery(existing.id, pushToken, locale).catch((error) =>
+          app.log.error(error, `Failed to subscribe push token for city ${existing.id}`)
+        );
       }
+      return reply.code(200).send(existing);
     }
 
     const cityId = existing?.id ?? `${createSlug(name)}-${Date.now().toString(36)}`;
@@ -341,6 +351,12 @@ async function buildServer() {
         radiusKm: radiusKm ?? 8,
         status: 'pending',
       });
+    }
+
+    if (pushToken) {
+      subscribeToCityDiscovery(cityId, pushToken, locale).catch((error) =>
+        app.log.error(error, `Failed to subscribe push token for city ${cityId}`)
+      );
     }
 
     const aiProvider = getAiProviderConfig();

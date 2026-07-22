@@ -31,6 +31,8 @@ export async function discoverCity(input: {
   lat: number;
   lng: number;
   country?: string;
+  pushToken?: string;
+  locale?: string;
 }): Promise<DiscoverCityResult> {
   const res = await fetch(`${API_BASE_URL}/cities/discover`, {
     method: 'POST',

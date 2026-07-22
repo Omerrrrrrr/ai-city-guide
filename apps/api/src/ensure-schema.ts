@@ -145,6 +145,16 @@ export async function ensureSchema() {
     );
   `);
 
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS "push_subscriptions" (
+      "id" varchar(64) PRIMARY KEY,
+      "city_id" varchar(96) NOT NULL,
+      "expo_push_token" varchar(255) NOT NULL,
+      "locale" varchar(8) NOT NULL DEFAULT 'en',
+      "created_at" varchar(64) NOT NULL
+    );
+  `);
+
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_places_slug" ON "places" ("slug");`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_places_city" ON "places" ("city");`);
   await db.execute(
@@ -152,6 +162,9 @@ export async function ensureSchema() {
   );
   await db.execute(
     sql`CREATE INDEX IF NOT EXISTS "idx_place_image_candidates_status" ON "place_image_candidates" ("status");`
+  );
+  await db.execute(
+    sql`CREATE INDEX IF NOT EXISTS "idx_push_subscriptions_city_id" ON "push_subscriptions" ("city_id");`
   );
 
   // Remove places whose first tag (the original Overture leaf category) identifies

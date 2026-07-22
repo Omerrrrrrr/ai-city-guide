@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { searchCities, discoverCity, type CityResult } from '@/src/api/cities';
+import { getExpoPushToken } from '@/src/hooks/use-push-notifications';
 import { useCityStore } from '@/src/store/city';
 
 const NAVY = '#0F1C3F';
@@ -33,7 +34,7 @@ function statusLabel(t: TFunction, status?: string): { text: string; color: stri
 
 export default function CityPickerScreen() {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const dark = useColorScheme() === 'dark';
   const { cityName: currentCity, setCity, clearCity } = useCityStore();
 
@@ -75,7 +76,15 @@ export default function CityPickerScreen() {
     setDiscovering(city.name);
     setError(null);
     try {
-      const result = await discoverCity({ name: city.name, lat: city.centerLat, lng: city.centerLng, country: city.country });
+      const pushToken = await getExpoPushToken();
+      const result = await discoverCity({
+        name: city.name,
+        lat: city.centerLat,
+        lng: city.centerLng,
+        country: city.country,
+        pushToken,
+        locale: i18n.language,
+      });
       setCity(result.id, city.name);
       router.back();
     } catch (e: any) {
