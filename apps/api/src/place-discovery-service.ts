@@ -14,7 +14,20 @@ import { haversineKm } from './geo';
 import { notifyCityDiscoveryFailed, notifyCityDiscoveryReady } from './push-notifications';
 
 const OVERTURE_RELEASE = process.env.OVERTURE_RELEASE?.trim() || '2026-06-17.0';
-const MAX_CANDIDATES_PER_CITY = 60;
+const MAX_CANDIDATES_PER_CITY = 100;
+// Overture's per-candidate "confidence" is a data-quality score, not a
+// tourist-relevance score — categories with thousands of instances (shops,
+// restaurants) cluster at very high confidence and, under a single global
+// top-N cut, crowd out sparse-but-important categories (nature, beach,
+// viewpoint, museum) entirely even when those candidates individually score
+// well. Reserve minimum slots per app category before filling the rest of
+// the budget by raw confidence.
+const RESERVED_SLOTS_PER_APP_CATEGORY: Record<string, number> = {
+  nature: 10,
+  beach: 6,
+  viewpoint: 5,
+  museum: 6,
+};
 const MAX_GOOGLE_FALLBACK_CALLS_PER_CITY = 10;
 const MIN_OVERTURE_CONFIDENCE = 0.4;
 const MIN_QUALITY_SCORE_TO_KEEP = 20;
@@ -192,7 +205,9 @@ export async function queryOvertureCandidates(input: {
 }
 
 export function filterAndMapOvertureRows(rows: Record<string, unknown>[]): OvertureCandidate[] {
-  return rows
+  // Rows arrive ordered by Overture confidence DESC (from the SQL query);
+  // filter/map below preserve that order.
+  const candidates = rows
     .filter((row) => {
       if (!VISITOR_RELEVANT_TOP_CATEGORIES.has(String(row.top_category))) return false;
       const leaf = String(row.category ?? '').toLowerCase();
@@ -212,8 +227,35 @@ export function filterAndMapOvertureRows(rows: Record<string, unknown>[]): Overt
       country: row.country ? String(row.country) : undefined,
       websites: toJsArray(row.websites),
       phones: toJsArray(row.phones),
-    }))
-    .slice(0, MAX_CANDIDATES_PER_CITY);
+    }));
+
+  const selected: OvertureCandidate[] = [];
+  const selectedIds = new Set<string>();
+
+  // Fill each reserved category's quota first, in confidence order, so a
+  // handful of high-value nature/beach/viewpoint/museum spots always survive
+  // even when outnumbered by shops and restaurants.
+  for (const [appCategory, quota] of Object.entries(RESERVED_SLOTS_PER_APP_CATEGORY)) {
+    let filled = 0;
+    for (const candidate of candidates) {
+      if (filled >= quota) break;
+      if (selectedIds.has(candidate.overtureId)) continue;
+      if (mapToAppCategory(candidate) !== appCategory) continue;
+      selected.push(candidate);
+      selectedIds.add(candidate.overtureId);
+      filled += 1;
+    }
+  }
+
+  // Fill the remaining budget by raw confidence, regardless of category.
+  for (const candidate of candidates) {
+    if (selected.length >= MAX_CANDIDATES_PER_CITY) break;
+    if (selectedIds.has(candidate.overtureId)) continue;
+    selected.push(candidate);
+    selectedIds.add(candidate.overtureId);
+  }
+
+  return selected.slice(0, MAX_CANDIDATES_PER_CITY);
 }
 
 export function isLikelyDuplicate(candidate: OvertureCandidate, existing: PlaceRow[]) {

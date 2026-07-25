@@ -121,7 +121,38 @@ test('filterAndMapOvertureRows caps results at the per-city candidate limit', ()
 
   const result = filterAndMapOvertureRows(manyRows);
 
-  assert.ok(result.length <= 60, `expected capped result, got ${result.length}`);
+  assert.ok(result.length <= 100, `expected capped result, got ${result.length}`);
+});
+
+test('filterAndMapOvertureRows reserves slots for nature so it is not crowded out by confidence', () => {
+  // 150 restaurants all outrank every nature candidate on raw confidence —
+  // a naive top-N-by-confidence cut would drop nature entirely.
+  const restaurants = Array.from({ length: 150 }, (_, index) =>
+    overtureRow({
+      id: `restaurant-${index}`,
+      name: `Restaurant ${index}`,
+      top_category: 'food_and_drink',
+      category: 'restaurant',
+      confidence: 0.99,
+    })
+  );
+  const natureSpots = Array.from({ length: 3 }, (_, index) =>
+    overtureRow({
+      id: `nature-${index}`,
+      name: `Nature Reserve ${index}`,
+      top_category: 'geographic_entities',
+      category: 'nature_reserve',
+      confidence: 0.5,
+    })
+  );
+
+  const result = filterAndMapOvertureRows([...restaurants, ...natureSpots]);
+
+  const natureIds = result
+    .filter((candidate) => mapToAppCategory(candidate) === 'nature')
+    .map((candidate) => candidate.overtureId)
+    .sort();
+  assert.deepEqual(natureIds, ['nature-0', 'nature-1', 'nature-2']);
 });
 
 test('mapToAppCategory maps Overture categories onto the app taxonomy', () => {
