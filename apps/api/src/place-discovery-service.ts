@@ -42,6 +42,13 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function isUniqueConstraintViolation(error: unknown): boolean {
+  const pgCode = (error as { cause?: { code?: string } } | undefined)?.cause?.code;
+  if (pgCode === '23505') return true;
+  const message = error instanceof Error ? error.message : String(error);
+  return /duplicate key value violates unique constraint/.test(message);
+}
+
 // Overture's taxonomy has hundreds of leaf categories; filtering by these
 // top-level buckets (verified against a real query, not guessed) keeps the
 // guide curated instead of dumping every parking lot and dentist's office.
@@ -370,47 +377,67 @@ export async function discoverPlacesForCity(input: DiscoverPlacesForCityInput) {
       }
 
       const baseSlug = createSlug(candidate.name);
-      const slug = existingPlaces.some((place) => place.slug === baseSlug)
+      const initialSlug = existingPlaces.some((place) => place.slug === baseSlug)
         ? `${baseSlug}-${candidate.overtureId.slice(0, 6)}`
         : baseSlug;
-      const placeId = slug;
 
-      const [created] = await db
-        .insert(places)
-        .values({
-          id: placeId,
-          slug,
-          name: candidate.name,
-          category: mapToAppCategory(candidate),
-          city: input.cityName,
-          country: input.country ?? candidate.country ?? null,
-          tags: [candidate.category.replace(/_/g, ' '), ...enrichment.tags].join(','),
-          description: enrichment.description,
-          shortStory: enrichment.shortStory,
-          imageUrl: 'https://placehold.co/600x400?text=' + encodeURIComponent(candidate.name),
-          imageVerified: false,
-          imageType: 'unknown',
-          importanceTier: enrichment.importanceTier,
-          factType: enrichment.factType,
-          address: candidate.address ?? null,
-          priceLevel: enrichment.priceLevel,
-          sourceUrl: candidate.websites[0] ?? null,
-          localVibeMood: enrichment.localVibeMood,
-          localVibeBestFor: enrichment.localVibeBestFor,
-          isIndoor: enrichment.isIndoor,
-          isFamilyFriendly: enrichment.isFamilyFriendly,
-          durationMinutes: enrichment.durationMinutes,
-          rainyDayFit: enrichment.rainyDayFit,
-          wikiPageTitle: wiki.status === 'matched' ? wiki.pageTitle : null,
-          wikiPageUrl: wiki.status === 'matched' ? wiki.pageUrl : null,
-          wikiSummary: wiki.status === 'matched' ? wiki.summary : null,
-          wikiMatchConfidence: wiki.status === 'matched' ? wiki.confidence : null,
-          wikiStatus: wiki.status,
-          wikiRawMetadataJson: JSON.stringify(wiki.rawMetadata ?? {}),
-          lat: candidate.lat,
-          lng: candidate.lng,
-        })
-        .returning();
+      const buildValues = (id: string, slug: string) => ({
+        id,
+        slug,
+        name: candidate.name,
+        category: mapToAppCategory(candidate),
+        city: input.cityName,
+        country: input.country ?? candidate.country ?? null,
+        tags: [candidate.category.replace(/_/g, ' '), ...enrichment.tags].join(','),
+        description: enrichment.description,
+        shortStory: enrichment.shortStory,
+        imageUrl: 'https://placehold.co/600x400?text=' + encodeURIComponent(candidate.name),
+        imageVerified: false,
+        imageType: 'unknown',
+        importanceTier: enrichment.importanceTier,
+        factType: enrichment.factType,
+        address: candidate.address ?? null,
+        priceLevel: enrichment.priceLevel,
+        sourceUrl: candidate.websites[0] ?? null,
+        localVibeMood: enrichment.localVibeMood,
+        localVibeBestFor: enrichment.localVibeBestFor,
+        isIndoor: enrichment.isIndoor,
+        isFamilyFriendly: enrichment.isFamilyFriendly,
+        durationMinutes: enrichment.durationMinutes,
+        rainyDayFit: enrichment.rainyDayFit,
+        wikiPageTitle: wiki.status === 'matched' ? wiki.pageTitle : null,
+        wikiPageUrl: wiki.status === 'matched' ? wiki.pageUrl : null,
+        wikiSummary: wiki.status === 'matched' ? wiki.summary : null,
+        wikiMatchConfidence: wiki.status === 'matched' ? wiki.confidence : null,
+        wikiStatus: wiki.status,
+        wikiRawMetadataJson: JSON.stringify(wiki.rawMetadata ?? {}),
+        lat: candidate.lat,
+        lng: candidate.lng,
+      });
+
+      let created: PlaceRow;
+      try {
+        [created] = await db.insert(places).values(buildValues(initialSlug, initialSlug)).returning();
+      } catch (error) {
+        // The in-memory existingPlaces snapshot only guards against slugs
+        // already in the DB when this city's run started — it can't see a
+        // same-named place (e.g. a chain brand like "Espresso House") that
+        // a DIFFERENT city's discovery run inserts concurrently, since ids
+        // are slug-derived and globally unique across all cities. That's a
+        // real distinct place, not a duplicate, so disambiguate and retry
+        // once instead of failing the whole city's discovery run.
+        if (!isUniqueConstraintViolation(error)) throw error;
+        const disambiguatedSlug = `${baseSlug}-${candidate.overtureId.slice(0, 6)}`;
+        try {
+          [created] = await db.insert(places).values(buildValues(disambiguatedSlug, disambiguatedSlug)).returning();
+        } catch (retryError) {
+          console.error(
+            `Skipping "${candidate.name}" in ${input.cityName} — place id collision persisted after retry:`,
+            retryError
+          );
+          continue;
+        }
+      }
 
       existingPlaces.push(created);
       insertedCount += 1;
