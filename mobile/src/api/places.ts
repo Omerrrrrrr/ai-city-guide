@@ -23,9 +23,15 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
-export function fetchPlaces(city?: string | null) {
-  const qs = city ? `?city=${encodeURIComponent(city)}` : '';
-  return request<Place[]>(`/places${qs}`);
+export function fetchPlaces(city?: string | null, lat?: number | null, lng?: number | null) {
+  const params = new URLSearchParams();
+  if (city) params.set('city', city);
+  if (lat != null && lng != null) {
+    params.set('lat', String(lat));
+    params.set('lng', String(lng));
+  }
+  const qs = params.toString();
+  return request<Place[]>(`/places${qs ? `?${qs}` : ''}`);
 }
 
 export function fetchPlace(id: string) {

@@ -34,7 +34,7 @@ async function getLocationFromGps(): Promise<GpsLocation | null> {
 
 async function resolveAndSetCityByCoords(
   location: GpsLocation,
-  setCity: (id: string, name: string) => void
+  setCity: (id: string, name: string, lat?: number, lng?: number) => void
 ) {
   // Always pass GPS coordinates to the backend. It uses an 8 km threshold to
   // decide whether to reuse a nearby existing city or create a new one. This
@@ -47,14 +47,20 @@ async function resolveAndSetCityByCoords(
     lng: location.lng,
     country: location.country,
   });
-  setCity(result.id, result.name);
+  // Keep the user's actual GPS position (not just the resolved city bucket)
+  // so place fetches can widen to a radius around it — see NEARBY_LOCATION_RADIUS_KM
+  // in apps/api/src/index.ts, same Søgne/Mandal boundary gap this fixes on the backend.
+  setCity(result.id, result.name, location.lat, location.lng);
 }
 
-async function resolveAndSetCityByName(cityName: string, setCity: (id: string, name: string) => void) {
+async function resolveAndSetCityByName(
+  cityName: string,
+  setCity: (id: string, name: string, lat?: number, lng?: number) => void
+) {
   const results = await searchCities(cityName);
   const known = results.find((r) => r.isKnown && r.status === 'ready');
   if (known) {
-    setCity(known.id, known.name);
+    setCity(known.id, known.name, known.centerLat, known.centerLng);
     return;
   }
   const geocoded = results[0];
@@ -65,7 +71,7 @@ async function resolveAndSetCityByName(cityName: string, setCity: (id: string, n
     lng: geocoded.centerLng,
     country: geocoded.country,
   });
-  setCity(result.id, result.name);
+  setCity(result.id, result.name, geocoded.centerLat, geocoded.centerLng);
 }
 
 // Auto-detects and sets the city from GPS (with weather as fallback source) when no city is selected.

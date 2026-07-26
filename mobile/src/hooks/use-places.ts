@@ -53,6 +53,8 @@ export function usePlaces(): QueryState<Place[]> {
   const [isStale, setIsStale] = React.useState(false);
   const [reloadKey, setReloadKey] = React.useState(0);
   const cityName = useCityStore((s) => s.cityName);
+  const cityLat = useCityStore((s) => s.lat);
+  const cityLng = useCityStore((s) => s.lng);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -71,7 +73,7 @@ export function usePlaces(): QueryState<Place[]> {
       }
 
       try {
-        const next = await fetchPlaces(cityName);
+        const next = await fetchPlaces(cityName, cityLat, cityLng);
         if (!cancelled) {
           setData(next);
           setIsStale(false);
@@ -96,7 +98,7 @@ export function usePlaces(): QueryState<Place[]> {
     return () => {
       cancelled = true;
     };
-  }, [reloadKey, cityName, t]);
+  }, [reloadKey, cityName, cityLat, cityLng, t]);
 
   return {
     data,

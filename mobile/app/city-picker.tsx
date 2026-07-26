@@ -71,7 +71,7 @@ export default function CityPickerScreen() {
       handleDiscover(city);
       return;
     }
-    setCity(city.id, city.name);
+    setCity(city.id, city.name, city.centerLat, city.centerLng);
     router.back();
   };
 
@@ -88,7 +88,7 @@ export default function CityPickerScreen() {
         pushToken,
         locale: i18n.language,
       });
-      setCity(result.id, city.name);
+      setCity(result.id, city.name, city.centerLat, city.centerLng);
       router.back();
     } catch (e: any) {
       setError(e.message || t('cityPicker.discoveryFailed'));

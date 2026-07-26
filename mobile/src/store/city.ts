@@ -5,7 +5,9 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 type CityStore = {
   cityId: string | null;
   cityName: string | null;
-  setCity: (id: string, name: string) => void;
+  lat: number | null;
+  lng: number | null;
+  setCity: (id: string, name: string, lat?: number, lng?: number) => void;
   clearCity: () => void;
 };
 
@@ -14,8 +16,11 @@ export const useCityStore = create<CityStore>()(
     (set) => ({
       cityId: null,
       cityName: null,
-      setCity: (id, name) => set({ cityId: id, cityName: name }),
-      clearCity: () => set({ cityId: null, cityName: null }),
+      lat: null,
+      lng: null,
+      setCity: (id, name, lat, lng) =>
+        set({ cityId: id, cityName: name, lat: lat ?? null, lng: lng ?? null }),
+      clearCity: () => set({ cityId: null, cityName: null, lat: null, lng: null }),
     }),
     {
       name: 'current-city',
