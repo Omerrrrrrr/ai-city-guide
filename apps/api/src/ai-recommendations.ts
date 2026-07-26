@@ -343,8 +343,11 @@ export function rankPlacesForQuery(
       const anchorLng = signals.anchorPlace?.lng ?? signals.userLocation?.lng;
       const anchorLabel = signals.anchorPlace?.name ?? 'your location';
 
+      // Distance is computed whenever we have an anchor, independent of
+      // prefersNearby — the model needs a real distanceKm in its shortlist to
+      // judge cross-town candidates (see NEARBY_LOCATION_RADIUS_KM in
+      // index.ts), even for queries that never say the word "nearby".
       if (
-        signals.prefersNearby &&
         signals.anchorPlace?.id !== row.id &&
         anchorLat != null &&
         anchorLng != null &&
@@ -353,16 +356,18 @@ export function rankPlacesForQuery(
       ) {
         distanceKm = haversineKm(anchorLat, anchorLng, row.lat, row.lng);
 
-        if (distanceKm <= 0.8) {
-          score += 10;
-          reasons.add(`very close to ${anchorLabel}`);
-        } else if (distanceKm <= 1.5) {
-          score += 7;
-          reasons.add(`close to ${anchorLabel}`);
-        } else if (distanceKm <= 3) {
-          score += 4;
-        } else if (distanceKm <= 6) {
-          score += 1;
+        if (signals.prefersNearby) {
+          if (distanceKm <= 0.8) {
+            score += 10;
+            reasons.add(`very close to ${anchorLabel}`);
+          } else if (distanceKm <= 1.5) {
+            score += 7;
+            reasons.add(`close to ${anchorLabel}`);
+          } else if (distanceKm <= 3) {
+            score += 4;
+          } else if (distanceKm <= 6) {
+            score += 1;
+          }
         }
       }
 
@@ -426,8 +431,7 @@ export function buildFallbackReason(entry: RankedPlace, allRows: PlaceRow[], que
     return `${capitalize(reasonBits[0])}.`;
   }
 
-  const cityName = allRows.find((row) => row.city)?.city;
-  return `Solid match for ${getPreferredSignalText(signals)}${cityName ? ` in ${cityName}` : ''}.`;
+  return `Solid match for ${getPreferredSignalText(signals)}${entry.row.city ? ` in ${entry.row.city}` : ''}.`;
 }
 
 function capitalize(input: string) {

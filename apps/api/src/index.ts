@@ -44,6 +44,14 @@ const OPENWEATHER_API_KEY = process.env.OPENWEATHER_API_KEY?.trim();
 const MAX_CONTEXT_PLACES = 14;
 const MIN_AI_RECOMMENDATIONS = 4;
 const MAX_AI_RECOMMENDATIONS = 5;
+// City discovery is bucketed by an 8km dedup radius (see /cities/discover),
+// which leaves gaps at the edges — a user in a small town like Søgne
+// (~13.6km from Kristiansand's center) sits right at that boundary, and a
+// genuinely separate nearby town like Mandal (~29km away) never shows up in
+// Kristiansand-scoped results at all. Location-aware queries widen the
+// candidate pool to everything within this radius of the user's actual GPS
+// position, regardless of which city bucket it's tagged under.
+const NEARBY_LOCATION_RADIUS_KM = 25;
 const AI_PROVIDER = process.env.AI_PROVIDER?.trim().toLowerCase();
 const ADMIN_API_TOKEN = process.env.ADMIN_API_TOKEN?.trim() || undefined;
 const CORS_ORIGINS = (process.env.CORS_ORIGINS ?? '')
@@ -242,6 +250,24 @@ function getAiProviderConfig():
 // current app language directly in the prompt — unlike the place data
 // itself (description, shortStory), which is generated once at discovery
 // time and stored in English only.
+async function fetchPlacesWithinRadius(lat: number, lng: number, radiusKm: number) {
+  // The places table is small enough (low thousands of rows) that a plain
+  // fetch-then-filter in JS is simpler and fast enough than adding a spatial
+  // index or a bounding-box WHERE clause — revisit if this table grows large.
+  const rows = await db.select().from(places);
+  return rows.filter(
+    (row) => row.lat != null && row.lng != null && haversineKm(lat, lng, row.lat, row.lng) <= radiusKm
+  );
+}
+
+function mergePlaceRows<T extends { id: string }>(...rowSets: T[][]): T[] {
+  const merged = new Map<string, T>();
+  for (const rows of rowSets) {
+    for (const row of rows) merged.set(row.id, row);
+  }
+  return Array.from(merged.values());
+}
+
 function languageInstruction(locale?: string): string {
   switch (locale) {
     case 'tr':
@@ -295,11 +321,23 @@ async function buildServer() {
   });
 
   app.get<{
-    Querystring: { city?: string };
+    Querystring: { city?: string; lat?: string; lng?: string; radiusKm?: string };
   }>('/places', async (request) => {
     const city = request.query?.city?.trim();
-    const rows = city ? await db.select().from(places).where(ilike(places.city, city)) : await db.select().from(places);
-    return rows.map(toPlaceDto);
+    const lat = request.query?.lat != null ? Number(request.query.lat) : undefined;
+    const lng = request.query?.lng != null ? Number(request.query.lng) : undefined;
+    const hasLocation = lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng);
+
+    if (!city && !hasLocation) {
+      const rows = await db.select().from(places);
+      return rows.map(toPlaceDto);
+    }
+
+    const radiusKm = Number(request.query?.radiusKm) || NEARBY_LOCATION_RADIUS_KM;
+    const cityRows = city ? await db.select().from(places).where(ilike(places.city, city)) : [];
+    const nearbyRows = hasLocation ? await fetchPlacesWithinRadius(lat!, lng!, radiusKm) : [];
+
+    return mergePlaceRows(cityRows, nearbyRows).map(toPlaceDto);
   });
 
   app.get<{
@@ -1156,13 +1194,24 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
       });
     }
 
-    const allRows = city ? await db.select().from(places).where(ilike(places.city, city)) : await db.select().from(places);
+    const userLocation = lat != null && lng != null ? { lat, lng } : undefined;
+    // When we know the user's real position, widen the candidate pool beyond
+    // their named city to anything nearby (see NEARBY_LOCATION_RADIUS_KM) —
+    // otherwise someone near a city-bucket boundary (e.g. Søgne, ~13.6km from
+    // Kristiansand's center) never sees an already-discovered neighboring
+    // town's places (e.g. Mandal, ~29km away) just because of where the
+    // arbitrary 8km city-dedup line fell.
+    const cityRows = city ? await db.select().from(places).where(ilike(places.city, city)) : [];
+    const nearbyRows = userLocation
+      ? await fetchPlacesWithinRadius(userLocation.lat, userLocation.lng, NEARBY_LOCATION_RADIUS_KM)
+      : [];
+    const allRows =
+      city || userLocation ? mergePlaceRows(cityRows, nearbyRows) : await db.select().from(places);
     const cityLabel = city ?? allRows[0]?.city ?? 'this city';
     const conversationSummary = messages
       .slice(-6)
       .map((message) => `${message.role.toUpperCase()}: ${message.content}`)
       .join('\n');
-    const userLocation = lat != null && lng != null ? { lat, lng } : undefined;
     const rankedRows = rankPlacesForQuery(allRows, query, conversationSummary, userLocation);
     const recommendableRows = rankedRows.filter(
       (entry) => entry.qualityScore >= 36 || entry.row.importanceTier === 'hero'
@@ -1231,7 +1280,7 @@ Continue the conversation naturally using the recent chat history when provided.
 Keep answers concise (1–3 sentences) and personalized to the user.${imageInstructions}${languageInstruction(locale)}
 
 ${placeContext.length > 0
-  ? `You have ${placeContext.length} places in your database for ${cityLabel}. Pick 4 places when possible, 5 when there are several strong matches, 3 when unusually narrow. Return ONLY places from the provided shortlist using exact IDs. Spread picks across different place types.`
+  ? `You have ${placeContext.length} candidate places${userLocation ? ` near the user's current location (they're around the ${cityLabel} area, but nearby places from other towns may be included too — that's intentional, don't assume every place is literally "in ${cityLabel}")` : ` in your database for ${cityLabel}`}. Only fill "recommendations" when the user's message is actually asking for a place, suggestion, itinerary idea, or something to do/see/eat — pick 3-5 when there are several strong matches, fewer when matches are narrow. For greetings, thanks, follow-up chit-chat, or questions that don't call for a place suggestion, return an EMPTY recommendations array and just answer naturally. Don't force a recommendation that doesn't fit the question. Return ONLY places from the provided shortlist using exact IDs. Spread picks across different place types.`
   : `You have NO places in your database for ${cityLabel} yet. Answer from your own knowledge — give a helpful, accurate response about the place or question. Tell the user you don't have ${cityLabel} mapped yet and suggest they use city search to trigger discovery. Return an empty recommendations array.`
 }
 
@@ -1239,7 +1288,8 @@ ${placeContext.length > 0 ? `Available shortlist:\n${JSON.stringify(placeContext
         messages: [...priorTurnMessages, finalUserMessage],
       } as any);
 
-      const enrichedRecommendations = ((object as any).recommendations ?? [])
+      const rawRecommendations = (object as any).recommendations ?? [];
+      const enrichedRecommendations = rawRecommendations
         .filter((rec: { id: string; reason: string }) => placeById.has(rec.id))
         .filter(
           (rec: { id: string; reason: string }, index: number, arr: Array<{ id: string; reason: string }>) =>
@@ -1255,7 +1305,13 @@ ${placeContext.length > 0 ? `Available shortlist:\n${JSON.stringify(placeContext
         })
         .filter(Boolean);
 
-      if (enrichedRecommendations.length < MIN_AI_RECOMMENDATIONS) {
+      // Only backfill when the model clearly intended to recommend something
+      // (a non-empty array) but its picks didn't survive validation (e.g.
+      // hallucinated IDs). An empty array from the model is a deliberate "this
+      // doesn't call for a place suggestion" answer and must stay empty —
+      // padding it here is exactly what made the AI recommend places for
+      // greetings and off-topic chat.
+      if (rawRecommendations.length > 0 && enrichedRecommendations.length < MIN_AI_RECOMMENDATIONS) {
         for (const entry of shortlistedEntries) {
           if (enrichedRecommendations.length >= MAX_AI_RECOMMENDATIONS) break;
           if (
