@@ -21,6 +21,7 @@
     "@duckdb/node-api": "^1.5.4-r.1",
     "@fastify/cors": "^10.0.1",
     "@fastify/rate-limit": "^10.3.0",
+    "@sentry/node": "^10.68.0",
     "ai": "^6.0.116",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.45.2",

@@ -10,6 +10,7 @@ import { z } from 'zod';
 
 import { closeDb, connectDb, db } from './db';
 import { ensureSchema } from './ensure-schema';
+import { initSentry, Sentry } from './sentry';
 import {
   buildFallbackReason,
   rankPlacesForQuery,
@@ -280,7 +281,24 @@ function languageInstruction(locale?: string): string {
 }
 
 async function buildServer() {
-  const app = Fastify({ logger: true });
+  const app = Fastify({
+    logger: {
+      level: 'info',
+      // Forward every error/fatal log (app.log.error / request.log.error,
+      // used throughout this file) to Sentry from one place, instead of
+      // adding Sentry.captureException at each of the ~14 call sites.
+      // No-ops when SENTRY_DSN is unset since Sentry.init() was never called.
+      hooks: {
+        logMethod(inputArgs, method, level) {
+          if (level >= 50) {
+            const error = inputArgs.find((arg): arg is Error => arg instanceof Error);
+            if (error) Sentry.captureException(error);
+          }
+          return method.apply(this, inputArgs);
+        },
+      },
+    },
+  });
 
   await app.register(cors, {
     origin: CORS_ORIGINS.length > 0 ? CORS_ORIGINS : DEFAULT_DEV_CORS_ORIGINS,
@@ -1392,6 +1410,7 @@ ${placeContext.length > 0 ? `Available shortlist:\n${JSON.stringify(placeContext
 }
 
 async function main() {
+  initSentry();
   validateEnv();
   await connectDb();
   await ensureSchema();

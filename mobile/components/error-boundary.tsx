@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Sentry } from '@/src/sentry';
 
 type Props = {
   children: React.ReactNode;
@@ -22,6 +23,8 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error('Unhandled error caught by ErrorBoundary:', error, info.componentStack);
+    // No-ops if Sentry was never initialized (no DSN, or running in Expo Go).
+    Sentry.captureException(error);
   }
 
   reset = () => {

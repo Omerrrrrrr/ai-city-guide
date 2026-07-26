@@ -9,10 +9,13 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import '@/src/i18n';
 import { useSyncLanguage } from '@/src/hooks/use-sync-language';
 import { useNotificationTapHandler } from '@/src/hooks/use-push-notifications';
+import { initSentry } from '@/src/sentry';
 
 export const unstable_settings = {
   anchor: 'index',
 };
+
+initSentry();
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
