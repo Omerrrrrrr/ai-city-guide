@@ -27,9 +27,19 @@ const RESERVED_SLOTS_PER_APP_CATEGORY: Record<string, number> = {
   beach: 6,
   viewpoint: 5,
   museum: 6,
+  lodging: 8,
+  'cultural-spot': 8,
 };
 const MAX_GOOGLE_FALLBACK_CALLS_PER_CITY = 10;
 const MIN_OVERTURE_CONFIDENCE = 0.4;
+// Raw Overture query fetch size, sorted by confidence DESC, BEFORE any
+// category filtering/quota logic runs. In dense metros (Bergen, Oslo) the
+// number of confidence>=MIN_OVERTURE_CONFIDENCE points within a 12km radius
+// exceeds the old 1500 on shops/cafes/restaurants alone — verified live,
+// Oslo's top-1500 pool contained zero lodging/nature/museum/beach/viewpoint
+// rows at all. Raised so sparse-but-real categories actually reach the
+// per-category quota logic instead of being truncated away upstream of it.
+const OVERTURE_RAW_FETCH_LIMIT = 6000;
 const MIN_QUALITY_SCORE_TO_KEEP = 20;
 const AUTO_APPLY_IMAGE_CONFIDENCE = 65;
 const DUPLICATE_NAME_SIMILARITY = 0.82;
@@ -229,7 +239,7 @@ export async function queryOvertureCandidates(input: {
       AND confidence >= ${MIN_OVERTURE_CONFIDENCE}
       AND names.primary IS NOT NULL
     ORDER BY confidence DESC
-    LIMIT 1500;
+    LIMIT ${OVERTURE_RAW_FETCH_LIMIT};
   `);
 
   return filterAndMapOvertureRows(reader.getRowObjects());

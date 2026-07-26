@@ -87,7 +87,7 @@ test('filterAndMapOvertureRows keeps visitor-relevant categories and drops munda
   const result = filterAndMapOvertureRows(rows);
 
   assert.deepEqual(
-    result.map((candidate) => candidate.overtureId),
+    result.map((candidate) => candidate.overtureId).sort(),
     ['cafe-1', 'museum-1']
   );
 });
