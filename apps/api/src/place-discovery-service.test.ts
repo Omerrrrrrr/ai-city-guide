@@ -6,6 +6,7 @@ import {
   filterAndMapOvertureRows,
   isLikelyDuplicate,
   mapToAppCategory,
+  runWithConcurrency,
   type OvertureCandidate,
 } from './place-discovery-service';
 
@@ -218,4 +219,40 @@ test('isLikelyDuplicate does not flag a nearby candidate with an unrelated name'
   const existing = [placeRow({ name: 'Posebyen Cafe', lat: 58.15, lng: 8.0 })];
 
   assert.equal(isLikelyDuplicate(candidate, existing), false);
+});
+
+test('runWithConcurrency processes every item exactly once', async () => {
+  const items = Array.from({ length: 23 }, (_, i) => i);
+  const seen: number[] = [];
+
+  await runWithConcurrency(items, 5, async (item) => {
+    await new Promise((resolve) => setTimeout(resolve, Math.random() * 5));
+    seen.push(item);
+  });
+
+  assert.deepEqual(seen.slice().sort((a, b) => a - b), items);
+});
+
+test('runWithConcurrency never runs more than `concurrency` tasks at once', async () => {
+  const items = Array.from({ length: 12 }, (_, i) => i);
+  let inFlight = 0;
+  let maxInFlight = 0;
+
+  await runWithConcurrency(items, 4, async () => {
+    inFlight += 1;
+    maxInFlight = Math.max(maxInFlight, inFlight);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    inFlight -= 1;
+  });
+
+  assert.ok(maxInFlight <= 4, `expected at most 4 concurrent tasks, saw ${maxInFlight}`);
+});
+
+test('runWithConcurrency propagates a task error', async () => {
+  await assert.rejects(
+    () => runWithConcurrency([1, 2, 3], 2, async (item) => {
+      if (item === 2) throw new Error('boom');
+    }),
+    /boom/
+  );
 });

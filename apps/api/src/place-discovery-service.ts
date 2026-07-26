@@ -37,9 +37,33 @@ const DUPLICATE_DISTANCE_KM = 0.15;
 // Wikipedia's API will start returning 429s if we hammer it candidate after
 // candidate with no pause; this keeps discovery a polite background job.
 const CANDIDATE_PROCESSING_DELAY_MS = 250;
+// How many candidates to enrich concurrently. Each one is a Wikipedia call
+// plus an AI call, both of which are much slower than they are CPU-heavy,
+// so a modest pool cuts wall-clock time close to linearly without hammering
+// either API hard enough to trigger aggressive rate limiting.
+const CANDIDATE_CONCURRENCY = 5;
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Runs `task` over `items` with at most `concurrency` in flight at once.
+// Candidate processing is I/O-bound (Wikipedia + AI round-trips), so this
+// turns discovery from one-at-a-time (~15-25 min per city) into several
+// concurrent pipelines without needing an external queue library.
+export async function runWithConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  task: (item: T, index: number) => Promise<void>
+) {
+  let cursor = 0;
+  async function worker() {
+    while (cursor < items.length) {
+      const index = cursor++;
+      await task(items[index], index);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => worker()));
 }
 
 function isUniqueConstraintViolation(error: unknown): boolean {
@@ -337,12 +361,10 @@ export async function discoverPlacesForCity(input: DiscoverPlacesForCityInput) {
     let googleFallbackCallsUsed = 0;
     let insertedCount = 0;
 
-    for (const [index, candidate] of candidates.entries()) {
-      if (isLikelyDuplicate(candidate, existingPlaces)) continue;
+    await runWithConcurrency(candidates, CANDIDATE_CONCURRENCY, async (candidate) => {
+      if (isLikelyDuplicate(candidate, existingPlaces)) return;
 
-      if (index > 0) {
-        await sleep(CANDIDATE_PROCESSING_DELAY_MS);
-      }
+      await sleep(CANDIDATE_PROCESSING_DELAY_MS);
 
       let wiki: Awaited<ReturnType<typeof enrichPlaceWithWikipedia>>;
       try {
@@ -435,7 +457,7 @@ export async function discoverPlacesForCity(input: DiscoverPlacesForCityInput) {
             `Skipping "${candidate.name}" in ${input.cityName} — place id collision persisted after retry:`,
             retryError
           );
-          continue;
+          return;
         }
       }
 
@@ -448,9 +470,13 @@ export async function discoverPlacesForCity(input: DiscoverPlacesForCityInput) {
       // filtered out at the Overture query stage via NON_TOURIST_LEAF_CATEGORIES.
       if (qualityScore < MIN_QUALITY_SCORE_TO_KEEP && enrichment.importanceTier === 'long-tail') {
         await db.delete(places).where(eq(places.id, created.id));
-        existingPlaces.pop();
+        // Remove by id, not .pop() — under concurrent processing the last
+        // array entry may belong to a different candidate that finished
+        // its own insert in the meantime.
+        const staleIndex = existingPlaces.findIndex((place) => place.id === created.id);
+        if (staleIndex !== -1) existingPlaces.splice(staleIndex, 1);
         insertedCount -= 1;
-        continue;
+        return;
       }
 
       await tryAutoAttachImage(created.id);
@@ -463,7 +489,7 @@ export async function discoverPlacesForCity(input: DiscoverPlacesForCityInput) {
         googleFallbackCallsUsed += 1;
         await tryGoogleHoursFallback(created);
       }
-    }
+    });
 
     // Apply category-representative images to places still using placeholder URLs.
     // Re-queries the DB (not in-memory array) so tryAutoAttachImage updates are respected.
