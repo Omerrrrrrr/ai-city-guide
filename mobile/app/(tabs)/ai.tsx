@@ -28,6 +28,7 @@ import {
   fetchRecommendations,
 } from '@/src/api/places';
 import { useUserProfile } from '@/src/store/user-profile';
+import { useRecentlyViewed } from '@/src/store/recently-viewed';
 import { useWeather, weatherEmoji } from '@/src/hooks/use-weather';
 import { useCityStore } from '@/src/store/city';
 import { CATEGORY_EMOJI, formatCategory } from '@/src/utils/categories';
@@ -64,8 +65,9 @@ export default function AiScreen() {
 
   const autoSubmittedRef = React.useRef(false);
   const locationRef = React.useRef<{ lat: number; lng: number } | null | undefined>(undefined);
-  const { name, profession, interests, faith } = useUserProfile();
-  const userProfile = { name, profession, interests, faith };
+  const { name, profession, interests, faith, budget, groupType, pace } = useUserProfile();
+  const userProfile = { name, profession, interests, faith, budget, groupType, pace };
+  const { viewedIds } = useRecentlyViewed();
   const { weather } = useWeather();
   const { cityName } = useCityStore();
 
@@ -140,7 +142,8 @@ export default function AiScreen() {
         cityName,
         locationRef.current ?? undefined,
         nextImage ? { base64: nextImage.base64, mimeType: 'image/jpeg' } : undefined,
-        i18n.language
+        i18n.language,
+        viewedIds
       );
       const assistantTurn: ConversationTurn = {
         id: `${Date.now()}-assistant`,

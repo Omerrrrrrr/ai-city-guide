@@ -38,6 +38,62 @@ describe('sortPlacesForProfile', () => {
 
     expect(result[0].id).toBe('b');
   });
+
+  it('boosts budget-tagged places for a budget traveler', () => {
+    const budgetSpot = makePlace({ id: 'budget-spot', tags: ['budget'] });
+    const other = makePlace({ id: 'other', tags: [] });
+
+    const result = sortPlacesForProfile([other, budgetSpot], { budget: 'budget' });
+
+    expect(result[0].id).toBe('budget-spot');
+  });
+
+  it('boosts family-tagged places for a family traveler', () => {
+    const familySpot = makePlace({ id: 'family-spot', tags: ['family'] });
+    const other = makePlace({ id: 'other', tags: [] });
+
+    const result = sortPlacesForProfile([other, familySpot], { groupType: 'family' });
+
+    expect(result[0].id).toBe('family-spot');
+  });
+
+  it('boosts quick stops for a packed pace and longer visits for a relaxed pace', () => {
+    const quick = makePlace({
+      id: 'quick',
+      visitInfo: { durationMinutes: 20, hoursVerified: false, temporarilyClosed: false },
+    });
+    const long = makePlace({
+      id: 'long',
+      visitInfo: { durationMinutes: 120, hoursVerified: false, temporarilyClosed: false },
+    });
+
+    const packedResult = sortPlacesForProfile([long, quick], { pace: 'packed' });
+    expect(packedResult[0].id).toBe('quick');
+
+    const relaxedResult = sortPlacesForProfile([quick, long], { pace: 'relaxed' });
+    expect(relaxedResult[0].id).toBe('long');
+  });
+
+  it('boosts places whose category matches recently viewed places, even with no explicit profile', () => {
+    const museum = makePlace({ id: 'museum', category: 'museum' });
+    const cafe = makePlace({ id: 'cafe', category: 'cafe' });
+    const viewedMuseum = makePlace({ id: 'viewed-museum', category: 'museum' });
+
+    const result = sortPlacesForProfile([cafe, museum], {}, [viewedMuseum]);
+
+    expect(result[0].id).toBe('museum');
+  });
+
+  it('does not let history override an explicit, conflicting profile boost', () => {
+    const museum = makePlace({ id: 'museum', category: 'museum' });
+    const cafe = makePlace({ id: 'cafe', category: 'cafe' });
+    const viewedCafe = makePlace({ id: 'viewed-cafe', category: 'cafe' });
+
+    // Historian profile boost (+6) for museum outweighs a single history match (+2) for cafe.
+    const result = sortPlacesForProfile([cafe, museum], { profession: 'historian' }, [viewedCafe]);
+
+    expect(result[0].id).toBe('museum');
+  });
 });
 
 describe('filterPlaces', () => {

@@ -62,6 +62,22 @@
       "hindu": "Hindu",
       "secular": "Seküler / Dinsiz",
       "preferNotToSay": "Belirtmek istemiyorum"
+    },
+    "budgets": {
+      "budget": "Ekonomik",
+      "moderate": "Orta",
+      "luxury": "Lüks"
+    },
+    "groupTypes": {
+      "solo": "Tek başıma",
+      "couple": "Çift",
+      "family": "Aile",
+      "friends": "Arkadaşlar"
+    },
+    "paces": {
+      "relaxed": "Rahat",
+      "balanced": "Dengeli",
+      "packed": "Yoğun"
     }
   },
   "onboarding": {
@@ -85,6 +101,13 @@
       "interestsLabel": "İlgi alanları",
       "faithLabel": "İnanç & bakış açısı",
       "faithNote": "Piri'nin kutsal ve tarihi mekânları çerçevelemesine yardımcı olur — bir camii Müslüman birine anlatıldığında, bir mimara anlatılandan farklıdır."
+    },
+    "travelStyle": {
+      "title": "Nasıl seyahat etmeyi seversin?",
+      "subtitle": "İsteğe bağlı. Piri'nin önerdiği tempo, bütçe ve atmosferi eşleştirmesine yardımcı olur.",
+      "paceLabel": "Tempo",
+      "budgetLabel": "Bütçe",
+      "groupLabel": "Kiminle seyahat ediyorsun"
     }
   },
   "home": {

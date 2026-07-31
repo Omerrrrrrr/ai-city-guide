@@ -203,7 +203,7 @@ export default function HomeScreen() {
   const intents = useIntents();
   const [refreshing, setRefreshing] = React.useState(false);
   const { data: places, isLoading, isStale, error: placesError, refresh: refreshPlaces } = usePlaces();
-  const { name, profession, interests, faith } = useUserProfile();
+  const { name, profession, interests, faith, budget, groupType, pace } = useUserProfile();
   const { weather } = useWeather();
   const nearbyUser = useNearbyUserPlaces(5);
   const { viewedIds, clearHistory } = useRecentlyViewed();
@@ -216,12 +216,15 @@ export default function HomeScreen() {
     [viewedIds, places]
   );
 
-  const profile = { profession, interests, faith };
-  const hasProfile = !!(profession || interests?.length || faith);
+  const profile = { profession, interests, faith, budget, groupType, pace };
+  const hasProfile = !!(profession || interests?.length || faith || budget || groupType || pace);
 
   const ranked = React.useMemo(
-    () => hasProfile ? sortPlacesForProfile(places ?? [], profile) : sortPlacesForBrowse(places ?? []),
-    [places, profession, interests?.join(','), faith]
+    () =>
+      hasProfile || recentlyViewed.length > 0
+        ? sortPlacesForProfile(places ?? [], profile, recentlyViewed)
+        : sortPlacesForBrowse(places ?? []),
+    [places, profession, interests?.join(','), faith, budget, groupType, pace, recentlyViewed]
   );
   const featured = React.useMemo(
     () => ranked.filter(isHighQualityPlace).slice(0, 8),

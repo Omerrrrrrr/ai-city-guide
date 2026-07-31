@@ -77,9 +77,9 @@ export default function ScanScreen() {
   const [pendingImageUri, setPendingImageUri] = React.useState<string | null>(null);
   const cameraRef = React.useRef<CameraView>(null);
   const [matchedPlace, setMatchedPlace] = React.useState<Place | null>(null);
-  const { name, profession, interests, faith } = useUserProfile();
+  const { name, profession, interests, faith, budget, groupType, pace } = useUserProfile();
 
-  const userProfile = { name, profession, interests, faith };
+  const userProfile = { name, profession, interests, faith, budget, groupType, pace };
 
   const handleShare = async (result: IdentifyResult) => {
     try {

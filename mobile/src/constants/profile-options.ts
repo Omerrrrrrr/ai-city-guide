@@ -1,4 +1,4 @@
-import type { Faith, Interest, Profession } from '@/src/store/user-profile';
+import type { Budget, Faith, GroupType, Interest, Pace, Profession } from '@/src/store/user-profile';
 
 export const PROFESSIONS: { value: Profession; labelKey: string; emoji: string }[] = [
   { value: 'architect', labelKey: 'profileOptions.professions.architect', emoji: '🏛️' },
@@ -34,4 +34,23 @@ export const FAITHS: { value: Faith; labelKey: string }[] = [
   { value: 'hindu', labelKey: 'profileOptions.faiths.hindu' },
   { value: 'secular', labelKey: 'profileOptions.faiths.secular' },
   { value: 'prefer_not_to_say', labelKey: 'profileOptions.faiths.preferNotToSay' },
+];
+
+export const BUDGETS: { value: Budget; labelKey: string; emoji: string }[] = [
+  { value: 'budget', labelKey: 'profileOptions.budgets.budget', emoji: '💸' },
+  { value: 'moderate', labelKey: 'profileOptions.budgets.moderate', emoji: '💳' },
+  { value: 'luxury', labelKey: 'profileOptions.budgets.luxury', emoji: '💎' },
+];
+
+export const GROUP_TYPES: { value: GroupType; labelKey: string; emoji: string }[] = [
+  { value: 'solo', labelKey: 'profileOptions.groupTypes.solo', emoji: '🧍' },
+  { value: 'couple', labelKey: 'profileOptions.groupTypes.couple', emoji: '💑' },
+  { value: 'family', labelKey: 'profileOptions.groupTypes.family', emoji: '👨‍👩‍👧' },
+  { value: 'friends', labelKey: 'profileOptions.groupTypes.friends', emoji: '👯' },
+];
+
+export const PACES: { value: Pace; labelKey: string; emoji: string }[] = [
+  { value: 'relaxed', labelKey: 'profileOptions.paces.relaxed', emoji: '🐢' },
+  { value: 'balanced', labelKey: 'profileOptions.paces.balanced', emoji: '⚖️' },
+  { value: 'packed', labelKey: 'profileOptions.paces.packed', emoji: '⚡' },
 ];

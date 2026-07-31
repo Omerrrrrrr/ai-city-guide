@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { FAITHS, INTERESTS, PROFESSIONS } from '@/src/constants/profile-options';
+import { BUDGETS, FAITHS, GROUP_TYPES, INTERESTS, PACES, PROFESSIONS } from '@/src/constants/profile-options';
 import { useSavedPlaces } from '@/src/store/saved-places';
 import { useRecentlyViewed } from '@/src/store/recently-viewed';
 import { useCityStore } from '@/src/store/city';
@@ -29,7 +29,7 @@ export default function ProfileScreen() {
   const dark = useColorScheme() === 'dark';
   const router = useRouter();
   const { t } = useTranslation();
-  const { name, profession, interests, faith, setProfile } = useProfile();
+  const { name, profession, interests, faith, budget, groupType, pace, setProfile } = useProfile();
   const { cityName } = useCityStore();
   const { language, setLanguage } = useLanguageStore();
   const [editingName, setEditingName] = React.useState(false);
@@ -179,6 +179,69 @@ export default function ProfileScreen() {
                 key={value}
                 style={[styles.chip, active && styles.chipActive]}
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setProfile({ faith: value }); }}>
+                <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>
+                  {t(labelKey)}
+                </ThemedText>
+              </Pressable>
+            );
+          })}
+        </View>
+      </ThemedView>
+
+      {/* Pace */}
+      <ThemedView style={styles.card}>
+        <ThemedText style={styles.cardLabel}>{t('onboarding.travelStyle.paceLabel')}</ThemedText>
+        <View style={styles.chipGrid}>
+          {PACES.map(({ value, labelKey, emoji }) => {
+            const active = pace === value;
+            return (
+              <Pressable
+                key={value}
+                style={[styles.chip, active && styles.chipActive]}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setProfile({ pace: value }); }}>
+                <ThemedText style={styles.chipEmoji}>{emoji}</ThemedText>
+                <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>
+                  {t(labelKey)}
+                </ThemedText>
+              </Pressable>
+            );
+          })}
+        </View>
+      </ThemedView>
+
+      {/* Budget */}
+      <ThemedView style={styles.card}>
+        <ThemedText style={styles.cardLabel}>{t('onboarding.travelStyle.budgetLabel')}</ThemedText>
+        <View style={styles.chipGrid}>
+          {BUDGETS.map(({ value, labelKey, emoji }) => {
+            const active = budget === value;
+            return (
+              <Pressable
+                key={value}
+                style={[styles.chip, active && styles.chipActive]}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setProfile({ budget: value }); }}>
+                <ThemedText style={styles.chipEmoji}>{emoji}</ThemedText>
+                <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>
+                  {t(labelKey)}
+                </ThemedText>
+              </Pressable>
+            );
+          })}
+        </View>
+      </ThemedView>
+
+      {/* Group type */}
+      <ThemedView style={styles.card}>
+        <ThemedText style={styles.cardLabel}>{t('onboarding.travelStyle.groupLabel')}</ThemedText>
+        <View style={styles.chipGrid}>
+          {GROUP_TYPES.map(({ value, labelKey, emoji }) => {
+            const active = groupType === value;
+            return (
+              <Pressable
+                key={value}
+                style={[styles.chip, active && styles.chipActive]}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setProfile({ groupType: value }); }}>
+                <ThemedText style={styles.chipEmoji}>{emoji}</ThemedText>
                 <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>
                   {t(labelKey)}
                 </ThemedText>

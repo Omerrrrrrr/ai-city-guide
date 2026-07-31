@@ -62,6 +62,22 @@
       "hindu": "Hindu",
       "secular": "Secular / Non-religious",
       "preferNotToSay": "Prefer not to say"
+    },
+    "budgets": {
+      "budget": "Budget",
+      "moderate": "Moderate",
+      "luxury": "Luxury"
+    },
+    "groupTypes": {
+      "solo": "Solo",
+      "couple": "Couple",
+      "family": "Family",
+      "friends": "Friends"
+    },
+    "paces": {
+      "relaxed": "Relaxed",
+      "balanced": "Balanced",
+      "packed": "Packed"
     }
   },
   "onboarding": {
@@ -85,6 +101,13 @@
       "interestsLabel": "Interests",
       "faithLabel": "Faith & perspective",
       "faithNote": "Helps Piri frame sacred and historic spaces — a mosque explained to a Muslim differs from one explained to an architect."
+    },
+    "travelStyle": {
+      "title": "How do you like to travel?",
+      "subtitle": "Optional. Helps Piri match the pace, budget, and vibe of what it suggests.",
+      "paceLabel": "Pace",
+      "budgetLabel": "Budget",
+      "groupLabel": "Traveling as"
     }
   },
   "home": {

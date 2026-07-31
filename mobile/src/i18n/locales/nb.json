@@ -62,6 +62,22 @@
       "hindu": "Hindu",
       "secular": "Sekulær / ikke-religiøs",
       "preferNotToSay": "Foretrekker å ikke si"
+    },
+    "budgets": {
+      "budget": "Budsjett",
+      "moderate": "Moderat",
+      "luxury": "Luksus"
+    },
+    "groupTypes": {
+      "solo": "Alene",
+      "couple": "Par",
+      "family": "Familie",
+      "friends": "Venner"
+    },
+    "paces": {
+      "relaxed": "Avslappet",
+      "balanced": "Balansert",
+      "packed": "Tett program"
     }
   },
   "onboarding": {
@@ -85,6 +101,13 @@
       "interestsLabel": "Interesser",
       "faithLabel": "Tro & perspektiv",
       "faithNote": "Hjelper Piri med å ramme inn hellige og historiske steder — en moské forklart til en muslim er annerledes enn forklart til en arkitekt."
+    },
+    "travelStyle": {
+      "title": "Hvordan liker du å reise?",
+      "subtitle": "Valgfritt. Hjelper Piri med å matche tempoet, budsjettet og stemningen i det som foreslås.",
+      "paceLabel": "Tempo",
+      "budgetLabel": "Budsjett",
+      "groupLabel": "Reiser som"
     }
   },
   "home": {

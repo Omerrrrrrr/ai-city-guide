@@ -35,11 +35,20 @@ export type Faith =
   | 'secular'
   | 'prefer_not_to_say';
 
+export type Budget = 'budget' | 'moderate' | 'luxury';
+
+export type GroupType = 'solo' | 'couple' | 'family' | 'friends';
+
+export type Pace = 'relaxed' | 'balanced' | 'packed';
+
 export interface UserProfile {
   name: string;
   profession: Profession | null;
   interests: Interest[];
   faith: Faith | null;
+  budget: Budget | null;
+  groupType: GroupType | null;
+  pace: Pace | null;
   onboardingCompleted: boolean;
 }
 
@@ -56,6 +65,9 @@ const DEFAULT_PROFILE: UserProfile = {
   profession: null,
   interests: [],
   faith: null,
+  budget: null,
+  groupType: null,
+  pace: null,
   onboardingCompleted: false,
 };
 

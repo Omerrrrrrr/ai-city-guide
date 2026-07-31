@@ -8,13 +8,16 @@ type UserProfile = {
   profession?: string | null;
   interests?: string[];
   faith?: string | null;
+  budget?: string | null;
+  groupType?: string | null;
+  pace?: string | null;
 };
 
 function getProfileBoost(place: Place, profile: UserProfile): number {
   let score = 0;
   const tags = place.tags;
   const cat = place.category;
-  const { profession, interests = [], faith } = profile;
+  const { profession, interests = [], faith, budget, groupType, pace } = profile;
 
   const isInterested = (interest: string) => interests.includes(interest);
 
@@ -46,15 +49,58 @@ function getProfileBoost(place: Place, profile: UserProfile): number {
     if (tags.includes('religion') || cat === 'cultural-spot') score += 3;
   }
 
+  // budget 'luxury'/'moderate' and groupType 'solo'/'friends' have no reliable
+  // DB-tag signal to rank on locally — they still shape the AI prompt
+  // (buildUserContext on the backend), just not this local sort.
+  if (budget === 'budget' && tags.includes('budget')) score += 5;
+  if (groupType === 'family' && tags.includes('family')) score += 6;
+  if (groupType === 'couple' && tags.includes('date night')) score += 5;
+
+  const durationMinutes = place.visitInfo?.durationMinutes;
+  if (pace === 'packed' && (tags.includes('short stop') || (durationMinutes != null && durationMinutes <= 45))) {
+    score += 4;
+  }
+  if (pace === 'relaxed' && durationMinutes != null && durationMinutes >= 90) {
+    score += 4;
+  }
+
   return score;
 }
 
-export function sortPlacesForProfile(places: Place[], profile: UserProfile): Place[] {
-  if (!profile.profession && !profile.interests?.length && !profile.faith) {
+// Implicit signal from what the user has actually looked at — category/tag
+// overlap with recently viewed places, capped so it complements rather than
+// overrides explicit profile preferences.
+function getHistoryBoost(place: Place, viewedPlaces: Place[]): number {
+  let score = 0;
+  for (const viewed of viewedPlaces) {
+    if (viewed.id === place.id) continue;
+    if (viewed.category === place.category) score += 2;
+    for (const tag of viewed.tags) {
+      if (place.tags.includes(tag)) score += 1;
+    }
+  }
+  return Math.min(score, 8);
+}
+
+export function sortPlacesForProfile(
+  places: Place[],
+  profile: UserProfile,
+  viewedPlaces: Place[] = []
+): Place[] {
+  const hasProfile = Boolean(
+    profile.profession ||
+      profile.interests?.length ||
+      profile.faith ||
+      profile.budget ||
+      profile.groupType ||
+      profile.pace
+  );
+  if (!hasProfile && viewedPlaces.length === 0) {
     return sortPlacesForBrowse(places);
   }
+  const totalBoost = (place: Place) => getProfileBoost(place, profile) + getHistoryBoost(place, viewedPlaces);
   return [...places].sort((a, b) => {
-    const boostDiff = getProfileBoost(b, profile) - getProfileBoost(a, profile);
+    const boostDiff = totalBoost(b) - totalBoost(a);
     if (boostDiff !== 0) return boostDiff;
     const openDiff = getOpenPriority(b) - getOpenPriority(a);
     if (openDiff !== 0) return openDiff;

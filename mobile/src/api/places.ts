@@ -77,15 +77,20 @@ export function lookupPlaceInfo(lat: number, lng: number) {
   return request<PlaceLookupResult>(`/places/lookup?lat=${lat}&lng=${lng}`);
 }
 
+export type PersonalizationProfile = {
+  name?: string;
+  profession?: string | null;
+  interests?: string[];
+  faith?: string | null;
+  budget?: string | null;
+  groupType?: string | null;
+  pace?: string | null;
+};
+
 export async function fetchRecommendations(
   query: string,
   messages: AIConversationMessage[] = [],
-  userProfile?: {
-    name?: string;
-    profession?: string | null;
-    interests?: string[];
-    faith?: string | null;
-  },
+  userProfile?: PersonalizationProfile,
   weather?: {
     condition: string;
     temp: number;
@@ -95,7 +100,8 @@ export async function fetchRecommendations(
   city?: string | null,
   location?: { lat: number; lng: number } | null,
   image?: { base64: string; mimeType?: string } | null,
-  locale?: string
+  locale?: string,
+  recentlyViewedPlaceIds?: string[]
 ): Promise<AIRecommendationResponse> {
   const response = await fetch(`${API_BASE_URL}/places/recommend`, {
     method: 'POST',
@@ -109,6 +115,7 @@ export async function fetchRecommendations(
       ...(location ? { lat: location.lat, lng: location.lng } : {}),
       ...(image ? { imageBase64: image.base64, mimeType: image.mimeType ?? 'image/jpeg' } : {}),
       ...(locale ? { locale } : {}),
+      ...(recentlyViewedPlaceIds?.length ? { recentlyViewedPlaceIds } : {}),
     }),
   });
 
@@ -130,22 +137,23 @@ const explainCache = new Map<string, ExplainResult>();
 
 export async function explainPlace(
   placeId: string,
-  userProfile?: {
-    name?: string;
-    profession?: string | null;
-    interests?: string[];
-    faith?: string | null;
-  },
-  locale?: string
+  userProfile?: PersonalizationProfile,
+  locale?: string,
+  recentlyViewedPlaceIds?: string[]
 ): Promise<ExplainResult> {
-  const cacheKey = `${placeId}:${userProfile?.profession ?? ''}:${(userProfile?.interests ?? []).join(',')}:${userProfile?.faith ?? ''}:${locale ?? ''}`;
+  const cacheKey = `${placeId}:${userProfile?.profession ?? ''}:${(userProfile?.interests ?? []).join(',')}:${userProfile?.faith ?? ''}:${userProfile?.budget ?? ''}:${userProfile?.groupType ?? ''}:${userProfile?.pace ?? ''}:${locale ?? ''}`;
   const cached = explainCache.get(cacheKey);
   if (cached) return cached;
 
   const response = await fetch(`${API_BASE_URL}/places/explain`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ placeId, userProfile, locale }),
+    body: JSON.stringify({
+      placeId,
+      userProfile,
+      locale,
+      ...(recentlyViewedPlaceIds?.length ? { recentlyViewedPlaceIds } : {}),
+    }),
   });
 
   if (!response.ok) {
@@ -172,12 +180,7 @@ export async function identifyPlace(payload: {
   lat?: number;
   lng?: number;
   locale?: string;
-  userProfile?: {
-    name?: string;
-    profession?: string | null;
-    interests?: string[];
-    faith?: string | null;
-  };
+  userProfile?: PersonalizationProfile;
 }): Promise<IdentifyResult> {
   const response = await fetch(`${API_BASE_URL}/places/identify`, {
     method: 'POST',

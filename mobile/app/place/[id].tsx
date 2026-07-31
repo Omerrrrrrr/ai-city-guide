@@ -60,8 +60,8 @@ export default function PlaceDetailScreen() {
   const { data: place, error, isLoading, refresh } = usePlace(id);
   const { data: nearbyPlaces } = useNearbyPlaces(id);
   const { isFavorite, toggleFavorite, isInPlan, togglePlan } = useSavedPlaces();
-  const { markViewed } = useRecentlyViewed();
-  const { name: userName, profession, interests, faith } = useUserProfile();
+  const { markViewed, viewedIds } = useRecentlyViewed();
+  const { name: userName, profession, interests, faith, budget, groupType, pace } = useUserProfile();
   const [isMapInteracting, setIsMapInteracting] = React.useState(false);
   const [piriseTake, setPirisTake] = React.useState<ExplainResult | null>(null);
   const [pirisLoading, setPirisLoading] = React.useState(false);
@@ -74,12 +74,17 @@ export default function PlaceDetailScreen() {
     if (!id || !place) return;
     let cancelled = false;
     setPirisLoading(true);
-    explainPlace(id, { name: userName, profession, interests, faith }, i18n.language)
+    explainPlace(
+      id,
+      { name: userName, profession, interests, faith, budget, groupType, pace },
+      i18n.language,
+      viewedIds
+    )
       .then((result) => { if (!cancelled) setPirisTake(result); })
       .catch(() => { /* silently fail — non-critical */ })
       .finally(() => { if (!cancelled) setPirisLoading(false); });
     return () => { cancelled = true; };
-  }, [id, place?.id, profession, faith, interests?.join(','), i18n.language]);
+  }, [id, place?.id, profession, faith, interests?.join(','), budget, groupType, pace, i18n.language]);
 
 
   const bg = dark ? '#0A0F1E' : '#F4F5F9';

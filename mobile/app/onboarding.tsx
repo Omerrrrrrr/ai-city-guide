@@ -16,13 +16,13 @@ import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
 
 import { AnimatedPressable } from '@/components/animated-pressable';
-import { FAITHS, INTERESTS, PROFESSIONS } from '@/src/constants/profile-options';
+import { BUDGETS, FAITHS, GROUP_TYPES, INTERESTS, PACES, PROFESSIONS } from '@/src/constants/profile-options';
 import { useUserProfile } from '@/src/store/user-profile';
-import type { Faith, Interest, Profession } from '@/src/store/user-profile';
+import type { Budget, Faith, GroupType, Interest, Pace, Profession } from '@/src/store/user-profile';
 
 const NAVY = '#0F1C3F';
 const GOLD = '#D4A843';
-const TOTAL_STEPS = 3;
+const TOTAL_STEPS = 4;
 
 export default function OnboardingScreen() {
   const router = useRouter();
@@ -34,9 +34,12 @@ export default function OnboardingScreen() {
   const [profession, setProfession] = React.useState<Profession | null>(null);
   const [interests, setInterests] = React.useState<Interest[]>([]);
   const [faith, setFaith] = React.useState<Faith | null>(null);
+  const [budget, setBudget] = React.useState<Budget | null>(null);
+  const [groupType, setGroupType] = React.useState<GroupType | null>(null);
+  const [pace, setPace] = React.useState<Pace | null>(null);
 
   const finish = () => {
-    setProfile({ name: name.trim(), profession, interests, faith });
+    setProfile({ name: name.trim(), profession, interests, faith, budget, groupType, pace });
     completeOnboarding();
     router.replace('/(tabs)');
   };
@@ -105,6 +108,16 @@ export default function OnboardingScreen() {
               onToggleInterest={toggleInterest}
               selectedFaith={faith}
               onSelectFaith={setFaith}
+            />
+          )}
+          {step === 4 && (
+            <StepTravelStyle
+              selectedPace={pace}
+              onSelectPace={setPace}
+              selectedBudget={budget}
+              onSelectBudget={setBudget}
+              selectedGroupType={groupType}
+              onSelectGroupType={setGroupType}
             />
           )}
         </ScrollView>
@@ -215,6 +228,78 @@ function StepFaithInterests({
               key={value}
               style={[styles.chip, active && styles.chipActive]}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onSelectFaith(value); }}>
+              <Text style={[styles.chipText, active && styles.chipTextActive]}>{t(labelKey)}</Text>
+            </AnimatedPressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+function StepTravelStyle({
+  selectedPace,
+  onSelectPace,
+  selectedBudget,
+  onSelectBudget,
+  selectedGroupType,
+  onSelectGroupType,
+}: {
+  selectedPace: Pace | null;
+  onSelectPace: (v: Pace) => void;
+  selectedBudget: Budget | null;
+  onSelectBudget: (v: Budget) => void;
+  selectedGroupType: GroupType | null;
+  onSelectGroupType: (v: GroupType) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <View style={styles.stepContainer}>
+      <Text style={styles.stepTitle}>{t('onboarding.travelStyle.title')}</Text>
+      <Text style={styles.stepSubtitle}>{t('onboarding.travelStyle.subtitle')}</Text>
+
+      <Text style={styles.sectionLabel}>{t('onboarding.travelStyle.paceLabel')}</Text>
+      <View style={styles.chipGrid}>
+        {PACES.map(({ value, labelKey, emoji }) => {
+          const active = selectedPace === value;
+          return (
+            <AnimatedPressable
+              key={value}
+              style={[styles.chip, active && styles.chipActive]}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onSelectPace(value); }}>
+              <Text style={styles.chipEmoji}>{emoji}</Text>
+              <Text style={[styles.chipText, active && styles.chipTextActive]}>{t(labelKey)}</Text>
+            </AnimatedPressable>
+          );
+        })}
+      </View>
+
+      <Text style={[styles.sectionLabel, { marginTop: 28 }]}>{t('onboarding.travelStyle.budgetLabel')}</Text>
+      <View style={styles.chipGrid}>
+        {BUDGETS.map(({ value, labelKey, emoji }) => {
+          const active = selectedBudget === value;
+          return (
+            <AnimatedPressable
+              key={value}
+              style={[styles.chip, active && styles.chipActive]}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onSelectBudget(value); }}>
+              <Text style={styles.chipEmoji}>{emoji}</Text>
+              <Text style={[styles.chipText, active && styles.chipTextActive]}>{t(labelKey)}</Text>
+            </AnimatedPressable>
+          );
+        })}
+      </View>
+
+      <Text style={[styles.sectionLabel, { marginTop: 28 }]}>{t('onboarding.travelStyle.groupLabel')}</Text>
+      <View style={styles.chipGrid}>
+        {GROUP_TYPES.map(({ value, labelKey, emoji }) => {
+          const active = selectedGroupType === value;
+          return (
+            <AnimatedPressable
+              key={value}
+              style={[styles.chip, active && styles.chipActive]}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onSelectGroupType(value); }}>
+              <Text style={styles.chipEmoji}>{emoji}</Text>
               <Text style={[styles.chipText, active && styles.chipTextActive]}>{t(labelKey)}</Text>
             </AnimatedPressable>
           );
