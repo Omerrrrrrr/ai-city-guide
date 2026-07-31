@@ -88,13 +88,20 @@ function copyFor(locale: string) {
 export async function subscribeToCityDiscovery(cityId: string, expoPushToken: string, locale?: string) {
   if (!isExpoPushToken(expoPushToken)) return;
 
-  await db.insert(pushSubscriptions).values({
-    id: randomUUID(),
-    cityId,
-    expoPushToken,
-    locale: locale && locale in COPY ? locale : 'en',
-    createdAt: new Date().toISOString(),
-  });
+  // A user re-tapping "discover" for a city already in progress (e.g. the
+  // /cities/discover retry path) would otherwise insert a second row for the
+  // same city+token pair and get the completion push twice. The unique index
+  // on (cityId, expoPushToken) makes this a safe no-op instead.
+  await db
+    .insert(pushSubscriptions)
+    .values({
+      id: randomUUID(),
+      cityId,
+      expoPushToken,
+      locale: locale && locale in COPY ? locale : 'en',
+      createdAt: new Date().toISOString(),
+    })
+    .onConflictDoNothing({ target: [pushSubscriptions.cityId, pushSubscriptions.expoPushToken] });
 }
 
 async function sendAndClearSubscriptions(

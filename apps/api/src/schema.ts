@@ -1,4 +1,4 @@
-import { pgTable, text, varchar, boolean, integer, doublePrecision, index } from 'drizzle-orm/pg-core';
+import { pgTable, text, varchar, boolean, integer, doublePrecision, index, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const places = pgTable('places', {
   id: varchar('id', { length: 64 }).primaryKey(),
@@ -95,6 +95,7 @@ export const pushSubscriptions = pgTable('push_subscriptions', {
   createdAt: varchar('created_at', { length: 64 }).notNull(),
 }, (table) => [
   index('idx_push_subscriptions_city_id').on(table.cityId),
+  uniqueIndex('idx_push_subscriptions_city_token').on(table.cityId, table.expoPushToken),
 ]);
 
 export type PlaceRow = typeof places.$inferSelect;

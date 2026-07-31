@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "idx_push_subscriptions_city_token" ON "push_subscriptions" USING btree ("city_id","expo_push_token");

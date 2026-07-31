@@ -526,9 +526,19 @@ export async function discoverPlacesForCity(input: DiscoverPlacesForCityInput) {
       console.error(`Category image pass failed for ${input.cityId}:`, err);
     }
 
+    // insertedCount only tracks net inserts/deletes from *this* run — on a
+    // rediscovery it undercounts (existing places are skipped as dupes) and
+    // can also drift the other way if something outside this function (e.g.
+    // ensure-schema.ts's retroactive non-tourist cleanup) removes rows for
+    // this city between runs. Query the real total instead of trusting the
+    // running counter, so cities.placeCount always reflects actual DB state.
+    const finalPlaceCount = (
+      await db.select({ id: places.id }).from(places).where(ilike(places.city, input.cityName))
+    ).length;
+
     await db
       .update(cities)
-      .set({ status: 'ready', placeCount: insertedCount, discoveredAt: new Date().toISOString(), errorMessage: null })
+      .set({ status: 'ready', placeCount: finalPlaceCount, discoveredAt: new Date().toISOString(), errorMessage: null })
       .where(eq(cities.id, input.cityId));
 
     notifyCityDiscoveryReady(input.cityId, input.cityName, insertedCount).catch((err) =>
