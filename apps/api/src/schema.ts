@@ -1,4 +1,4 @@
-import { pgTable, text, varchar, boolean, integer, doublePrecision } from 'drizzle-orm/pg-core';
+import { pgTable, text, varchar, boolean, integer, doublePrecision, index } from 'drizzle-orm/pg-core';
 
 export const places = pgTable('places', {
   id: varchar('id', { length: 64 }).primaryKey(),
@@ -48,7 +48,10 @@ export const places = pgTable('places', {
   wikiMatchConfidence: integer('wiki_match_confidence'),
   wikiStatus: varchar('wiki_status', { length: 32 }),
   wikiRawMetadataJson: text('wiki_raw_metadata_json'),
-});
+}, (table) => [
+  index('idx_places_slug').on(table.slug),
+  index('idx_places_city').on(table.city),
+]);
 
 export const placeImageCandidates = pgTable('place_image_candidates', {
   id: varchar('id', { length: 96 }).primaryKey(),
@@ -66,7 +69,10 @@ export const placeImageCandidates = pgTable('place_image_candidates', {
   imageAttribution: text('image_attribution'),
   imageType: varchar('image_type', { length: 32 }).notNull().default('wikimedia'),
   notes: text('notes'),
-});
+}, (table) => [
+  index('idx_place_image_candidates_place_id').on(table.placeId),
+  index('idx_place_image_candidates_status').on(table.status),
+]);
 
 export const cities = pgTable('cities', {
   id: varchar('id', { length: 96 }).primaryKey(),
@@ -87,7 +93,9 @@ export const pushSubscriptions = pgTable('push_subscriptions', {
   expoPushToken: varchar('expo_push_token', { length: 255 }).notNull(),
   locale: varchar('locale', { length: 8 }).notNull().default('en'),
   createdAt: varchar('created_at', { length: 64 }).notNull(),
-});
+}, (table) => [
+  index('idx_push_subscriptions_city_id').on(table.cityId),
+]);
 
 export type PlaceRow = typeof places.$inferSelect;
 export type PlaceImageCandidateRow = typeof placeImageCandidates.$inferSelect;

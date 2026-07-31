@@ -1,172 +1,19 @@
-import { eq, inArray, lt, sql } from 'drizzle-orm';
+import path from 'node:path';
+import { eq, inArray, lt } from 'drizzle-orm';
+import { migrate } from 'drizzle-orm/node-postgres/migrator';
 
 import { db } from './db';
 import { cities, places } from './schema';
 import { TOURIST_WORTHY_SHOPPING_KEYWORDS } from './place-discovery-service';
 
 export async function ensureSchema() {
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS "places" (
-      "id" varchar(64) PRIMARY KEY,
-      "city" varchar(64) NOT NULL,
-      "country" varchar(64),
-      "name" varchar(256) NOT NULL,
-      "slug" varchar(256) NOT NULL,
-      "category" varchar(64) NOT NULL,
-      "tags" text NOT NULL,
-      "description" text NOT NULL,
-      "image_url" text NOT NULL,
-      "image_source_url" text,
-      "image_source_name" varchar(256),
-      "image_license" text,
-      "image_attribution" text,
-      "image_verified" boolean NOT NULL DEFAULT false,
-      "image_type" varchar(32) NOT NULL DEFAULT 'unknown',
-      "importance_tier" varchar(32) NOT NULL DEFAULT 'supporting',
-      "short_story" text NOT NULL,
-      "fact_type" varchar(128),
-      "address" varchar(256),
-      "price_level" varchar(64),
-      "source_url" text,
-      "hours_note" text,
-      "opening_hours_json" text,
-      "hours_verified" boolean NOT NULL DEFAULT false,
-      "hours_source_url" text,
-      "hours_last_checked_at" varchar(64),
-      "best_time" text,
-      "seasonality" text,
-      "temporarily_closed" boolean NOT NULL DEFAULT false,
-      "local_vibe_mood" text,
-      "local_vibe_best_for" text,
-      "is_indoor" boolean,
-      "is_family_friendly" boolean,
-      "duration_minutes" integer,
-      "rainy_day_fit" boolean,
-      "wiki_page_title" varchar(512),
-      "wiki_page_url" text,
-      "wiki_summary" text,
-      "wiki_match_confidence" integer,
-      "wiki_status" varchar(32),
-      "wiki_raw_metadata_json" text,
-      "lat" double precision,
-      "lng" double precision
-    );
-  `);
-
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS "place_image_candidates" (
-      "id" varchar(96) PRIMARY KEY,
-      "place_id" varchar(64) NOT NULL,
-      "provider" varchar(32) NOT NULL,
-      "status" varchar(32) NOT NULL DEFAULT 'pending',
-      "confidence" integer NOT NULL DEFAULT 0,
-      "rank" integer NOT NULL DEFAULT 0,
-      "search_query" text,
-      "page_title" varchar(512) NOT NULL,
-      "image_url" text NOT NULL,
-      "source_url" text NOT NULL,
-      "source_name" varchar(256),
-      "image_license" text,
-      "image_attribution" text,
-      "image_type" varchar(32) NOT NULL DEFAULT 'wikimedia',
-      "notes" text
-    );
-  `);
-
-  await db.execute(sql`
-    ALTER TABLE "places"
-    ADD COLUMN IF NOT EXISTS "city" varchar(64),
-    ADD COLUMN IF NOT EXISTS "country" varchar(64),
-    ADD COLUMN IF NOT EXISTS "slug" varchar(256),
-    ADD COLUMN IF NOT EXISTS "image_source_url" text,
-    ADD COLUMN IF NOT EXISTS "image_source_name" varchar(256),
-    ADD COLUMN IF NOT EXISTS "image_license" text,
-    ADD COLUMN IF NOT EXISTS "image_attribution" text,
-    ADD COLUMN IF NOT EXISTS "image_verified" boolean NOT NULL DEFAULT false,
-    ADD COLUMN IF NOT EXISTS "image_type" varchar(32) NOT NULL DEFAULT 'unknown',
-    ADD COLUMN IF NOT EXISTS "importance_tier" varchar(32) NOT NULL DEFAULT 'supporting',
-    ADD COLUMN IF NOT EXISTS "address" varchar(256),
-    ADD COLUMN IF NOT EXISTS "price_level" varchar(64),
-    ADD COLUMN IF NOT EXISTS "source_url" text,
-    ADD COLUMN IF NOT EXISTS "hours_note" text,
-    ADD COLUMN IF NOT EXISTS "opening_hours_json" text,
-    ADD COLUMN IF NOT EXISTS "hours_verified" boolean NOT NULL DEFAULT false,
-    ADD COLUMN IF NOT EXISTS "hours_source_url" text,
-    ADD COLUMN IF NOT EXISTS "hours_last_checked_at" varchar(64),
-    ADD COLUMN IF NOT EXISTS "best_time" text,
-    ADD COLUMN IF NOT EXISTS "seasonality" text,
-    ADD COLUMN IF NOT EXISTS "temporarily_closed" boolean NOT NULL DEFAULT false,
-    ADD COLUMN IF NOT EXISTS "fact_type" varchar(128),
-    ADD COLUMN IF NOT EXISTS "local_vibe_mood" text,
-    ADD COLUMN IF NOT EXISTS "local_vibe_best_for" text,
-    ADD COLUMN IF NOT EXISTS "is_indoor" boolean,
-    ADD COLUMN IF NOT EXISTS "is_family_friendly" boolean,
-    ADD COLUMN IF NOT EXISTS "duration_minutes" integer,
-    ADD COLUMN IF NOT EXISTS "rainy_day_fit" boolean,
-    ADD COLUMN IF NOT EXISTS "wiki_page_title" varchar(512),
-    ADD COLUMN IF NOT EXISTS "wiki_page_url" text,
-    ADD COLUMN IF NOT EXISTS "wiki_summary" text,
-    ADD COLUMN IF NOT EXISTS "wiki_match_confidence" integer,
-    ADD COLUMN IF NOT EXISTS "wiki_status" varchar(32),
-    ADD COLUMN IF NOT EXISTS "wiki_raw_metadata_json" text,
-    ADD COLUMN IF NOT EXISTS "lat" double precision,
-    ADD COLUMN IF NOT EXISTS "lng" double precision;
-  `);
-
-  await db.execute(sql`
-    ALTER TABLE "place_image_candidates"
-    ADD COLUMN IF NOT EXISTS "place_id" varchar(64),
-    ADD COLUMN IF NOT EXISTS "provider" varchar(32),
-    ADD COLUMN IF NOT EXISTS "status" varchar(32) NOT NULL DEFAULT 'pending',
-    ADD COLUMN IF NOT EXISTS "confidence" integer NOT NULL DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS "rank" integer NOT NULL DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS "search_query" text,
-    ADD COLUMN IF NOT EXISTS "page_title" varchar(512),
-    ADD COLUMN IF NOT EXISTS "image_url" text,
-    ADD COLUMN IF NOT EXISTS "source_url" text,
-    ADD COLUMN IF NOT EXISTS "source_name" varchar(256),
-    ADD COLUMN IF NOT EXISTS "image_license" text,
-    ADD COLUMN IF NOT EXISTS "image_attribution" text,
-    ADD COLUMN IF NOT EXISTS "image_type" varchar(32) NOT NULL DEFAULT 'wikimedia',
-    ADD COLUMN IF NOT EXISTS "notes" text;
-  `);
-
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS "cities" (
-      "id" varchar(96) PRIMARY KEY,
-      "name" varchar(256) NOT NULL,
-      "country" varchar(64),
-      "center_lat" double precision NOT NULL,
-      "center_lng" double precision NOT NULL,
-      "radius_km" double precision NOT NULL DEFAULT 12,
-      "status" varchar(32) NOT NULL DEFAULT 'pending',
-      "place_count" integer NOT NULL DEFAULT 0,
-      "error_message" text,
-      "discovered_at" varchar(64)
-    );
-  `);
-
-  await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS "push_subscriptions" (
-      "id" varchar(64) PRIMARY KEY,
-      "city_id" varchar(96) NOT NULL,
-      "expo_push_token" varchar(255) NOT NULL,
-      "locale" varchar(8) NOT NULL DEFAULT 'en',
-      "created_at" varchar(64) NOT NULL
-    );
-  `);
-
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_places_slug" ON "places" ("slug");`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_places_city" ON "places" ("city");`);
-  await db.execute(
-    sql`CREATE INDEX IF NOT EXISTS "idx_place_image_candidates_place_id" ON "place_image_candidates" ("place_id");`
-  );
-  await db.execute(
-    sql`CREATE INDEX IF NOT EXISTS "idx_place_image_candidates_status" ON "place_image_candidates" ("status");`
-  );
-  await db.execute(
-    sql`CREATE INDEX IF NOT EXISTS "idx_push_subscriptions_city_id" ON "push_subscriptions" ("city_id");`
-  );
+  // Schema is managed by drizzle-kit migrations (see apps/api/drizzle/ and
+  // `npm run db:generate`) instead of hand-written DDL. migrate() is
+  // idempotent — it only applies migrations newer than the last one recorded
+  // in drizzle.__drizzle_migrations, so this is safe to call on every boot.
+  // Resolved relative to this file (not process.cwd()) so it works the same
+  // whether run via ts-node-dev from src/ or as compiled dist/ensure-schema.js.
+  await migrate(db, { migrationsFolder: path.join(__dirname, '../drizzle') });
 
   // Remove places whose first tag (the original Overture leaf category) identifies
   // them as non-tourist infrastructure that slipped through earlier discovery runs.
