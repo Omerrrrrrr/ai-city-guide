@@ -1,6 +1,8 @@
 import React from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  Image,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -11,6 +13,7 @@ import {
 } from 'react-native';
 import MapView, { Marker, Polyline, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -57,7 +60,7 @@ export default function MapScreen() {
   const [activeCategory, setActiveCategory] = React.useState<PlaceCategory | 'all'>('all');
 
   // Route planning
-  const { activeTripId, startTrip, endTrip, addBreadcrumb, trips } = useTrips();
+  const { activeTripId, startTrip, endTrip, addBreadcrumb, addPhoto, trips } = useTrips();
   const activeTrip = React.useMemo(() => trips.find((trip) => trip.id === activeTripId) ?? null, [trips, activeTripId]);
   const [routeMode, setRouteMode] = React.useState(false);
   const [plannedStops, setPlannedStops] = React.useState<Place[]>([]);
@@ -107,6 +110,37 @@ export default function MapScreen() {
     setRouteMode(false);
     setPlannedStops([]);
     setRouteGeometry(null);
+  };
+
+  // Photos stay on-device only — no upload/storage backend exists (or is
+  // planned) for this feature, expo already persists the picked/captured
+  // file locally, so we just keep a reference to its uri.
+  const attachTripPhoto = async (fromCamera: boolean) => {
+    if (!activeTripId) return;
+    const picker = fromCamera ? ImagePicker.launchCameraAsync : ImagePicker.launchImageLibraryAsync;
+    const result = await picker({ mediaTypes: ['images'], quality: 0.7 });
+    if (result.canceled || !result.assets[0]) return;
+
+    let lat: number | undefined;
+    let lng: number | undefined;
+    try {
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status === 'granted') {
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        lat = loc.coords.latitude;
+        lng = loc.coords.longitude;
+      }
+    } catch { /* photo is still saved without coordinates */ }
+
+    addPhoto(activeTripId, { uri: result.assets[0].uri, timestamp: Date.now(), lat, lng });
+  };
+
+  const handleAddPhoto = () => {
+    Alert.alert(t('map.route.addPhoto'), undefined, [
+      { text: t('map.route.photoCamera'), onPress: () => void attachTripPhoto(true) },
+      { text: t('map.route.photoGallery'), onPress: () => void attachTripPhoto(false) },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
   };
 
   // Live GPS breadcrumb recording — foreground only (tied to this screen
@@ -348,12 +382,27 @@ export default function MapScreen() {
           {routeError && <ThemedText style={styles.routeErrorText}>{routeError}</ThemedText>}
 
           {activeTrip && (
-            <View style={styles.trackingRow}>
-              <View style={styles.trackingDot} />
-              <ThemedText style={styles.trackingText}>
-                {t('map.route.tracking', { count: activeTrip.breadcrumb.length })}
-              </ThemedText>
-            </View>
+            <>
+              <View style={styles.trackingRow}>
+                <View style={styles.trackingDot} />
+                <ThemedText style={styles.trackingText}>
+                  {t('map.route.tracking', { count: activeTrip.breadcrumb.length })}
+                </ThemedText>
+              </View>
+
+              <View style={styles.photoRow}>
+                <Pressable style={styles.addPhotoBtn} onPress={handleAddPhoto}>
+                  <Text style={styles.addPhotoBtnText}>📷 {t('map.route.addPhoto')}</Text>
+                </Pressable>
+                {activeTrip.photos.length > 0 && (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoThumbRow}>
+                    {activeTrip.photos.map((photo) => (
+                      <Image key={photo.uri + photo.timestamp} source={{ uri: photo.uri }} style={styles.photoThumb} />
+                    ))}
+                  </ScrollView>
+                )}
+              </View>
+            </>
           )}
 
           {activeTripId ? (
@@ -553,6 +602,15 @@ const styles = StyleSheet.create({
   trackingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 10 },
   trackingDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#D9342A' },
   trackingText: { fontSize: 12.5, opacity: 0.6 },
+  photoRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 10, flexWrap: 'wrap' },
+  addPhotoBtn: {
+    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 50,
+    backgroundColor: 'rgba(15,28,63,0.06)',
+    borderWidth: 1, borderColor: 'rgba(15,28,63,0.15)',
+  },
+  addPhotoBtnText: { fontSize: 13, fontWeight: '600' },
+  photoThumbRow: { gap: 6 },
+  photoThumb: { width: 44, height: 44, borderRadius: 8 },
   routeActionBtn: {
     marginTop: 12,
     backgroundColor: NAVY,

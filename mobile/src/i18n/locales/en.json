@@ -232,7 +232,10 @@
       "end": "End Route",
       "failed": "Couldn't calculate a route. Check your connection.",
       "tracking_one": "Tracking your route · {{count}} point recorded",
-      "tracking_other": "Tracking your route · {{count}} points recorded"
+      "tracking_other": "Tracking your route · {{count}} points recorded",
+      "addPhoto": "Add Photo",
+      "photoCamera": "Take Photo",
+      "photoGallery": "Choose from Gallery"
     }
   },
   "saved": {

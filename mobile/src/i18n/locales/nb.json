@@ -232,7 +232,10 @@
       "end": "Avslutt rute",
       "failed": "Kunne ikke beregne rute. Sjekk internettforbindelsen din.",
       "tracking_one": "Sporer ruten din · {{count}} punkt registrert",
-      "tracking_other": "Sporer ruten din · {{count}} punkter registrert"
+      "tracking_other": "Sporer ruten din · {{count}} punkter registrert",
+      "addPhoto": "Legg til bilde",
+      "photoCamera": "Ta bilde",
+      "photoGallery": "Velg fra galleri"
     }
   },
   "saved": {

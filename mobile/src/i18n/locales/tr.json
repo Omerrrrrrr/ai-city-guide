@@ -232,7 +232,10 @@
       "end": "Rotayı Bitir",
       "failed": "Rota hesaplanamadı. Bağlantını kontrol et.",
       "tracking_one": "Rota takip ediliyor · {{count}} nokta kaydedildi",
-      "tracking_other": "Rota takip ediliyor · {{count}} nokta kaydedildi"
+      "tracking_other": "Rota takip ediliyor · {{count}} nokta kaydedildi",
+      "addPhoto": "Fotoğraf Ekle",
+      "photoCamera": "Fotoğraf Çek",
+      "photoGallery": "Galeriden Seç"
     }
   },
   "saved": {
