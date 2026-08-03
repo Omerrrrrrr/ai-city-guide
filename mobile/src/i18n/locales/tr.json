@@ -230,7 +230,9 @@
       "hint": "Rotana durak eklemek için haritadaki yerlere dokun.",
       "start": "Rotayı Başlat",
       "end": "Rotayı Bitir",
-      "failed": "Rota hesaplanamadı. Bağlantını kontrol et."
+      "failed": "Rota hesaplanamadı. Bağlantını kontrol et.",
+      "tracking_one": "Rota takip ediliyor · {{count}} nokta kaydedildi",
+      "tracking_other": "Rota takip ediliyor · {{count}} nokta kaydedildi"
     }
   },
   "saved": {

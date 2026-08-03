@@ -230,7 +230,9 @@
       "hint": "Trykk på steder på kartet for å legge til stopp på ruten din.",
       "start": "Start rute",
       "end": "Avslutt rute",
-      "failed": "Kunne ikke beregne rute. Sjekk internettforbindelsen din."
+      "failed": "Kunne ikke beregne rute. Sjekk internettforbindelsen din.",
+      "tracking_one": "Sporer ruten din · {{count}} punkt registrert",
+      "tracking_other": "Sporer ruten din · {{count}} punkter registrert"
     }
   },
   "saved": {

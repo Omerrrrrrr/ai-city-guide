@@ -230,7 +230,9 @@
       "hint": "Tap places on the map to add stops to your route.",
       "start": "Start Route",
       "end": "End Route",
-      "failed": "Couldn't calculate a route. Check your connection."
+      "failed": "Couldn't calculate a route. Check your connection.",
+      "tracking_one": "Tracking your route · {{count}} point recorded",
+      "tracking_other": "Tracking your route · {{count}} points recorded"
     }
   },
   "saved": {

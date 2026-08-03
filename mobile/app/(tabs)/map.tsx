@@ -57,7 +57,8 @@ export default function MapScreen() {
   const [activeCategory, setActiveCategory] = React.useState<PlaceCategory | 'all'>('all');
 
   // Route planning
-  const { activeTripId, startTrip, endTrip } = useTrips();
+  const { activeTripId, startTrip, endTrip, addBreadcrumb, trips } = useTrips();
+  const activeTrip = React.useMemo(() => trips.find((trip) => trip.id === activeTripId) ?? null, [trips, activeTripId]);
   const [routeMode, setRouteMode] = React.useState(false);
   const [plannedStops, setPlannedStops] = React.useState<Place[]>([]);
   const [routeGeometry, setRouteGeometry] = React.useState<[number, number][] | null>(null);
@@ -66,8 +67,12 @@ export default function MapScreen() {
 
   const toggleRouteMode = () => {
     setSelectedPlace(null);
+    // While a trip is live, the panel must stay reachable — it's the only
+    // way to reach "Rotayı Bitir", and GPS recording keeps running
+    // regardless of whether this panel is visible, so hiding it would leave
+    // no way to stop tracking from the UI.
+    if (activeTripId) { setRouteMode(true); return; }
     setRouteMode((prev) => !prev);
-    if (activeTripId) return; // keep an in-progress trip's stops/route visible
     setPlannedStops([]);
     setRouteGeometry(null);
     setRouteError(null);
@@ -103,6 +108,38 @@ export default function MapScreen() {
     setPlannedStops([]);
     setRouteGeometry(null);
   };
+
+  // Live GPS breadcrumb recording — foreground only (tied to this screen
+  // being mounted), while a trip is active. Records a point roughly every
+  // 20s or 25m of movement, whichever comes first, so a trip's breadcrumb
+  // trail can be replayed later (see the trip history/playback screen).
+  React.useEffect(() => {
+    if (!activeTripId) return;
+    let cancelled = false;
+    let subscription: Location.LocationSubscription | null = null;
+
+    void (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted' || cancelled) return;
+      const sub = await Location.watchPositionAsync(
+        { accuracy: Location.Accuracy.Balanced, timeInterval: 20000, distanceInterval: 25 },
+        (loc) => {
+          addBreadcrumb(activeTripId, {
+            lat: loc.coords.latitude,
+            lng: loc.coords.longitude,
+            timestamp: loc.timestamp,
+          });
+        }
+      );
+      if (cancelled) { sub.remove(); return; }
+      subscription = sub;
+    })();
+
+    return () => {
+      cancelled = true;
+      subscription?.remove();
+    };
+  }, [activeTripId, addBreadcrumb]);
 
   React.useEffect(() => {
     void (async () => {
@@ -228,6 +265,13 @@ export default function MapScreen() {
             strokeWidth={4}
           />
         )}
+        {activeTrip && activeTrip.breadcrumb.length > 1 && (
+          <Polyline
+            coordinates={activeTrip.breadcrumb.map((point) => ({ latitude: point.lat, longitude: point.lng }))}
+            strokeColor={NAVY}
+            strokeWidth={5}
+          />
+        )}
       </MapView>
 
       {/* Top: category chips + count pill */}
@@ -302,6 +346,15 @@ export default function MapScreen() {
           )}
 
           {routeError && <ThemedText style={styles.routeErrorText}>{routeError}</ThemedText>}
+
+          {activeTrip && (
+            <View style={styles.trackingRow}>
+              <View style={styles.trackingDot} />
+              <ThemedText style={styles.trackingText}>
+                {t('map.route.tracking', { count: activeTrip.breadcrumb.length })}
+              </ThemedText>
+            </View>
+          )}
 
           {activeTripId ? (
             <Pressable style={styles.routeActionBtn} onPress={handleEndRoute}>
@@ -497,6 +550,9 @@ const styles = StyleSheet.create({
   stopChipText: { fontSize: 13, fontWeight: '600', flexShrink: 1 },
   stopChipRemove: { fontSize: 16, color: '#999', paddingHorizontal: 2 },
   routeErrorText: { color: '#B42318', fontSize: 13, paddingTop: 8 },
+  trackingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 10 },
+  trackingDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#D9342A' },
+  trackingText: { fontSize: 12.5, opacity: 0.6 },
   routeActionBtn: {
     marginTop: 12,
     backgroundColor: NAVY,
