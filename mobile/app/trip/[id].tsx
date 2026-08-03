@@ -1,5 +1,19 @@
 import React from 'react';
-import { Image, Pressable, SafeAreaView, ScrollView, Share, StyleSheet, Text, TextInput, View, useColorScheme } from 'react-native';
+import {
+  Dimensions,
+  FlatList,
+  Image,
+  Modal,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  useColorScheme,
+} from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -11,6 +25,8 @@ import { useTrips, type TripWaypoint } from '@/src/store/trips';
 
 const NAVY = '#0F1C3F';
 const GOLD = '#D4A843';
+
+const VIEWER_WIDTH = Dimensions.get('window').width;
 
 const PLAYBACK_STEP_MS = 50;
 const PLAYBACK_SEGMENT_MS = 450; // compressed travel time between two consecutive breadcrumb points
@@ -34,6 +50,7 @@ export default function TripDetailScreen() {
   const playbackRef = React.useRef<{ segment: number; t: number } | null>(null);
   const [editingName, setEditingName] = React.useState(false);
   const [nameInput, setNameInput] = React.useState('');
+  const [viewerIndex, setViewerIndex] = React.useState<number | null>(null);
 
   const stops = React.useMemo(
     () => (trip?.placeIds ?? []).map((placeId) => allPlaces?.find((p) => p.id === placeId)).filter((p) => Boolean(p?.location)),
@@ -238,13 +255,53 @@ export default function TripDetailScreen() {
           <>
             <ThemedText style={styles.sectionLabel}>{t('trips.photosLabel')}</ThemedText>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photosRow}>
-              {trip.photos.map((photo) => (
-                <Image key={photo.uri + photo.timestamp} source={{ uri: photo.uri }} style={styles.photo} />
+              {trip.photos.map((photo, index) => (
+                <Pressable key={photo.uri + photo.timestamp} onPress={() => setViewerIndex(index)}>
+                  <Image source={{ uri: photo.uri }} style={styles.photo} />
+                </Pressable>
               ))}
             </ScrollView>
           </>
         )}
       </ScrollView>
+
+      <Modal
+        visible={viewerIndex !== null}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setViewerIndex(null)}>
+        <View style={styles.viewerBackdrop}>
+          <SafeAreaView style={styles.viewerHeader}>
+            <ThemedText style={styles.viewerCount} lightColor="#fff" darkColor="#fff">
+              {viewerIndex != null ? `${viewerIndex + 1} / ${trip.photos.length}` : ''}
+            </ThemedText>
+            <Pressable onPress={() => setViewerIndex(null)} hitSlop={12}>
+              <Text style={styles.viewerCloseText}>×</Text>
+            </Pressable>
+          </SafeAreaView>
+          {viewerIndex != null && (
+            <FlatList
+              style={styles.viewerList}
+              data={trip.photos}
+              keyExtractor={(photo) => photo.uri + photo.timestamp}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              initialScrollIndex={viewerIndex}
+              getItemLayout={(_, index) => ({ length: VIEWER_WIDTH, offset: VIEWER_WIDTH * index, index })}
+              onMomentumScrollEnd={(e) => {
+                const nextIndex = Math.round(e.nativeEvent.contentOffset.x / VIEWER_WIDTH);
+                setViewerIndex(nextIndex);
+              }}
+              renderItem={({ item }) => (
+                <View style={styles.viewerPage}>
+                  <Image source={{ uri: item.uri }} style={styles.viewerImage} resizeMode="contain" />
+                </View>
+              )}
+            />
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -318,4 +375,15 @@ const styles = StyleSheet.create({
   stopRowName: { flex: 1, fontSize: 14, fontWeight: '600' },
   photosRow: { gap: 8 },
   photo: { width: 90, height: 90, borderRadius: 12 },
+
+  viewerBackdrop: { flex: 1, backgroundColor: '#000' },
+  viewerHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingTop: 8,
+  },
+  viewerCount: { fontSize: 14, fontWeight: '600' },
+  viewerCloseText: { fontSize: 30, color: '#fff', lineHeight: 32 },
+  viewerList: { flex: 1 },
+  viewerPage: { width: VIEWER_WIDTH, alignItems: 'center', justifyContent: 'center' },
+  viewerImage: { width: VIEWER_WIDTH, height: '100%' },
 });
