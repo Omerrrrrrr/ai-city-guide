@@ -901,8 +901,12 @@ async function buildServer() {
       }
 
       const { text: userContext, hasProfile: identifyHasProfile } = buildUserContext(userProfile);
+      const identifyFaithMismatchGuard =
+        userProfile?.faith && userProfile.faith !== 'secular' && userProfile.faith !== 'prefer_not_to_say'
+          ? ` If the identified place belongs to a different faith tradition than the user's, don't invent or overstate religious or architectural connections that aren't real — frame it respectfully as cultural, historical, or architectural significance instead, and only cite a genuine interfaith link (e.g. a building that changed religious use over its history) if you're actually confident it's true.`
+          : '';
       const profileContext = identifyHasProfile
-        ? `${userContext}\n\nTailor every sentence to this specific person. An architect should hear about structure and engineering. A Muslim should hear about religious significance. A historian should hear about historical layers. A photographer should hear about light, composition, and visual opportunities. Be specific, not generic.`
+        ? `${userContext}\n\nTailor every sentence to this specific person. An architect should hear about structure and engineering. A Muslim should hear about religious significance. A historian should hear about historical layers. A photographer should hear about light, composition, and visual opportunities. Be specific, not generic.${identifyFaithMismatchGuard}`
         : '';
 
       const nearbyHint =
@@ -914,7 +918,7 @@ async function buildServer() {
       const locationHint =
         lat != null && lng != null
           ? ` The user is near coordinates ${lat.toFixed(5)}, ${lng.toFixed(5)}.${nearbyHint} Treat location only as a hint to disambiguate similar-looking places — the photo is the primary evidence. Never identify a place from location alone; if the image doesn't support a nearby candidate, ignore it and describe what the image actually shows.`
-          : '';
+          : ` No location is available for this photo — many landmarks (neo-Gothic churches, generic city squares, chain storefronts, etc.) look nearly identical across different cities and countries worldwide. Without location to disambiguate, don't confidently name a specific place unless it has truly distinctive, unmistakable features (a famous, unique silhouette). If the photo could plausibly be one of several similar places, say so honestly (e.g. "This looks like a European neo-Gothic church, though I can't confirm exactly which one without a location") instead of guessing a specific name that might be wrong.`;
 
       try {
         const identifySchema = z.object({
