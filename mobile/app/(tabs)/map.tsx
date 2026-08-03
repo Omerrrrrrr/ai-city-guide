@@ -60,13 +60,32 @@ export default function MapScreen() {
   const [activeCategory, setActiveCategory] = React.useState<PlaceCategory | 'all'>('all');
 
   // Route planning
-  const { activeTripId, startTrip, endTrip, addBreadcrumb, addPhoto, trips } = useTrips();
+  const { activeTripId, startTrip, endTrip, addBreadcrumb, addPhoto, updateTripStops, trips } = useTrips();
   const activeTrip = React.useMemo(() => trips.find((trip) => trip.id === activeTripId) ?? null, [trips, activeTripId]);
   const [routeMode, setRouteMode] = React.useState(false);
   const [plannedStops, setPlannedStops] = React.useState<Place[]>([]);
   const [routeGeometry, setRouteGeometry] = React.useState<[number, number][] | null>(null);
   const [isFetchingRoute, setIsFetchingRoute] = React.useState(false);
   const [routeError, setRouteError] = React.useState<string | null>(null);
+  const hydratedTripIdRef = React.useRef<string | null>(null);
+
+  // If this screen mounts (or remounts) while a trip is already active — e.g.
+  // the user left the Map tab mid-trip and came back — rehydrate the local
+  // editable stop list from the stored trip once, so editing continues from
+  // where it left off instead of starting from an empty selection.
+  React.useEffect(() => {
+    if (!activeTrip || !places?.length) return;
+    if (hydratedTripIdRef.current === activeTrip.id) return;
+    hydratedTripIdRef.current = activeTrip.id;
+    const resolved = activeTrip.placeIds
+      .map((placeId) => places.find((p) => p.id === placeId))
+      .filter((p): p is Place => Boolean(p));
+    if (resolved.length) {
+      setPlannedStops(resolved);
+      setRouteGeometry(activeTrip.routeGeometry ?? null);
+      setRouteMode(true);
+    }
+  }, [activeTrip, places]);
 
   const toggleRouteMode = () => {
     setSelectedPlace(null);
@@ -87,6 +106,21 @@ export default function MapScreen() {
     );
   };
 
+  const moveStop = (index: number, direction: -1 | 1) => {
+    setPlannedStops((prev) => {
+      const target = index + direction;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  };
+
+  const stopsChangedFromActiveTrip =
+    !!activeTrip &&
+    (plannedStops.length !== activeTrip.placeIds.length ||
+      plannedStops.some((stop, index) => stop.id !== activeTrip.placeIds[index]));
+
   const handleStartRoute = async () => {
     if (plannedStops.length < 2) return;
     setIsFetchingRoute(true);
@@ -94,10 +128,31 @@ export default function MapScreen() {
     try {
       const result = await fetchDirections(plannedStops.map((p) => ({ lat: p.location!.lat, lng: p.location!.lng })));
       setRouteGeometry(result.route);
-      startTrip(
-        plannedStops.map((p) => p.id),
-        result.route
-      );
+      const id = startTrip(plannedStops.map((p) => p.id), {
+        routeGeometry: result.route,
+        distanceMeters: result.distanceMeters,
+        durationSeconds: result.durationSeconds,
+      });
+      hydratedTripIdRef.current = id;
+    } catch (err) {
+      setRouteError(err instanceof Error ? err.message : t('map.route.failed'));
+    } finally {
+      setIsFetchingRoute(false);
+    }
+  };
+
+  const handleUpdateRoute = async () => {
+    if (!activeTripId || plannedStops.length < 2) return;
+    setIsFetchingRoute(true);
+    setRouteError(null);
+    try {
+      const result = await fetchDirections(plannedStops.map((p) => ({ lat: p.location!.lat, lng: p.location!.lng })));
+      setRouteGeometry(result.route);
+      updateTripStops(activeTripId, plannedStops.map((p) => p.id), {
+        routeGeometry: result.route,
+        distanceMeters: result.distanceMeters,
+        durationSeconds: result.durationSeconds,
+      });
     } catch (err) {
       setRouteError(err instanceof Error ? err.message : t('map.route.failed'));
     } finally {
@@ -107,6 +162,7 @@ export default function MapScreen() {
 
   const handleEndRoute = () => {
     if (activeTripId) endTrip(activeTripId);
+    hydratedTripIdRef.current = null;
     setRouteMode(false);
     setPlannedStops([]);
     setRouteGeometry(null);
@@ -269,7 +325,7 @@ export default function MapScreen() {
               onPress={(e) => {
                 e.stopPropagation();
                 if (routeMode) {
-                  if (!activeTripId) toggleStop(place);
+                  toggleStop(place);
                   return;
                 }
                 setSelectedPlace(place);
@@ -338,6 +394,13 @@ export default function MapScreen() {
         </ScrollView>
       </SafeAreaView>
 
+      {/* My trips */}
+      <Pressable
+        style={({ pressed }) => [styles.tripsBtn, { top: insets.top + 10 }, pressed && { opacity: 0.8 }]}
+        onPress={() => router.push('/trips')}>
+        <Text style={styles.tripsBtnText}>🗂</Text>
+      </Pressable>
+
       {/* Route planning toggle */}
       <Pressable
         style={({ pressed }) => [
@@ -367,13 +430,19 @@ export default function MapScreen() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stopsRow}>
               {plannedStops.map((stop, index) => (
                 <View key={stop.id} style={styles.stopChip}>
+                  <View style={styles.stopChipReorder}>
+                    <Pressable onPress={() => moveStop(index, -1)} disabled={index === 0} hitSlop={4}>
+                      <Text style={[styles.stopChipArrow, index === 0 && styles.stopChipArrowDisabled]}>▲</Text>
+                    </Pressable>
+                    <Pressable onPress={() => moveStop(index, 1)} disabled={index === plannedStops.length - 1} hitSlop={4}>
+                      <Text style={[styles.stopChipArrow, index === plannedStops.length - 1 && styles.stopChipArrowDisabled]}>▼</Text>
+                    </Pressable>
+                  </View>
                   <Text style={styles.stopChipIndex}>{index + 1}</Text>
                   <Text numberOfLines={1} style={styles.stopChipText}>{stop.name}</Text>
-                  {!activeTripId && (
-                    <Pressable onPress={() => toggleStop(stop)} hitSlop={8}>
-                      <Text style={styles.stopChipRemove}>×</Text>
-                    </Pressable>
-                  )}
+                  <Pressable onPress={() => toggleStop(stop)} hitSlop={8}>
+                    <Text style={styles.stopChipRemove}>×</Text>
+                  </Pressable>
                 </View>
               ))}
             </ScrollView>
@@ -406,9 +475,23 @@ export default function MapScreen() {
           )}
 
           {activeTripId ? (
-            <Pressable style={styles.routeActionBtn} onPress={handleEndRoute}>
-              <Text style={styles.routeActionBtnText}>{t('map.route.end')}</Text>
-            </Pressable>
+            <>
+              {stopsChangedFromActiveTrip && plannedStops.length >= 2 && (
+                <Pressable
+                  style={[styles.routeActionBtn, styles.routeUpdateBtn, isFetchingRoute && { opacity: 0.6 }]}
+                  onPress={handleUpdateRoute}
+                  disabled={isFetchingRoute}>
+                  {isFetchingRoute ? (
+                    <ActivityIndicator color={NAVY} size="small" />
+                  ) : (
+                    <Text style={[styles.routeActionBtnText, styles.routeUpdateBtnText]}>{t('map.route.update')}</Text>
+                  )}
+                </Pressable>
+              )}
+              <Pressable style={styles.routeActionBtn} onPress={handleEndRoute}>
+                <Text style={styles.routeActionBtnText}>{t('map.route.end')}</Text>
+              </Pressable>
+            </>
           ) : (
             plannedStops.length >= 2 && (
               <Pressable
@@ -583,6 +666,15 @@ const styles = StyleSheet.create({
   },
   stopPinText: { color: NAVY, fontWeight: '800', fontSize: 13 },
   routeToggleBtn: { right: 16 },
+  tripsBtn: {
+    position: 'absolute', right: 16,
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: '#fff',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 }, elevation: 4,
+  },
+  tripsBtnText: { fontSize: 18 },
   routeToggleBtnActive: { backgroundColor: GOLD },
   routeToggleTextActive: { color: NAVY },
   routeHint: { fontSize: 14, opacity: 0.6, paddingVertical: 6 },
@@ -592,9 +684,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(212,168,67,0.12)',
     borderWidth: 1, borderColor: 'rgba(212,168,67,0.35)',
     borderRadius: 50,
-    paddingHorizontal: 12, paddingVertical: 7,
-    maxWidth: 160,
+    paddingHorizontal: 10, paddingVertical: 6,
+    maxWidth: 190,
   },
+  stopChipReorder: { gap: 1 },
+  stopChipArrow: { fontSize: 9, color: GOLD, lineHeight: 11 },
+  stopChipArrowDisabled: { opacity: 0.25 },
   stopChipIndex: { fontSize: 12, fontWeight: '800', color: GOLD },
   stopChipText: { fontSize: 13, fontWeight: '600', flexShrink: 1 },
   stopChipRemove: { fontSize: 16, color: '#999', paddingHorizontal: 2 },
@@ -619,4 +714,6 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   routeActionBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  routeUpdateBtn: { backgroundColor: 'rgba(212,168,67,0.15)', borderWidth: 1, borderColor: GOLD, marginBottom: 0 },
+  routeUpdateBtnText: { color: NAVY },
 });

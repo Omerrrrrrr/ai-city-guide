@@ -229,6 +229,7 @@
     "route": {
       "hint": "Rotana durak eklemek için haritadaki yerlere dokun.",
       "start": "Rotayı Başlat",
+      "update": "Rotayı Güncelle",
       "end": "Rotayı Bitir",
       "failed": "Rota hesaplanamadı. Bağlantını kontrol et.",
       "tracking_one": "Rota takip ediliyor · {{count}} nokta kaydedildi",
@@ -236,6 +237,30 @@
       "addPhoto": "Fotoğraf Ekle",
       "photoCamera": "Fotoğraf Çek",
       "photoGallery": "Galeriden Seç"
+    }
+  },
+  "trips": {
+    "title": "Gezilerim",
+    "count_one": "{{count}} gezi kaydedildi",
+    "count_other": "{{count}} gezi kaydedildi",
+    "stopsCount_one": "{{count}} durak",
+    "stopsCount_other": "{{count}} durak",
+    "photosCount_one": "{{count}} fotoğraf",
+    "photosCount_other": "{{count}} fotoğraf",
+    "inProgress": "Devam ediyor",
+    "notFound": "Gezi bulunamadı",
+    "play": "Oynat",
+    "pause": "Duraklat",
+    "stopsLabel": "Duraklar",
+    "photosLabel": "Fotoğraflar",
+    "empty": {
+      "title": "Henüz gezi yok",
+      "body": "Haritada bir rota oluşturup başlat, ilk gezin kaydedilsin."
+    },
+    "share": {
+      "message": "{{title}} · {{date}}\n\n{{stops}}\n{{distanceLine}}\n\n— Piri ile keşfedildi",
+      "distance": "{{km}} km yürüdü",
+      "noStops": "Kayıtlı durak yok"
     }
   },
   "saved": {

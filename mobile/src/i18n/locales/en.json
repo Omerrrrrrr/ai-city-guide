@@ -229,6 +229,7 @@
     "route": {
       "hint": "Tap places on the map to add stops to your route.",
       "start": "Start Route",
+      "update": "Update Route",
       "end": "End Route",
       "failed": "Couldn't calculate a route. Check your connection.",
       "tracking_one": "Tracking your route · {{count}} point recorded",
@@ -236,6 +237,30 @@
       "addPhoto": "Add Photo",
       "photoCamera": "Take Photo",
       "photoGallery": "Choose from Gallery"
+    }
+  },
+  "trips": {
+    "title": "My Trips",
+    "count_one": "{{count}} trip recorded",
+    "count_other": "{{count}} trips recorded",
+    "stopsCount_one": "{{count}} stop",
+    "stopsCount_other": "{{count}} stops",
+    "photosCount_one": "{{count}} photo",
+    "photosCount_other": "{{count}} photos",
+    "inProgress": "In progress",
+    "notFound": "Trip not found",
+    "play": "Play",
+    "pause": "Pause",
+    "stopsLabel": "Stops",
+    "photosLabel": "Photos",
+    "empty": {
+      "title": "No trips yet",
+      "body": "Build a route on the map and start it to record your first trip."
+    },
+    "share": {
+      "message": "{{title}} · {{date}}\n\n{{stops}}\n{{distanceLine}}\n\n— Discovered with Piri",
+      "distance": "{{km}} km walked",
+      "noStops": "No stops recorded"
     }
   },
   "saved": {

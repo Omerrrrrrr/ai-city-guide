@@ -229,6 +229,7 @@
     "route": {
       "hint": "Trykk på steder på kartet for å legge til stopp på ruten din.",
       "start": "Start rute",
+      "update": "Oppdater rute",
       "end": "Avslutt rute",
       "failed": "Kunne ikke beregne rute. Sjekk internettforbindelsen din.",
       "tracking_one": "Sporer ruten din · {{count}} punkt registrert",
@@ -236,6 +237,30 @@
       "addPhoto": "Legg til bilde",
       "photoCamera": "Ta bilde",
       "photoGallery": "Velg fra galleri"
+    }
+  },
+  "trips": {
+    "title": "Mine turer",
+    "count_one": "{{count}} tur registrert",
+    "count_other": "{{count}} turer registrert",
+    "stopsCount_one": "{{count}} stopp",
+    "stopsCount_other": "{{count}} stopp",
+    "photosCount_one": "{{count}} bilde",
+    "photosCount_other": "{{count}} bilder",
+    "inProgress": "Pågår",
+    "notFound": "Fant ikke turen",
+    "play": "Spill av",
+    "pause": "Pause",
+    "stopsLabel": "Stopp",
+    "photosLabel": "Bilder",
+    "empty": {
+      "title": "Ingen turer ennå",
+      "body": "Lag en rute på kartet og start den for å registrere din første tur."
+    },
+    "share": {
+      "message": "{{title}} · {{date}}\n\n{{stops}}\n{{distanceLine}}\n\n— Oppdaget med Piri",
+      "distance": "{{km}} km gått",
+      "noStops": "Ingen stopp registrert"
     }
   },
   "saved": {

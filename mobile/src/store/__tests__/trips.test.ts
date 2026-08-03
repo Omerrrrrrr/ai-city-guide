@@ -6,8 +6,12 @@ beforeEach(() => {
 
 describe('useTrips', () => {
   it('starts a trip with the given stops and route, marking it active', () => {
-    const route: [number, number][] = [[58.1, 7.9], [58.11, 7.91]];
-    const id = useTrips.getState().startTrip(['posebyen', 'kunstsilo'], route);
+    const routeGeometry: [number, number][] = [[58.1, 7.9], [58.11, 7.91]];
+    const id = useTrips.getState().startTrip(['posebyen', 'kunstsilo'], {
+      routeGeometry,
+      distanceMeters: 1200,
+      durationSeconds: 900,
+    });
 
     const state = useTrips.getState();
     expect(state.activeTripId).toBe(id);
@@ -15,11 +19,38 @@ describe('useTrips', () => {
     expect(state.trips[0]).toMatchObject({
       id,
       placeIds: ['posebyen', 'kunstsilo'],
-      routeGeometry: route,
+      routeGeometry,
+      distanceMeters: 1200,
+      durationSeconds: 900,
       breadcrumb: [],
       photos: [],
     });
     expect(state.trips[0].endedAt).toBeUndefined();
+  });
+
+  it('renames a trip', () => {
+    const id = useTrips.getState().startTrip(['posebyen']);
+    useTrips.getState().renameTrip(id, 'Sunday walk');
+
+    expect(useTrips.getState().trips.find((t) => t.id === id)?.name).toBe('Sunday walk');
+  });
+
+  it('updates a trip\'s stops and route without touching its breadcrumb/photos', () => {
+    const id = useTrips.getState().startTrip(['posebyen']);
+    useTrips.getState().addBreadcrumb(id, { lat: 58.1, lng: 7.9, timestamp: 1000 });
+
+    const newRoute: [number, number][] = [[58.2, 8.0], [58.21, 8.01]];
+    useTrips.getState().updateTripStops(id, ['posebyen', 'kunstsilo'], {
+      routeGeometry: newRoute,
+      distanceMeters: 2000,
+      durationSeconds: 1500,
+    });
+
+    const trip = useTrips.getState().trips.find((t) => t.id === id);
+    expect(trip?.placeIds).toEqual(['posebyen', 'kunstsilo']);
+    expect(trip?.routeGeometry).toEqual(newRoute);
+    expect(trip?.distanceMeters).toBe(2000);
+    expect(trip?.breadcrumb).toEqual([{ lat: 58.1, lng: 7.9, timestamp: 1000 }]);
   });
 
   it('appends breadcrumb points to the right trip only', () => {

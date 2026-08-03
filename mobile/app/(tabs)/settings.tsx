@@ -11,6 +11,7 @@ import { ThemedView } from '@/components/themed-view';
 import { BUDGETS, FAITHS, GROUP_TYPES, INTERESTS, PACES, PROFESSIONS } from '@/src/constants/profile-options';
 import { useSavedPlaces } from '@/src/store/saved-places';
 import { useRecentlyViewed } from '@/src/store/recently-viewed';
+import { useTrips } from '@/src/store/trips';
 import { useCityStore } from '@/src/store/city';
 import { useLanguageStore, type LanguageCode } from '@/src/store/language';
 import { useUserProfile as useProfile, type Interest } from '@/src/store/user-profile';
@@ -36,6 +37,7 @@ export default function ProfileScreen() {
   const [nameInput, setNameInput] = React.useState(name);
   const { favoritePlaceIds, planPlaceIds, clearFavorites, clearPlan } = useSavedPlaces();
   const { viewedIds, clearHistory } = useRecentlyViewed();
+  const tripCount = useTrips((s) => s.trips.length);
   const favoriteCount = Object.keys(favoritePlaceIds).length;
   const planCount = planPlaceIds.length;
   const recentCount = viewedIds.length;
@@ -328,6 +330,21 @@ export default function ProfileScreen() {
           ]}>
           <ThemedText style={styles.buttonText}>{t('settings.clearHistory')}</ThemedText>
         </Pressable>
+      </ThemedView>
+
+      {/* Trips */}
+      <ThemedView style={styles.card}>
+        <View style={styles.cardHeaderRow}>
+          <ThemedText style={styles.cardLabel}>{t('trips.title')}</ThemedText>
+          <Link href={'/trips' as never} asChild>
+            <Pressable style={({ pressed }) => [styles.viewAllBtn, pressed && styles.buttonPressed]}>
+              <ThemedText style={styles.viewAllText} lightColor={NAVY} darkColor={GOLD}>
+                {t('settings.viewAll')}
+              </ThemedText>
+            </Pressable>
+          </Link>
+        </View>
+        <ThemedText style={styles.cardNote}>{t('trips.count', { count: tripCount })}</ThemedText>
       </ThemedView>
 
       {/* App info */}

@@ -31,6 +31,8 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="onboarding" options={{ headerShown: false, animation: 'fade' }} />
           <Stack.Screen name="place/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="trips" options={{ headerShown: false }} />
+          <Stack.Screen name="trip/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="city-picker" options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
           <Stack.Screen name="admin-hours" options={{ title: t('screenTitles.manageHours') }} />
           <Stack.Screen name="admin-images" options={{ title: t('screenTitles.manageImages') }} />
