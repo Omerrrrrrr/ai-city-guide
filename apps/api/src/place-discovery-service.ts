@@ -310,6 +310,25 @@ export function isLikelyDuplicate(candidate: OvertureCandidate, existing: PlaceR
   });
 }
 
+// Mirrors mobile/src/utils/place-filters.ts's CURATED_TAGS exactly — the
+// Explore screen's tag filter chips only match on these literal strings, so
+// an enrichment that writes a synonym (e.g. "family-friendly" instead of
+// "family") is invisible to that filter even though the signal is real.
+// Confirmed live: only ~11% of already-discovered places carried any curated
+// tag, while "family-friendly" alone appeared 129 times vs 17 for "family".
+const CURATED_TAGS = [
+  'rainy day',
+  'short stop',
+  'family',
+  'budget',
+  'local favorite',
+  'waterfront',
+  'photogenic',
+  'date night',
+  'coffee break',
+  'meal',
+] as const;
+
 const enrichmentSchema = z.object({
   description: z.string().describe('1-2 factual sentences describing the place for a visitor guide.'),
   shortStory: z.string().describe('A short, evocative 1-2 sentence teaser, max 180 characters.'),
@@ -320,9 +339,18 @@ const enrichmentSchema = z.object({
   isFamilyFriendly: z.boolean(),
   durationMinutes: z.number().int().min(10).max(480),
   rainyDayFit: z.boolean(),
-  priceLevel: z.string().describe('One of: Free, Budget, Moderate, Expensive, Ticketed events, or Unknown.'),
+  // A free-text description here drifted in practice (seen live: "Low to
+  // medium", "Ticketed admission", "Paid activity", "Medium to high", ~19
+  // distinct values across existing places) — a real enum is enforced by the
+  // schema itself rather than relying on the model to follow a suggestion.
+  priceLevel: z.enum(['Free', 'Budget', 'Moderate', 'Expensive', 'Ticketed events', 'Unknown']),
   importanceTier: z.enum(['hero', 'supporting', 'long-tail']),
-  tags: z.array(z.string()).max(6),
+  tags: z
+    .array(z.string())
+    .max(6)
+    .describe(
+      `Free-form descriptive tags, but FIRST check this exact curated list and include every one that genuinely applies, using the exact string (not a synonym or rephrasing): ${CURATED_TAGS.join(', ')}. E.g. write "family" not "family-friendly", "budget" not "affordable" or "cheap", "short stop" not "quick visit". After including whichever curated tags fit, add up to a few more free-form tags for anything curated tags don't cover.`
+    ),
 });
 
 async function generatePlaceEnrichment(
