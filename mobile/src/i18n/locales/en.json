@@ -225,7 +225,13 @@
   "map": {
     "loading": "Loading map...",
     "placesCount_one": "{{count}} place",
-    "placesCount_other": "{{count}} places"
+    "placesCount_other": "{{count}} places",
+    "route": {
+      "hint": "Tap places on the map to add stops to your route.",
+      "start": "Start Route",
+      "end": "End Route",
+      "failed": "Couldn't calculate a route. Check your connection."
+    }
   },
   "saved": {
     "title": "Collection",

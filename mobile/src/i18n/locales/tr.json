@@ -225,7 +225,13 @@
   "map": {
     "loading": "Harita yükleniyor...",
     "placesCount_one": "{{count}} yer",
-    "placesCount_other": "{{count}} yer"
+    "placesCount_other": "{{count}} yer",
+    "route": {
+      "hint": "Rotana durak eklemek için haritadaki yerlere dokun.",
+      "start": "Rotayı Başlat",
+      "end": "Rotayı Bitir",
+      "failed": "Rota hesaplanamadı. Bağlantını kontrol et."
+    }
   },
   "saved": {
     "title": "Koleksiyon",

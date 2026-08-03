@@ -9,7 +9,7 @@ import {
   View,
   useColorScheme,
 } from 'react-native';
-import MapView, { Marker, Region } from 'react-native-maps';
+import MapView, { Marker, Polyline, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -23,6 +23,8 @@ import { usePlaces } from '@/src/hooks/use-places';
 import { getPlaceOpenStatus } from '@/src/utils/place-hours';
 import { useCityStore } from '@/src/store/city';
 import { CATEGORY_EMOJI, formatCategory } from '@/src/utils/categories';
+import { fetchDirections } from '@/src/api/routes';
+import { useTrips } from '@/src/store/trips';
 
 const NAVY = '#0F1C3F';
 const GOLD = '#D4A843';
@@ -53,6 +55,54 @@ export default function MapScreen() {
   const [region, setRegion] = React.useState<Region>(KRISTIANSAND);
   const [selectedPlace, setSelectedPlace] = React.useState<Place | null>(null);
   const [activeCategory, setActiveCategory] = React.useState<PlaceCategory | 'all'>('all');
+
+  // Route planning
+  const { activeTripId, startTrip, endTrip } = useTrips();
+  const [routeMode, setRouteMode] = React.useState(false);
+  const [plannedStops, setPlannedStops] = React.useState<Place[]>([]);
+  const [routeGeometry, setRouteGeometry] = React.useState<[number, number][] | null>(null);
+  const [isFetchingRoute, setIsFetchingRoute] = React.useState(false);
+  const [routeError, setRouteError] = React.useState<string | null>(null);
+
+  const toggleRouteMode = () => {
+    setSelectedPlace(null);
+    setRouteMode((prev) => !prev);
+    if (activeTripId) return; // keep an in-progress trip's stops/route visible
+    setPlannedStops([]);
+    setRouteGeometry(null);
+    setRouteError(null);
+  };
+
+  const toggleStop = (place: Place) => {
+    setPlannedStops((prev) =>
+      prev.some((p) => p.id === place.id) ? prev.filter((p) => p.id !== place.id) : [...prev, place]
+    );
+  };
+
+  const handleStartRoute = async () => {
+    if (plannedStops.length < 2) return;
+    setIsFetchingRoute(true);
+    setRouteError(null);
+    try {
+      const result = await fetchDirections(plannedStops.map((p) => ({ lat: p.location!.lat, lng: p.location!.lng })));
+      setRouteGeometry(result.route);
+      startTrip(
+        plannedStops.map((p) => p.id),
+        result.route
+      );
+    } catch (err) {
+      setRouteError(err instanceof Error ? err.message : t('map.route.failed'));
+    } finally {
+      setIsFetchingRoute(false);
+    }
+  };
+
+  const handleEndRoute = () => {
+    if (activeTripId) endTrip(activeTripId);
+    setRouteMode(false);
+    setPlannedStops([]);
+    setRouteGeometry(null);
+  };
 
   React.useEffect(() => {
     void (async () => {
@@ -139,12 +189,18 @@ export default function MapScreen() {
         onPress={() => setSelectedPlace(null)}>
         {filteredPlaces.map((place) => {
           const isSelected = selectedPlace?.id === place.id;
+          const stopIndex = plannedStops.findIndex((p) => p.id === place.id);
+          const isStop = stopIndex !== -1;
           return (
             <Marker
               key={place.id}
               coordinate={{ latitude: place.location!.lat, longitude: place.location!.lng }}
               onPress={(e) => {
                 e.stopPropagation();
+                if (routeMode) {
+                  if (!activeTripId) toggleStop(place);
+                  return;
+                }
                 setSelectedPlace(place);
                 mapRef.current?.animateToRegion({
                   latitude: place.location!.lat - 0.005,
@@ -153,12 +209,25 @@ export default function MapScreen() {
                   longitudeDelta: 0.025,
                 }, 400);
               }}>
-              <View style={[styles.pin, isSelected && styles.pinSelected]}>
-                <View style={[styles.pinDot, isSelected && styles.pinDotSelected]} />
-              </View>
+              {isStop ? (
+                <View style={styles.stopPin}>
+                  <Text style={styles.stopPinText}>{stopIndex + 1}</Text>
+                </View>
+              ) : (
+                <View style={[styles.pin, isSelected && styles.pinSelected]}>
+                  <View style={[styles.pinDot, isSelected && styles.pinDotSelected]} />
+                </View>
+              )}
             </Marker>
           );
         })}
+        {routeGeometry && routeGeometry.length > 1 && (
+          <Polyline
+            coordinates={routeGeometry.map(([lat, lng]) => ({ latitude: lat, longitude: lng }))}
+            strokeColor={GOLD}
+            strokeWidth={4}
+          />
+        )}
       </MapView>
 
       {/* Top: category chips + count pill */}
@@ -191,15 +260,72 @@ export default function MapScreen() {
         </ScrollView>
       </SafeAreaView>
 
+      {/* Route planning toggle */}
+      <Pressable
+        style={({ pressed }) => [
+          styles.locationBtn,
+          styles.routeToggleBtn,
+          { bottom: insets.bottom + (routeMode ? 190 : 96) },
+          routeMode && styles.routeToggleBtnActive,
+          pressed && { opacity: 0.8 },
+        ]}
+        onPress={toggleRouteMode}>
+        <Text style={[styles.locationBtnText, routeMode && styles.routeToggleTextActive]}>⚐</Text>
+      </Pressable>
+
       {/* My location button */}
       <Pressable
-        style={({ pressed }) => [styles.locationBtn, { bottom: insets.bottom + (selectedPlace ? 190 : 40) }, pressed && { opacity: 0.8 }]}
+        style={({ pressed }) => [styles.locationBtn, { bottom: insets.bottom + (selectedPlace || routeMode ? 190 : 40) }, pressed && { opacity: 0.8 }]}
         onPress={goToMyLocation}>
         <Text style={styles.locationBtnText}>◎</Text>
       </Pressable>
 
+      {/* Route planning bar */}
+      {routeMode && (
+        <View style={[styles.bottomCard, { paddingBottom: insets.bottom + 12, backgroundColor: dark ? '#1A2744' : '#fff' }]}>
+          {plannedStops.length === 0 ? (
+            <ThemedText style={styles.routeHint}>{t('map.route.hint')}</ThemedText>
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stopsRow}>
+              {plannedStops.map((stop, index) => (
+                <View key={stop.id} style={styles.stopChip}>
+                  <Text style={styles.stopChipIndex}>{index + 1}</Text>
+                  <Text numberOfLines={1} style={styles.stopChipText}>{stop.name}</Text>
+                  {!activeTripId && (
+                    <Pressable onPress={() => toggleStop(stop)} hitSlop={8}>
+                      <Text style={styles.stopChipRemove}>×</Text>
+                    </Pressable>
+                  )}
+                </View>
+              ))}
+            </ScrollView>
+          )}
+
+          {routeError && <ThemedText style={styles.routeErrorText}>{routeError}</ThemedText>}
+
+          {activeTripId ? (
+            <Pressable style={styles.routeActionBtn} onPress={handleEndRoute}>
+              <Text style={styles.routeActionBtnText}>{t('map.route.end')}</Text>
+            </Pressable>
+          ) : (
+            plannedStops.length >= 2 && (
+              <Pressable
+                style={[styles.routeActionBtn, isFetchingRoute && { opacity: 0.6 }]}
+                onPress={handleStartRoute}
+                disabled={isFetchingRoute}>
+                {isFetchingRoute ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.routeActionBtnText}>{t('map.route.start')}</Text>
+                )}
+              </Pressable>
+            )
+          )}
+        </View>
+      )}
+
       {/* Selected place card */}
-      {selectedPlace && (
+      {!routeMode && selectedPlace && (
         <View style={[styles.bottomCard, { paddingBottom: insets.bottom + 12, backgroundColor: dark ? '#1A2744' : '#fff' }]}>
           <Pressable
             style={({ pressed }) => [styles.bottomCardInner, pressed && { opacity: 0.92 }]}
@@ -343,4 +469,40 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   dismissBtnText: { fontSize: 18, color: '#666', lineHeight: 22 },
+
+  // Route planning
+  stopPin: {
+    minWidth: 26, height: 26, borderRadius: 13, paddingHorizontal: 6,
+    backgroundColor: GOLD,
+    borderWidth: 2.5, borderColor: '#fff',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 }, elevation: 4,
+  },
+  stopPinText: { color: NAVY, fontWeight: '800', fontSize: 13 },
+  routeToggleBtn: { right: 16 },
+  routeToggleBtnActive: { backgroundColor: GOLD },
+  routeToggleTextActive: { color: NAVY },
+  routeHint: { fontSize: 14, opacity: 0.6, paddingVertical: 6 },
+  stopsRow: { gap: 8, paddingVertical: 4 },
+  stopChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(212,168,67,0.12)',
+    borderWidth: 1, borderColor: 'rgba(212,168,67,0.35)',
+    borderRadius: 50,
+    paddingHorizontal: 12, paddingVertical: 7,
+    maxWidth: 160,
+  },
+  stopChipIndex: { fontSize: 12, fontWeight: '800', color: GOLD },
+  stopChipText: { fontSize: 13, fontWeight: '600', flexShrink: 1 },
+  stopChipRemove: { fontSize: 16, color: '#999', paddingHorizontal: 2 },
+  routeErrorText: { color: '#B42318', fontSize: 13, paddingTop: 8 },
+  routeActionBtn: {
+    marginTop: 12,
+    backgroundColor: NAVY,
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  routeActionBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });

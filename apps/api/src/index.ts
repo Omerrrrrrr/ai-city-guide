@@ -49,6 +49,7 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY?.trim();
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL ?? 'anthropic/claude-sonnet-4.5';
 const APP_URL = process.env.APP_URL ?? 'http://localhost:4000';
 const OPENWEATHER_API_KEY = process.env.OPENWEATHER_API_KEY?.trim();
+const OPENROUTESERVICE_API_KEY = process.env.OPENROUTESERVICE_API_KEY?.trim();
 const MAX_CONTEXT_PLACES = 14;
 const MIN_AI_RECOMMENDATIONS = 4;
 const MAX_AI_RECOMMENDATIONS = 5;
@@ -1408,6 +1409,72 @@ ${placeContext.length > 0 ? `Available shortlist:\n${JSON.stringify(placeContext
       } catch (e: any) {
         app.log.error(e);
         return reply.code(500).send({ error: 'Failed to fetch weather' });
+      }
+    }
+  );
+
+  // ── /routes/directions — Proxy OpenRouteService for real walking/driving routes ──
+  // Key stays server-side (never sent to the client) — same proxy pattern as
+  // /weather. OPENROUTESERVICE_API_KEY is free to obtain (no credit card,
+  // openrouteservice.org), 2000 req/day free tier. 503s until configured.
+  app.post<{
+    Body: {
+      coordinates: { lat: number; lng: number }[];
+      profile?: 'foot-walking' | 'driving-car';
+    };
+  }>(
+    '/routes/directions',
+    { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const parsed = z
+        .object({
+          coordinates: z
+            .array(z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }))
+            .min(2)
+            .max(10),
+          profile: z.enum(['foot-walking', 'driving-car']).optional().default('foot-walking'),
+        })
+        .safeParse(request.body);
+
+      if (!parsed.success) {
+        return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Invalid request' });
+      }
+
+      if (!OPENROUTESERVICE_API_KEY) {
+        return reply.code(503).send({ error: 'Routing is not configured' });
+      }
+
+      const { coordinates, profile } = parsed.data;
+
+      try {
+        const res = await fetch(`https://api.openrouteservice.org/v2/directions/${profile}/geojson`, {
+          method: 'POST',
+          headers: {
+            Authorization: OPENROUTESERVICE_API_KEY,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ coordinates: coordinates.map((c) => [c.lng, c.lat]) }),
+        });
+
+        if (!res.ok) {
+          const text = await res.text().catch(() => '');
+          throw new Error(`OpenRouteService ${res.status}: ${text}`);
+        }
+
+        const data = (await res.json()) as any;
+        const geometry: [number, number][] = (data.features?.[0]?.geometry?.coordinates ?? []).map(
+          ([lng, lat]: [number, number]) => [lat, lng]
+        );
+        const summary = data.features?.[0]?.properties?.summary;
+
+        return reply.send({
+          route: geometry,
+          distanceMeters: summary?.distance ?? null,
+          durationSeconds: summary?.duration ?? null,
+        });
+      } catch (e: any) {
+        app.log.error(e);
+        return reply.code(500).send({ error: 'Failed to fetch route' });
       }
     }
   );

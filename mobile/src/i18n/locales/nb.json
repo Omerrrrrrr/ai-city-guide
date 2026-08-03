@@ -225,7 +225,13 @@
   "map": {
     "loading": "Laster kart...",
     "placesCount_one": "{{count}} sted",
-    "placesCount_other": "{{count}} steder"
+    "placesCount_other": "{{count}} steder",
+    "route": {
+      "hint": "Trykk på steder på kartet for å legge til stopp på ruten din.",
+      "start": "Start rute",
+      "end": "Avslutt rute",
+      "failed": "Kunne ikke beregne rute. Sjekk internettforbindelsen din."
+    }
   },
   "saved": {
     "title": "Samling",
