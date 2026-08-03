@@ -1044,8 +1044,12 @@ async function buildServer() {
         .filter(Boolean)
         .join('\n');
 
+      const faithMismatchGuard =
+        userProfile?.faith && userProfile.faith !== 'secular' && userProfile.faith !== 'prefer_not_to_say'
+          ? ` If this place belongs to a different faith tradition than the user's, don't invent or overstate religious or architectural connections that aren't real (e.g. don't claim "Islamic architectural elements" in a Christian building just because the user is Muslim) — frame it respectfully as cultural, historical, or architectural significance instead. Only mention a genuine interfaith link — a building that changed religious use over its history, for instance — if the facts given below actually support it.`
+          : '';
       const personalization = hasProfile
-        ? `Speak directly to this person. A ${userProfile?.profession ?? 'visitor'} should hear what they uniquely care about — structural details for an architect, spiritual layers for a person of faith, historical depth for a historian. Be specific. Avoid generic tourist-guide language.`
+        ? `Speak directly to this person. A ${userProfile?.profession ?? 'visitor'} should hear what they uniquely care about — structural details for an architect, spiritual layers for a person of faith, historical depth for a historian. Be specific. Avoid generic tourist-guide language.${faithMismatchGuard}`
         : `Give a warm, engaging overview that a curious traveler would enjoy.`;
 
       try {
@@ -1251,7 +1255,11 @@ Continue the conversation naturally using the recent chat history when provided.
 Keep answers concise (1–3 sentences) and personalized to the user.${imageInstructions}${languageInstruction(locale)}
 
 ${placeContext.length > 0
-  ? `You have ${placeContext.length} candidate places${userLocation ? ` near the user's current location (they're around the ${cityLabel} area, but nearby places from other towns may be included too — that's intentional, don't assume every place is literally "in ${cityLabel}")` : ` in your database for ${cityLabel}`}. Only fill "recommendations" when the user's message is actually asking for a place, suggestion, itinerary idea, or something to do/see/eat — pick 3-5 when there are several strong matches, fewer when matches are narrow. For greetings, thanks, follow-up chit-chat, or questions that don't call for a place suggestion, return an EMPTY recommendations array and just answer naturally. Don't force a recommendation that doesn't fit the question. Return ONLY places from the provided shortlist using exact IDs. Spread picks across different place types.`
+  ? `You have ${placeContext.length} candidate places${userLocation ? ` near the user's current location (they're around the ${cityLabel} area, but nearby places from other towns may be included too — that's intentional, don't assume every place is literally "in ${cityLabel}")` : ` in your database for ${cityLabel}`}. Only fill "recommendations" when the user's message is actually asking for a place, suggestion, itinerary idea, or something to do/see/eat — pick 3-5 when there are several strong matches, fewer when matches are narrow. For greetings, thanks, follow-up chit-chat, or questions that don't call for a place suggestion, return an EMPTY recommendations array and just answer naturally. Don't force a recommendation that doesn't fit the question. Return ONLY places from the provided shortlist using exact IDs. Spread picks across different place types, and avoid picking more than one branch of the same chain (e.g. two locations of the same fast-food brand) unless the user specifically wants multiple options from it.
+
+GROUNDING RULE: never name a specific venue in your answer text that is not in the shortlist below — not a real place you happen to know from general knowledge, not a plausible-sounding invented name, none of that. Every specific place name in your answer must come from the shortlist, and every one you name MUST also appear in "recommendations" — never mention a place by name without also returning it as a card. If nothing in the shortlist fits well, don't invent or recall one from memory — speak generically instead ("a cozy cafe nearby", "a scenic walking spot") or say you don't have a great match for that yet.
+
+PRIORITY RULE: the user's current message always overrides their general profile — the profile is just a fallback for when they haven't said what they want right now. If the message explicitly asks for something that differs from a stated profile preference (e.g. they say "something cheap" even though their profile says budget: luxury, or "quick stop" even though their profile says pace: relaxed), you MUST follow what they just asked for and treat the conflicting profile field as irrelevant for this turn — do not mention the mismatch, do not ask a clarifying question, do not offer to look for something else instead. Silently pick your best matches from the shortlist for the immediate request and answer as if the profile said exactly what the message asked for. A shortlist almost always has *something* that plausibly fits a simple, common request like "cheap food" or "somewhere quick" — recommend from it rather than declining.`
   : `You have NO places in your database for ${cityLabel} yet. Answer from your own knowledge — give a helpful, accurate response about the place or question. Tell the user you don't have ${cityLabel} mapped yet and suggest they use city search to trigger discovery. Return an empty recommendations array.`
 }
 
@@ -1275,6 +1283,33 @@ ${placeContext.length > 0 ? `Available shortlist:\n${JSON.stringify(placeContext
           };
         })
         .filter(Boolean);
+
+      // Safety net for a real failure mode we saw live: the model names a
+      // specific shortlisted place in the answer text (e.g. "you could visit
+      // Bystranda") but leaves it out of "recommendations", so no card shows
+      // up for something the user was just told about. Catch any shortlisted
+      // place mentioned by name in the answer that isn't already included.
+      const answerText: string = (object as any).answer ?? '';
+      if (answerText) {
+        for (const entry of shortlistedEntries) {
+          if (enrichedRecommendations.length >= MAX_AI_RECOMMENDATIONS) break;
+          if (entry.row.name.length < 4) continue;
+          if (!answerText.toLowerCase().includes(entry.row.name.toLowerCase())) continue;
+          if (
+            enrichedRecommendations.some(
+              (recommendation: ReturnType<typeof toPlaceDto> & { aiReason: string } | null) =>
+                recommendation?.id === entry.row.id
+            )
+          ) {
+            continue;
+          }
+
+          enrichedRecommendations.push({
+            ...toPlaceDto(entry.row),
+            aiReason: buildFallbackReason(entry, allRows, query, conversationSummary),
+          });
+        }
+      }
 
       // Only backfill when the model clearly intended to recommend something
       // (a non-empty array) but its picks didn't survive validation (e.g.
@@ -1301,9 +1336,23 @@ ${placeContext.length > 0 ? `Available shortlist:\n${JSON.stringify(placeContext
         }
       }
 
+      // Same-name safety net: the chain-diversity prompt rule above isn't
+      // always followed (live-observed two Burger King branches for one
+      // "cheap food" query) — keep only the first occurrence of a repeated name.
+      const seenNames = new Set<string>();
+      const dedupedRecommendations = enrichedRecommendations.filter(
+        (recommendation: ReturnType<typeof toPlaceDto> & { aiReason: string } | null) => {
+          if (!recommendation) return false;
+          const key = recommendation.name.toLowerCase();
+          if (seenNames.has(key)) return false;
+          seenNames.add(key);
+          return true;
+        }
+      );
+
       return {
         answer: (object as any).answer,
-        recommendations: enrichedRecommendations,
+        recommendations: dedupedRecommendations,
       };
     } catch (e: any) {
       app.log.error(e);
