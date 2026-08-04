@@ -227,7 +227,8 @@
     "placesCount_one": "{{count}} yer",
     "placesCount_other": "{{count}} yer",
     "live": {
-      "error": "Bu yer yüklenemedi"
+      "error": "Bu yer yüklenemedi",
+      "discoverArea": "Bu bölgeyi keşfet"
     },
     "route": {
       "hint": "Rotana durak eklemek için haritadaki yerlere dokun.",

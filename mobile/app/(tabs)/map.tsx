@@ -51,16 +51,6 @@ const MAP_CATEGORY_FILTERS = CATEGORY_FILTERS.filter((c) => MAP_CATEGORY_IDS.inc
 // Maps' own behavior of not flooding pins at country/world zoom, and keeps
 // a single drag from fanning out into dozens of cold-cache Overture queries.
 const LIVE_PINS_MAX_LATITUDE_DELTA = 0.3;
-// Longer than a typical debounce: a full livePins replacement swaps most of
-// the map's Marker set in one React commit, and react-native-maps' Fabric
-// interop layer (RCTLegacyViewManagerInteropComponentView, since the library
-// isn't a native Fabric component yet) crashes on bulk marker insert/remove
-// under load (live-confirmed: AIRMap insertReactSubview:atIndex: SIGABRT).
-// Simulator mouse-drags in particular fire onRegionChangeComplete many times
-// per gesture rather than once, so debounce hard and skip near-identical
-// re-centers to keep marker-set replacements rare and small.
-const LIVE_PINS_DEBOUNCE_MS = 900;
-const LIVE_PINS_MIN_MOVE_DEG = 0.01;
 
 export default function MapScreen() {
   const colorScheme = useColorScheme();
@@ -81,8 +71,6 @@ export default function MapScreen() {
   // beyond the curated cities. See fetchLiveNearbyPlaces/enrichLivePlace.
   const [livePins, setLivePins] = React.useState<LivePin[]>([]);
   const [enrichingPinId, setEnrichingPinId] = React.useState<string | null>(null);
-  const liveDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastLivePinsCenterRef = React.useRef<{ lat: number; lng: number } | null>(null);
 
   // Route planning
   const { activeTripId, startTrip, endTrip, addBreadcrumb, addPhoto, updateTripStops, trips } = useTrips();
@@ -303,20 +291,25 @@ export default function MapScreen() {
     } catch { /* ignore */ }
   };
 
+  // react-native-maps isn't a native Fabric component yet, so it runs
+  // through React Native's legacy-interop bridge under the New Architecture
+  // — live-confirmed (crash reports) that bulk Marker insert/remove in one
+  // commit crashes it (SIGABRT in -[AIRMap insertReactSubview:atIndex:]).
+  // Auto-refreshing the live-pin marker set on every drag replaces most of
+  // it in one commit, over and over — tried debouncing harder and gating on
+  // minimum movement, still crashed. Only a fix that ships with Expo Go's
+  // fixed native binary would truly resolve this (not available to us), so
+  // instead live pins now only refresh on an explicit tap — a single,
+  // deliberate, infrequent marker-set replacement instead of a continuous
+  // one during every pan gesture.
+  const [isFetchingLivePins, setIsFetchingLivePins] = React.useState(false);
+
   const fetchLivePinsForRegion = React.useCallback((r: Region) => {
     if (r.latitudeDelta > LIVE_PINS_MAX_LATITUDE_DELTA) {
       setLivePins([]);
       return;
     }
-    const last = lastLivePinsCenterRef.current;
-    if (
-      last &&
-      Math.abs(last.lat - r.latitude) < LIVE_PINS_MIN_MOVE_DEG &&
-      Math.abs(last.lng - r.longitude) < LIVE_PINS_MIN_MOVE_DEG
-    ) {
-      return; // barely moved since the last fetch — not worth a full marker-set replacement
-    }
-    lastLivePinsCenterRef.current = { lat: r.latitude, lng: r.longitude };
+    setIsFetchingLivePins(true);
     fetchLiveNearbyPlaces({
       minLat: r.latitude - r.latitudeDelta / 2,
       maxLat: r.latitude + r.latitudeDelta / 2,
@@ -324,22 +317,21 @@ export default function MapScreen() {
       maxLng: r.longitude + r.longitudeDelta / 2,
     })
       .then(setLivePins)
-      .catch(() => { /* live pins are a supplementary overlay — fail silently */ });
+      .catch(() => { /* live pins are a supplementary overlay — fail silently */ })
+      .finally(() => setIsFetchingLivePins(false));
   }, []);
 
+  // Just tracks the current region — no fetch, no marker mutation — so the
+  // manual "discover this area" button knows what to fetch for.
+  const currentRegionRef = React.useRef<Region>(region);
   const handleRegionChangeComplete = (r: Region) => {
-    if (routeMode) return; // ambiguous to tap an un-enriched pin mid-route-building
-    if (liveDebounceRef.current) clearTimeout(liveDebounceRef.current);
-    liveDebounceRef.current = setTimeout(() => fetchLivePinsForRegion(r), LIVE_PINS_DEBOUNCE_MS);
+    currentRegionRef.current = r;
   };
 
-  // Fetch once for the initial resting region too — onRegionChangeComplete
-  // only fires on user-driven drags, not on mount.
-  React.useEffect(() => {
-    if (!locationReady) return;
-    fetchLivePinsForRegion(region);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [locationReady]);
+  const handleDiscoverArea = () => {
+    fetchLivePinsForRegion(currentRegionRef.current);
+  };
+
 
   const handleLivePinPress = async (pin: LivePin) => {
     if (enrichingPinId) return;
@@ -516,6 +508,25 @@ export default function MapScreen() {
         onPress={() => router.push('/trips')}>
         <Text style={styles.tripsBtnText}>🗂</Text>
       </Pressable>
+
+      {/* Discover live pins for the current view — deliberately manual, see
+          the comment above fetchLivePinsForRegion for why this isn't automatic. */}
+      {!routeMode && (
+        <Pressable
+          style={({ pressed }) => [
+            styles.discoverAreaBtn,
+            { top: insets.top + 62 },
+            pressed && { opacity: 0.85 },
+          ]}
+          disabled={isFetchingLivePins}
+          onPress={handleDiscoverArea}>
+          {isFetchingLivePins ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.discoverAreaBtnText}>📍 {t('map.live.discoverArea')}</Text>
+          )}
+        </Pressable>
+      )}
 
       {/* Route planning toggle */}
       <Pressable
@@ -816,6 +827,16 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
   tripsBtnText: { fontSize: 18 },
+  discoverAreaBtn: {
+    position: 'absolute', right: 16,
+    minHeight: 40, paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: NAVY,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 }, elevation: 4,
+  },
+  discoverAreaBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   routeToggleBtnActive: { backgroundColor: GOLD },
   routeToggleTextActive: { color: NAVY },
   routeHint: { fontSize: 14, opacity: 0.6, paddingVertical: 6 },
