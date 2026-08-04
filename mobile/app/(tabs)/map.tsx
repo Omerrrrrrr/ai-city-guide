@@ -382,23 +382,35 @@ export default function MapScreen() {
         showsCompass={false}
         onPress={() => setSelectedPlace(null)}
         onRegionChangeComplete={handleRegionChangeComplete}>
-        {!routeMode && livePins.map((pin) => (
-          <Marker
-            key={`live-${pin.id}`}
-            coordinate={{ latitude: pin.lat, longitude: pin.lng }}
-            onPress={(e) => {
-              e.stopPropagation();
-              void handleLivePinPress(pin);
-            }}>
-            <View style={styles.livePin}>
-              {enrichingPinId === pin.id ? (
+        {!routeMode && livePins.map((pin) =>
+          // Custom-View marker children force react-native-maps into
+          // snapshot-based rendering, which is a well-known iOS crash risk
+          // (especially in Simulator) when many markers render/re-render
+          // during a drag — live-confirmed here (SIGABRT on every pan).
+          // Only the single pin actively being enriched gets a custom
+          // loading view; every idle pin uses a plain system pin instead.
+          enrichingPinId === pin.id ? (
+            <Marker
+              key={`live-${pin.id}`}
+              coordinate={{ latitude: pin.lat, longitude: pin.lng }}
+              onPress={(e) => e.stopPropagation()}>
+              <View style={styles.livePin}>
                 <ActivityIndicator size="small" color={NAVY} />
-              ) : (
-                <View style={styles.livePinDot} />
-              )}
-            </View>
-          </Marker>
-        ))}
+              </View>
+            </Marker>
+          ) : (
+            <Marker
+              key={`live-${pin.id}`}
+              coordinate={{ latitude: pin.lat, longitude: pin.lng }}
+              pinColor="#8A8FA3"
+              opacity={0.85}
+              onPress={(e) => {
+                e.stopPropagation();
+                void handleLivePinPress(pin);
+              }}
+            />
+          )
+        )}
         {filteredPlaces.map((place) => {
           const isSelected = selectedPlace?.id === place.id;
           const stopIndex = plannedStops.findIndex((p) => p.id === place.id);
@@ -663,15 +675,14 @@ const styles = StyleSheet.create({
   pinDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: GOLD },
   pinDotSelected: { backgroundColor: NAVY },
 
-  // Live-explore pins — deliberately lighter/hollow vs. the solid curated
-  // pin above, to read as "not yet personalized, tap to see Piri's take".
+  // Loading state for the single live pin currently being enriched — the
+  // only live-pin case that still uses a custom marker view.
   livePin: {
     width: 16, height: 16, borderRadius: 8,
     backgroundColor: 'rgba(255,255,255,0.85)',
     borderWidth: 1.5, borderColor: NAVY,
     alignItems: 'center', justifyContent: 'center',
   },
-  livePinDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: NAVY },
 
   // Top overlay
   topOverlay: {
