@@ -956,31 +956,39 @@ async function buildServer() {
     let placeRow = row;
 
     if (placeRow.wikiStatus == null && placeRow.lat != null && placeRow.lng != null) {
-      const enrichment = await enrichPlaceWithWikipedia(
-        {
-          name: placeRow.name,
-          category: placeRow.category,
-          tags: placeRow.tags.split(',').map((tag) => tag.trim()).filter(Boolean),
-          lat: placeRow.lat,
-          lng: placeRow.lng,
-        },
-        aiProvider
-      );
+      // Best-effort lazy backfill — a transient Wikipedia failure (rate
+      // limit, timeout) must never block loading the place itself. Leaves
+      // wikiStatus null so it's retried on a later visit once Wikipedia is
+      // reachable again, instead of permanently failing this request.
+      try {
+        const enrichment = await enrichPlaceWithWikipedia(
+          {
+            name: placeRow.name,
+            category: placeRow.category,
+            tags: placeRow.tags.split(',').map((tag) => tag.trim()).filter(Boolean),
+            lat: placeRow.lat,
+            lng: placeRow.lng,
+          },
+          aiProvider
+        );
 
-      const [updated] = await db
-        .update(places)
-        .set({
-          wikiPageTitle: enrichment.status === 'matched' ? enrichment.pageTitle : null,
-          wikiPageUrl: enrichment.status === 'matched' ? enrichment.pageUrl : null,
-          wikiSummary: enrichment.status === 'matched' ? enrichment.summary : null,
-          wikiMatchConfidence: enrichment.status === 'matched' ? enrichment.confidence : null,
-          wikiStatus: enrichment.status,
-          wikiRawMetadataJson: JSON.stringify(enrichment.rawMetadata ?? {}),
-        })
-        .where(eq(places.id, placeRow.id))
-        .returning();
+        const [updated] = await db
+          .update(places)
+          .set({
+            wikiPageTitle: enrichment.status === 'matched' ? enrichment.pageTitle : null,
+            wikiPageUrl: enrichment.status === 'matched' ? enrichment.pageUrl : null,
+            wikiSummary: enrichment.status === 'matched' ? enrichment.summary : null,
+            wikiMatchConfidence: enrichment.status === 'matched' ? enrichment.confidence : null,
+            wikiStatus: enrichment.status,
+            wikiRawMetadataJson: JSON.stringify(enrichment.rawMetadata ?? {}),
+          })
+          .where(eq(places.id, placeRow.id))
+          .returning();
 
-      placeRow = updated;
+        placeRow = updated;
+      } catch (error) {
+        request.log.error(error, `Lazy Wikipedia backfill failed for place ${placeRow.id}, continuing without it`);
+      }
     }
 
     const gallery = await getPlaceGalleryImages(placeRow.id, placeRow.imageUrl);
