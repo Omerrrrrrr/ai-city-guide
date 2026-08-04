@@ -537,7 +537,7 @@ async function buildServer() {
   // Expo Go on the iOS Simulator (SIGABRT). Cap per cell first so no one
   // dense block dominates, then cap the whole response as a hard ceiling.
   const MAX_LIVE_PINS_PER_CELL = 6;
-  const MAX_LIVE_PINS_RESPONSE = 40;
+  const MAX_LIVE_PINS_RESPONSE = 25;
 
   app.get<{
     Querystring: { minLat: string; maxLat: string; minLng: string; maxLng: string };

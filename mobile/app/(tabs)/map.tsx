@@ -51,7 +51,16 @@ const MAP_CATEGORY_FILTERS = CATEGORY_FILTERS.filter((c) => MAP_CATEGORY_IDS.inc
 // Maps' own behavior of not flooding pins at country/world zoom, and keeps
 // a single drag from fanning out into dozens of cold-cache Overture queries.
 const LIVE_PINS_MAX_LATITUDE_DELTA = 0.3;
-const LIVE_PINS_DEBOUNCE_MS = 400;
+// Longer than a typical debounce: a full livePins replacement swaps most of
+// the map's Marker set in one React commit, and react-native-maps' Fabric
+// interop layer (RCTLegacyViewManagerInteropComponentView, since the library
+// isn't a native Fabric component yet) crashes on bulk marker insert/remove
+// under load (live-confirmed: AIRMap insertReactSubview:atIndex: SIGABRT).
+// Simulator mouse-drags in particular fire onRegionChangeComplete many times
+// per gesture rather than once, so debounce hard and skip near-identical
+// re-centers to keep marker-set replacements rare and small.
+const LIVE_PINS_DEBOUNCE_MS = 900;
+const LIVE_PINS_MIN_MOVE_DEG = 0.01;
 
 export default function MapScreen() {
   const colorScheme = useColorScheme();
@@ -73,6 +82,7 @@ export default function MapScreen() {
   const [livePins, setLivePins] = React.useState<LivePin[]>([]);
   const [enrichingPinId, setEnrichingPinId] = React.useState<string | null>(null);
   const liveDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastLivePinsCenterRef = React.useRef<{ lat: number; lng: number } | null>(null);
 
   // Route planning
   const { activeTripId, startTrip, endTrip, addBreadcrumb, addPhoto, updateTripStops, trips } = useTrips();
@@ -298,6 +308,15 @@ export default function MapScreen() {
       setLivePins([]);
       return;
     }
+    const last = lastLivePinsCenterRef.current;
+    if (
+      last &&
+      Math.abs(last.lat - r.latitude) < LIVE_PINS_MIN_MOVE_DEG &&
+      Math.abs(last.lng - r.longitude) < LIVE_PINS_MIN_MOVE_DEG
+    ) {
+      return; // barely moved since the last fetch — not worth a full marker-set replacement
+    }
+    lastLivePinsCenterRef.current = { lat: r.latitude, lng: r.longitude };
     fetchLiveNearbyPlaces({
       minLat: r.latitude - r.latitudeDelta / 2,
       maxLat: r.latitude + r.latitudeDelta / 2,
