@@ -530,6 +530,13 @@ async function buildServer() {
   // every subsequent viewer of that area reads straight from Postgres.
   const MAX_LIVE_BBOX_SPAN_DEG = 0.5; // ~55km — bounds worst-case cold-cell fan-out per request
   const LIVE_CELL_QUERY_CONCURRENCY = 3;
+  // A single dense cell alone can legitimately cache 100 candidates (live-
+  // observed: central Kristiansand, Shanghai) and a viewport spans many
+  // cells — rendering all of them as native map markers at once crashed
+  // Expo Go on the iOS Simulator (SIGABRT). Cap per cell first so no one
+  // dense block dominates, then cap the whole response as a hard ceiling.
+  const MAX_LIVE_PINS_PER_CELL = 6;
+  const MAX_LIVE_PINS_RESPONSE = 40;
 
   app.get<{
     Querystring: { minLat: string; maxLat: string; minLng: string; maxLng: string };
@@ -582,9 +589,17 @@ async function buildServer() {
           ),
       ]);
 
+      const perCellCount = new Map<string, number>();
       const livePins = cachedPins
         .filter((pin) => !pin.promotedPlaceId)
         .filter((pin) => !isLikelyDuplicate(pin, curatedNearby))
+        .filter((pin) => {
+          const seenInCell = perCellCount.get(pin.gridCell) ?? 0;
+          if (seenInCell >= MAX_LIVE_PINS_PER_CELL) return false;
+          perCellCount.set(pin.gridCell, seenInCell + 1);
+          return true;
+        })
+        .slice(0, MAX_LIVE_PINS_RESPONSE)
         .map((pin) => ({ id: pin.id, name: pin.name, category: pin.category, lat: pin.lat, lng: pin.lng }));
 
       return { livePins };
