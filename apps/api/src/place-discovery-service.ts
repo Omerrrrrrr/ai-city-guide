@@ -133,14 +133,16 @@ function isNonTouristLeaf(leaf: string): boolean {
 
 // Overture's `addresses[1].freeform` is empty for a meaningful slice of
 // candidates outside well-mapped countries (live-sampled: ~6% in Erzurum),
-// but the structured locality/region fields are still populated ~96% of
-// that missing-freeform slice — "Yakutiye" beats a blank address, and it's
-// already in the same query response, so this costs nothing extra.
+// but `locality` is still populated ~96% of that missing-freeform slice —
+// "Yakutiye" beats a blank address, and it's already in the same query
+// response, so this costs nothing extra. `region` is deliberately NOT used
+// here: live data showed Overture returning it inconsistently for Norway —
+// sometimes the bare country name ("Norge"), sometimes a raw numeric county
+// code ("42", "46") — producing garbage like "Bergen, 46" rather than
+// anything a user could read as an address.
 function buildFallbackAddress(row: Record<string, unknown>): string | undefined {
-  const parts = [row.locality, row.region]
-    .map((value) => (typeof value === 'string' ? value.trim() : ''))
-    .filter((value) => value.length > 0);
-  return parts.length > 0 ? parts.join(', ') : undefined;
+  const locality = typeof row.locality === 'string' ? row.locality.trim() : '';
+  return locality.length > 0 ? locality : undefined;
 }
 
 // The 'shopping' top category is dominated by generic retail (clothing,
@@ -261,7 +263,6 @@ export async function queryOvertureCandidates(input: {
       ST_Y(geometry) AS lat,
       addresses[1].freeform AS address,
       addresses[1].locality AS locality,
-      addresses[1].region AS region,
       addresses[1].country AS country,
       websites,
       phones

@@ -110,12 +110,15 @@ test('filterAndMapOvertureRows drops commercial gyms, auto shops, and transit in
   );
 });
 
-test('filterAndMapOvertureRows falls back to locality/region when freeform address is empty, and leaves address undefined when nothing is available', () => {
+test('filterAndMapOvertureRows falls back to locality when freeform address is empty, and leaves address undefined when nothing is available', () => {
   const rows = [
     overtureRow({ id: 'has-freeform', address: 'Somunoglu Cad' }),
-    overtureRow({ id: 'locality-only', address: '', locality: 'Yakutiye', region: null }),
-    overtureRow({ id: 'locality-and-region', address: '', locality: 'Yakutiye', region: 'Erzurum' }),
-    overtureRow({ id: 'nothing', address: '', locality: null, region: null }),
+    overtureRow({ id: 'locality-only', address: '', locality: 'Yakutiye' }),
+    overtureRow({ id: 'nothing', address: '', locality: null }),
+    // Overture returns `region` inconsistently for Norway (bare country name
+    // or a raw numeric county code) — must never leak into the address even
+    // when present, since it produces unreadable output like "Bergen, 46".
+    overtureRow({ id: 'region-only-must-be-ignored', address: '', locality: null, region: '46' }),
   ];
 
   const result = filterAndMapOvertureRows(rows);
@@ -123,8 +126,8 @@ test('filterAndMapOvertureRows falls back to locality/region when freeform addre
 
   assert.equal(byId.get('has-freeform'), 'Somunoglu Cad');
   assert.equal(byId.get('locality-only'), 'Yakutiye');
-  assert.equal(byId.get('locality-and-region'), 'Yakutiye, Erzurum');
   assert.equal(byId.get('nothing'), undefined);
+  assert.equal(byId.get('region-only-must-be-ignored'), undefined);
 });
 
 test('filterAndMapOvertureRows keeps only tourist-worthy shopping leaf categories', () => {
