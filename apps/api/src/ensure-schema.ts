@@ -26,8 +26,14 @@ export async function ensureSchema() {
     'pharmacy', 'drugstore',
     'car dealer', 'car rental', 'car repair', 'car wash',
     'motorcycle dealer', 'automotive repair', 'vehicle inspection',
-    'travel agency', 'travel agent',
+    'travel agency', 'travel agent', 'travel services',
     'real estate',
+    // Commercial gyms, auto shops, and transit infra that slipped through as
+    // "landmark"/"walking-area" places before place-discovery-service.ts's
+    // NON_TOURIST_LEAF_CATEGORIES/NON_TOURIST_LEAF_KEYWORDS were widened.
+    'gym', 'fitness trainer', 'automotive consultant', 'automotive',
+    'tire', 'auto body', 'auto glass', 'auto repair', 'truck repair', 'towing',
+    'transportation', 'bus station', 'airport terminal',
   ];
 
   const allPlaces = await db.select({ id: places.id, tags: places.tags }).from(places);

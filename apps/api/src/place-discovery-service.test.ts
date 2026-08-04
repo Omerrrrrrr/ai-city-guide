@@ -92,6 +92,24 @@ test('filterAndMapOvertureRows keeps visitor-relevant categories and drops munda
   );
 });
 
+test('filterAndMapOvertureRows drops commercial gyms, auto shops, and transit infra even though their top category is visitor-relevant', () => {
+  const rows = [
+    overtureRow({ id: 'gym-1', top_category: 'sports_and_recreation', category: 'gym', name: 'Fresh Fitness' }),
+    overtureRow({ id: 'trainer-1', top_category: 'sports_and_recreation', category: 'fitness_trainer', name: 'PT Studio' }),
+    overtureRow({ id: 'tire-1', top_category: 'travel_and_transportation', category: 'tire_shop', name: 'BestDrive' }),
+    overtureRow({ id: 'autobody-1', top_category: 'travel_and_transportation', category: 'auto_body_shop', name: 'MPS Bilskade' }),
+    overtureRow({ id: 'bus-1', top_category: 'travel_and_transportation', category: 'bus_station', name: 'Central Bus Station' }),
+    overtureRow({ id: 'climbing-1', top_category: 'sports_and_recreation', category: 'rock_climbing_spot', name: 'Boulder Hall' }),
+  ];
+
+  const result = filterAndMapOvertureRows(rows);
+
+  assert.deepEqual(
+    result.map((candidate) => candidate.overtureId).sort(),
+    ['climbing-1']
+  );
+});
+
 test('filterAndMapOvertureRows keeps only tourist-worthy shopping leaf categories', () => {
   const rows = [
     overtureRow({ id: 'clothing-1', top_category: 'shopping', category: 'clothing_store', name: 'Generic Clothing Co' }),

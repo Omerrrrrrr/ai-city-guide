@@ -109,9 +109,27 @@ const NON_TOURIST_LEAF_CATEGORIES = new Set([
   'pharmacy', 'drugstore',
   'car_dealer', 'car_rental', 'car_repair', 'car_wash',
   'motorcycle_dealer', 'automotive_repair', 'vehicle_inspection',
-  'travel_agency', 'travel_agent',
+  'travel_agency', 'travel_agent', 'travel_services',
   'real_estate',
+  // Found live in production data: commercial gyms, auto shops, and transit
+  // infrastructure that Overture files under visitor-relevant top categories
+  // (sports_and_recreation, travel_and_transportation) but nobody actually
+  // plans a city visit around — e.g. a tire shop or personal-trainer studio
+  // showing up as a recommended "landmark".
+  'gym', 'fitness_trainer', 'automotive_consultant',
+  'tire_shop', 'tire_dealer_and_repair', 'auto_body_shop', 'auto_glass_service',
+  'automotive_services_and_repair', 'truck_repair', 'towing_service',
+  'transportation', 'bus_station', 'airport_terminal',
 ]);
+
+// Overture has many auto-repair leaf variants beyond the exact strings above
+// (new ones surface as the dataset is regenerated) — catch the whole family
+// by keyword instead of chasing an ever-growing exact list.
+const NON_TOURIST_LEAF_KEYWORDS = ['auto_body', 'auto_glass', 'auto_repair', 'automotive', 'tire_'];
+
+function isNonTouristLeaf(leaf: string): boolean {
+  return NON_TOURIST_LEAF_CATEGORIES.has(leaf) || NON_TOURIST_LEAF_KEYWORDS.some((kw) => leaf.includes(kw));
+}
 
 // The 'shopping' top category is dominated by generic retail (clothing,
 // electronics, hardware, pet supplies...) that nobody plans a visit around.
@@ -252,7 +270,7 @@ export function filterAndMapOvertureRows(rows: Record<string, unknown>[]): Overt
     .filter((row) => {
       if (!VISITOR_RELEVANT_TOP_CATEGORIES.has(String(row.top_category))) return false;
       const leaf = String(row.category ?? '').toLowerCase();
-      if (NON_TOURIST_LEAF_CATEGORIES.has(leaf)) return false;
+      if (isNonTouristLeaf(leaf)) return false;
       if (String(row.top_category) === 'shopping' && !isTouristWorthyShopping(leaf)) return false;
       return true;
     })

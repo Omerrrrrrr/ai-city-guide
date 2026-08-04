@@ -1318,13 +1318,20 @@ ${placeContext.length > 0 ? `Available shortlist:\n${JSON.stringify(placeContext
 
       // Only backfill when the model clearly intended to recommend something
       // (a non-empty array) but its picks didn't survive validation (e.g.
-      // hallucinated IDs). An empty array from the model is a deliberate "this
-      // doesn't call for a place suggestion" answer and must stay empty —
-      // padding it here is exactly what made the AI recommend places for
-      // greetings and off-topic chat.
-      if (rawRecommendations.length > 0 && enrichedRecommendations.length < MIN_AI_RECOMMENDATIONS) {
+      // hallucinated IDs) — restore up to what it actually attempted, never
+      // past MIN_AI_RECOMMENDATIONS. An empty array from the model is a
+      // deliberate "this doesn't call for a place suggestion" answer and must
+      // stay empty — padding it here is exactly what made the AI recommend
+      // places for greetings and off-topic chat. Likewise, a single genuine,
+      // valid match for a narrow request (e.g. one specific cheap-food pick)
+      // must not get padded up to a fixed floor with unrelated shortlist
+      // entries (live-observed: "cheapest food" answered with Burger King
+      // plus a water park, a beach, and a town square) — the backfill target
+      // is bounded by what the model tried, not by MIN_AI_RECOMMENDATIONS.
+      const backfillTarget = Math.min(rawRecommendations.length, MIN_AI_RECOMMENDATIONS);
+      if (rawRecommendations.length > 0 && enrichedRecommendations.length < backfillTarget) {
         for (const entry of shortlistedEntries) {
-          if (enrichedRecommendations.length >= MAX_AI_RECOMMENDATIONS) break;
+          if (enrichedRecommendations.length >= backfillTarget) break;
           if (
             enrichedRecommendations.some(
               (recommendation: ReturnType<typeof toPlaceDto> & { aiReason: string } | null) =>
