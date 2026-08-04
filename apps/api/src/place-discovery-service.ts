@@ -31,6 +31,10 @@ const RESERVED_SLOTS_PER_APP_CATEGORY: Record<string, number> = {
   'cultural-spot': 8,
 };
 const MAX_GOOGLE_FALLBACK_CALLS_PER_CITY = 10;
+// Naturally rare in practice (Overture's freeform+locality already resolve
+// ~99% of candidates), but cap it anyway as a sanity ceiling — well within
+// OpenRouteService's free 2000-2500 req/day tier even if every city hit it.
+const MAX_REVERSE_GEOCODE_CALLS_PER_CITY = 30;
 const MIN_OVERTURE_CONFIDENCE = 0.4;
 // Raw Overture query fetch size, sorted by confidence DESC, BEFORE any
 // category filtering/quota logic runs. In dense metros (Bergen, Oslo) the
@@ -430,6 +434,7 @@ export async function discoverPlacesForCity(input: DiscoverPlacesForCityInput) {
     const candidates = await queryOvertureCandidates({ lat: input.lat, lng: input.lng, radiusKm });
     const existingPlaces = await db.select().from(places);
     let googleFallbackCallsUsed = 0;
+    let reverseGeocodeCallsUsed = 0;
     let insertedCount = 0;
 
     await runWithConcurrency(candidates, CANDIDATE_CONCURRENCY, async (candidate) => {
@@ -558,7 +563,17 @@ export async function discoverPlacesForCity(input: DiscoverPlacesForCityInput) {
 
       if (needsHoursFallback) {
         googleFallbackCallsUsed += 1;
-        await tryGoogleHoursFallback(created);
+        const backfilledAddress = await tryGoogleHoursFallback(created);
+        if (backfilledAddress) created.address = backfilledAddress;
+      }
+
+      // Last-resort fallback: Overture had no freeform address AND no
+      // locality, and (if this place even qualified) Google's hours lookup
+      // didn't have one either. Skip silently if OPENROUTESERVICE_API_KEY
+      // isn't configured yet, matching the /routes/directions convention.
+      if (!created.address && reverseGeocodeCallsUsed < MAX_REVERSE_GEOCODE_CALLS_PER_CITY) {
+        reverseGeocodeCallsUsed += 1;
+        await tryReverseGeocodeFallback(created);
       }
     });
 
@@ -722,11 +737,11 @@ export async function retryImagesForCity(cityId: string) {
   }
 }
 
-async function tryGoogleHoursFallback(place: PlaceRow) {
+async function tryGoogleHoursFallback(place: PlaceRow): Promise<string | null> {
   try {
     const previews = await previewGoogleHoursForPlace(place);
     const best = previews[0];
-    if (!best) return;
+    if (!best) return null;
 
     const update: Partial<typeof places.$inferInsert> = {};
     if (best.openingHours) {
@@ -746,7 +761,39 @@ async function tryGoogleHoursFallback(place: PlaceRow) {
     if (Object.keys(update).length > 0) {
       await db.update(places).set(update).where(eq(places.id, place.id));
     }
+    return update.address ?? null;
   } catch (error) {
     console.error(`Google hours fallback failed for place ${place.id}:`, error);
+    return null;
+  }
+}
+
+// Last-resort address fallback for the small remainder Overture and Google
+// both leave blank — reverse-geocodes the place's own coordinates via
+// OpenRouteService's free Pelias-based geocoder (same key/proxy pattern as
+// /routes/directions in index.ts; free tier is ~2000-2500 req/day, no
+// credit card). No-ops until OPENROUTESERVICE_API_KEY is configured.
+async function tryReverseGeocodeFallback(place: PlaceRow) {
+  const apiKey = process.env.OPENROUTESERVICE_API_KEY?.trim();
+  if (!apiKey || place.lat == null || place.lng == null) return;
+
+  try {
+    const url = new URL('https://api.openrouteservice.org/geocode/reverse');
+    url.searchParams.set('api_key', apiKey);
+    url.searchParams.set('point.lon', String(place.lng));
+    url.searchParams.set('point.lat', String(place.lat));
+    url.searchParams.set('size', '1');
+
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`OpenRouteService geocode ${res.status}: ${await res.text().catch(() => '')}`);
+    }
+    const data = (await res.json()) as { features?: { properties?: { label?: string } }[] };
+    const label = data.features?.[0]?.properties?.label;
+    if (label) {
+      await db.update(places).set({ address: label }).where(eq(places.id, place.id));
+    }
+  } catch (error) {
+    console.error(`OpenRouteService reverse geocode fallback failed for place ${place.id}:`, error);
   }
 }
