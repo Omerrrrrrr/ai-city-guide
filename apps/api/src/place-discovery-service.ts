@@ -513,6 +513,37 @@ export type DiscoverPlacesForCityInput = {
   aiProvider: AiProviderConfig | null;
 };
 
+// discoverPlacesForCity runs as fire-and-forget background work tied to the
+// live process (POST /cities/discover never awaits it) -- a server restart
+// or crash mid-run silently abandons it, leaving the city stuck at status
+// 'discovering' forever with only whatever candidates happened to be
+// inserted before the process died. There's no legitimate way for a city to
+// still be genuinely "discovering" right as a fresh process boots (the
+// process that was running it no longer exists), so any row found in that
+// state at boot is unambiguously orphaned and safe to resume automatically.
+// Resuming just re-runs discoverPlacesForCity, which already skips
+// candidates matching an existing place (isLikelyDuplicate) -- so it picks
+// up roughly where it left off instead of starting over.
+export async function resumeStuckDiscoveries(aiProvider: AiProviderConfig | null): Promise<number> {
+  const stuck = await db.select().from(cities).where(eq(cities.status, 'discovering'));
+
+  for (const city of stuck) {
+    discoverPlacesForCity({
+      cityId: city.id,
+      cityName: city.name,
+      country: city.country ?? undefined,
+      lat: city.centerLat,
+      lng: city.centerLng,
+      radiusKm: city.radiusKm,
+      aiProvider,
+    }).catch((error) => {
+      console.error(`Resumed discovery failed for city ${city.id}:`, error);
+    });
+  }
+
+  return stuck.length;
+}
+
 export async function discoverPlacesForCity(input: DiscoverPlacesForCityInput) {
   const radiusKm = input.radiusKm ?? 12;
 

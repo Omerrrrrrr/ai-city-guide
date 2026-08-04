@@ -38,6 +38,7 @@ import {
   isLikelyDuplicate,
   LIVE_GRID_CELL_TTL_DAYS,
   populateLiveCacheForCell,
+  resumeStuckDiscoveries,
   retryImagesForCity,
   runWithConcurrency,
 } from './place-discovery-service';
@@ -1664,6 +1665,17 @@ async function main() {
   validateEnv();
   await connectDb();
   await ensureSchema();
+
+  // Any city still marked 'discovering' at boot was orphaned by whatever
+  // stopped the previous process (crash, deploy, restart) -- resume them
+  // now rather than leaving them stuck forever. Fire-and-forget, same as
+  // how a fresh POST /cities/discover kicks off discovery.
+  resumeStuckDiscoveries(getAiProviderConfig())
+    .then((count) => {
+      if (count > 0) console.log(`Resumed ${count} stuck city discoveries`);
+    })
+    .catch((error) => console.error('Failed to resume stuck discoveries:', error));
+
   const app = await buildServer();
   let isShuttingDown = false;
 
