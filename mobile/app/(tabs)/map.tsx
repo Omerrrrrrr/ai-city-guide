@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Linking,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -24,6 +25,7 @@ import { CATEGORY_FILTERS } from '@/src/constants/category-filters';
 import type { Place, PlaceCategory } from '@/src/data/places';
 import { usePlaces } from '@/src/hooks/use-places';
 import { getPlaceOpenStatus } from '@/src/utils/place-hours';
+import { getDirectionsUrl } from '@/src/utils/directions';
 import { useCityStore } from '@/src/store/city';
 import { CATEGORY_EMOJI, formatCategory } from '@/src/utils/categories';
 import { fetchDirections } from '@/src/api/routes';
@@ -367,6 +369,7 @@ export default function MapScreen() {
 
   const selectedStatus = selectedPlace ? getPlaceOpenStatus(selectedPlace, t) : null;
   const selectedOpen = selectedStatus?.state === 'open' || selectedStatus?.state === 'all-day';
+  const selectedDirectionsUrl = selectedPlace ? getDirectionsUrl(selectedPlace) : null;
 
   return (
     <View style={styles.container}>
@@ -616,6 +619,13 @@ export default function MapScreen() {
               <ThemedText style={styles.bottomCardChevText}>›</ThemedText>
             </View>
           </Pressable>
+          {selectedDirectionsUrl && (
+            <Pressable
+              style={({ pressed }) => [styles.directionsRow, pressed && { opacity: 0.85 }]}
+              onPress={() => Linking.openURL(selectedDirectionsUrl).catch(() => {})}>
+              <Text style={styles.directionsRowText}>🧭 {t('placeDetail.actionBar.directions')}</Text>
+            </Pressable>
+          )}
           <Pressable
             style={styles.dismissBtn}
             onPress={() => setSelectedPlace(null)}>
@@ -739,6 +749,15 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   bottomCardChevText: { color: '#fff', fontSize: 20, fontWeight: '300' },
+  directionsRow: {
+    marginTop: 10,
+    borderRadius: 12,
+    paddingVertical: 11,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(15,28,63,0.06)',
+    borderWidth: 1, borderColor: 'rgba(15,28,63,0.15)',
+  },
+  directionsRowText: { fontSize: 14, fontWeight: '700', color: NAVY },
   dismissBtn: {
     position: 'absolute', top: 12, right: 16,
     width: 28, height: 28, borderRadius: 14,

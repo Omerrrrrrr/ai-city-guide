@@ -28,22 +28,10 @@ import { explainPlace, type ExplainResult } from '@/src/api/places';
 import { useUserProfile } from '@/src/store/user-profile';
 import { getPlaceOpenStatus, getWeeklyHoursSchedule } from '@/src/utils/place-hours';
 import { CATEGORY_EMOJI, formatCategory } from '@/src/utils/categories';
+import { getDirectionsUrl } from '@/src/utils/directions';
 
 const NAVY = '#0F1C3F';
 const GOLD = '#D4A843';
-
-function getDirectionsUrl(place: {
-  location?: { lat: number; lng: number };
-  verifiedFacts?: { address?: string };
-}) {
-  if (place.location) {
-    return `https://www.google.com/maps/search/?api=1&query=${place.location.lat},${place.location.lng}`;
-  }
-  if (place.verifiedFacts?.address) {
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.verifiedFacts.address)}`;
-  }
-  return null;
-}
 
 function getWalkMinutes(distanceKm: number) {
   return Math.max(1, Math.round((distanceKm / 4.8) * 60));
