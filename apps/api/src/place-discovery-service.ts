@@ -131,6 +131,18 @@ function isNonTouristLeaf(leaf: string): boolean {
   return NON_TOURIST_LEAF_CATEGORIES.has(leaf) || NON_TOURIST_LEAF_KEYWORDS.some((kw) => leaf.includes(kw));
 }
 
+// Overture's `addresses[1].freeform` is empty for a meaningful slice of
+// candidates outside well-mapped countries (live-sampled: ~6% in Erzurum),
+// but the structured locality/region fields are still populated ~96% of
+// that missing-freeform slice — "Yakutiye" beats a blank address, and it's
+// already in the same query response, so this costs nothing extra.
+function buildFallbackAddress(row: Record<string, unknown>): string | undefined {
+  const parts = [row.locality, row.region]
+    .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    .filter((value) => value.length > 0);
+  return parts.length > 0 ? parts.join(', ') : undefined;
+}
+
 // The 'shopping' top category is dominated by generic retail (clothing,
 // electronics, hardware, pet supplies...) that nobody plans a visit around.
 // Blocklisting every mundane shop type would be an endless, leaky list, so
@@ -248,6 +260,8 @@ export async function queryOvertureCandidates(input: {
       ST_X(geometry) AS lng,
       ST_Y(geometry) AS lat,
       addresses[1].freeform AS address,
+      addresses[1].locality AS locality,
+      addresses[1].region AS region,
       addresses[1].country AS country,
       websites,
       phones
@@ -282,7 +296,7 @@ export function filterAndMapOvertureRows(rows: Record<string, unknown>[]): Overt
       confidence: Number(row.confidence),
       lat: Number(row.lat),
       lng: Number(row.lng),
-      address: row.address ? String(row.address) : undefined,
+      address: row.address ? String(row.address) : buildFallbackAddress(row),
       country: row.country ? String(row.country) : undefined,
       websites: toJsArray(row.websites),
       phones: toJsArray(row.phones),
@@ -711,16 +725,25 @@ async function tryGoogleHoursFallback(place: PlaceRow) {
   try {
     const previews = await previewGoogleHoursForPlace(place);
     const best = previews[0];
-    if (best?.openingHours) {
-      await db
-        .update(places)
-        .set({
-          openingHoursJson: JSON.stringify(best.openingHours),
-          hoursNote: `${best.hoursNote} (auto-imported, unverified)`.trim(),
-          hoursSourceUrl: best.googleMapsUri ?? null,
-          hoursVerified: false,
-        })
-        .where(eq(places.id, place.id));
+    if (!best) return;
+
+    const update: Partial<typeof places.$inferInsert> = {};
+    if (best.openingHours) {
+      update.openingHoursJson = JSON.stringify(best.openingHours);
+      update.hoursNote = `${best.hoursNote} (auto-imported, unverified)`.trim();
+      update.hoursSourceUrl = best.googleMapsUri ?? null;
+      update.hoursVerified = false;
+    }
+    // Free by-product of the same request: Google's formattedAddress is
+    // often more precise than Overture's, and this call already happens for
+    // hours verification — only fill a gap, never override an existing
+    // (possibly locality-fallback) address we already trust more/equally.
+    if (!place.address && best.formattedAddress) {
+      update.address = best.formattedAddress;
+    }
+
+    if (Object.keys(update).length > 0) {
+      await db.update(places).set(update).where(eq(places.id, place.id));
     }
   } catch (error) {
     console.error(`Google hours fallback failed for place ${place.id}:`, error);
