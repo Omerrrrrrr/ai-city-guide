@@ -3,7 +3,7 @@ import 'dotenv/config';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
-import { eq, ilike } from 'drizzle-orm';
+import { and, eq, gte, ilike, inArray, lte } from 'drizzle-orm';
 import { generateObject, generateText } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
@@ -30,7 +30,17 @@ import { openingHoursSchema } from './opening-hours';
 import { enrichPlaceWithWikipedia, type AiProviderConfig } from './wiki-enrichment';
 import { toPlaceDto } from './place-dto';
 import { createSlug } from './slug';
-import { discoverPlacesForCity, retryImagesForCity } from './place-discovery-service';
+import {
+  cellsCoveringBbox,
+  discoverPlacesForCity,
+  enrichAndPromoteCandidate,
+  findLikelyDuplicate,
+  isLikelyDuplicate,
+  LIVE_GRID_CELL_TTL_DAYS,
+  populateLiveCacheForCell,
+  retryImagesForCity,
+  runWithConcurrency,
+} from './place-discovery-service';
 import { subscribeToCityDiscovery } from './push-notifications';
 import {
   buildUserContext,
@@ -40,7 +50,7 @@ import {
   type UserProfileInput,
 } from './user-context';
 import { haversineKm } from './geo';
-import { places, cities } from './schema';
+import { places, cities, liveGridCellStatus, livePlaceCache } from './schema';
 
 const PORT = Number(process.env.PORT ?? 4000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY?.trim();
@@ -509,6 +519,143 @@ async function buildServer() {
     } catch (error: any) {
       request.log.error(error);
       return reply.code(502).send({ error: error?.message ?? 'Location lookup failed' });
+    }
+  });
+
+  // ── /places/nearby-live — raw, un-enriched pins for any map viewport ──────────
+  // Complements the curated `places` table: this shows breadth (any location
+  // worldwide, Overture-sourced, no AI cost) rather than depth. Cached per
+  // ~1.1km grid cell in livePlaceCache/liveGridCellStatus so any given cell
+  // only ever pays Overture's live multi-second query cost once, globally —
+  // every subsequent viewer of that area reads straight from Postgres.
+  const MAX_LIVE_BBOX_SPAN_DEG = 0.5; // ~55km — bounds worst-case cold-cell fan-out per request
+  const LIVE_CELL_QUERY_CONCURRENCY = 3;
+
+  app.get<{
+    Querystring: { minLat: string; maxLat: string; minLng: string; maxLng: string };
+  }>('/places/nearby-live', { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const coord = () => z.string().regex(/^-?\d+(?:\.\d+)?$/).transform(Number);
+    const parsedQuery = z
+      .object({ minLat: coord(), maxLat: coord(), minLng: coord(), maxLng: coord() })
+      .safeParse(request.query);
+
+    if (!parsedQuery.success) {
+      return reply.code(400).send({ error: 'minLat, maxLat, minLng, and maxLng are required.' });
+    }
+
+    const { minLat, maxLat, minLng, maxLng } = parsedQuery.data;
+    if (maxLat <= minLat || maxLng <= minLng) {
+      return reply.code(400).send({ error: 'max values must be greater than min values.' });
+    }
+    if (maxLat - minLat > MAX_LIVE_BBOX_SPAN_DEG || maxLng - minLng > MAX_LIVE_BBOX_SPAN_DEG) {
+      return reply.code(400).send({ error: 'Requested area is too large — zoom in further.' });
+    }
+
+    try {
+      const cells = cellsCoveringBbox(minLat, maxLat, minLng, maxLng);
+      const statuses = await db
+        .select()
+        .from(liveGridCellStatus)
+        .where(inArray(liveGridCellStatus.gridCell, cells));
+      const statusByCell = new Map(statuses.map((row) => [row.gridCell, row]));
+      const ttlCutoff = Date.now() - LIVE_GRID_CELL_TTL_DAYS * 24 * 60 * 60 * 1000;
+
+      const staleOrMissingCells = cells.filter((cell) => {
+        const status = statusByCell.get(cell);
+        if (!status) return true;
+        return new Date(status.queriedAt).getTime() < ttlCutoff;
+      });
+
+      if (staleOrMissingCells.length > 0) {
+        await runWithConcurrency(staleOrMissingCells, LIVE_CELL_QUERY_CONCURRENCY, async (cell) => {
+          await populateLiveCacheForCell(cell);
+        });
+      }
+
+      const [cachedPins, curatedNearby] = await Promise.all([
+        db.select().from(livePlaceCache).where(inArray(livePlaceCache.gridCell, cells)),
+        db
+          .select()
+          .from(places)
+          .where(
+            and(gte(places.lat, minLat), lte(places.lat, maxLat), gte(places.lng, minLng), lte(places.lng, maxLng))
+          ),
+      ]);
+
+      const livePins = cachedPins
+        .filter((pin) => !pin.promotedPlaceId)
+        .filter((pin) => !isLikelyDuplicate(pin, curatedNearby))
+        .map((pin) => ({ id: pin.id, name: pin.name, category: pin.category, lat: pin.lat, lng: pin.lng }));
+
+      return { livePins };
+    } catch (error: any) {
+      request.log.error(error);
+      return reply.code(502).send({ error: error?.message ?? 'Failed to load nearby live places' });
+    }
+  });
+
+  // ── /places/enrich-live — promote a tapped raw pin into a curated place ───────
+  // The only place a live pin gets AI-personalized: /places/nearby-live shows
+  // breadth for free (no AI cost), and only a place a real user cared enough
+  // to tap gets the AI enrichment that's the app's actual differentiator.
+  // Idempotent — a second tap (by the same or a different user) on an
+  // already-promoted pin just returns the existing curated place.
+  app.post<{
+    Body: { overtureId: string };
+  }>('/places/enrich-live', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const parsedBody = z.object({ overtureId: z.string().trim().min(1) }).safeParse(request.body);
+    if (!parsedBody.success) {
+      return reply.code(400).send({ error: 'overtureId is required' });
+    }
+    const { overtureId } = parsedBody.data;
+
+    const [cached] = await db.select().from(livePlaceCache).where(eq(livePlaceCache.id, overtureId)).limit(1);
+    if (!cached) {
+      return reply.code(404).send({ error: 'Unknown live pin — refresh the map and try again' });
+    }
+
+    if (cached.promotedPlaceId) {
+      const [existingPlace] = await db.select().from(places).where(eq(places.id, cached.promotedPlaceId)).limit(1);
+      if (existingPlace) return toPlaceDto(existingPlace);
+    }
+
+    // A curated place may have appeared here since this pin was cached
+    // (e.g. a full city discovery ran in the meantime) — reuse it instead
+    // of enriching a second copy of the same physical place.
+    const nearbyPlaces = await db
+      .select()
+      .from(places)
+      .where(
+        and(
+          gte(places.lat, cached.lat - 0.01),
+          lte(places.lat, cached.lat + 0.01),
+          gte(places.lng, cached.lng - 0.01),
+          lte(places.lng, cached.lng + 0.01)
+        )
+      );
+    const duplicate = findLikelyDuplicate(cached, nearbyPlaces);
+    if (duplicate) {
+      await db.update(livePlaceCache).set({ promotedPlaceId: duplicate.id }).where(eq(livePlaceCache.id, overtureId));
+      return toPlaceDto(duplicate);
+    }
+
+    try {
+      const created = await enrichAndPromoteCandidate({
+        overtureId: cached.id,
+        name: cached.name,
+        appCategory: cached.category,
+        rawCategory: cached.rawCategory ?? cached.category,
+        lat: cached.lat,
+        lng: cached.lng,
+        country: cached.country,
+        address: cached.address,
+        aiProvider: getAiProviderConfig(),
+      });
+      await db.update(livePlaceCache).set({ promotedPlaceId: created.id }).where(eq(livePlaceCache.id, overtureId));
+      return toPlaceDto(created);
+    } catch (error: any) {
+      request.log.error(error);
+      return reply.code(500).send({ error: error?.message ?? 'Failed to enrich place' });
     }
   });
 

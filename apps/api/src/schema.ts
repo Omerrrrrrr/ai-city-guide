@@ -98,7 +98,45 @@ export const pushSubscriptions = pgTable('push_subscriptions', {
   uniqueIndex('idx_push_subscriptions_city_token').on(table.cityId, table.expoPushToken),
 ]);
 
+// Raw (un-enriched) Overture candidates cached per grid cell so a live
+// map-drag anywhere in the world only pays Overture's multi-second query
+// cost once per cell, ever -- every subsequent viewer of that area reads
+// straight from Postgres. Deliberately NOT the same shape as `places`: no
+// AI enrichment happens until a user taps a specific pin (see
+// enrichAndPromoteCandidate in place-discovery-service.ts).
+export const livePlaceCache = pgTable('live_place_cache', {
+  id: varchar('id', { length: 128 }).primaryKey(), // = OvertureCandidate.overtureId
+  gridCell: varchar('grid_cell', { length: 32 }).notNull(),
+  name: varchar('name', { length: 256 }).notNull(),
+  category: varchar('category', { length: 64 }).notNull(),
+  rawCategory: varchar('raw_category', { length: 128 }),
+  lat: doublePrecision('lat').notNull(),
+  lng: doublePrecision('lng').notNull(),
+  country: varchar('country', { length: 64 }),
+  address: varchar('address', { length: 256 }),
+  cachedAt: varchar('cached_at', { length: 64 }).notNull(),
+  // Set once a user taps this pin and it gets AI-enriched into `places` --
+  // lets repeat taps and future cache reads short-circuit straight to the
+  // already-promoted place instead of re-running enrichment.
+  promotedPlaceId: varchar('promoted_place_id', { length: 64 }),
+}, (table) => [
+  index('idx_live_place_cache_grid_cell').on(table.gridCell),
+]);
+
+// Tracks which grid cells have EVER been queried against Overture,
+// independent of how many candidates came back -- a cell can legitimately
+// have zero tourist-relevant places, and without this a query-came-back-
+// empty cell would look identical to "never queried" and get re-hit on
+// every request instead of being trusted as an empty result.
+export const liveGridCellStatus = pgTable('live_grid_cell_status', {
+  gridCell: varchar('grid_cell', { length: 32 }).primaryKey(),
+  queriedAt: varchar('queried_at', { length: 64 }).notNull(),
+  candidateCount: integer('candidate_count').notNull().default(0),
+});
+
 export type PlaceRow = typeof places.$inferSelect;
 export type PlaceImageCandidateRow = typeof placeImageCandidates.$inferSelect;
 export type CityRow = typeof cities.$inferSelect;
 export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
+export type LivePlaceCacheRow = typeof livePlaceCache.$inferSelect;
+export type LiveGridCellStatusRow = typeof liveGridCellStatus.$inferSelect;

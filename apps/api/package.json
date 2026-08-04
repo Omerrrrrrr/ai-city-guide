@@ -15,6 +15,7 @@
     "images:approve": "ts-node-dev --exit-child --transpile-only src/images-approve.ts",
     "images:reject": "ts-node-dev --exit-child --transpile-only src/images-reject.ts",
     "images:apply": "ts-node-dev --exit-child --transpile-only src/images-apply.ts",
+    "prewarm:live-pins": "ts-node-dev --exit-child --transpile-only src/live-pins-prewarm.ts",
     "test": "npm run build && node --test \"dist/**/*.test.js\""
   },
   "dependencies": {

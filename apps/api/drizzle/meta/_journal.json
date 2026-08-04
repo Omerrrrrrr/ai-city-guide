@@ -15,6 +15,13 @@
       "when": 1785490221001,
       "tag": "0001_amused_kid_colt",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785826316196,
+      "tag": "0002_blue_satana",
+      "breakpoints": true
     }
   ]
 }

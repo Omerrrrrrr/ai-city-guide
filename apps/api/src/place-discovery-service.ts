@@ -3,7 +3,7 @@ import { and, eq, ilike } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { db } from './db';
-import { cities, placeImageCandidates, places, type PlaceRow } from './schema';
+import { cities, liveGridCellStatus, livePlaceCache, placeImageCandidates, places, type PlaceRow } from './schema';
 import { computePlaceQualityScore } from './ai-recommendations';
 import { applyApprovedImageCandidates, approveImageCandidate, discoverImageCandidates, listImageCandidates } from './image-candidate-service';
 import { fetchCategoryImagesForCity, getWikipediaThumbnail } from './wikimedia-images';
@@ -336,15 +336,103 @@ export function filterAndMapOvertureRows(rows: Record<string, unknown>[]): Overt
   return selected.slice(0, MAX_CANDIDATES_PER_CITY);
 }
 
-export function isLikelyDuplicate(candidate: OvertureCandidate, existing: PlaceRow[]) {
+export function findLikelyDuplicate(
+  candidate: { name: string; lat: number; lng: number },
+  existing: PlaceRow[]
+): PlaceRow | undefined {
   const normalizedCandidateName = normalizeText(candidate.name);
 
-  return existing.some((place) => {
+  return existing.find((place) => {
     if (place.lat == null || place.lng == null) return false;
     const distanceKm = haversineKm(candidate.lat, candidate.lng, place.lat, place.lng);
     if (distanceKm > DUPLICATE_DISTANCE_KM) return false;
     return computeNameSimilarity(normalizedCandidateName, normalizeText(place.name)) >= DUPLICATE_NAME_SIMILARITY;
   });
+}
+
+export function isLikelyDuplicate(candidate: { name: string; lat: number; lng: number }, existing: PlaceRow[]) {
+  return findLikelyDuplicate(candidate, existing) !== undefined;
+}
+
+// Live map-drag pin cache: quantizes the world into ~1.1km cells (plain
+// floor-based snapping, no geohash dependency needed) so repeated visits to
+// the same area — by the same or different users — reuse one Overture
+// query forever instead of re-paying its multi-second cost every time.
+const LIVE_GRID_CELL_SIZE_DEG = 0.01;
+// Slightly larger than the cell's own half-width so a query centered on one
+// cell also catches candidates just across a cell boundary.
+const LIVE_GRID_CELL_QUERY_RADIUS_KM = 1;
+// Overture ships roughly monthly and physical POIs don't churn fast — a
+// cell only needs re-querying this rarely.
+export const LIVE_GRID_CELL_TTL_DAYS = 30;
+
+export function gridCellKey(lat: number, lng: number): string {
+  const snappedLat = Math.floor(lat / LIVE_GRID_CELL_SIZE_DEG) * LIVE_GRID_CELL_SIZE_DEG;
+  const snappedLng = Math.floor(lng / LIVE_GRID_CELL_SIZE_DEG) * LIVE_GRID_CELL_SIZE_DEG;
+  return `${snappedLat.toFixed(2)},${snappedLng.toFixed(2)}`;
+}
+
+function gridCellCenter(gridCell: string): { lat: number; lng: number } {
+  const [latStr, lngStr] = gridCell.split(',');
+  return {
+    lat: parseFloat(latStr) + LIVE_GRID_CELL_SIZE_DEG / 2,
+    lng: parseFloat(lngStr) + LIVE_GRID_CELL_SIZE_DEG / 2,
+  };
+}
+
+// Enumerates every grid cell whose center falls within (or whose cell
+// bounds overlap) the given bbox — used to figure out what a map viewport
+// needs before checking which of those cells are already cached.
+export function cellsCoveringBbox(minLat: number, maxLat: number, minLng: number, maxLng: number): string[] {
+  const cells: string[] = [];
+  const startLat = Math.floor(minLat / LIVE_GRID_CELL_SIZE_DEG) * LIVE_GRID_CELL_SIZE_DEG;
+  const startLng = Math.floor(minLng / LIVE_GRID_CELL_SIZE_DEG) * LIVE_GRID_CELL_SIZE_DEG;
+  for (let lat = startLat; lat <= maxLat; lat += LIVE_GRID_CELL_SIZE_DEG) {
+    for (let lng = startLng; lng <= maxLng; lng += LIVE_GRID_CELL_SIZE_DEG) {
+      cells.push(gridCellKey(lat + LIVE_GRID_CELL_SIZE_DEG / 2, lng + LIVE_GRID_CELL_SIZE_DEG / 2));
+    }
+  }
+  return cells;
+}
+
+// Queries Overture once for a single grid cell and upserts raw (un-enriched)
+// candidates into livePlaceCache, plus a liveGridCellStatus row marking the
+// cell as checked — even when zero candidates come back, so an empty cell
+// isn't indistinguishable from a never-queried one. Shared by the live
+// nearby-pins endpoint (cache-miss path) and the background prewarm script.
+export async function populateLiveCacheForCell(gridCell: string): Promise<number> {
+  const { lat, lng } = gridCellCenter(gridCell);
+  const candidates = await queryOvertureCandidates({ lat, lng, radiusKm: LIVE_GRID_CELL_QUERY_RADIUS_KM });
+  const now = new Date().toISOString();
+
+  for (const candidate of candidates) {
+    const values = {
+      id: candidate.overtureId,
+      gridCell,
+      name: candidate.name,
+      category: mapToAppCategory(candidate),
+      rawCategory: candidate.category,
+      lat: candidate.lat,
+      lng: candidate.lng,
+      country: candidate.country ?? null,
+      address: candidate.address ?? null,
+      cachedAt: now,
+    };
+    await db.insert(livePlaceCache).values(values).onConflictDoUpdate({
+      target: livePlaceCache.id,
+      set: values,
+    });
+  }
+
+  await db
+    .insert(liveGridCellStatus)
+    .values({ gridCell, queriedAt: now, candidateCount: candidates.length })
+    .onConflictDoUpdate({
+      target: liveGridCellStatus.gridCell,
+      set: { queriedAt: now, candidateCount: candidates.length },
+    });
+
+  return candidates.length;
 }
 
 // Mirrors mobile/src/utils/place-filters.ts's CURATED_TAGS exactly — the
@@ -637,6 +725,131 @@ export async function discoverPlacesForCity(input: DiscoverPlacesForCityInput) {
     );
     throw error;
   }
+}
+
+export type EnrichAndPromoteInput = {
+  overtureId: string;
+  name: string;
+  appCategory: string; // already-mapped app category, e.g. from livePlaceCache.category
+  rawCategory: string; // Overture leaf category, e.g. from livePlaceCache.rawCategory
+  lat: number;
+  lng: number;
+  country?: string | null;
+  address?: string | null;
+  aiProvider: AiProviderConfig | null;
+};
+
+// Single-place analog of discoverPlacesForCity's per-candidate body, for a
+// user tapping one raw live-map pin rather than a whole-city bulk sweep.
+// Reuses the exact same enrichment/image/hours/address helpers, minus the
+// city-loop-only concerns (existingPlaces mutation, per-city call budgets,
+// city status/placeCount updates) which don't apply to a lone ad-hoc place.
+export async function enrichAndPromoteCandidate(input: EnrichAndPromoteInput): Promise<PlaceRow> {
+  const candidate: OvertureCandidate = {
+    overtureId: input.overtureId,
+    name: input.name,
+    category: input.rawCategory,
+    topCategory: '',
+    confidence: 1,
+    lat: input.lat,
+    lng: input.lng,
+    address: input.address ?? undefined,
+    country: input.country ?? undefined,
+    websites: [],
+    phones: [],
+  };
+
+  // No real city for an ad-hoc tapped pin — best-effort display label using
+  // whatever locality/address data we already have (same chain used to
+  // backfill addresses elsewhere: Overture locality, then country as a
+  // last resort). May read oddly for a rural POI far from a named town —
+  // an accepted simplification for v1.
+  const cityLabel = input.address ?? input.country ?? 'Unknown location';
+
+  let wiki: Awaited<ReturnType<typeof enrichPlaceWithWikipedia>>;
+  try {
+    wiki = await enrichPlaceWithWikipedia(
+      { name: candidate.name, category: candidate.category, lat: candidate.lat, lng: candidate.lng },
+      input.aiProvider
+    );
+  } catch (error) {
+    console.error(`Wikipedia enrichment failed for "${candidate.name}", continuing without it:`, error);
+    wiki = { status: null as unknown as 'not-found', rawMetadata: {} };
+  }
+  const wikiSummary = wiki.status === 'matched' ? wiki.summary : undefined;
+
+  let enrichment: z.infer<typeof enrichmentSchema>;
+  if (input.aiProvider) {
+    try {
+      enrichment = await generatePlaceEnrichment(candidate, cityLabel, input.country ?? undefined, wikiSummary, input.aiProvider);
+    } catch (error) {
+      console.error(`AI enrichment failed for "${candidate.name}", using fallback fields:`, error);
+      enrichment = fallbackEnrichment(candidate);
+    }
+  } else {
+    enrichment = fallbackEnrichment(candidate);
+  }
+
+  const baseSlug = createSlug(candidate.name);
+  const buildValues = (id: string, slug: string) => ({
+    id,
+    slug,
+    name: candidate.name,
+    category: input.appCategory,
+    city: cityLabel,
+    country: input.country ?? candidate.country ?? null,
+    tags: [candidate.category.replace(/_/g, ' '), ...enrichment.tags].join(','),
+    description: enrichment.description,
+    shortStory: enrichment.shortStory,
+    imageUrl: 'https://placehold.co/600x400?text=' + encodeURIComponent(candidate.name),
+    imageVerified: false,
+    imageType: 'unknown',
+    importanceTier: enrichment.importanceTier,
+    factType: enrichment.factType,
+    address: candidate.address ?? null,
+    priceLevel: enrichment.priceLevel,
+    sourceUrl: candidate.websites[0] ?? null,
+    localVibeMood: enrichment.localVibeMood,
+    localVibeBestFor: enrichment.localVibeBestFor,
+    isIndoor: enrichment.isIndoor,
+    isFamilyFriendly: enrichment.isFamilyFriendly,
+    durationMinutes: enrichment.durationMinutes,
+    rainyDayFit: enrichment.rainyDayFit,
+    wikiPageTitle: wiki.status === 'matched' ? wiki.pageTitle : null,
+    wikiPageUrl: wiki.status === 'matched' ? wiki.pageUrl : null,
+    wikiSummary: wiki.status === 'matched' ? wiki.summary : null,
+    wikiMatchConfidence: wiki.status === 'matched' ? wiki.confidence : null,
+    wikiStatus: wiki.status,
+    wikiRawMetadataJson: JSON.stringify(wiki.rawMetadata ?? {}),
+    lat: candidate.lat,
+    lng: candidate.lng,
+  });
+
+  let created: PlaceRow;
+  try {
+    [created] = await db.insert(places).values(buildValues(baseSlug, baseSlug)).returning();
+  } catch (error) {
+    if (!isUniqueConstraintViolation(error)) throw error;
+    const disambiguatedSlug = `${baseSlug}-${candidate.overtureId.slice(0, 6)}`;
+    [created] = await db.insert(places).values(buildValues(disambiguatedSlug, disambiguatedSlug)).returning();
+  }
+
+  // Always keep a tap-promoted place regardless of its quality score — a
+  // real user's tap is a stronger relevance signal than the bulk-discovery
+  // heuristic that prunes low-quality long-tail candidates during a whole-
+  // city sweep, so that pruning step is deliberately not repeated here.
+  await tryAutoAttachImage(created.id);
+
+  const backfilledAddress = await tryGoogleHoursFallback(created);
+  if (backfilledAddress) created.address = backfilledAddress;
+
+  if (!created.address) {
+    await tryReverseGeocodeFallback(created);
+    const [refreshed] = await db.select().from(places).where(eq(places.id, created.id)).limit(1);
+    if (refreshed) created = refreshed;
+  }
+
+  return created;
 }
 
 function fallbackEnrichment(candidate: OvertureCandidate): z.infer<typeof enrichmentSchema> {

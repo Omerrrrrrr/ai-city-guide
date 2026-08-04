@@ -4,6 +4,7 @@ import test from 'node:test';
 import type { PlaceRow } from './schema';
 import {
   filterAndMapOvertureRows,
+  gridCellKey,
   isLikelyDuplicate,
   mapToAppCategory,
   runWithConcurrency,
@@ -293,4 +294,23 @@ test('runWithConcurrency propagates a task error', async () => {
     }),
     /boom/
   );
+});
+
+test('gridCellKey snaps nearby points to the same cell and returns a stable, parseable key', () => {
+  const a = gridCellKey(58.1467, 7.9956);
+  const b = gridCellKey(58.1469, 7.9959); // a few meters away, same ~1.1km cell
+  assert.equal(a, b);
+  assert.match(a, /^-?\d+\.\d{2},-?\d+\.\d{2}$/);
+});
+
+test('gridCellKey assigns different cells to points ~1km+ apart', () => {
+  const a = gridCellKey(58.1467, 7.9956);
+  const b = gridCellKey(58.16, 7.9956); // ~1.5km further north
+  assert.notEqual(a, b);
+});
+
+test('gridCellKey works consistently for negative-hemisphere coordinates', () => {
+  const a = gridCellKey(-33.8688, 151.2093);
+  const b = gridCellKey(-33.869, 151.2095);
+  assert.equal(a, b);
 });

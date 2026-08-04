@@ -27,6 +27,7 @@ import { getPlaceOpenStatus } from '@/src/utils/place-hours';
 import { useCityStore } from '@/src/store/city';
 import { CATEGORY_EMOJI, formatCategory } from '@/src/utils/categories';
 import { fetchDirections } from '@/src/api/routes';
+import { enrichLivePlace, fetchLiveNearbyPlaces, type LivePin } from '@/src/api/live-places';
 import { useTrips } from '@/src/store/trips';
 
 const NAVY = '#0F1C3F';
@@ -44,6 +45,12 @@ const MAP_CATEGORY_IDS: (PlaceCategory | 'all')[] = [
 ];
 const MAP_CATEGORY_FILTERS = CATEGORY_FILTERS.filter((c) => MAP_CATEGORY_IDS.includes(c.id));
 
+// Only fetch live pins at city/district zoom or closer — matches Google
+// Maps' own behavior of not flooding pins at country/world zoom, and keeps
+// a single drag from fanning out into dozens of cold-cache Overture queries.
+const LIVE_PINS_MAX_LATITUDE_DELTA = 0.3;
+const LIVE_PINS_DEBOUNCE_MS = 400;
+
 export default function MapScreen() {
   const colorScheme = useColorScheme();
   const dark = colorScheme === 'dark';
@@ -58,6 +65,12 @@ export default function MapScreen() {
   const [region, setRegion] = React.useState<Region>(KRISTIANSAND);
   const [selectedPlace, setSelectedPlace] = React.useState<Place | null>(null);
   const [activeCategory, setActiveCategory] = React.useState<PlaceCategory | 'all'>('all');
+
+  // Live-explore: raw, un-enriched pins for anywhere the map is dragged to,
+  // beyond the curated cities. See fetchLiveNearbyPlaces/enrichLivePlace.
+  const [livePins, setLivePins] = React.useState<LivePin[]>([]);
+  const [enrichingPinId, setEnrichingPinId] = React.useState<string | null>(null);
+  const liveDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Route planning
   const { activeTripId, startTrip, endTrip, addBreadcrumb, addPhoto, updateTripStops, trips } = useTrips();
@@ -278,6 +291,57 @@ export default function MapScreen() {
     } catch { /* ignore */ }
   };
 
+  const fetchLivePinsForRegion = React.useCallback((r: Region) => {
+    if (r.latitudeDelta > LIVE_PINS_MAX_LATITUDE_DELTA) {
+      setLivePins([]);
+      return;
+    }
+    fetchLiveNearbyPlaces({
+      minLat: r.latitude - r.latitudeDelta / 2,
+      maxLat: r.latitude + r.latitudeDelta / 2,
+      minLng: r.longitude - r.longitudeDelta / 2,
+      maxLng: r.longitude + r.longitudeDelta / 2,
+    })
+      .then(setLivePins)
+      .catch(() => { /* live pins are a supplementary overlay — fail silently */ });
+  }, []);
+
+  const handleRegionChangeComplete = (r: Region) => {
+    if (routeMode) return; // ambiguous to tap an un-enriched pin mid-route-building
+    if (liveDebounceRef.current) clearTimeout(liveDebounceRef.current);
+    liveDebounceRef.current = setTimeout(() => fetchLivePinsForRegion(r), LIVE_PINS_DEBOUNCE_MS);
+  };
+
+  // Fetch once for the initial resting region too — onRegionChangeComplete
+  // only fires on user-driven drags, not on mount.
+  React.useEffect(() => {
+    if (!locationReady) return;
+    fetchLivePinsForRegion(region);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locationReady]);
+
+  const handleLivePinPress = async (pin: LivePin) => {
+    if (enrichingPinId) return;
+    setEnrichingPinId(pin.id);
+    try {
+      const enriched = await enrichLivePlace(pin.id);
+      setLivePins((prev) => prev.filter((p) => p.id !== pin.id));
+      setSelectedPlace(enriched);
+      if (enriched.location) {
+        mapRef.current?.animateToRegion({
+          latitude: enriched.location.lat - 0.005,
+          longitude: enriched.location.lng,
+          latitudeDelta: 0.025,
+          longitudeDelta: 0.025,
+        }, 400);
+      }
+    } catch (err) {
+      Alert.alert(t('map.live.error'), err instanceof Error ? err.message : undefined);
+    } finally {
+      setEnrichingPinId(null);
+    }
+  };
+
   const filteredPlaces = React.useMemo(() => {
     const withLocation = (places ?? []).filter((p) => p.location);
     if (activeCategory === 'all') return withLocation;
@@ -313,7 +377,25 @@ export default function MapScreen() {
         showsUserLocation
         showsMyLocationButton={false}
         showsCompass={false}
-        onPress={() => setSelectedPlace(null)}>
+        onPress={() => setSelectedPlace(null)}
+        onRegionChangeComplete={handleRegionChangeComplete}>
+        {!routeMode && livePins.map((pin) => (
+          <Marker
+            key={`live-${pin.id}`}
+            coordinate={{ latitude: pin.lat, longitude: pin.lng }}
+            onPress={(e) => {
+              e.stopPropagation();
+              void handleLivePinPress(pin);
+            }}>
+            <View style={styles.livePin}>
+              {enrichingPinId === pin.id ? (
+                <ActivityIndicator size="small" color={NAVY} />
+              ) : (
+                <View style={styles.livePinDot} />
+              )}
+            </View>
+          </Marker>
+        ))}
         {filteredPlaces.map((place) => {
           const isSelected = selectedPlace?.id === place.id;
           const stopIndex = plannedStops.findIndex((p) => p.id === place.id);
@@ -570,6 +652,16 @@ const styles = StyleSheet.create({
   },
   pinDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: GOLD },
   pinDotSelected: { backgroundColor: NAVY },
+
+  // Live-explore pins — deliberately lighter/hollow vs. the solid curated
+  // pin above, to read as "not yet personalized, tap to see Piri's take".
+  livePin: {
+    width: 16, height: 16, borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    borderWidth: 1.5, borderColor: NAVY,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  livePinDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: NAVY },
 
   // Top overlay
   topOverlay: {

@@ -226,6 +226,9 @@
     "loading": "Laster kart...",
     "placesCount_one": "{{count}} sted",
     "placesCount_other": "{{count}} steder",
+    "live": {
+      "error": "Kunne ikke laste dette stedet"
+    },
     "route": {
       "hint": "Trykk på steder på kartet for å legge til stopp på ruten din.",
       "start": "Start rute",

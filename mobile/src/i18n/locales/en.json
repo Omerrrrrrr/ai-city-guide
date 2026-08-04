@@ -226,6 +226,9 @@
     "loading": "Loading map...",
     "placesCount_one": "{{count}} place",
     "placesCount_other": "{{count}} places",
+    "live": {
+      "error": "Couldn't load this place"
+    },
     "route": {
       "hint": "Tap places on the map to add stops to your route.",
       "start": "Start Route",

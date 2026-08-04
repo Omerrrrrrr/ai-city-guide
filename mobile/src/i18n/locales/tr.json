@@ -226,6 +226,9 @@
     "loading": "Harita yükleniyor...",
     "placesCount_one": "{{count}} yer",
     "placesCount_other": "{{count}} yer",
+    "live": {
+      "error": "Bu yer yüklenemedi"
+    },
     "route": {
       "hint": "Rotana durak eklemek için haritadaki yerlere dokun.",
       "start": "Rotayı Başlat",
