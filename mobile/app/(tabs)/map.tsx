@@ -50,7 +50,11 @@ const MAP_CATEGORY_FILTERS = CATEGORY_FILTERS.filter((c) => MAP_CATEGORY_IDS.inc
 // Only fetch live pins at city/district zoom or closer — matches Google
 // Maps' own behavior of not flooding pins at country/world zoom, and keeps
 // a single drag from fanning out into dozens of cold-cache Overture queries.
-const LIVE_PINS_MAX_LATITUDE_DELTA = 0.3;
+// Live-tested: an uncached ~35-cell viewport took up to 55s to resolve
+// (each cold ~1.1km cell costs a real multi-second Overture query). Capped
+// tight enough that a single "keşfet" tap stays well under ~10-15s even
+// when every cell in view is uncached.
+const LIVE_PINS_MAX_LATITUDE_DELTA = 0.04;
 
 export default function MapScreen() {
   const colorScheme = useColorScheme();
@@ -307,6 +311,7 @@ export default function MapScreen() {
   const fetchLivePinsForRegion = React.useCallback((r: Region) => {
     if (r.latitudeDelta > LIVE_PINS_MAX_LATITUDE_DELTA) {
       setLivePins([]);
+      Alert.alert(t('map.live.zoomInTitle'), t('map.live.zoomInMessage'));
       return;
     }
     setIsFetchingLivePins(true);
@@ -317,9 +322,9 @@ export default function MapScreen() {
       maxLng: r.longitude + r.longitudeDelta / 2,
     })
       .then(setLivePins)
-      .catch(() => { /* live pins are a supplementary overlay — fail silently */ })
+      .catch(() => Alert.alert(t('map.live.error')))
       .finally(() => setIsFetchingLivePins(false));
-  }, []);
+  }, [t]);
 
   // Just tracks the current region — no fetch, no marker mutation — so the
   // manual "discover this area" button knows what to fetch for.

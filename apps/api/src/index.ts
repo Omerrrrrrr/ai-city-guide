@@ -529,7 +529,11 @@ async function buildServer() {
   // ~1.1km grid cell in livePlaceCache/liveGridCellStatus so any given cell
   // only ever pays Overture's live multi-second query cost once, globally —
   // every subsequent viewer of that area reads straight from Postgres.
-  const MAX_LIVE_BBOX_SPAN_DEG = 0.5; // ~55km — bounds worst-case cold-cell fan-out per request
+  // Live-tested: an uncached ~35-cell viewport (~0.07deg span) took up to
+  // 55s to resolve. 0.5deg (~55km) let a single request fan out into
+  // hundreds of cold cells -- tightened to keep worst-case latency sane
+  // even if a client bypasses its own (also tightened) zoom gating.
+  const MAX_LIVE_BBOX_SPAN_DEG = 0.05; // ~5.5km
   const LIVE_CELL_QUERY_CONCURRENCY = 3;
   // A single dense cell alone can legitimately cache 100 candidates (live-
   // observed: central Kristiansand, Shanghai) and a viewport spans many

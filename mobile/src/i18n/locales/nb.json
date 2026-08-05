@@ -228,7 +228,9 @@
     "placesCount_other": "{{count}} steder",
     "live": {
       "error": "Kunne ikke laste dette stedet",
-      "discoverArea": "Utforsk dette området"
+      "discoverArea": "Utforsk dette området",
+      "zoomInTitle": "Zoom inn mer",
+      "zoomInMessage": "Zoom inn nærmere for å utforske steder i dette området."
     },
     "route": {
       "hint": "Trykk på steder på kartet for å legge til stopp på ruten din.",

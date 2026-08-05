@@ -228,7 +228,9 @@
     "placesCount_other": "{{count}} places",
     "live": {
       "error": "Couldn't load this place",
-      "discoverArea": "Discover this area"
+      "discoverArea": "Discover this area",
+      "zoomInTitle": "Zoom in more",
+      "zoomInMessage": "Zoom in closer to discover places in this area."
     },
     "route": {
       "hint": "Tap places on the map to add stops to your route.",

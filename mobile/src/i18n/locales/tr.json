@@ -228,7 +228,9 @@
     "placesCount_other": "{{count}} yer",
     "live": {
       "error": "Bu yer yüklenemedi",
-      "discoverArea": "Bu bölgeyi keşfet"
+      "discoverArea": "Bu bölgeyi keşfet",
+      "zoomInTitle": "Daha fazla yakınlaştır",
+      "zoomInMessage": "Bu bölgedeki yerleri keşfetmek için haritayı biraz daha yakınlaştır."
     },
     "route": {
       "hint": "Rotana durak eklemek için haritadaki yerlere dokun.",
