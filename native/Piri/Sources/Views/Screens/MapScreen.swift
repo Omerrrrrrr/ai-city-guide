@@ -170,10 +170,20 @@ struct MapScreen: View {
             guard routeMode else { return }
             rehydrateActiveTripIfNeeded()
         }
-        .onChange(of: tabSelection.pendingRouteStops) { _, newValue in
-            guard let stops = newValue else { return }
+        // `.task(id:)`, not `.onChange` — `pendingRouteStops` is very often
+        // already set by the time this view first appears (the whole point
+        // of the hand-off is jumping here from another tab), and `onChange`
+        // only fires on a delta from a baseline observed *while mounted*,
+        // so a value that's already non-nil on first appearance never
+        // fires it. `.task(id:)` runs immediately on appearance too, not
+        // just on subsequent changes. Cleared *after* the work finishes
+        // (not before) so re-setting it back to nil doesn't self-cancel
+        // this same task mid-flight — `.task(id:)` restarts whenever its id
+        // changes, including changes made by its own body.
+        .task(id: tabSelection.pendingRouteStops) {
+            guard let stops = tabSelection.pendingRouteStops else { return }
+            await startPendingRoute(stops)
             tabSelection.pendingRouteStops = nil
-            Task { await startPendingRoute(stops) }
         }
         .onChange(of: locationManager.breadcrumb) { _, points in
             guard let activeTripId = tripsStore.activeTripId, let last = points.last else { return }

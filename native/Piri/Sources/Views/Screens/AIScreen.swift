@@ -154,14 +154,19 @@ struct AIScreen: View {
                 attachedImage = UIImage(data: data)
             }
         }
-        .onChange(of: tabSelection.pendingAIQuery) { _, newValue in
-            guard let newValue else { return }
-            tabSelection.pendingAIQuery = nil
+        // `.task(id:)`, not `.onChange` — see the identical comment on
+        // MapScreen's `pendingRouteStops` handling. This tab-root AIScreen
+        // instance is created once at launch and can easily still be on its
+        // very first appearance the first time some other tab hands off a
+        // query (e.g. before the user has ever manually opened Ask Piri),
+        // and `onChange` never fires for a value that was already set
+        // before this view mounted.
+        .task(id: tabSelection.pendingAIQuery) {
+            guard let newValue = tabSelection.pendingAIQuery else { return }
             query = newValue
-            Task {
-                try? await Task.sleep(for: .milliseconds(300))
-                await search()
-            }
+            try? await Task.sleep(for: .milliseconds(300))
+            await search()
+            tabSelection.pendingAIQuery = nil
         }
         .sheet(item: $selectedPOI) { poi in POIExplainSheet(poi: poi) }
     }
