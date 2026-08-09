@@ -10,6 +10,59 @@ export interface TripAdvisorRating {
   reviewCount: number;
   url: string;
   iconUrl: string;
+  /// Tripadvisor's own human-readable weekly schedule lines (e.g.
+  /// "Mo,Tu,We,Th,Fr,Sa 07:00-22:00") — real plain data, unlike Apple's
+  /// MKMapItem which has no hours field at all.
+  hoursFormatted?: string[];
+  /// Computed from `periods` + `timezone` at request time; `null` when
+  /// Tripadvisor didn't return structured hours for this location.
+  isOpenNow?: boolean;
+}
+
+interface OpeningHoursPayload {
+  timezone?: string;
+  periods?: { day_of_week?: string; opens?: string; closes?: string }[];
+  formatted?: string[];
+}
+
+/**
+ * `now` is in the location's own timezone via `Intl.DateTimeFormat`, so this
+ * is correct regardless of where the server runs. Doesn't handle a period
+ * that opens before midnight and is still open after — Tripadvisor's data
+ * always attributes such a period to the day it opens, so a lookup right
+ * after midnight (still within last night's overnight hours) would
+ * incorrectly read as closed. Edge case, not the common venue.
+ */
+function computeOpenNow(hours: OpeningHoursPayload | undefined): boolean | undefined {
+  if (!hours?.timezone || !hours.periods?.length) return undefined;
+
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: hours.timezone,
+      weekday: 'long',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(new Date());
+
+    const weekday = parts.find((p) => p.type === 'weekday')?.value;
+    const hour = parts.find((p) => p.type === 'hour')?.value;
+    const minute = parts.find((p) => p.type === 'minute')?.value;
+    if (!weekday || hour === undefined || minute === undefined) return undefined;
+
+    const nowMinutes = Number(hour) * 60 + Number(minute);
+
+    return hours.periods.some((period) => {
+      if (period.day_of_week !== weekday || !period.opens || !period.closes) return false;
+      const [openH, openM] = period.opens.split(':').map(Number);
+      const [closeH, closeM] = period.closes.split(':').map(Number);
+      const openMinutes = openH * 60 + openM;
+      const closeMinutes = closeH * 60 + closeM > openMinutes ? closeH * 60 + closeM : closeH * 60 + closeM + 24 * 60;
+      return nowMinutes >= openMinutes && nowMinutes < closeMinutes;
+    });
+  } catch {
+    return undefined;
+  }
 }
 
 function normalizeName(name: string): string {
@@ -55,6 +108,7 @@ export async function fetchTripAdvisorRating(
           names?: { value?: string }[];
           traveler_ratings?: { overall?: { rating?: number; count?: number; icon_url?: string } };
           urls?: { tripadvisor?: { main?: string } };
+          opening_hours?: OpeningHoursPayload;
         };
       }[];
     };
@@ -68,11 +122,15 @@ export async function fetchTripAdvisorRating(
     const overall = match?.location?.traveler_ratings?.overall;
     if (!overall?.rating || !overall?.count) return null;
 
+    const hours = match?.location?.opening_hours;
+
     return {
       score: overall.rating,
       reviewCount: overall.count,
       url: match?.location?.urls?.tripadvisor?.main ?? '',
       iconUrl: overall.icon_url ?? '',
+      hoursFormatted: hours?.formatted,
+      isOpenNow: computeOpenNow(hours),
     };
   } catch {
     return null;

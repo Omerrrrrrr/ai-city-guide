@@ -141,6 +141,12 @@ struct TripAdvisorRating: Codable {
     var reviewCount: Int
     var url: String
     var iconUrl: String
+    /// Tripadvisor's own human-readable weekly schedule lines — real plain
+    /// data, unlike Apple's `MKMapItem` which has no hours field at all.
+    var hoursFormatted: [String]?
+    /// Computed server-side from Tripadvisor's structured hours; `nil` when
+    /// Tripadvisor didn't return hours for this location.
+    var isOpenNow: Bool?
 }
 
 /// Port-side request for `/places/explain-poi` — same personalized-blurb

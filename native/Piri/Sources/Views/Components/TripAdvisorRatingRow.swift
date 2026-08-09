@@ -8,22 +8,36 @@ struct TripAdvisorRatingRow: View {
     let rating: TripAdvisorRating
 
     var body: some View {
-        Link(destination: URL(string: rating.url) ?? URL(string: "https://www.tripadvisor.com")!) {
-            HStack(spacing: 6) {
-                CachedAsyncImage(url: URL(string: rating.iconUrl), maxPixelSize: 120) { image in
-                    image.resizable().aspectRatio(contentMode: .fit)
-                } placeholder: {
-                    Color.clear
+        VStack(alignment: .leading, spacing: 4) {
+            Link(destination: URL(string: rating.url) ?? URL(string: "https://www.tripadvisor.com")!) {
+                HStack(spacing: 6) {
+                    CachedAsyncImage(url: URL(string: rating.iconUrl), maxPixelSize: 120) { image in
+                        image.resizable().aspectRatio(contentMode: .fit)
+                    } placeholder: {
+                        Color.clear
+                    }
+                    .frame(height: 20)
+
+                    Text("\(rating.score, specifier: "%.1f") (\(rating.reviewCount))")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+
+                    Text("Tripadvisor")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    if let isOpenNow = rating.isOpenNow {
+                        Text(isOpenNow ? "tripadvisor.openNow" : "tripadvisor.closedNow")
+                            .font(.caption.bold())
+                            .foregroundStyle(isOpenNow ? Theme.openGreen : Theme.closedRed)
+                    }
                 }
-                .frame(height: 20)
+            }
 
-                Text("\(rating.score, specifier: "%.1f") (\(rating.reviewCount))")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-
-                Text("Tripadvisor")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            if let hoursFormatted = rating.hoursFormatted {
+                ForEach(hoursFormatted, id: \.self) { line in
+                    Text(line).font(.caption).foregroundStyle(.secondary)
+                }
             }
         }
     }
