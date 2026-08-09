@@ -17,11 +17,6 @@ export interface TripAdvisorRating {
   /// Computed from `periods` + `timezone` at request time; `null` when
   /// Tripadvisor didn't return structured hours for this location.
   isOpenNow?: boolean;
-  /// All available traveler/management photo URLs from Tripadvisor's own
-  /// photos endpoint (up to their page-size max) — real photos of the
-  /// actual place, not AI-generated or scraped from elsewhere. Empty when
-  /// the location has none on file.
-  photoUrls: string[];
 }
 
 interface OpeningHoursPayload {
@@ -75,7 +70,7 @@ function computeOpenNow(hours: OpeningHoursPayload | undefined): boolean | undef
  * to their max page size of 20). Returns `[]` on any failure — same
  * best-effort contract as the rest of this module.
  */
-async function fetchTripAdvisorPhotos(locationId: number): Promise<string[]> {
+export async function fetchTripAdvisorPhotos(locationId: number): Promise<string[]> {
   try {
     const url = new URL(`https://terra.tripadvisor.com/api/locations/${locationId}/photos`);
     url.searchParams.set('size', '20');
@@ -111,9 +106,14 @@ export interface TripAdvisorInfo {
   /// be fed into the AI explain prompt as grounding context so it can cite
   /// actual specifics instead of only generic knowledge about the category.
   description: string | null;
+  /// All available traveler/management photo URLs from Tripadvisor's own
+  /// photos endpoint (up to their page-size max). Separate from `rating`
+  /// since the caller tags these with their source when merging with other
+  /// photo providers (e.g. Wikipedia).
+  photoUrls: string[];
 }
 
-const emptyInfo: TripAdvisorInfo = { rating: null, description: null };
+const emptyInfo: TripAdvisorInfo = { rating: null, description: null, photoUrls: [] };
 
 /**
  * Looks up the nearest Tripadvisor location within 300m whose name overlaps
@@ -160,13 +160,13 @@ export async function fetchTripAdvisorInfo(name: string, lat: number, lng: numbe
     });
 
     const description = match?.location?.descriptions?.[0]?.value ?? null;
-
-    const overall = match?.location?.traveler_ratings?.overall;
-    if (!overall?.rating || !overall?.count) return { rating: null, description };
-
-    const hours = match?.location?.opening_hours;
     const locationId = match?.location?.id;
     const photoUrls = locationId ? await fetchTripAdvisorPhotos(locationId) : [];
+
+    const overall = match?.location?.traveler_ratings?.overall;
+    if (!overall?.rating || !overall?.count) return { rating: null, description, photoUrls };
+
+    const hours = match?.location?.opening_hours;
 
     return {
       rating: {
@@ -176,9 +176,9 @@ export async function fetchTripAdvisorInfo(name: string, lat: number, lng: numbe
         iconUrl: overall.icon_url ?? '',
         hoursFormatted: hours?.formatted,
         isOpenNow: computeOpenNow(hours),
-        photoUrls,
       },
       description,
+      photoUrls,
     };
   } catch {
     return emptyInfo;

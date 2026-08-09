@@ -52,6 +52,7 @@ import {
 } from './user-context';
 import { haversineKm } from './geo';
 import { fetchTripAdvisorInfo } from './tripadvisor';
+import { fetchWikipediaPhoto } from './wiki-photo';
 import { places, cities, liveGridCellStatus, livePlaceCache } from './schema';
 
 const PORT = Number(process.env.PORT ?? 4000);
@@ -1324,7 +1325,9 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
       // Tripadvisor description, when there is one, can ground the prompt
       // instead of only reaching the client after the fact.
       const tripAdvisorInfo =
-        lat !== undefined && lng !== undefined ? await fetchTripAdvisorInfo(name, lat, lng) : { rating: null, description: null };
+        lat !== undefined && lng !== undefined
+          ? await fetchTripAdvisorInfo(name, lat, lng)
+          : { rating: null, description: null, photoUrls: [] };
 
       const placeContext = [
         `Name: ${name}`,
@@ -1354,29 +1357,44 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         : '';
 
       try {
-        const { object } = await generateObject({
-          model: aiProvider.client.chat(aiProvider.model),
-          maxOutputTokens: 300,
-          schema: z.object({
-            headline: z
-              .string()
-              .describe('One punchy sentence that connects this place to who the user is. Max 12 words.'),
-            body: z
-              .string()
-              .describe('2-3 sentences of personalized insight. Speak directly to this person\'s expertise or interests.'),
-            highlights: z
-              .array(z.string())
-              .min(2)
-              .max(3)
-              .describe('2-3 specific things this particular person would find most interesting here.'),
-          }),
-          system: `You are Piri, a deeply knowledgeable personal travel guide. Your job is to explain a place in a way that speaks directly to who the user is — their profession, interests, and worldview. ${factualGuard}${NO_HYPE_GUARD}${profileContext}
+        // Wikipedia has no dependency on the AI prompt (unlike the
+        // Tripadvisor description above), so it runs concurrently with the
+        // generateObject call instead of adding to the sequential wait.
+        const [{ object }, wikiPhoto] = await Promise.all([
+          generateObject({
+            model: aiProvider.client.chat(aiProvider.model),
+            maxOutputTokens: 300,
+            schema: z.object({
+              headline: z
+                .string()
+                .describe('One punchy sentence that connects this place to who the user is. Max 12 words.'),
+              body: z
+                .string()
+                .describe('2-3 sentences of personalized insight. Speak directly to this person\'s expertise or interests.'),
+              highlights: z
+                .array(z.string())
+                .min(2)
+                .max(3)
+                .describe('2-3 specific things this particular person would find most interesting here.'),
+            }),
+            system: `You are Piri, a deeply knowledgeable personal travel guide. Your job is to explain a place in a way that speaks directly to who the user is — their profession, interests, and worldview. ${factualGuard}${NO_HYPE_GUARD}${profileContext}
 
 ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
-          prompt: `Explain this place:\n\n${placeContext}`,
-        } as any);
+            prompt: `Explain this place:\n\n${placeContext}`,
+          } as any),
+          lat !== undefined && lng !== undefined ? fetchWikipediaPhoto(name, lat, lng) : Promise.resolve(null),
+        ]);
 
-        return reply.send({ ...(object as Record<string, unknown>), rating: tripAdvisorInfo.rating });
+        // Wikipedia first — the user's explicit priority — then Tripadvisor.
+        // Each photo carries its own source so the client can attribute it
+        // correctly rather than a single blanket label.
+        const photos: { url: string; source: 'wikipedia' | 'tripadvisor'; attributionUrl?: string }[] = [];
+        if (wikiPhoto) {
+          photos.push({ url: wikiPhoto.url, source: 'wikipedia', attributionUrl: wikiPhoto.pageUrl });
+        }
+        photos.push(...tripAdvisorInfo.photoUrls.map((url) => ({ url, source: 'tripadvisor' as const })));
+
+        return reply.send({ ...(object as Record<string, unknown>), rating: tripAdvisorInfo.rating, photos });
       } catch (e: any) {
         app.log.error(e);
         return reply.code(500).send({ error: e.message || 'Failed to explain place' });

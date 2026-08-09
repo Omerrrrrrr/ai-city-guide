@@ -131,6 +131,27 @@ struct ExplainResult: Codable {
     /// `TRIPADVISOR_API_KEY` is unset server-side or no matching Tripadvisor
     /// location was found nearby.
     var rating: TripAdvisorRating?
+    /// Real photos of this place from Wikipedia and/or Tripadvisor (never
+    /// AI-generated) — Wikipedia's photo, when there is one, sorts first
+    /// per the user's explicit priority. Each carries its own `source` for
+    /// per-photo attribution rather than one blanket label, since a single
+    /// place can have photos from both providers at once.
+    var photos: [POIPhoto] = []
+}
+
+enum POIPhotoSource: String, Codable {
+    case wikipedia
+    case tripadvisor
+}
+
+struct POIPhoto: Codable, Identifiable, Hashable {
+    var url: String
+    var source: POIPhotoSource
+    /// Link to the source page (Wikipedia article / Tripadvisor listing) —
+    /// present for Wikipedia photos, `nil` for Tripadvisor ones (its photos
+    /// endpoint doesn't return a per-photo page link).
+    var attributionUrl: String?
+    var id: String { url }
 }
 
 /// Tripadvisor's own bubble-rating icon URL is used as-is (`iconUrl`) rather
@@ -147,10 +168,6 @@ struct TripAdvisorRating: Codable {
     /// Computed server-side from Tripadvisor's structured hours; `nil` when
     /// Tripadvisor didn't return hours for this location.
     var isOpenNow: Bool?
-    /// Real Tripadvisor traveler/management photos of this place — never
-    /// AI-generated or sourced elsewhere. Empty when the location has none
-    /// on file.
-    var photoUrls: [String] = []
 }
 
 /// Port-side request for `/places/explain-poi` — same personalized-blurb
