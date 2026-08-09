@@ -116,10 +116,8 @@ extension MapScreen {
         }
     }
 
-    func moveStop(from index: Int, direction: Int) {
-        let target = index + direction
-        guard plannedStops.indices.contains(index), plannedStops.indices.contains(target) else { return }
-        plannedStops.swapAt(index, target)
+    func moveStops(fromOffsets offsets: IndexSet, toOffset destination: Int) {
+        plannedStops.move(fromOffsets: offsets, toOffset: destination)
     }
 
     func removeStop(_ identifier: String) {
@@ -234,13 +232,24 @@ extension MapScreen {
             if plannedStops.isEmpty {
                 Text("map.route.hint").font(.footnote).foregroundStyle(.secondary)
             } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(Array(plannedStops.enumerated()), id: \.element.identifier) { index, stop in
-                            stopChip(index: index, stop: stop)
-                        }
+                // Stacked rows with a native drag handle (`.onMove`), not the
+                // old horizontal row of chips with up/down chevron buttons —
+                // full-width rows read each stop's name without truncation,
+                // and dragging a row to any position is a single gesture
+                // instead of repeated adjacent-swap taps.
+                List {
+                    ForEach(Array(plannedStops.enumerated()), id: \.element.identifier) { index, stop in
+                        stopRow(index: index, stop: stop)
+                            .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
                     }
+                    .onMove(perform: moveStops)
                 }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .environment(\.editMode, .constant(.active))
+                .frame(height: min(CGFloat(plannedStops.count), 4) * 52)
             }
 
             if let activeTrip, !activeTrip.photos.isEmpty {
@@ -323,24 +332,22 @@ extension MapScreen {
         }
     }
 
-    private func stopChip(index: Int, stop: SavedPOIReference) -> some View {
-        HStack(spacing: 6) {
-            Button { moveStop(from: index, direction: -1) } label: {
-                Image(systemName: "chevron.up").font(.caption2)
+    private func stopRow(index: Int, stop: SavedPOIReference) -> some View {
+        HStack(spacing: 10) {
+            ZStack {
+                Circle().fill(Theme.gold.opacity(0.15))
+                Text("\(index + 1)").font(.caption.weight(.bold)).foregroundStyle(Theme.gold)
             }
-            .disabled(index == 0)
+            .frame(width: 24, height: 24)
 
-            Button { moveStop(from: index, direction: 1) } label: {
-                Image(systemName: "chevron.down").font(.caption2)
-            }
-            .disabled(index == plannedStops.count - 1)
+            Text(stop.name).font(.subheadline.weight(.semibold)).lineLimit(1)
 
-            Text("\(index + 1)").font(.caption.weight(.bold)).foregroundStyle(Theme.gold)
-            Text(stop.name).font(.caption.weight(.semibold)).lineLimit(1)
+            Spacer()
 
             Button { removeStop(stop.identifier) } label: {
                 Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
             }
+            .buttonStyle(.borderless)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
