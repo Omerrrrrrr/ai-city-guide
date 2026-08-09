@@ -88,6 +88,7 @@ struct POIExplainSheet: View {
                                 Text(result.headline).font(.subheadline.bold()).foregroundStyle(Theme.gold)
                                 if let rating = result.rating {
                                     TripAdvisorRatingRow(rating: rating)
+                                    TripAdvisorPhotoGallery(photoUrls: rating.photoUrls)
                                 }
                                 Text(result.body).font(.footnote)
                                 ForEach(result.highlights, id: \.self) { highlight in

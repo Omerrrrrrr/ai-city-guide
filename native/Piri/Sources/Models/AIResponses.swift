@@ -147,6 +147,10 @@ struct TripAdvisorRating: Codable {
     /// Computed server-side from Tripadvisor's structured hours; `nil` when
     /// Tripadvisor didn't return hours for this location.
     var isOpenNow: Bool?
+    /// Real Tripadvisor traveler/management photos of this place — never
+    /// AI-generated or sourced elsewhere. Empty when the location has none
+    /// on file.
+    var photoUrls: [String] = []
 }
 
 /// Port-side request for `/places/explain-poi` — same personalized-blurb

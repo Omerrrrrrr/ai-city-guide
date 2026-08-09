@@ -17,6 +17,11 @@ export interface TripAdvisorRating {
   /// Computed from `periods` + `timezone` at request time; `null` when
   /// Tripadvisor didn't return structured hours for this location.
   isOpenNow?: boolean;
+  /// All available traveler/management photo URLs from Tripadvisor's own
+  /// photos endpoint (up to their page-size max) — real photos of the
+  /// actual place, not AI-generated or scraped from elsewhere. Empty when
+  /// the location has none on file.
+  photoUrls: string[];
 }
 
 interface OpeningHoursPayload {
@@ -62,6 +67,31 @@ function computeOpenNow(hours: OpeningHoursPayload | undefined): boolean | undef
     });
   } catch {
     return undefined;
+  }
+}
+
+/**
+ * Fetches every photo Tripadvisor has on file for a location (one page, up
+ * to their max page size of 20). Returns `[]` on any failure — same
+ * best-effort contract as the rest of this module.
+ */
+async function fetchTripAdvisorPhotos(locationId: number): Promise<string[]> {
+  try {
+    const url = new URL(`https://terra.tripadvisor.com/api/locations/${locationId}/photos`);
+    url.searchParams.set('size', '20');
+
+    const res = await fetch(url, {
+      headers: { 'X-API-Key': TRIPADVISOR_API_KEY! },
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) return [];
+
+    const data = (await res.json()) as {
+      data?: { photo?: { original_size_url?: string } }[];
+    };
+    return (data.data ?? []).map((item) => item.photo?.original_size_url).filter((url): url is string => Boolean(url));
+  } catch {
+    return [];
   }
 }
 
@@ -113,6 +143,7 @@ export async function fetchTripAdvisorInfo(name: string, lat: number, lng: numbe
     const data = (await res.json()) as {
       data?: {
         location?: {
+          id?: number;
           names?: { value?: string }[];
           descriptions?: { value?: string }[];
           traveler_ratings?: { overall?: { rating?: number; count?: number; icon_url?: string } };
@@ -134,6 +165,8 @@ export async function fetchTripAdvisorInfo(name: string, lat: number, lng: numbe
     if (!overall?.rating || !overall?.count) return { rating: null, description };
 
     const hours = match?.location?.opening_hours;
+    const locationId = match?.location?.id;
+    const photoUrls = locationId ? await fetchTripAdvisorPhotos(locationId) : [];
 
     return {
       rating: {
@@ -143,6 +176,7 @@ export async function fetchTripAdvisorInfo(name: string, lat: number, lng: numbe
         iconUrl: overall.icon_url ?? '',
         hoursFormatted: hours?.formatted,
         isOpenNow: computeOpenNow(hours),
+        photoUrls,
       },
       description,
     };

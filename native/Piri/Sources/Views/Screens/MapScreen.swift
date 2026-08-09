@@ -362,6 +362,7 @@ struct MapScreen: View {
                 Text(poiExplainResult.headline).font(.subheadline.bold()).foregroundStyle(Theme.gold)
                 if let rating = poiExplainResult.rating {
                     TripAdvisorRatingRow(rating: rating)
+                    TripAdvisorPhotoGallery(photoUrls: rating.photoUrls)
                 }
                 Text(poiExplainResult.body).font(.footnote)
                 ForEach(poiExplainResult.highlights, id: \.self) { highlight in
