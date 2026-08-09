@@ -490,6 +490,23 @@ struct MapScreen: View {
     }
 
     private func explainMapFeature(_ feature: MKMapFeatureAnnotation) async {
+        var category: String?
+        var address: String?
+        // Best-effort enrichment — the annotation alone only has a title and
+        // coordinate, `MKMapItemRequest` gets the rest (category, address,
+        // and `resolvedMapFeatureItem` for the phone/website rows and
+        // "Detaylı Bilgi" button). Always resolved, even on an AI-cache hit
+        // below — this used to sit after the cache's early `return`, so
+        // revisiting any previously-explained POI left `resolvedMapFeatureItem`
+        // nil (reset by `selectMapFeature`) and silently hid all of that.
+        if let mapItem = try? await MKMapItemRequest(mapFeatureAnnotation: feature).mapItem {
+            category = mapItem.pointOfInterestCategory?.rawValue.replacingOccurrences(of: "MKPOICategory", with: "")
+            address = mapItem.placemark.title
+            resolvedMapFeatureItem = mapItem
+        }
+
+        guard !Task.isCancelled else { return }
+
         let cacheKey = poiCacheKey(feature)
         if let cached = Self.poiExplainCache[cacheKey] {
             poiExplainResult = cached
@@ -498,19 +515,6 @@ struct MapScreen: View {
 
         poiExplainLoading = true
         defer { poiExplainLoading = false }
-
-        var category: String?
-        var address: String?
-        // Best-effort enrichment — the annotation alone only has a title and
-        // coordinate, `MKMapItemRequest` gets the rest (category, address).
-        // Never block the AI call on this; a plain name is enough to ask for.
-        if let mapItem = try? await MKMapItemRequest(mapFeatureAnnotation: feature).mapItem {
-            category = mapItem.pointOfInterestCategory?.rawValue.replacingOccurrences(of: "MKPOICategory", with: "")
-            address = mapItem.placemark.title
-            resolvedMapFeatureItem = mapItem
-        }
-
-        guard !Task.isCancelled else { return }
 
         let profile = userProfileStore.profile
         let request = ExplainPOIRequest(
