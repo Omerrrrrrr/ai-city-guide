@@ -7,6 +7,15 @@ private let languageOptions: [(code: String?, emoji: String, labelKey: String)] 
     ("nb", "🇳🇴", "settings.language.nb"),
 ]
 
+/// Groups the same way `OnboardingScreen`'s wizard steps already do:
+/// interests+faith together, pace+budget+group ("who are you traveling
+/// with") together under "Plan" — mirrored here as tabs instead of one long
+/// scroll of stacked cards.
+private enum ProfileTab: Hashable, Identifiable {
+    case language, profession, interests, plan
+    var id: Self { self }
+}
+
 /// Port of `mobile/app/(tabs)/settings.tsx`.
 struct ProfileScreen: View {
     @Environment(UserProfileStore.self) private var userProfileStore
@@ -22,6 +31,7 @@ struct ProfileScreen: View {
     @State private var showingCityPicker = false
     @State private var showingSaved: SavedTab?
     @State private var showingRestartHint = false
+    @State private var profileTab: ProfileTab = .language
 
     private var profile: UserProfile { userProfileStore.profile }
     private var displayName: String {
@@ -33,49 +43,8 @@ struct ProfileScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 header
-                languageCard
-                card(titleKey: "onboarding.profession.title") {
-                    ChipGrid(options: ProfileOptions.professions, isSelected: { profile.profession == $0 }) { value in
-                        Haptics.light()
-                        userProfileStore.update { $0.profession = value }
-                    }
-                }
-                card(titleKey: "onboarding.faithInterests.interestsLabel") {
-                    ChipGrid(options: ProfileOptions.interests, isSelected: { profile.interests.contains($0) }) { value in
-                        Haptics.light()
-                        userProfileStore.update { profile in
-                            if let index = profile.interests.firstIndex(of: value) {
-                                profile.interests.remove(at: index)
-                            } else {
-                                profile.interests.append(value)
-                            }
-                        }
-                    }
-                }
-                card(titleKey: "onboarding.faithInterests.faithLabel", noteKey: "settings.faithNote") {
-                    ChipGrid(options: ProfileOptions.faiths, isSelected: { profile.faith == $0 }) { value in
-                        Haptics.light()
-                        userProfileStore.update { $0.faith = value }
-                    }
-                }
-                card(titleKey: "onboarding.travelStyle.paceLabel") {
-                    ChipGrid(options: ProfileOptions.paces, isSelected: { profile.pace == $0 }) { value in
-                        Haptics.light()
-                        userProfileStore.update { $0.pace = value }
-                    }
-                }
-                card(titleKey: "onboarding.travelStyle.budgetLabel") {
-                    ChipGrid(options: ProfileOptions.budgets, isSelected: { profile.budget == $0 }) { value in
-                        Haptics.light()
-                        userProfileStore.update { $0.budget = value }
-                    }
-                }
-                card(titleKey: "onboarding.travelStyle.groupLabel") {
-                    ChipGrid(options: ProfileOptions.groupTypes, isSelected: { profile.groupType == $0 }) { value in
-                        Haptics.light()
-                        userProfileStore.update { $0.groupType = value }
-                    }
-                }
+                profileTabsSegment
+                profileTabContent
                 cityCard
                 savedDataCard
                 tripsCard
@@ -165,6 +134,100 @@ struct ProfileScreen: View {
         .background(Theme.navy)
         .padding(.horizontal, -20)
         .padding(.top, -20)
+    }
+
+    private var profileTabsSegment: some View {
+        HStack(spacing: 3) {
+            profileTabButton(.language, label: String(localized: "settings.tabs.language"))
+            profileTabButton(.profession, label: String(localized: "settings.tabs.profession"))
+            profileTabButton(.interests, label: String(localized: "settings.tabs.interests"))
+            profileTabButton(.plan, label: String(localized: "settings.tabs.plan"))
+        }
+        .padding(3)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemBackground)))
+    }
+
+    private func profileTabButton(_ value: ProfileTab, label: String) -> some View {
+        let active = profileTab == value
+        return Button {
+            profileTab = value
+        } label: {
+            Text(label)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(active ? .white : .primary.opacity(0.65))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 9)
+                .background(active ? RoundedRectangle(cornerRadius: 10).fill(Theme.navy) : nil)
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var profileTabContent: some View {
+        switch profileTab {
+        case .language: languageCard
+        case .profession: professionCard
+        case .interests: interestsTabContent
+        case .plan: planTabContent
+        }
+    }
+
+    private var professionCard: some View {
+        card(titleKey: "onboarding.profession.title") {
+            ChipGrid(options: ProfileOptions.professions, isSelected: { profile.profession == $0 }) { value in
+                Haptics.light()
+                userProfileStore.update { $0.profession = value }
+            }
+        }
+    }
+
+    // Grouped the same way `OnboardingScreen.faithInterestsStep` already
+    // groups them.
+    @ViewBuilder
+    private var interestsTabContent: some View {
+        card(titleKey: "onboarding.faithInterests.interestsLabel") {
+            ChipGrid(options: ProfileOptions.interests, isSelected: { profile.interests.contains($0) }) { value in
+                Haptics.light()
+                userProfileStore.update { profile in
+                    if let index = profile.interests.firstIndex(of: value) {
+                        profile.interests.remove(at: index)
+                    } else {
+                        profile.interests.append(value)
+                    }
+                }
+            }
+        }
+        card(titleKey: "onboarding.faithInterests.faithLabel", noteKey: "settings.faithNote") {
+            ChipGrid(options: ProfileOptions.faiths, isSelected: { profile.faith == $0 }) { value in
+                Haptics.light()
+                userProfileStore.update { $0.faith = value }
+            }
+        }
+    }
+
+    // Grouped the same way `OnboardingScreen.travelStyleStep` already
+    // groups them — pace, budget, and "who are you traveling with" (group
+    // type) all under one "Plan" heading.
+    @ViewBuilder
+    private var planTabContent: some View {
+        card(titleKey: "onboarding.travelStyle.paceLabel") {
+            ChipGrid(options: ProfileOptions.paces, isSelected: { profile.pace == $0 }) { value in
+                Haptics.light()
+                userProfileStore.update { $0.pace = value }
+            }
+        }
+        card(titleKey: "onboarding.travelStyle.budgetLabel") {
+            ChipGrid(options: ProfileOptions.budgets, isSelected: { profile.budget == $0 }) { value in
+                Haptics.light()
+                userProfileStore.update { $0.budget = value }
+            }
+        }
+        card(titleKey: "onboarding.travelStyle.groupLabel") {
+            ChipGrid(options: ProfileOptions.groupTypes, isSelected: { profile.groupType == $0 }) { value in
+                Haptics.light()
+                userProfileStore.update { $0.groupType = value }
+            }
+        }
     }
 
     private var languageCard: some View {
