@@ -38,33 +38,45 @@ export type RankedPlace = {
 
 const MAX_CATEGORY_REPEATS = 2;
 
+// Includes English, Turkish, and Norwegian Bokmal terms (the app's three
+// locales) -- these used to be English-only, so a Turkish or Norwegian query
+// never matched any of these signals and silently lost every category boost
+// below (e.g. +12 for a cafe query actually landing on `category === 'cafe'`).
 const KEYWORDS = {
-  indoor: ['indoor', 'inside', 'museum', 'gallery', 'rainy'],
-  outdoor: ['outdoor', 'outside', 'fresh air', 'walk outside', 'beach', 'park', 'viewpoint'],
-  rainyDay: ['rain', 'rainy', 'wet', 'storm', 'bad weather'],
-  family: ['family', 'kids', 'children', 'baby', 'stroller'],
-  romantic: ['couple', 'date', 'romantic', 'boyfriend', 'girlfriend'],
-  coffee: ['coffee', 'cafe', 'espresso', 'latte', 'pastry', 'bakery'],
-  food: ['food', 'eat', 'dinner', 'lunch', 'restaurant', 'meal', 'brunch'],
-  museum: ['museum', 'history', 'art', 'gallery', 'exhibition', 'culture'],
-  walk: ['walk', 'stroll', 'wander', 'hike', 'promenade', 'walkable'],
-  shopping: ['shopping', 'shops', 'mall', 'store', 'buy'],
-  waterfront: ['waterfront', 'sea', 'harbor', 'coastal', 'beach', 'boats'],
-  viewpoint: ['view', 'viewpoint', 'sunset', 'panorama', 'photo spot'],
-  quiet: ['quiet', 'calm', 'peaceful', 'relax', 'cozy'],
-  lively: ['lively', 'busy', 'social', 'nightlife', 'crowd', 'energetic'],
-  shortStop: ['short', 'quick', 'brief', '30 min', '1 hour', 'one hour'],
-  fullDay: ['full day', 'whole day', 'all day', 'big day', 'major attraction'],
-  central: ['central', 'center', 'city centre', 'city center', 'downtown'],
-  budget: ['cheap', 'budget', 'free', 'low cost', 'affordable'],
-  nearby: ['near', 'nearby', 'close', 'close by', 'walking distance'],
-  alternative: ['next', 'after', 'another', 'else', 'instead'],
+  indoor: ['indoor', 'inside', 'museum', 'gallery', 'rainy', 'iç mekan', 'kapalı', 'müze', 'galeri', 'yağmurlu', 'innendørs', 'inne', 'museum', 'galleri', 'regnvær'],
+  outdoor: ['outdoor', 'outside', 'fresh air', 'walk outside', 'beach', 'park', 'viewpoint', 'dış mekan', 'açık hava', 'sahil', 'park', 'manzara noktası', 'utendørs', 'ute', 'frisk luft', 'strand', 'utsiktspunkt'],
+  rainyDay: ['rain', 'rainy', 'wet', 'storm', 'bad weather', 'yağmur', 'yağmurlu', 'ıslak', 'fırtına', 'kötü hava', 'regn', 'regnvær', 'vått', 'storm', 'dårlig vær'],
+  family: ['family', 'kids', 'children', 'baby', 'stroller', 'aile', 'çocuk', 'çocuklar', 'bebek', 'familie', 'barn', 'baby', 'vogn'],
+  romantic: ['couple', 'date', 'romantic', 'boyfriend', 'girlfriend', 'çift', 'randevu', 'romantik', 'sevgili', 'erkek arkadaş', 'kız arkadaş', 'par', 'kjæreste'],
+  coffee: ['coffee', 'cafe', 'espresso', 'latte', 'pastry', 'bakery', 'kahve', 'kafe', 'pasta', 'fırın', 'kaffe', 'kafé', 'bakeri'],
+  food: ['food', 'eat', 'dinner', 'lunch', 'restaurant', 'meal', 'brunch', 'yemek', 'akşam yemeği', 'öğle yemeği', 'restoran', 'kahvaltı', 'mat', 'spise', 'middag', 'lunsj', 'restaurant', 'brunsj'],
+  museum: ['museum', 'history', 'art', 'gallery', 'exhibition', 'culture', 'müze', 'tarih', 'sanat', 'galeri', 'sergi', 'kültür', 'historie', 'kunst', 'galleri', 'utstilling', 'kultur'],
+  walk: ['walk', 'stroll', 'wander', 'hike', 'promenade', 'walkable', 'yürüyüş', 'gezinti', 'gezi', 'gå', 'spasertur', 'vandre'],
+  shopping: ['shopping', 'shops', 'mall', 'store', 'buy', 'alışveriş', 'mağaza', 'mağazalar', 'dükkan', 'butikk', 'butikker', 'kjøpe'],
+  waterfront: ['waterfront', 'sea', 'harbor', 'coastal', 'beach', 'boats', 'sahil', 'deniz', 'liman', 'kıyı', 'sjøfront', 'sjø', 'havn', 'kystlinje'],
+  viewpoint: ['view', 'viewpoint', 'sunset', 'panorama', 'photo spot', 'manzara', 'gün batımı', 'fotoğraf noktası', 'utsikt', 'utsiktspunkt', 'solnedgang'],
+  quiet: ['quiet', 'calm', 'peaceful', 'relax', 'cozy', 'sakin', 'huzurlu', 'stille', 'rolig', 'fredelig', 'koselig'],
+  lively: ['lively', 'busy', 'social', 'nightlife', 'crowd', 'energetic', 'canlı', 'hareketli', 'sosyal', 'gece hayatı', 'kalabalık', 'livlig', 'sosial', 'nattelivet', 'folkemengde'],
+  shortStop: ['short', 'quick', 'brief', '30 min', '1 hour', 'one hour', 'kısa', 'hızlı', 'çabuk', 'kort', 'rask'],
+  fullDay: ['full day', 'whole day', 'all day', 'big day', 'major attraction', 'tüm gün', 'bütün gün', 'hele dagen'],
+  central: ['central', 'center', 'city centre', 'city center', 'downtown', 'merkez', 'şehir merkezi', 'sentrum', 'sentral'],
+  budget: ['cheap', 'budget', 'free', 'low cost', 'affordable', 'ucuz', 'bütçe', 'ücretsiz', 'uygun fiyatlı', 'billig', 'budsjett', 'gratis', 'rimelig'],
+  nearby: ['near', 'nearby', 'close', 'close by', 'walking distance', 'yakın', 'yakınımda', 'yakınında', 'yürüme mesafesinde', 'nær', 'i nærheten'],
+  alternative: ['next', 'after', 'another', 'else', 'instead', 'sonra', 'başka', 'yerine', 'annen', 'i stedet'],
 } as const;
 
 function normalizeText(input: string) {
   return input
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
+    // Turkish dotless "\u0131" and Norwegian "\u00f8"/"\u00e6"/"\u00e5" have no NFD diacritic
+    // decomposition (unlike "\u015f"/"\u00fc"/"\u00f6", which fold to a base letter above) --
+    // left alone, tokenize()'s `[^a-z0-9]+` split treats them as delimiters
+    // and fractures words like "al\u0131\u015fveri\u015f" into meaningless fragments.
+    .replace(/\u0131/g, 'i')
+    .replace(/\u00f8/g, 'o')
+    .replace(/\u00e6/g, 'ae')
+    .replace(/\u00e5/g, 'a')
     .toLowerCase();
 }
 
@@ -79,8 +91,24 @@ function tokenize(input: string) {
   );
 }
 
+function escapeRegExp(input: string) {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Word-boundary matching, not a raw substring check -- short keywords (e.g.
+// English "art") kept accidentally matching inside unrelated Turkish/
+// Norwegian words that happen to contain the same letters (e.g. "art" inside
+// normalized "sart", from "şart" meaning "requirement"; "kunst" inside
+// "kunstsilo", a real place name). `[^a-z0-9]` boundaries treat multi-word
+// phrases like "short stop" as a single unit while still requiring the whole
+// phrase not be embedded inside a larger word on either side.
 function includesAny(input: string, phrases: readonly string[]) {
-  return phrases.some((phrase) => input.includes(normalizeText(phrase)));
+  return phrases.some((phrase) => {
+    const normalizedPhrase = normalizeText(phrase);
+    if (!normalizedPhrase) return false;
+    const pattern = new RegExp(`(?:^|[^a-z0-9])${escapeRegExp(normalizedPhrase)}(?:$|[^a-z0-9])`);
+    return pattern.test(input);
+  });
 }
 
 function getPlaceSearchHaystack(row: PlaceRow) {

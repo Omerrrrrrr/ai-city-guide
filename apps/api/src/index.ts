@@ -1551,7 +1551,21 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
     const recommendableRows = rankedRows.filter(
       (entry) => entry.qualityScore >= 36 || entry.row.importanceTier === 'hero'
     );
-    const shortlistCandidates = recommendableRows.length > 0 ? recommendableRows : rankedRows;
+    // The quality gate above is meant to avoid surfacing unverified/low-effort
+    // entries when better-verified alternatives exist -- but it's a blanket
+    // list-wide filter. If every place in the single most relevant category
+    // for this query happens to be unverified (e.g. freshly seeded/discovered
+    // data admins haven't reviewed yet), it can silently wipe out the entire
+    // best-matching category while less-relevant-but-verified places from
+    // other categories survive and reach the LLM instead. Guarantee the
+    // highest-relevance matches always reach the shortlist regardless of
+    // verification status, then let quality/verification act as a tiebreaker
+    // (rankPlacesForQuery's own sort) rather than a hard exclusion.
+    const topByRelevance = rankedRows.slice(0, MAX_CONTEXT_PLACES);
+    const shortlistCandidates =
+      recommendableRows.length > 0
+        ? Array.from(new Set([...topByRelevance, ...recommendableRows])).sort((a, b) => b.score - a.score)
+        : rankedRows;
     const shortlistedEntries = selectDiverseShortlist(shortlistCandidates, MAX_CONTEXT_PLACES);
     const placeById = new Map(allRows.map((row) => [row.id, row]));
     const placeContext = shortlistedEntries.map((entry) => ({

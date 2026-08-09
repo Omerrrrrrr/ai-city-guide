@@ -176,3 +176,25 @@ test('buildFallbackReason returns a readable sentence', () => {
 
   assert.equal(reason, 'Matches a quieter vibe, and easy to fit into a short stop.');
 });
+
+test('rankPlacesForQuery boosts a cafe for a Turkish-language query, not just English', () => {
+  const cafe = createPlace({ id: 'cafe-1', category: 'cafe', name: 'Kafe Bir' });
+  const museum = createPlace({ id: 'museum-1', category: 'museum', name: 'Muze Bir' });
+
+  const ranked = rankPlacesForQuery([cafe, museum], 'yakınımda güzel bir kafe önerir misin', '');
+
+  assert.equal(ranked[0]?.row.id, 'cafe-1');
+});
+
+test('rankPlacesForQuery does not fragment tokens on Turkish dotless "ı" or Norwegian ø/æ/å', () => {
+  // Regression: normalizeText used to leave "ı"/"ø"/"æ"/"å" untouched (they
+  // have no NFD diacritic decomposition, unlike "ş"/"ü"/"ö"), so tokenize()'s
+  // `[^a-z0-9]+` split treated them as delimiters and fractured words like
+  // "alışveriş" into meaningless fragments (e.g. "sveris").
+  const walkingArea = createPlace({ id: 'walk-1', category: 'walking-area', tags: 'walking,promenade' });
+  const other = createPlace({ id: 'other-1', category: 'museum' });
+
+  const ranked = rankPlacesForQuery([walkingArea, other], 'gezinti yapmak istiyorum, yürüyüş şart', '');
+
+  assert.equal(ranked[0]?.row.id, 'walk-1');
+});
