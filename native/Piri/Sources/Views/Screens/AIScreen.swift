@@ -370,13 +370,22 @@ struct AIScreen: View {
     /// exchange (see `POIRecommendation`, which embeds the resolved
     /// `POIPlace` directly into the conversation turn).
     private func nearbyPOICandidates(query: String, near coordinate: CLLocationCoordinate2D) async -> [POIPlace] {
-        let textResults = await POISearchService.search(near: coordinate, categories: nil, naturalLanguageQuery: query)
-        var combined = textResults
-        if combined.count < 8 {
-            let browseResults = await POISearchService.search(near: coordinate, categories: nil)
-            let existingNames = Set(combined.map { $0.name.lowercased() })
-            combined += browseResults.filter { !existingNames.contains($0.name.lowercased()) }
-        }
+        // Always merge in a plain category-less browse, not just when the
+        // text search comes up short — `naturalLanguageQuery` is built for
+        // short search terms ("coffee", "pizza"), not a full natural-
+        // language question like "şu an açık en iyi kafeler". Sent whole,
+        // it can fuzzy-match 8+ loosely-related local businesses by
+        // word-fragment overlap alone (confirmed live: it returned unrelated
+        // Norwegian company listings for a "best cafes open now" question),
+        // which used to block the real fallback merge below from ever
+        // running since it only fired when results were sparse. Actual
+        // nearby POIs are now unconditionally in the pool for the AI to
+        // choose from, regardless of how the free-text match went.
+        async let textResults = POISearchService.search(near: coordinate, categories: nil, naturalLanguageQuery: query)
+        async let browseResults = POISearchService.search(near: coordinate, categories: nil)
+        var combined = await textResults
+        let existingNames = Set(combined.map { $0.name.lowercased() })
+        combined += await browseResults.filter { !existingNames.contains($0.name.lowercased()) }
         return combined
             .sorted {
                 geoDistanceKm($0.coordinate.latitude, $0.coordinate.longitude, coordinate.latitude, coordinate.longitude)
