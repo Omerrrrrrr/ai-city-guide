@@ -35,9 +35,16 @@ struct MapScreen: View {
     @State private var selectedMapFeature: MKMapFeatureAnnotation?
     @State private var poiExplainResult: ExplainResult?
     @State private var poiExplainLoading = false
+    /// Resolved alongside the AI explain call so `mapFeatureCard` can offer
+    /// Apple's own native Place Card (hours, ratings, phone/website) via
+    /// `mapItemDetailPopover` — a mini embedded Map (like POIExplainSheet
+    /// uses) looked broken here since it duplicates the real map already
+    /// behind this card.
+    @State private var resolvedMapFeatureItem: MKMapItem?
+    @State private var showingMapItemDetail = false
     @State private var lookAroundScene: MKLookAroundScene?
     @State private var routeCoordinates: [CLLocationCoordinate2D] = []
-    @State private var initialRegion: MKCoordinateRegion?
+    @State var initialRegion: MKCoordinateRegion?
     @State private var recenterTrigger: UUID?
     @State private var searchQuery = ""
     @State private var searchTask: Task<Void, Never>?
@@ -89,7 +96,7 @@ struct MapScreen: View {
                         routeCoordinates: (activeTrip.routeGeometry ?? routeGeometry ?? []).compactMap(coordinate(fromPair:)),
                         breadcrumbCoordinates: activeTrip.breadcrumb.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng) },
                         stops: routeStopAnnotations,
-                        initialRegion: initialRegion,
+                        initialRegion: activeTripDisplayRegion(for: activeTrip) ?? initialRegion,
                         showsUserLocation: true
                     )
                     .ignoresSafeArea(edges: .bottom)
@@ -262,6 +269,8 @@ struct MapScreen: View {
         selectedLivePin = nil
         poiExplainResult = nil
         lookAroundScene = nil
+        resolvedMapFeatureItem = nil
+        showingMapItemDetail = false
         poiExplainTask?.cancel()
         poiExplainTask = Task { await explainMapFeature(feature) }
         Task { lookAroundScene = try? await MKLookAroundSceneRequest(coordinate: feature.coordinate).scene }
@@ -271,6 +280,7 @@ struct MapScreen: View {
         selectedMapFeature = nil
         poiExplainResult = nil
         lookAroundScene = nil
+        showingMapItemDetail = false
         poiExplainTask?.cancel()
     }
 
@@ -325,6 +335,20 @@ struct MapScreen: View {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
                 }
+            }
+
+            // Apple's own full native Place Card (hours, ratings/reviews,
+            // photos, "useful info") — opens itself as soon as it resolves,
+            // same as tapping a POI in Apple Maps itself does. An embedded
+            // mini map for the selection-accessory callout was tried first
+            // but rendered as a messy duplicate on top of the real map
+            // already behind this card, and only exposed a thinner subset
+            // of the data anyway (no photos/reviews) — the system sheet is
+            // the only surface with the full card (confirmed via research).
+            if let resolvedMapFeatureItem {
+                Color.clear.frame(height: 0)
+                    .mapItemDetailPopover(isPresented: $showingMapItemDetail, item: resolvedMapFeatureItem)
+                    .task(id: resolvedMapFeatureItem) { showingMapItemDetail = true }
             }
 
             if let lookAroundScene {
@@ -463,6 +487,7 @@ struct MapScreen: View {
         if let mapItem = try? await MKMapItemRequest(mapFeatureAnnotation: feature).mapItem {
             category = mapItem.pointOfInterestCategory?.rawValue.replacingOccurrences(of: "MKPOICategory", with: "")
             address = mapItem.placemark.title
+            resolvedMapFeatureItem = mapItem
         }
 
         guard !Task.isCancelled else { return }

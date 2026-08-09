@@ -2020,11 +2020,36 @@ ${poiCandidates.length > 0 ? `Candidates:\n${candidateList}` : ''}${PROMPT_INJEC
         return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Invalid request' });
       }
 
-      if (!OPENROUTESERVICE_API_KEY) {
-        return reply.code(503).send({ error: 'Routing is not configured' });
-      }
-
       const { coordinates, profile } = parsed.data;
+
+      // Straight-line fallback: connects the stops in the given order with
+      // a direct line and estimates distance/duration from haversine
+      // distance at a plain walking/driving pace. Same response shape as
+      // the real OpenRouteService path below, so the client needs no
+      // knowledge of which one it got -- it renders either way, just
+      // following streets once OPENROUTESERVICE_API_KEY is configured
+      // instead of cutting straight across blocks/water/etc.
+      const straightLineFallback = () => {
+        let distanceMeters = 0;
+        for (let i = 0; i < coordinates.length - 1; i++) {
+          distanceMeters += haversineKm(
+            coordinates[i].lat,
+            coordinates[i].lng,
+            coordinates[i + 1].lat,
+            coordinates[i + 1].lng
+          ) * 1000;
+        }
+        const speedMetersPerSecond = profile === 'driving-car' ? 11.1 : 1.4; // ~40 km/h vs ~5 km/h
+        return reply.send({
+          route: coordinates.map((c) => [c.lat, c.lng]),
+          distanceMeters,
+          durationSeconds: distanceMeters / speedMetersPerSecond,
+        });
+      };
+
+      if (!OPENROUTESERVICE_API_KEY) {
+        return straightLineFallback();
+      }
 
       try {
         const res = await fetch(`https://api.openrouteservice.org/v2/directions/${profile}/geojson`, {
@@ -2053,8 +2078,8 @@ ${poiCandidates.length > 0 ? `Candidates:\n${candidateList}` : ''}${PROMPT_INJEC
           durationSeconds: summary?.duration ?? null,
         });
       } catch (e: any) {
-        app.log.error(e);
-        return reply.code(500).send({ error: 'Failed to fetch route' });
+        app.log.error(e, 'OpenRouteService request failed, falling back to a straight-line route');
+        return straightLineFallback();
       }
     }
   );

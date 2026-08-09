@@ -25,11 +25,18 @@ struct SavedPOIReference: Codable, Identifiable, Hashable {
 }
 
 extension POIPlace {
-    /// `nil` when `mapItem.identifier` is unavailable (reported to happen on
-    /// some real devices) — callers should disable the save/plan action
-    /// rather than silently persist something unresolvable later.
-    var asReference: SavedPOIReference? {
-        guard let identifier = mapItem.identifier?.rawValue else { return nil }
+    /// Never `nil` — `mapItem.identifier` is reported to be missing on some
+    /// real devices/search results (confirmed via research), and gating
+    /// favoriting/route-stop-picking on its presence made those features
+    /// silently do nothing whenever it was absent (live-observed: Route Mode
+    /// stop-tapping appeared completely broken). A synthetic fallback
+    /// identifier (never mistakable for a real Apple one, which look like
+    /// "I63802885C8189B2B") keeps the reference — and therefore the
+    /// favorite/stop itself — always capturable. Only `resolve()` (reopening
+    /// the live detail sheet later) degrades gracefully when it's synthetic.
+    var asReference: SavedPOIReference {
+        let identifier = mapItem.identifier?.rawValue
+            ?? "local:\(name)|\(coordinate.latitude)|\(coordinate.longitude)"
         return SavedPOIReference(
             identifier: identifier,
             name: name,

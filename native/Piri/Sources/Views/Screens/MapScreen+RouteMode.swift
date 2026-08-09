@@ -22,6 +22,37 @@ extension MapScreen {
         }
     }
 
+    /// Region that fits every coordinate belonging to the active trip (route
+    /// line + breadcrumb + all stops), not just `MapScreen`'s own
+    /// general-purpose `initialRegion` (city/GPS center with a fixed small
+    /// span). `TripMapView` only applies `initialRegion` once on first
+    /// render, so this has to already be correct as soon as route-mode
+    /// tracking starts — otherwise only whichever stop happens to sit inside
+    /// the general region's small span is visible, and the rest (and often
+    /// the route line itself) render off-screen.
+    func activeTripDisplayRegion(for trip: Trip) -> MKCoordinateRegion? {
+        let routeCoords = (trip.routeGeometry ?? routeGeometry ?? []).compactMap(coordinate(fromPair:))
+        let breadcrumbCoords = trip.breadcrumb.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng) }
+        let stopCoords = trip.stops.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng) }
+        let all = routeCoords + breadcrumbCoords + stopCoords
+        guard !all.isEmpty else { return initialRegion }
+
+        let lats = all.map(\.latitude)
+        let lngs = all.map(\.longitude)
+        let center = CLLocationCoordinate2D(
+            latitude: (lats.min()! + lats.max()!) / 2,
+            longitude: (lngs.min()! + lngs.max()!) / 2
+        )
+        // Pad the bounding box so stops near the edge aren't clipped against
+        // the map view's frame, with a floor so a single-stop or
+        // very-close-together trip doesn't zoom in to street level.
+        let span = MKCoordinateSpan(
+            latitudeDelta: max((lats.max()! - lats.min()!) * 1.6, 0.02),
+            longitudeDelta: max((lngs.max()! - lngs.min()!) * 1.6, 0.02)
+        )
+        return MKCoordinateRegion(center: center, span: span)
+    }
+
     func coordinate(fromPair pair: [Double]) -> CLLocationCoordinate2D? {
         guard pair.count == 2 else { return nil }
         return CLLocationCoordinate2D(latitude: pair[0], longitude: pair[1])
@@ -77,7 +108,7 @@ extension MapScreen {
             coordinate: feature.coordinate,
             mapItem: mapItem
         )
-        guard let reference = poi.asReference else { return }
+        let reference = poi.asReference
         if let index = plannedStops.firstIndex(where: { $0.identifier == reference.identifier }) {
             plannedStops.remove(at: index)
         } else {

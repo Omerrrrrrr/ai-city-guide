@@ -21,7 +21,7 @@ final class RecentlyViewedStore {
     }
 
     func markViewed(_ poi: POIPlace) {
-        guard let reference = poi.asReference else { return }
+        let reference = poi.asReference
         var filtered = viewed.filter { $0.identifier != reference.identifier }
         filtered.insert(reference, at: 0)
         viewed = Array(filtered.prefix(maxRecent))

@@ -21,6 +21,15 @@ struct POIExplainSheet: View {
     @State private var chatInput = ""
     @State private var chatSending = false
     @State private var lookAroundScene: MKLookAroundScene?
+    /// Drives Apple's own full native Place Card (hours, ratings/reviews,
+    /// photos, "useful info") via `mapItemDetailSheet` — opened
+    /// automatically as soon as this page appears (see `.task` below) rather
+    /// than waiting on a tap. No public API exposes this data as plain
+    /// values (confirmed via research); the full sheet is the only surface
+    /// that renders Apple's actual rich card — a smaller
+    /// `mapItemDetailSelectionAccessory` callout was tried first but only
+    /// exposes a much thinner subset (no photos/reviews).
+    @State private var showingMapItemDetail = false
 
     var body: some View {
         NavigationStack {
@@ -57,6 +66,23 @@ struct POIExplainSheet: View {
                                 }
                             }
 
+                            // Apple's own full native Place Card — hours,
+                            // ratings/reviews, photos, "useful info" — opens
+                            // automatically as soon as this page appears (see
+                            // `.task` below), no tap needed. It's still a
+                            // system sheet (the only surface with this much
+                            // content, confirmed via research) rather than
+                            // literally laid out on this page, but it opens
+                            // itself instead of waiting behind a button.
+                            Color.clear.frame(height: 0)
+                                .mapItemDetailSheet(isPresented: $showingMapItemDetail, item: poi.mapItem)
+                                .task { showingMapItemDetail = true }
+
+                            Button("common.openInMaps") {
+                                poi.mapItem.openInMaps()
+                            }
+                            .buttonStyle(.bordered)
+
                             // Apple's own street-level imagery — silently
                             // omitted where Look Around has no coverage
                             // (common outside a handful of countries) rather
@@ -83,11 +109,6 @@ struct POIExplainSheet: View {
                             } else if let errorMessage {
                                 Text(errorMessage).font(.footnote).foregroundStyle(Theme.closedRed)
                             }
-
-                            Button("common.openInMaps") {
-                                poi.mapItem.openInMaps()
-                            }
-                            .buttonStyle(.bordered)
 
                             if !chatHistory.isEmpty {
                                 Divider().padding(.vertical, 4)

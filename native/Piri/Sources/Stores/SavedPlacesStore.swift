@@ -29,10 +29,8 @@ final class SavedPlacesStore {
         favorites.contains { $0.identifier == identifier }
     }
 
-    /// No-op if `poi.asReference` is `nil` (identifier unavailable) —
-    /// nothing to persist in that case.
     func toggleFavorite(_ poi: POIPlace) {
-        guard let reference = poi.asReference else { return }
+        let reference = poi.asReference
         if let index = favorites.firstIndex(where: { $0.identifier == reference.identifier }) {
             favorites.remove(at: index)
         } else {
@@ -46,7 +44,7 @@ final class SavedPlacesStore {
     }
 
     func togglePlan(_ poi: POIPlace) {
-        guard let reference = poi.asReference else { return }
+        let reference = poi.asReference
         if let index = plan.firstIndex(where: { $0.identifier == reference.identifier }) {
             plan.remove(at: index)
         } else {
