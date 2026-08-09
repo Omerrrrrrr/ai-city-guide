@@ -51,7 +51,7 @@ import {
   type UserProfileInput,
 } from './user-context';
 import { haversineKm } from './geo';
-import { fetchTripAdvisorRating } from './tripadvisor';
+import { fetchTripAdvisorInfo } from './tripadvisor';
 import { places, cities, liveGridCellStatus, livePlaceCache } from './schema';
 
 const PORT = Number(process.env.PORT ?? 4000);
@@ -1320,9 +1320,24 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
       const recentlyViewedSummaries = await resolveRecentlyViewedSummaries(recentlyViewedPlaceIds);
       const { text: profileContext, hasProfile } = buildUserContext(userProfile, recentlyViewedSummaries);
 
-      const placeContext = [`Name: ${name}`, category ? `Category: ${category}` : null, address ? `Address: ${address}` : null]
+      // Fetched ahead of the AI call (not run in parallel with it) so a real
+      // Tripadvisor description, when there is one, can ground the prompt
+      // instead of only reaching the client after the fact.
+      const tripAdvisorInfo =
+        lat !== undefined && lng !== undefined ? await fetchTripAdvisorInfo(name, lat, lng) : { rating: null, description: null };
+
+      const placeContext = [
+        `Name: ${name}`,
+        category ? `Category: ${category}` : null,
+        address ? `Address: ${address}` : null,
+        tripAdvisorInfo.description ? `Tripadvisor description: ${tripAdvisorInfo.description}` : null,
+      ]
         .filter(Boolean)
         .join('\n');
+
+      const factualGuard = tripAdvisorInfo.description
+        ? `A real Tripadvisor description of this place is included below — ground your response in it and don't contradict it, but still don't invent additional unverifiable specifics (exact founding dates, named owners, awards) beyond what's given.`
+        : `Only the place's name, category, and address are given below — you have no verified facts beyond that, so rely on general knowledge about places of this type and this name; don't invent specific unverifiable claims (exact founding dates, named owners, awards) about it.`;
 
       const faithMismatchGuard =
         userProfile?.faith && userProfile.faith !== 'secular' && userProfile.faith !== 'prefer_not_to_say'
@@ -1339,32 +1354,29 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         : '';
 
       try {
-        const [{ object }, rating] = await Promise.all([
-          generateObject({
-            model: aiProvider.client.chat(aiProvider.model),
-            maxOutputTokens: 300,
-            schema: z.object({
-              headline: z
-                .string()
-                .describe('One punchy sentence that connects this place to who the user is. Max 12 words.'),
-              body: z
-                .string()
-                .describe('2-3 sentences of personalized insight. Speak directly to this person\'s expertise or interests.'),
-              highlights: z
-                .array(z.string())
-                .min(2)
-                .max(3)
-                .describe('2-3 specific things this particular person would find most interesting here.'),
-            }),
-            system: `You are Piri, a deeply knowledgeable personal travel guide. Your job is to explain a place in a way that speaks directly to who the user is — their profession, interests, and worldview. Only the place's name, category, and address are given below — you have no verified facts beyond that, so rely on general knowledge about places of this type and this name; don't invent specific unverifiable claims (exact founding dates, named owners, awards) about it.${NO_HYPE_GUARD}${profileContext}
+        const { object } = await generateObject({
+          model: aiProvider.client.chat(aiProvider.model),
+          maxOutputTokens: 300,
+          schema: z.object({
+            headline: z
+              .string()
+              .describe('One punchy sentence that connects this place to who the user is. Max 12 words.'),
+            body: z
+              .string()
+              .describe('2-3 sentences of personalized insight. Speak directly to this person\'s expertise or interests.'),
+            highlights: z
+              .array(z.string())
+              .min(2)
+              .max(3)
+              .describe('2-3 specific things this particular person would find most interesting here.'),
+          }),
+          system: `You are Piri, a deeply knowledgeable personal travel guide. Your job is to explain a place in a way that speaks directly to who the user is — their profession, interests, and worldview. ${factualGuard}${NO_HYPE_GUARD}${profileContext}
 
 ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
-            prompt: `Explain this place:\n\n${placeContext}`,
-          } as any),
-          lat !== undefined && lng !== undefined ? fetchTripAdvisorRating(name, lat, lng) : Promise.resolve(null),
-        ]);
+          prompt: `Explain this place:\n\n${placeContext}`,
+        } as any);
 
-        return reply.send({ ...(object as Record<string, unknown>), rating });
+        return reply.send({ ...(object as Record<string, unknown>), rating: tripAdvisorInfo.rating });
       } catch (e: any) {
         app.log.error(e);
         return reply.code(500).send({ error: e.message || 'Failed to explain place' });

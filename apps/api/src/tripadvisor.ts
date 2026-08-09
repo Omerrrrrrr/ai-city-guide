@@ -74,19 +74,27 @@ function normalizeName(name: string): string {
     .trim();
 }
 
+export interface TripAdvisorInfo {
+  rating: TripAdvisorRating | null;
+  /// Tripadvisor's own business-provided description, when the matched
+  /// location has one — real, verifiable copy (not AI-invented), meant to
+  /// be fed into the AI explain prompt as grounding context so it can cite
+  /// actual specifics instead of only generic knowledge about the category.
+  description: string | null;
+}
+
+const emptyInfo: TripAdvisorInfo = { rating: null, description: null };
+
 /**
  * Looks up the nearest Tripadvisor location within 300m whose name overlaps
- * the given POI name, and returns its aggregate rating. Returns `null` on
- * any failure (missing key, no match, network error, malformed response) —
- * this is a nice-to-have addition to the AI blurb, never something the POI
- * explain flow should fail over.
+ * the given POI name, and returns its aggregate rating and description.
+ * Returns `{ rating: null, description: null }` on any failure (missing
+ * key, no match, network error, malformed response) — this is a nice-to-
+ * have addition to the AI blurb, never something the POI explain flow
+ * should fail over.
  */
-export async function fetchTripAdvisorRating(
-  name: string,
-  lat: number,
-  lng: number
-): Promise<TripAdvisorRating | null> {
-  if (!TRIPADVISOR_API_KEY) return null;
+export async function fetchTripAdvisorInfo(name: string, lat: number, lng: number): Promise<TripAdvisorInfo> {
+  if (!TRIPADVISOR_API_KEY) return emptyInfo;
 
   try {
     const url = new URL('https://terra.tripadvisor.com/api/locations/nearby');
@@ -100,12 +108,13 @@ export async function fetchTripAdvisorRating(
       headers: { 'X-API-Key': TRIPADVISOR_API_KEY },
       signal: AbortSignal.timeout(4000),
     });
-    if (!res.ok) return null;
+    if (!res.ok) return emptyInfo;
 
     const data = (await res.json()) as {
       data?: {
         location?: {
           names?: { value?: string }[];
+          descriptions?: { value?: string }[];
           traveler_ratings?: { overall?: { rating?: number; count?: number; icon_url?: string } };
           urls?: { tripadvisor?: { main?: string } };
           opening_hours?: OpeningHoursPayload;
@@ -119,20 +128,25 @@ export async function fetchTripAdvisorRating(
       return candidateName.length > 0 && (candidateName.includes(target) || target.includes(candidateName));
     });
 
+    const description = match?.location?.descriptions?.[0]?.value ?? null;
+
     const overall = match?.location?.traveler_ratings?.overall;
-    if (!overall?.rating || !overall?.count) return null;
+    if (!overall?.rating || !overall?.count) return { rating: null, description };
 
     const hours = match?.location?.opening_hours;
 
     return {
-      score: overall.rating,
-      reviewCount: overall.count,
-      url: match?.location?.urls?.tripadvisor?.main ?? '',
-      iconUrl: overall.icon_url ?? '',
-      hoursFormatted: hours?.formatted,
-      isOpenNow: computeOpenNow(hours),
+      rating: {
+        score: overall.rating,
+        reviewCount: overall.count,
+        url: match?.location?.urls?.tripadvisor?.main ?? '',
+        iconUrl: overall.icon_url ?? '',
+        hoursFormatted: hours?.formatted,
+        isOpenNow: computeOpenNow(hours),
+      },
+      description,
     };
   } catch {
-    return null;
+    return emptyInfo;
   }
 }
