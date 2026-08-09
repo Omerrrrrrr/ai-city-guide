@@ -221,9 +221,9 @@ struct ProfileScreen: View {
     }
 
     private var savedDataCard: some View {
-        let favoriteCount = savedPlacesStore.favoritePlaceIds.count
-        let planCount = savedPlacesStore.planPlaceIds.count
-        let recentCount = recentlyViewedStore.viewedIds.count
+        let favoriteCount = savedPlacesStore.favorites.count
+        let planCount = savedPlacesStore.plan.count
+        let recentCount = recentlyViewedStore.viewed.count
 
         return card(titleKey: "settings.savedPlaces", trailing: {
             Button("settings.viewAll") { showingSaved = .favorites }

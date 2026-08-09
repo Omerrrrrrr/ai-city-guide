@@ -2,7 +2,7 @@ name: Piri
 options:
   bundleIdPrefix: com.piriapp
   deploymentTarget:
-    iOS: "17.0"
+    iOS: "18.0"
   createIntermediateGroups: true
 configs:
   Debug: debug
@@ -19,7 +19,7 @@ targets:
   Piri:
     type: application
     platform: iOS
-    deploymentTarget: "17.0"
+    deploymentTarget: "18.0"
     sources:
       - path: Sources
     dependencies:
@@ -49,7 +49,7 @@ targets:
   PiriTests:
     type: bundle.unit-test
     platform: iOS
-    deploymentTarget: "17.0"
+    deploymentTarget: "18.0"
     sources:
       - path: Tests
     dependencies:

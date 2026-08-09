@@ -13,16 +13,21 @@ final class TripsStoreTests: XCTestCase {
         return TripsStore(defaults: defaults)
     }
 
+    private func stop(_ identifier: String, lat: Double = 58.1, lng: Double = 7.9) -> SavedPOIReference {
+        SavedPOIReference(identifier: identifier, name: identifier, categoryRawValue: nil, lat: lat, lng: lng, address: nil)
+    }
+
     func testStartTripMarksItActiveWithGivenStopsAndRoute() {
         let store = makeStore()
         let routeGeometry: [[Double]] = [[58.1, 7.9], [58.11, 7.91]]
-        let id = store.startTrip(placeIds: ["posebyen", "kunstsilo"], route: RouteInfo(routeGeometry: routeGeometry, distanceMeters: 1200, durationSeconds: 900))
+        let stops = [stop("posebyen"), stop("kunstsilo")]
+        let id = store.startTrip(stops: stops, route: RouteInfo(routeGeometry: routeGeometry, distanceMeters: 1200, durationSeconds: 900))
 
         XCTAssertEqual(store.activeTripId, id)
         XCTAssertEqual(store.trips.count, 1)
         let trip = store.trips[0]
         XCTAssertEqual(trip.id, id)
-        XCTAssertEqual(trip.placeIds, ["posebyen", "kunstsilo"])
+        XCTAssertEqual(trip.stops, stops)
         XCTAssertEqual(trip.routeGeometry ?? [], routeGeometry)
         XCTAssertEqual(trip.distanceMeters, 1200)
         XCTAssertEqual(trip.durationSeconds, 900)
@@ -33,7 +38,7 @@ final class TripsStoreTests: XCTestCase {
 
     func testRenameTrip() {
         let store = makeStore()
-        let id = store.startTrip(placeIds: ["posebyen"])
+        let id = store.startTrip(stops: [stop("posebyen")])
         store.renameTrip(id, name: "Sunday walk")
 
         XCTAssertEqual(store.trips.first { $0.id == id }?.name, "Sunday walk")
@@ -41,14 +46,15 @@ final class TripsStoreTests: XCTestCase {
 
     func testUpdateTripStopsWithoutTouchingBreadcrumbOrPhotos() {
         let store = makeStore()
-        let id = store.startTrip(placeIds: ["posebyen"])
+        let id = store.startTrip(stops: [stop("posebyen")])
         store.addBreadcrumb(id, point: TripWaypoint(lat: 58.1, lng: 7.9, timestamp: 1000))
 
         let newRoute: [[Double]] = [[58.2, 8.0], [58.21, 8.01]]
-        store.updateTripStops(id, placeIds: ["posebyen", "kunstsilo"], route: RouteInfo(routeGeometry: newRoute, distanceMeters: 2000, durationSeconds: 1500))
+        let newStops = [stop("posebyen"), stop("kunstsilo")]
+        store.updateTripStops(id, stops: newStops, route: RouteInfo(routeGeometry: newRoute, distanceMeters: 2000, durationSeconds: 1500))
 
         let trip = store.trips.first { $0.id == id }
-        XCTAssertEqual(trip?.placeIds, ["posebyen", "kunstsilo"])
+        XCTAssertEqual(trip?.stops, newStops)
         XCTAssertEqual(trip?.routeGeometry ?? [], newRoute)
         XCTAssertEqual(trip?.distanceMeters, 2000)
         XCTAssertEqual(trip?.breadcrumb, [TripWaypoint(lat: 58.1, lng: 7.9, timestamp: 1000)])
@@ -56,7 +62,7 @@ final class TripsStoreTests: XCTestCase {
 
     func testAppendsBreadcrumbPointsToTheRightTripOnly() {
         let store = makeStore()
-        let id = store.startTrip(placeIds: ["posebyen"])
+        let id = store.startTrip(stops: [stop("posebyen")])
         store.addBreadcrumb(id, point: TripWaypoint(lat: 58.1, lng: 7.9, timestamp: 1000))
         store.addBreadcrumb(id, point: TripWaypoint(lat: 58.11, lng: 7.91, timestamp: 2000))
 
@@ -69,7 +75,7 @@ final class TripsStoreTests: XCTestCase {
 
     func testAppendsPhotosToATrip() {
         let store = makeStore()
-        let id = store.startTrip(placeIds: ["posebyen"])
+        let id = store.startTrip(stops: [stop("posebyen")])
         store.addPhoto(id, photo: TripPhoto(uri: "file:///photo.jpg", timestamp: 5000, lat: nil, lng: nil))
 
         let trip = store.trips.first { $0.id == id }
@@ -78,7 +84,7 @@ final class TripsStoreTests: XCTestCase {
 
     func testEndTripStampsEndedAtAndClearsActiveTripId() {
         let store = makeStore()
-        let id = store.startTrip(placeIds: ["posebyen"])
+        let id = store.startTrip(stops: [stop("posebyen")])
         store.endTrip(id)
 
         XCTAssertNil(store.activeTripId)
@@ -87,7 +93,7 @@ final class TripsStoreTests: XCTestCase {
 
     func testDeleteTripClearsActiveTripIdIfItWasActive() {
         let store = makeStore()
-        let id = store.startTrip(placeIds: ["posebyen"])
+        let id = store.startTrip(stops: [stop("posebyen")])
         store.deleteTrip(id)
 
         XCTAssertEqual(store.trips.count, 0)

@@ -4,31 +4,32 @@ import Observation
 private let maxRecent = 8
 
 private struct RecentlyViewedState: Codable {
-    var viewedIds: [String] = []
+    var viewed: [SavedPOIReference] = []
 }
 
 /// Port of `mobile/src/store/recently-viewed.ts`.
 @Observable
 final class RecentlyViewedStore {
-    private(set) var viewedIds: [String] = []
+    private(set) var viewed: [SavedPOIReference] = []
 
     private let persistence = UserDefaultsStore<RecentlyViewedState>(key: "recently-viewed")
 
     init() {
         if let saved = persistence.load() {
-            viewedIds = saved.viewedIds
+            viewed = saved.viewed
         }
     }
 
-    func markViewed(_ id: String) {
-        var filtered = viewedIds.filter { $0 != id }
-        filtered.insert(id, at: 0)
-        viewedIds = Array(filtered.prefix(maxRecent))
-        persistence.save(RecentlyViewedState(viewedIds: viewedIds))
+    func markViewed(_ poi: POIPlace) {
+        guard let reference = poi.asReference else { return }
+        var filtered = viewed.filter { $0.identifier != reference.identifier }
+        filtered.insert(reference, at: 0)
+        viewed = Array(filtered.prefix(maxRecent))
+        persistence.save(RecentlyViewedState(viewed: viewed))
     }
 
     func clearHistory() {
-        viewedIds = []
-        persistence.save(RecentlyViewedState(viewedIds: viewedIds))
+        viewed = []
+        persistence.save(RecentlyViewedState(viewed: viewed))
     }
 }

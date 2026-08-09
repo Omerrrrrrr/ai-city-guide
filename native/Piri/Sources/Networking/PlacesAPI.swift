@@ -28,6 +28,10 @@ enum PlacesAPI {
         try await APIClient.shared.post("/places/recommend", body: request)
     }
 
+    static func recommendPOI(_ request: RecommendPOIRequest) async throws -> RecommendPOIResponse {
+        try await APIClient.shared.post("/places/recommend-poi", body: request)
+    }
+
     static func explain(_ request: ExplainRequest) async throws -> ExplainResult {
         try await APIClient.shared.post("/places/explain", body: request)
     }

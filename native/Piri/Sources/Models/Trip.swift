@@ -18,7 +18,7 @@ struct TripPhoto: Codable, Hashable, Identifiable {
 struct Trip: Codable, Identifiable, Hashable {
     var id: String
     var name: String?
-    var placeIds: [String]
+    var stops: [SavedPOIReference]
     var routeGeometry: [[Double]]?
     var distanceMeters: Double?
     var durationSeconds: Double?

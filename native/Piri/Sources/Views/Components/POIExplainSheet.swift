@@ -11,6 +11,7 @@ struct POIExplainSheet: View {
     let poi: POIPlace
 
     @Environment(UserProfileStore.self) private var userProfileStore
+    @Environment(SavedPlacesStore.self) private var savedPlacesStore
     @Environment(\.dismiss) private var dismiss
 
     @State private var result: ExplainResult?
@@ -27,9 +28,33 @@ struct POIExplainSheet: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text(poi.name).font(.title3.bold())
-                            if !poi.categoryLabel.isEmpty {
-                                Text(poi.categoryLabel).font(.subheadline).foregroundStyle(.secondary)
+                            HStack(alignment: .top) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(poi.name).font(.title3.bold())
+                                    if !poi.categoryLabel.isEmpty {
+                                        Text(poi.categoryLabel).font(.subheadline).foregroundStyle(.secondary)
+                                    }
+                                }
+                                Spacer()
+                                if let identifier = poi.mapItem.identifier?.rawValue {
+                                    HStack(spacing: 14) {
+                                        Button {
+                                            Haptics.medium()
+                                            savedPlacesStore.toggleFavorite(poi)
+                                        } label: {
+                                            Image(systemName: savedPlacesStore.isFavorite(identifier) ? "heart.fill" : "heart")
+                                                .foregroundStyle(savedPlacesStore.isFavorite(identifier) ? Theme.gold : .secondary)
+                                        }
+                                        Button {
+                                            Haptics.light()
+                                            savedPlacesStore.togglePlan(poi)
+                                        } label: {
+                                            Image(systemName: savedPlacesStore.isInPlan(identifier) ? "checkmark.circle.fill" : "plus.circle")
+                                                .foregroundStyle(savedPlacesStore.isInPlan(identifier) ? Theme.gold : .secondary)
+                                        }
+                                    }
+                                    .font(.title3)
+                                }
                             }
 
                             // Apple's own street-level imagery — silently

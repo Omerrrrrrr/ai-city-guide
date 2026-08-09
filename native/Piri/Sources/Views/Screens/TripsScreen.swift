@@ -77,7 +77,7 @@ private struct TripRowView: View {
     }
 
     private var metaText: String {
-        var text = LPlural("trips.stopsCount", count: trip.placeIds.count)
+        var text = LPlural("trips.stopsCount", count: trip.stops.count)
         if !trip.photos.isEmpty {
             text += " · " + LPlural("trips.photosCount", count: trip.photos.count)
         }

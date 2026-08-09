@@ -30,8 +30,11 @@ struct HomeScreen: View {
             || profile.budget != nil || profile.groupType != nil || profile.pace != nil
     }
 
+    // Dormant with the rest of the `useCuratedHomeData == false` branch —
+    // `RecentlyViewedStore` now stores Apple POI references, which don't
+    // correspond to curated place ids, so this can no longer find matches.
     private var recentlyViewedPlaces: [Place] {
-        recentlyViewedStore.viewedIds.compactMap(placesQuery.place)
+        recentlyViewedStore.viewed.map(\.identifier).compactMap(placesQuery.place)
     }
 
     private var ranked: [Place] {

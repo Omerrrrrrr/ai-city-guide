@@ -1741,6 +1741,210 @@ ${placeContext.length > 0 ? `Available shortlist:\n${JSON.stringify(placeContext
     }
   });
 
+  // ── /places/recommend-poi — Ask Piri over client-supplied Apple POI data ────
+  // Sibling of /places/recommend, but for the Apple-MapKit-POI-sourced world
+  // Map/Home already moved to (see useCuratedMapData/useCuratedHomeData) --
+  // no DB query, no ranking algorithm. The client runs its own MKLocalSearch
+  // and sends a numbered candidate list; this picks indices from it, same
+  // no-DB-round-trip philosophy as /places/explain-poi. /places/recommend
+  // itself is left completely untouched, same reversible-toggle precedent.
+  app.post<{
+    Body: {
+      query: string;
+      city?: string;
+      lat?: number;
+      lng?: number;
+      imageBase64?: string;
+      mimeType?: string;
+      locale?: string;
+      messages?: Array<{ role: 'user' | 'assistant'; content: string }>;
+      userProfile?: UserProfileInput;
+      recentlyViewedPlaceIds?: string[];
+      weather?: { condition: string; temp: number; city: string; description: string };
+      poiCandidates?: Array<{ name: string; category?: string; lat?: number; lng?: number; address?: string }>;
+    };
+  }>('/places/recommend-poi', { config: { rateLimit: { max: 12, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const parsedBody = z
+      .object({
+        query: z.string().trim().min(1, 'Query is required').max(500),
+        city: z.string().trim().min(1).max(100).optional(),
+        lat: z.number().optional(),
+        lng: z.number().optional(),
+        imageBase64: z.string().min(1).optional(),
+        mimeType: z.string().optional().default('image/jpeg'),
+        locale: z.string().trim().min(2).max(8).optional(),
+        messages: z.array(chatMessageSchema).max(8).optional(),
+        userProfile: userProfileSchema.optional(),
+        recentlyViewedPlaceIds: recentlyViewedPlaceIdsSchema,
+        weather: z
+          .object({
+            condition: z.string(),
+            temp: z.number(),
+            city: z.string(),
+            description: z.string(),
+          })
+          .optional(),
+        // Independently capped server-side -- never trust the client's own cap.
+        // `.nullable()` alongside `.optional()` on the optional fields: Swift's
+        // synthesized `Encodable` omits nil Optionals entirely (so the native
+        // client never sends explicit `null`), but accepting `null` too is a
+        // one-line defensive move against any other/future caller that does
+        // (found via stress-testing with a harness that sent explicit nulls).
+        poiCandidates: z
+          .array(
+            z.object({
+              name: z.string().trim().min(1).max(200),
+              category: z.string().trim().max(100).nullable().optional(),
+              lat: z.number().nullable().optional(),
+              lng: z.number().nullable().optional(),
+              address: z.string().trim().max(300).nullable().optional(),
+            })
+          )
+          .max(30)
+          .optional()
+          .default([]),
+      })
+      .safeParse(request.body);
+
+    if (!parsedBody.success) {
+      return reply.code(400).send({ error: parsedBody.error.issues[0]?.message ?? 'Invalid request' });
+    }
+
+    const {
+      query,
+      imageBase64,
+      mimeType,
+      locale,
+      messages = [],
+      userProfile,
+      recentlyViewedPlaceIds,
+      weather,
+      poiCandidates,
+    } = parsedBody.data;
+
+    const recentlyViewedSummaries = await resolveRecentlyViewedSummaries(recentlyViewedPlaceIds);
+    const { text: userContext } = buildUserContext(userProfile, recentlyViewedSummaries);
+    const profileContext = userContext ? `${userContext}\nPersonalize your answer to this person.` : '';
+
+    const weatherContext = weather
+      ? `\n\nCurrent weather: ${weather.description}, ${weather.temp}°C in ${weather.city}. Condition: ${weather.condition}. ${
+          weather.condition === 'rainy' || weather.condition === 'stormy'
+            ? 'Strongly prefer indoor venues unless the user specifically asks for outdoor.'
+            : weather.condition === 'sunny' && weather.temp > 18
+            ? 'Great weather for outdoor venues — highlight terraces, parks, and waterfront spots.'
+            : weather.condition === 'snowy'
+            ? 'Prefer indoor or cozy venues given the snow.'
+            : ''
+        }`
+      : '';
+
+    const aiProvider = getAiProviderConfig();
+    if (!aiProvider) {
+      return reply.code(500).send({
+        error: 'OPENAI_API_KEY or OPENROUTER_API_KEY is not configured in the backend',
+      });
+    }
+
+    const candidateList = poiCandidates
+      .map((c, i) => `[${i}] ${c.name}${c.category ? ` — ${c.category}` : ''}${c.address ? ` (${c.address})` : ''}`)
+      .join('\n');
+
+    try {
+      const imageInstructions = imageBase64
+        ? `\n\nThe user attached a photo along with their message. Look at it and answer their question with what the photo actually shows — identify it if that's what they're asking, or use it as context for their question. If it clearly matches one of the numbered candidates below, include it in recommendations by index; don't force a match if it doesn't.`
+        : '';
+
+      const priorTurnMessages = messages.slice(-6).map((message) => ({
+        role: message.role,
+        content: message.content,
+      }));
+      const finalUserMessage = imageBase64
+        ? {
+            role: 'user' as const,
+            content: [
+              { type: 'image' as const, image: imageBase64, mimeType },
+              { type: 'text' as const, text: query },
+            ],
+          }
+        : { role: 'user' as const, content: query };
+
+      const { object } = await generateObject({
+        model: aiProvider.client.chat(aiProvider.model),
+        maxOutputTokens: 420,
+        schema: z.object({
+          answer: z.string().describe('A short conversational reply in 1-2 sentences'),
+          recommendations: z.array(
+            z.object({
+              index: z.number().int().describe('Index of the candidate from the numbered list'),
+              reason: z.string().describe('1-2 sentence custom explanation of match'),
+            })
+          ),
+        }) as any,
+        system: `You are Piri, a personal travel guide.${profileContext}${weatherContext}
+Continue the conversation naturally using the recent chat history when provided.
+Keep answers concise (1–3 sentences) and personalized to the user.${imageInstructions}${languageInstruction(locale)}
+
+${poiCandidates.length > 0
+  ? `You have ${poiCandidates.length} nearby points of interest, from Apple Maps, numbered below. Only fill "recommendations" when the user's message is actually asking for a place, suggestion, itinerary idea, or something to do/see/eat — pick 3-5 when there are several strong matches, fewer when matches are narrow. For greetings, thanks, follow-up chit-chat, or questions that don't call for a place suggestion, return an EMPTY recommendations array and just answer naturally. Don't force a recommendation that doesn't fit the question. Return ONLY candidates from the numbered list using their exact index.
+
+GROUNDING RULE: never name a specific venue in your answer text that is not one of the numbered candidates below — not a real place you happen to know from general knowledge, not a plausible-sounding invented name, none of that. Every specific place name in your answer must be the exact name of a candidate you also return by index in "recommendations." If nothing below fits well, don't invent or recall one from memory — speak generically instead ("a cozy cafe nearby", "a scenic walking spot") or say you don't have a great match for that yet.
+
+PRIORITY RULE: the user's current message always overrides their general profile — the profile is just a fallback for when they haven't said what they want right now. If the message explicitly asks for something that differs from a stated profile preference, you MUST follow what they just asked for and treat the conflicting profile field as irrelevant for this turn — do not mention the mismatch, do not ask a clarifying question. Silently pick your best matches from the candidates for the immediate request.
+
+DECISIVENESS RULE (found via testing: the model was asking "what kind of food?" for a plain "food" request instead of just recommending from four perfectly good restaurant candidates already in hand): if the candidate list contains one or more plausible matches for what the user asked, RECOMMEND THEM — don't ask a clarifying question first. A single generic word ("food", "yemek", "coffee") is specific enough on its own; treat it as "surprise me with your best options," not as missing information you need to gather. Only skip recommending and ask a follow-up when the message is genuinely ambiguous in a way no candidate could resolve (e.g. "what's the weather like") or none of the candidates are even remotely plausible.`
+  : `You have no nearby points of interest available right now (location may be unknown, or Apple Maps has little POI data for this exact spot). Answer from your own knowledge, don't recommend a specific unverifiable venue by name, and return an empty recommendations array.`
+}
+
+${poiCandidates.length > 0 ? `Candidates:\n${candidateList}` : ''}${PROMPT_INJECTION_GUARD}`,
+        messages: [...priorTurnMessages, finalUserMessage],
+      } as any);
+
+      const rawRecommendations = (object as any).recommendations ?? [];
+      const seenIndices = new Set<number>();
+      const validated: { index: number; aiReason: string }[] = rawRecommendations
+        .filter(
+          (rec: { index: number }) =>
+            Number.isInteger(rec.index) && rec.index >= 0 && rec.index < poiCandidates.length
+        )
+        .filter((rec: { index: number }) => {
+          if (seenIndices.has(rec.index)) return false;
+          seenIndices.add(rec.index);
+          return true;
+        })
+        .map((rec: { index: number; reason: string }) => ({ index: rec.index, aiReason: rec.reason }));
+
+      // Same safety net as /places/recommend: the model sometimes names a
+      // candidate in the answer text but leaves it out of "recommendations".
+      const answerText: string = (object as any).answer ?? '';
+      if (answerText) {
+        poiCandidates.forEach((candidate, index) => {
+          if (validated.length >= MAX_AI_RECOMMENDATIONS) return;
+          if (candidate.name.length < 4) return;
+          if (!answerText.toLowerCase().includes(candidate.name.toLowerCase())) return;
+          if (validated.some((rec) => rec.index === index)) return;
+          validated.push({ index, aiReason: 'Mentioned above.' });
+        });
+      }
+
+      // Same-name safety net (two branches of the same chain within radius).
+      const seenNames = new Set<string>();
+      const deduped = validated.filter((rec) => {
+        const key = poiCandidates[rec.index].name.toLowerCase();
+        if (seenNames.has(key)) return false;
+        seenNames.add(key);
+        return true;
+      });
+
+      return {
+        answer: answerText,
+        recommendations: deduped.slice(0, MAX_AI_RECOMMENDATIONS),
+      };
+    } catch (e: any) {
+      app.log.error(e);
+      return reply.code(500).send({ error: e.message || 'Failed to generate recommendations' });
+    }
+  });
+
   // ── /weather — Proxy OpenWeatherMap current conditions ───────────────────────
   app.get<{ Querystring: { lat: string; lng: string } }>(
     '/weather',

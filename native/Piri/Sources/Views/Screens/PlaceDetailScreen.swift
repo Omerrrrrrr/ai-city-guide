@@ -5,9 +5,13 @@ import SwiftUI
 struct PlaceDetailScreen: View {
     let placeId: String
 
+    // Dormant screen — no longer reachable from anywhere in the app now that
+    // Explore/Saved/Trips resolve through Apple POI data (`POIExplainSheet`)
+    // instead. Kept compiling rather than deleted (see `useCuratedMapData`
+    // precedent). `SavedPlacesStore`/`RecentlyViewedStore` now only accept
+    // `POIPlace`, not curated `Place`, so favorite/plan/recently-viewed
+    // integration below is stubbed out rather than wired to them.
     @Environment(PlacesQuery.self) private var placesQuery
-    @Environment(SavedPlacesStore.self) private var savedPlacesStore
-    @Environment(RecentlyViewedStore.self) private var recentlyViewedStore
     @Environment(UserProfileStore.self) private var userProfileStore
     @Environment(\.dismiss) private var dismiss
 
@@ -28,7 +32,6 @@ struct PlaceDetailScreen: View {
             }
         }
         .task(id: placeId) {
-            recentlyViewedStore.markViewed(placeId)
             await load()
         }
         .navigationBarHidden(true)
@@ -63,7 +66,7 @@ struct PlaceDetailScreen: View {
                 pace: profile.pace?.rawValue
             ),
             locale: Locale.current.language.languageCode?.identifier,
-            recentlyViewedPlaceIds: recentlyViewedStore.viewedIds
+            recentlyViewedPlaceIds: nil
         )
         explainResult = try? await PlacesAPI.explain(request)
     }
@@ -85,8 +88,8 @@ struct PlaceDetailScreen: View {
     private func content(for place: Place) -> some View {
         let status = PlaceHours.openStatus(for: place)
         let open = PlaceHours.isOpen(status)
-        let saved = savedPlacesStore.isFavorite(place.id)
-        let inPlan = savedPlacesStore.isInPlan(place.id)
+        let saved = false
+        let inPlan = false
         let verifiedGallery = (place.gallery ?? []).filter { $0.verified || $0.status == "applied" }
         let nearby = placesQuery.nearby(to: place, limit: 5)
 
@@ -144,14 +147,8 @@ struct PlaceDetailScreen: View {
             HStack {
                 iconButton(systemName: "chevron.left") { dismiss() }
                 Spacer()
-                iconButton(systemName: saved ? "heart.fill" : "heart", active: saved) {
-                    Haptics.medium()
-                savedPlacesStore.toggleFavorite(place.id)
-                }
-                iconButton(systemName: inPlan ? "checkmark.circle.fill" : "plus.circle", active: inPlan) {
-                    Haptics.light()
-                savedPlacesStore.togglePlan(place.id)
-                }
+                iconButton(systemName: saved ? "heart.fill" : "heart", active: saved) {}
+                iconButton(systemName: inPlan ? "checkmark.circle.fill" : "plus.circle", active: inPlan) {}
             }
             .padding(.horizontal, 16)
             .padding(.top, 50)
@@ -184,15 +181,9 @@ struct PlaceDetailScreen: View {
 
     private func actionBar(_ place: Place, saved: Bool, inPlan: Bool) -> some View {
         HStack(spacing: 0) {
-            actionBarButton(icon: saved ? "heart.fill" : "heart", label: saved ? "placeDetail.actionBar.saved" : "placeDetail.actionBar.save") {
-                Haptics.medium()
-                savedPlacesStore.toggleFavorite(place.id)
-            }
+            actionBarButton(icon: saved ? "heart.fill" : "heart", label: saved ? "placeDetail.actionBar.saved" : "placeDetail.actionBar.save") {}
             Divider().frame(height: 32)
-            actionBarButton(icon: inPlan ? "checkmark" : "list.bullet.clipboard", label: inPlan ? "placeDetail.actionBar.inPlan" : "placeDetail.actionBar.addToPlan") {
-                Haptics.light()
-                savedPlacesStore.togglePlan(place.id)
-            }
+            actionBarButton(icon: inPlan ? "checkmark" : "list.bullet.clipboard", label: inPlan ? "placeDetail.actionBar.inPlan" : "placeDetail.actionBar.addToPlan") {}
             Divider().frame(height: 32)
             actionBarButton(icon: "arrow.up.right", label: "placeDetail.actionBar.directions", disabled: !PlaceDirections.canOpenInMaps(place)) {
                 PlaceDirections.openInMaps(place)

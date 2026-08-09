@@ -7,7 +7,6 @@ struct TripDetailScreen: View {
     let tripId: String
 
     @Environment(TripsStore.self) private var tripsStore
-    @Environment(PlacesQuery.self) private var placesQuery
     @Environment(\.dismiss) private var dismiss
 
     @State private var isPlaying = false
@@ -16,6 +15,8 @@ struct TripDetailScreen: View {
     @State private var isEditingName = false
     @State private var nameInput = ""
     @State private var viewerIndex: Int?
+    @State private var selectedPOI: POIPlace?
+    @State private var resolvingStopIdentifier: String?
 
     private let playbackStepMs = 50.0
     private let playbackSegmentMs = 450.0
@@ -42,15 +43,13 @@ struct TripDetailScreen: View {
 
     @ViewBuilder
     private func content(_ trip: Trip) -> some View {
-        let stops = trip.placeIds.compactMap(placesQuery.place).filter { $0.location != nil }
+        let stops = trip.stops
         let breadcrumbCoordinates = trip.breadcrumb.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng) }
         let routeCoordinates = (trip.routeGeometry ?? []).compactMap { pair -> CLLocationCoordinate2D? in
             guard pair.count == 2 else { return nil }
             return CLLocationCoordinate2D(latitude: pair[0], longitude: pair[1])
         }
-        let allCoordinates = routeCoordinates + breadcrumbCoordinates + stops.compactMap { place -> CLLocationCoordinate2D? in
-            place.location.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng) }
-        }
+        let allCoordinates = routeCoordinates + breadcrumbCoordinates + stops.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng) }
 
         VStack(spacing: 0) {
             header(trip)
@@ -59,8 +58,8 @@ struct TripDetailScreen: View {
                 TripMapView(
                     routeCoordinates: routeCoordinates,
                     breadcrumbCoordinates: breadcrumbCoordinates,
-                    stops: Array(stops.enumerated()).compactMap { index, place in
-                        place.location.map { (index, CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng)) }
+                    stops: Array(stops.enumerated()).map { index, stop in
+                        (index, CLLocationCoordinate2D(latitude: stop.lat, longitude: stop.lng))
                     },
                     playbackPosition: playbackPosition,
                     initialRegion: averageRegion(allCoordinates)
@@ -84,20 +83,31 @@ struct TripDetailScreen: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("trips.stopsLabel").font(.system(size: 12, weight: .bold)).opacity(0.45).textCase(.uppercase)
-                    ForEach(Array(stops.enumerated()), id: \.element.id) { index, place in
-                        NavigationLink(destination: PlaceDetailScreen(placeId: place.id)) {
+                    ForEach(Array(stops.enumerated()), id: \.element.identifier) { index, stop in
+                        Button {
+                            Task { await openStop(stop) }
+                        } label: {
                             HStack(spacing: 10) {
                                 ZStack {
                                     Circle().fill(Theme.gold.opacity(0.15))
                                     Text("\(index + 1)").font(.system(size: 11, weight: .heavy)).foregroundStyle(Theme.gold)
                                 }
                                 .frame(width: 22, height: 22)
-                                PlaceImageView(place: place, cornerRadius: 10).frame(width: 44, height: 44)
-                                Text(place.name).font(.system(size: 14, weight: .semibold)).lineLimit(1)
+                                ZStack {
+                                    Color(.secondarySystemBackground)
+                                    Image(systemName: POICategoryGroups.icon(for: stop.category)).foregroundStyle(Theme.gold)
+                                }
+                                .frame(width: 44, height: 44)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                Text(stop.name).font(.system(size: 14, weight: .semibold)).lineLimit(1)
                                 Spacer()
+                                if resolvingStopIdentifier == stop.identifier {
+                                    ProgressView()
+                                }
                             }
                         }
                         .buttonStyle(.plain)
+                        .disabled(resolvingStopIdentifier != nil)
                     }
 
                     if !trip.photos.isEmpty {
@@ -124,7 +134,14 @@ struct TripDetailScreen: View {
         .sheet(item: Binding(get: { viewerIndex.map(PhotoViewerIndex.init) }, set: { viewerIndex = $0?.value })) { wrapped in
             PhotoViewer(photos: trip.photos, index: wrapped.value)
         }
+        .sheet(item: $selectedPOI) { poi in POIExplainSheet(poi: poi) }
         .onAppear { nameInput = trip.name ?? "" }
+    }
+
+    private func openStop(_ stop: SavedPOIReference) async {
+        resolvingStopIdentifier = stop.identifier
+        selectedPOI = await stop.resolve()
+        resolvingStopIdentifier = nil
     }
 
     private func header(_ trip: Trip) -> some View {
@@ -182,8 +199,7 @@ struct TripDetailScreen: View {
     }
 
     private func shareText(_ trip: Trip) -> String {
-        let stops = trip.placeIds.compactMap(placesQuery.place)
-        let stopNames = stops.map(\.name).joined(separator: " → ")
+        let stopNames = trip.stops.map(\.name).joined(separator: " → ")
         let distanceLine = trip.distanceMeters.map { L("trips.share.distance", String(format: "%.1f", $0 / 1000)) } ?? ""
         return L(
             "trips.share.message",

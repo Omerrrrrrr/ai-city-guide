@@ -19,6 +19,7 @@
 		16F3D8BA42FD1F276EE5A0F7 /* AdminGateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 075FABAAD9BF8ECA21982D81 /* AdminGateView.swift */; };
 		18686DBA2F9325533A80E0D1 /* PlaceHours.swift in Sources */ = {isa = PBXBuildFile; fileRef = 717A345206E0678E81ADF461 /* PlaceHours.swift */; };
 		189B088BE06E083C3934876B /* APIConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DCA1094E66C258A4211AC15 /* APIConfig.swift */; };
+		195EA9B33959C182EFED15A5 /* SavedPOIReference.swift in Sources */ = {isa = PBXBuildFile; fileRef = D81083A6ED959FC685F77BB0 /* SavedPOIReference.swift */; };
 		1E086E37354ECEE0BD0A696D /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 976D59311B25086F62FC1B9B /* Localization.swift */; };
 		2543E63D0C2DA553A725C458 /* TripMiniMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AD9D3415FA1CE99CB46112B /* TripMiniMap.swift */; };
 		25B756C97A73DF9878AC1832 /* POIPlace.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFE56DF7DF9101D7624A7945 /* POIPlace.swift */; };
@@ -178,6 +179,7 @@
 		D207ADFEE3A017CC4579BF6E /* ChipGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChipGrid.swift; sourceTree = "<group>"; };
 		D51DBC290790323812C65938 /* Place.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Place.swift; sourceTree = "<group>"; };
 		D6CACD0DF38D58B018010C67 /* PlacesQuery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlacesQuery.swift; sourceTree = "<group>"; };
+		D81083A6ED959FC685F77BB0 /* SavedPOIReference.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedPOIReference.swift; sourceTree = "<group>"; };
 		DB354EEA308416A9AB05BE5B /* TripsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripsScreen.swift; sourceTree = "<group>"; };
 		DB62061C800BEF24D07A2C43 /* PushNotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotificationManager.swift; sourceTree = "<group>"; };
 		E712507F714C68342D7027E7 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
@@ -281,6 +283,7 @@
 				F887777DB4455F61F087FC46 /* LivePin.swift */,
 				D51DBC290790323812C65938 /* Place.swift */,
 				FFE56DF7DF9101D7624A7945 /* POIPlace.swift */,
+				D81083A6ED959FC685F77BB0 /* SavedPOIReference.swift */,
 				96FE584464E381510D16935C /* Trip.swift */,
 				31BFBA845700A3D94868AF4F /* UserProfile.swift */,
 				5A709406E05ADF1CFB117E2E /* Weather.swift */,
@@ -575,6 +578,7 @@
 				C4571C5476BB6CECDD2B4F47 /* PushNotificationManager.swift in Sources */,
 				53511741B554A932B2C211B3 /* RecentlyViewedStore.swift in Sources */,
 				CFB1868E248503850317D2E5 /* RootView.swift in Sources */,
+				195EA9B33959C182EFED15A5 /* SavedPOIReference.swift in Sources */,
 				FF415DF0EEFDF751AFD3FDE9 /* SavedPlacesStore.swift in Sources */,
 				B32A7E5F97F0950A4DDC57EC /* SavedScreen.swift in Sources */,
 				D33E22E7628EB1496DE2A8E7 /* ScanScreen.swift in Sources */,
@@ -614,7 +618,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -636,7 +640,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Generated/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -656,7 +660,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Generated/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -719,7 +723,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -777,7 +781,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -794,7 +798,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

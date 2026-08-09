@@ -1,9 +1,25 @@
+import MapKit
 import PhotosUI
 import SwiftUI
 
+/// Pairs a resolved `POIPlace` (with its live `MKMapItem`, recovered from the
+/// same-turn candidate array by index) with the AI's reason for suggesting
+/// it. Same-file private type, matching `TripDetailScreen`'s `PhotoViewerIndex`.
+private struct POIRecommendation: Identifiable {
+    let poi: POIPlace
+    let aiReason: String
+    /// Distance from the anchor used for that turn's POI search — the
+    /// user's actual GPS position if no city is being browsed, or the
+    /// browsed city's center otherwise (see `search()`). Either way "how far
+    /// from here" is the right framing, so the label doesn't need to state
+    /// which anchor it is.
+    let distanceKm: Double
+    var id: UUID { poi.id }
+}
+
 private enum ConversationTurn: Identifiable {
     case user(id: String, content: String, image: UIImage?)
-    case assistant(id: String, content: String, recommendations: [AIRecommendation])
+    case assistant(id: String, content: String, recommendations: [POIRecommendation])
 
     var id: String {
         switch self {
@@ -30,6 +46,7 @@ struct AIScreen: View {
     @State private var attachedItem: PhotosPickerItem?
     @State private var attachedImage: UIImage?
     @State private var hasAutoSubmitted = false
+    @State private var selectedPOI: POIPlace?
 
     private let initialQuery: String?
 
@@ -146,6 +163,7 @@ struct AIScreen: View {
                 await search()
             }
         }
+        .sheet(item: $selectedPOI) { poi in POIExplainSheet(poi: poi) }
     }
 
     private var header: some View {
@@ -237,7 +255,9 @@ struct AIScreen: View {
                     Text("ai.noMatches").foregroundStyle(.secondary).padding(.horizontal, 4)
                 } else {
                     ForEach(recommendations) { recommendation in
-                        NavigationLink(destination: PlaceDetailScreen(placeId: recommendation.place.id)) {
+                        Button {
+                            selectedPOI = recommendation.poi
+                        } label: {
                             recommendationCard(recommendation)
                         }
                         .buttonStyle(.plain)
@@ -247,24 +267,42 @@ struct AIScreen: View {
         }
     }
 
-    private func recommendationCard(_ recommendation: AIRecommendation) -> some View {
-        let place = recommendation.place
-        return VStack(alignment: .leading, spacing: 0) {
-            PlaceImageView(place: place).frame(height: 140)
-            VStack(alignment: .leading, spacing: 6) {
-                Text(place.name).font(.system(size: 18, weight: .bold))
-                Text("\(Categories.emoji(for: place.category)) \(Categories.label(for: place.category))\(place.tags.first.map { " · \($0)" } ?? "")")
-                    .font(.system(size: 14)).foregroundStyle(.secondary)
-                HStack(alignment: .top, spacing: 8) {
-                    Text("✨")
-                    Text(recommendation.aiReason).font(.system(size: 14, weight: .medium)).foregroundStyle(Color(red: 0.61, green: 0.48, blue: 0.1))
-                }
-                .padding(12)
-                .background(RoundedRectangle(cornerRadius: 12).fill(Theme.gold.opacity(0.1)))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.gold.opacity(0.25)))
-            }
-            .padding(16)
+    private func distanceLabel(_ distanceKm: Double) -> String {
+        if distanceKm < 1 {
+            let meters = (distanceKm * 1000 / 50).rounded() * 50
+            return L("home.distance.meters", String(Int(meters)))
         }
+        return L("home.distance.km", String(format: "%.1f", distanceKm))
+    }
+
+    private func recommendationCard(_ recommendation: POIRecommendation) -> some View {
+        let poi = recommendation.poi
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: POICategoryGroups.icon(for: poi.category))
+                    .font(.system(size: 20))
+                    .foregroundStyle(Theme.gold)
+                    .frame(width: 36, height: 36)
+                    .background(Circle().fill(Theme.gold.opacity(0.12)))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(poi.name).font(.system(size: 18, weight: .bold))
+                    Text(
+                        [poi.categoryLabel.isEmpty ? nil : poi.categoryLabel, distanceLabel(recommendation.distanceKm)]
+                            .compactMap { $0 }
+                            .joined(separator: " · ")
+                    )
+                    .font(.system(size: 14)).foregroundStyle(.secondary)
+                }
+            }
+            HStack(alignment: .top, spacing: 8) {
+                Text("✨")
+                Text(recommendation.aiReason).font(.system(size: 14, weight: .medium)).foregroundStyle(Color(red: 0.61, green: 0.48, blue: 0.1))
+            }
+            .padding(12)
+            .background(RoundedRectangle(cornerRadius: 12).fill(Theme.gold.opacity(0.1)))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.gold.opacity(0.25)))
+        }
+        .padding(16)
         .background(RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemGroupedBackground)))
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
@@ -320,6 +358,29 @@ struct AIScreen: View {
         }
     }
 
+    /// Nearby Apple POIs are looked up fresh per message rather than reused
+    /// across turns — keeps candidates current with whatever city/location
+    /// is active right now, and avoids stale-index bugs across turns since
+    /// each turn's `[POIPlace]` array only ever needs to outlive that one
+    /// exchange (see `POIRecommendation`, which embeds the resolved
+    /// `POIPlace` directly into the conversation turn).
+    private func nearbyPOICandidates(query: String, near coordinate: CLLocationCoordinate2D) async -> [POIPlace] {
+        let textResults = await POISearchService.search(near: coordinate, categories: nil, naturalLanguageQuery: query)
+        var combined = textResults
+        if combined.count < 8 {
+            let browseResults = await POISearchService.search(near: coordinate, categories: nil)
+            let existingNames = Set(combined.map { $0.name.lowercased() })
+            combined += browseResults.filter { !existingNames.contains($0.name.lowercased()) }
+        }
+        return combined
+            .sorted {
+                geoDistanceKm($0.coordinate.latitude, $0.coordinate.longitude, coordinate.latitude, coordinate.longitude)
+                    < geoDistanceKm($1.coordinate.latitude, $1.coordinate.longitude, coordinate.latitude, coordinate.longitude)
+            }
+            .prefix(24)
+            .map { $0 }
+    }
+
     private func search(overrideQuery: String? = nil) async {
         let nextQuery = (overrideQuery ?? query).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !nextQuery.isEmpty else { return }
@@ -333,10 +394,28 @@ struct AIScreen: View {
 
         conversation.append(.user(id: "\(Date().timeIntervalSince1970)-user", content: nextQuery, image: imageForRequest))
 
-        let location = await locationManager.currentLocationOnce()
+        // cityStore first (matches HomeScreen.loadPOIs's precedent — "near
+        // the city being browsed," not necessarily near the device), GPS
+        // fallback. A deliberate, small behavior change from the old
+        // GPS-only lookup, aligning Ask Piri with how Home/Map already work.
+        let coordinate: CLLocationCoordinate2D?
+        if let lat = cityStore.lat, let lng = cityStore.lng {
+            coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+        } else {
+            coordinate = await locationManager.currentLocationOnce()
+        }
+
+        var candidates: [POIPlace] = []
+        if let coordinate {
+            candidates = await nearbyPOICandidates(query: nextQuery, near: coordinate)
+        }
+        // Empty candidates isn't an error — a normal, backend-handled state
+        // (no location, or an area with little Apple POI data). The request
+        // still goes out so chit-chat/general-knowledge answers keep working.
+
         let profile = userProfileStore.profile
 
-        let request = RecommendRequest(
+        let request = RecommendPOIRequest(
             query: nextQuery,
             messages: history,
             userProfile: PersonalizationProfile(
@@ -350,17 +429,39 @@ struct AIScreen: View {
             ),
             weather: weatherQuery.weather.map { WeatherContext(condition: $0.condition.rawValue, temp: $0.temp, city: $0.city, description: $0.description) },
             city: cityStore.cityName,
-            lat: location?.latitude,
-            lng: location?.longitude,
+            lat: coordinate?.latitude,
+            lng: coordinate?.longitude,
+            poiCandidates: candidates.map {
+                POICandidateInput(
+                    name: $0.name,
+                    category: $0.categoryLabel.isEmpty ? nil : $0.categoryLabel,
+                    lat: $0.coordinate.latitude,
+                    lng: $0.coordinate.longitude,
+                    address: $0.mapItem.placemark.title
+                )
+            },
             imageBase64: imageForRequest?.jpegData(compressionQuality: 0.6)?.base64EncodedString(),
             mimeType: imageForRequest != nil ? "image/jpeg" : nil,
             locale: Locale.current.language.languageCode?.identifier,
-            recentlyViewedPlaceIds: recentlyViewedStore.viewedIds
+            // `RecentlyViewedStore` holds Apple POI references now, not
+            // curated DB ids — nothing left for the backend to resolve
+            // recently-viewed summaries against.
+            recentlyViewedPlaceIds: nil
         )
 
         do {
-            let response = try await PlacesAPI.recommend(request)
-            conversation.append(.assistant(id: "\(Date().timeIntervalSince1970)-assistant", content: response.answer, recommendations: response.recommendations))
+            let response = try await PlacesAPI.recommendPOI(request)
+            // Defensive bounds check client-side too, even though the
+            // server already validates indices — never trust blindly.
+            let resolved = response.recommendations.compactMap { rec -> POIRecommendation? in
+                guard candidates.indices.contains(rec.index) else { return nil }
+                let poi = candidates[rec.index]
+                let distanceKm = coordinate.map {
+                    geoDistanceKm(poi.coordinate.latitude, poi.coordinate.longitude, $0.latitude, $0.longitude)
+                } ?? 0
+                return POIRecommendation(poi: poi, aiReason: rec.aiReason, distanceKm: distanceKm)
+            }
+            conversation.append(.assistant(id: "\(Date().timeIntervalSince1970)-assistant", content: response.answer, recommendations: resolved))
         } catch {
             query = nextQuery
             errorMessage = error.localizedDescription

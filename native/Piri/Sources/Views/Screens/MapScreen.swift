@@ -47,11 +47,9 @@ struct MapScreen: View {
 
     // MARK: Route mode (`MapScreen+RouteMode.swift`)
     @State var routeMode = false
-    /// Loaded on demand for stop-picking regardless of `useCuratedMapData` —
-    /// route planning needs real curated `Place`s with stable ids even while
-    /// the base map itself only shows Apple's POI layer.
-    @State var routeCandidatePlaces: [Place] = []
-    @State var plannedStopIds: [String] = []
+    /// Stops are picked by tapping Apple's own base-map POI features (same
+    /// resolution path as `explainMapFeature`) — no curated data involved.
+    @State var plannedStops: [SavedPOIReference] = []
     @State var routeGeometry: [[Double]]?
     @State var routeDistanceMeters: Double?
     @State var routeDurationSeconds: Double?
@@ -95,22 +93,13 @@ struct MapScreen: View {
                         showsUserLocation: true
                     )
                     .ignoresSafeArea(edges: .bottom)
-                } else if routeMode {
-                    PiriMapView(
-                        places: routeCandidatePlaces,
-                        livePins: [],
-                        routeCoordinates: [],
-                        showsUserLocation: true,
-                        onRegionChange: { _ in },
-                        onSelectPlace: { toggleStop($0.id) },
-                        onSelectLivePin: { _ in },
-                        onSelectMapFeature: { _ in },
-                        pointOfInterestCategories: nil,
-                        selectedPlaceIds: Set(plannedStopIds),
-                        centerOnce: initialRegion
-                    )
-                    .ignoresSafeArea(edges: .bottom)
                 } else {
+                    // Route-mode stop-picking reuses this same Apple-POI base
+                    // map — tapping a POI feature toggles it as a stop
+                    // instead of opening the explain card. There's no way to
+                    // tint an already-picked Apple base-tile POI (unlike the
+                    // old curated-pin picker), so the stop list in
+                    // `routeModeSheet` is the primary "what's selected" UI.
                     PiriMapView(
                         places: filteredPlaces,
                         livePins: Self.useCuratedMapData ? livePins : [],
@@ -119,7 +108,13 @@ struct MapScreen: View {
                         onRegionChange: handleRegionChange,
                         onSelectPlace: { selectPlace($0) },
                         onSelectLivePin: { selectLivePin($0) },
-                        onSelectMapFeature: { selectMapFeature($0) },
+                        onSelectMapFeature: { feature in
+                            if routeMode {
+                                Task { await toggleStop(fromFeature: feature) }
+                            } else {
+                                selectMapFeature(feature)
+                            }
+                        },
                         pointOfInterestCategories: selectedCategoryGroup?.categories,
                         centerOnce: initialRegion,
                         recenterTrigger: recenterTrigger
@@ -168,7 +163,6 @@ struct MapScreen: View {
         }
         .task(id: routeMode) {
             guard routeMode else { return }
-            await loadRouteCandidatesIfNeeded()
             rehydrateActiveTripIfNeeded()
         }
         .onChange(of: locationManager.breadcrumb) { _, points in
@@ -280,24 +274,16 @@ struct MapScreen: View {
         poiExplainTask?.cancel()
     }
 
+    // Dormant — `filteredPlaces` (curated data) is always empty while
+    // `useCuratedMapData` is off, so `selectedPlace` never gets set and this
+    // never renders. Kept compiling (favorite/plan removed since
+    // `SavedPlacesStore` now only accepts Apple `POIPlace`, not curated
+    // `Place`) rather than deleted, matching the rest of this pivot.
     private func placeCard(for place: Place) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                VStack(alignment: .leading) {
-                    Text(place.name).font(.headline)
-                    Text(place.category).font(.subheadline).foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button {
-                    savedPlacesStore.toggleFavorite(place.id)
-                } label: {
-                    Image(systemName: savedPlacesStore.isFavorite(place.id) ? "heart.fill" : "heart")
-                }
-                Button {
-                    savedPlacesStore.togglePlan(place.id)
-                } label: {
-                    Image(systemName: savedPlacesStore.isInPlan(place.id) ? "plus.circle.fill" : "plus.circle")
-                }
+            VStack(alignment: .leading) {
+                Text(place.name).font(.headline)
+                Text(place.category).font(.subheadline).foregroundStyle(.secondary)
             }
             Button("common.openInMaps") {
                 Task { await fetchDirections(to: place) }

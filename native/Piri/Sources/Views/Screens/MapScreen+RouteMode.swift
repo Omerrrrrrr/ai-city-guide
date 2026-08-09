@@ -4,23 +4,21 @@ import PhotosUI
 import SwiftUI
 
 /// Route/trip creation, port of the `routeMode` parts of
-/// `mobile/app/(tabs)/map.tsx`: pick ≥2 stops by tapping place pins, fetch a
-/// walking route, start a trip, record a GPS breadcrumb while it's active,
-/// optionally attach photos, then end it. Split into its own file (still the
-/// same `MapScreen` type — extensions can't add stored properties, so the
-/// `@State` itself stays declared on the struct in `MapScreen.swift`) purely
-/// to keep that file from growing unmanageably.
+/// `mobile/app/(tabs)/map.tsx`: pick ≥2 stops by tapping Apple POI features
+/// on the map, fetch a walking route, start a trip, record a GPS breadcrumb
+/// while it's active, optionally attach photos, then end it. Split into its
+/// own file (still the same `MapScreen` type — extensions can't add stored
+/// properties, so the `@State` itself stays declared on the struct in
+/// `MapScreen.swift`) purely to keep that file from growing unmanageably.
 extension MapScreen {
     var stopsChangedFromActiveTrip: Bool {
         guard let activeTrip = tripsStore.trips.first(where: { $0.id == tripsStore.activeTripId }) else { return false }
-        return activeTrip.placeIds != plannedStopIds
+        return activeTrip.stops != plannedStops
     }
 
     var routeStopAnnotations: [(index: Int, coordinate: CLLocationCoordinate2D)] {
-        Array(plannedStopIds.enumerated()).compactMap { index, id in
-            routeCandidatePlaces.first(where: { $0.id == id })?.location.map {
-                (index, CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng))
-            }
+        Array(plannedStops.enumerated()).map { index, stop in
+            (index, CLLocationCoordinate2D(latitude: stop.lat, longitude: stop.lng))
         }
     }
 
@@ -37,7 +35,7 @@ extension MapScreen {
             }
             routeMode.toggle()
             if !routeMode {
-                plannedStopIds = []
+                plannedStops = []
                 routeGeometry = nil
                 routeDistanceMeters = nil
                 routeDurationSeconds = nil
@@ -53,22 +51,13 @@ extension MapScreen {
         }
     }
 
-    func loadRouteCandidatesIfNeeded() async {
-        guard routeCandidatePlaces.isEmpty else { return }
-        do {
-            routeCandidatePlaces = try await PlacesAPI.fetchPlaces(city: cityStore.cityName, lat: cityStore.lat, lng: cityStore.lng)
-        } catch {
-            routeError = error.localizedDescription
-        }
-    }
-
     /// Mirrors `map.tsx`'s hydration effect: resync local planning state from
     /// a trip that's already active (e.g. the user left the Map tab mid-trip
     /// and came back), and make sure breadcrumb recording is running.
     func rehydrateActiveTripIfNeeded() {
         guard let activeTripId = tripsStore.activeTripId, hydratedTripId != activeTripId,
               let activeTrip = tripsStore.trips.first(where: { $0.id == activeTripId }) else { return }
-        plannedStopIds = activeTrip.placeIds
+        plannedStops = activeTrip.stops
         routeGeometry = activeTrip.routeGeometry
         routeDistanceMeters = activeTrip.distanceMeters
         routeDurationSeconds = activeTrip.durationSeconds
@@ -78,30 +67,40 @@ extension MapScreen {
         }
     }
 
-    func toggleStop(_ placeId: String) {
-        if let index = plannedStopIds.firstIndex(of: placeId) {
-            plannedStopIds.remove(at: index)
+    /// Resolves a tapped Apple base-map POI feature (same path
+    /// `explainMapFeature` uses) and toggles it as a route stop.
+    func toggleStop(fromFeature feature: MKMapFeatureAnnotation) async {
+        guard let mapItem = try? await MKMapItemRequest(mapFeatureAnnotation: feature).mapItem else { return }
+        let poi = POIPlace(
+            name: mapItem.name ?? feature.title ?? "",
+            category: mapItem.pointOfInterestCategory,
+            coordinate: feature.coordinate,
+            mapItem: mapItem
+        )
+        guard let reference = poi.asReference else { return }
+        if let index = plannedStops.firstIndex(where: { $0.identifier == reference.identifier }) {
+            plannedStops.remove(at: index)
         } else {
-            plannedStopIds.append(placeId)
+            plannedStops.append(reference)
         }
     }
 
     func moveStop(from index: Int, direction: Int) {
         let target = index + direction
-        guard plannedStopIds.indices.contains(index), plannedStopIds.indices.contains(target) else { return }
-        plannedStopIds.swapAt(index, target)
+        guard plannedStops.indices.contains(index), plannedStops.indices.contains(target) else { return }
+        plannedStops.swapAt(index, target)
     }
 
-    func removeStop(_ placeId: String) {
-        plannedStopIds.removeAll { $0 == placeId }
+    func removeStop(_ identifier: String) {
+        plannedStops.removeAll { $0.identifier == identifier }
     }
 
     private func stopCoordinates() -> [PlaceCoordinate] {
-        plannedStopIds.compactMap { id in routeCandidatePlaces.first(where: { $0.id == id })?.location }
+        plannedStops.map { PlaceCoordinate(lat: $0.lat, lng: $0.lng) }
     }
 
     func startRoute() async {
-        guard plannedStopIds.count >= 2 else { return }
+        guard plannedStops.count >= 2 else { return }
         isFetchingRoute = true
         routeError = nil
         defer { isFetchingRoute = false }
@@ -111,7 +110,7 @@ extension MapScreen {
             routeDistanceMeters = result.distanceMeters
             routeDurationSeconds = result.durationSeconds
             let tripId = tripsStore.startTrip(
-                placeIds: plannedStopIds,
+                stops: plannedStops,
                 route: RouteInfo(routeGeometry: result.route, distanceMeters: result.distanceMeters, durationSeconds: result.durationSeconds)
             )
             hydratedTripId = tripId
@@ -122,7 +121,7 @@ extension MapScreen {
     }
 
     func updateRoute() async {
-        guard let activeTripId = tripsStore.activeTripId, plannedStopIds.count >= 2 else { return }
+        guard let activeTripId = tripsStore.activeTripId, plannedStops.count >= 2 else { return }
         isFetchingRoute = true
         routeError = nil
         defer { isFetchingRoute = false }
@@ -133,7 +132,7 @@ extension MapScreen {
             routeDurationSeconds = result.durationSeconds
             tripsStore.updateTripStops(
                 activeTripId,
-                placeIds: plannedStopIds,
+                stops: plannedStops,
                 route: RouteInfo(routeGeometry: result.route, distanceMeters: result.distanceMeters, durationSeconds: result.durationSeconds)
             )
         } catch {
@@ -147,7 +146,7 @@ extension MapScreen {
         }
         locationManager.stopBreadcrumbRecording()
         hydratedTripId = nil
-        plannedStopIds = []
+        plannedStops = []
         routeGeometry = nil
         routeDistanceMeters = nil
         routeDurationSeconds = nil
@@ -184,13 +183,13 @@ extension MapScreen {
                 }
             }
 
-            if plannedStopIds.isEmpty {
+            if plannedStops.isEmpty {
                 Text("map.route.hint").font(.footnote).foregroundStyle(.secondary)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(Array(plannedStopIds.enumerated()), id: \.element) { index, placeId in
-                            stopChip(index: index, placeId: placeId)
+                        ForEach(Array(plannedStops.enumerated()), id: \.element.identifier) { index, stop in
+                            stopChip(index: index, stop: stop)
                         }
                     }
                 }
@@ -247,11 +246,11 @@ extension MapScreen {
                 .padding(.vertical, 12)
                 .background(RoundedRectangle(cornerRadius: 10).fill(Theme.navy))
             }
-            .disabled(plannedStopIds.count < 2 || isFetchingRoute)
-            .opacity(plannedStopIds.count < 2 ? 0.5 : 1)
+            .disabled(plannedStops.count < 2 || isFetchingRoute)
+            .opacity(plannedStops.count < 2 ? 0.5 : 1)
         } else {
             HStack(spacing: 10) {
-                if stopsChangedFromActiveTrip, plannedStopIds.count >= 2 {
+                if stopsChangedFromActiveTrip, plannedStops.count >= 2 {
                     Button {
                         Task { await updateRoute() }
                     } label: {
@@ -276,9 +275,8 @@ extension MapScreen {
         }
     }
 
-    private func stopChip(index: Int, placeId: String) -> some View {
-        let name = routeCandidatePlaces.first(where: { $0.id == placeId })?.name ?? placeId
-        return HStack(spacing: 6) {
+    private func stopChip(index: Int, stop: SavedPOIReference) -> some View {
+        HStack(spacing: 6) {
             Button { moveStop(from: index, direction: -1) } label: {
                 Image(systemName: "chevron.up").font(.caption2)
             }
@@ -287,12 +285,12 @@ extension MapScreen {
             Button { moveStop(from: index, direction: 1) } label: {
                 Image(systemName: "chevron.down").font(.caption2)
             }
-            .disabled(index == plannedStopIds.count - 1)
+            .disabled(index == plannedStops.count - 1)
 
             Text("\(index + 1)").font(.caption.weight(.bold)).foregroundStyle(Theme.gold)
-            Text(name).font(.caption.weight(.semibold)).lineLimit(1)
+            Text(stop.name).font(.caption.weight(.semibold)).lineLimit(1)
 
-            Button { removeStop(placeId) } label: {
+            Button { removeStop(stop.identifier) } label: {
                 Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
             }
         }

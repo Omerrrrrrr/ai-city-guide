@@ -23,12 +23,12 @@ final class TripsStore {
     }
 
     @discardableResult
-    func startTrip(placeIds: [String], route: RouteInfo? = nil) -> String {
+    func startTrip(stops: [SavedPOIReference], route: RouteInfo? = nil) -> String {
         let id = "trip-\(Int(Date().timeIntervalSince1970 * 1000))"
         let trip = Trip(
             id: id,
             name: nil,
-            placeIds: placeIds,
+            stops: stops,
             routeGeometry: route?.routeGeometry,
             distanceMeters: route?.distanceMeters,
             durationSeconds: route?.durationSeconds,
@@ -79,9 +79,9 @@ final class TripsStore {
         persist()
     }
 
-    func updateTripStops(_ id: String, placeIds: [String], route: RouteInfo? = nil) {
+    func updateTripStops(_ id: String, stops: [SavedPOIReference], route: RouteInfo? = nil) {
         guard let index = trips.firstIndex(where: { $0.id == id }) else { return }
-        trips[index].placeIds = placeIds
+        trips[index].stops = stops
         if let route {
             trips[index].routeGeometry = route.routeGeometry
             trips[index].distanceMeters = route.distanceMeters

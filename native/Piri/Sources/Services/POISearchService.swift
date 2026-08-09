@@ -9,6 +9,7 @@ enum POISearchService {
     static func search(
         near coordinate: CLLocationCoordinate2D,
         categories: Set<MKPointOfInterestCategory>?,
+        naturalLanguageQuery: String? = nil,
         radiusMeters: CLLocationDistance = 4000
     ) async -> [POIPlace] {
         let request = MKLocalSearch.Request()
@@ -18,6 +19,7 @@ enum POISearchService {
             longitudinalMeters: radiusMeters * 2
         )
         request.resultTypes = .pointOfInterest
+        request.naturalLanguageQuery = naturalLanguageQuery
         // A category-only browse (no `naturalLanguageQuery`) requires an
         // explicit `pointOfInterestFilter` — leaving it unset returns zero
         // results even with `resultTypes = .pointOfInterest` and a region.

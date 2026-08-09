@@ -78,6 +78,44 @@ struct AIRecommendationResponse: Decodable {
     var recommendations: [AIRecommendation]
 }
 
+/// Client-supplied candidate for `/places/recommend-poi` — an Apple MapKit
+/// POI, not a Piri DB record. See `POIPlace`/`POISearchService`.
+struct POICandidateInput: Encodable {
+    var name: String
+    var category: String?
+    var lat: Double?
+    var lng: Double?
+    var address: String?
+}
+
+struct RecommendPOIRequest: Encodable {
+    var query: String
+    var messages: [AIConversationMessage]
+    var userProfile: PersonalizationProfile?
+    var weather: WeatherContext?
+    var city: String?
+    var lat: Double?
+    var lng: Double?
+    var poiCandidates: [POICandidateInput]
+    var imageBase64: String?
+    var mimeType: String?
+    var locale: String?
+    var recentlyViewedPlaceIds: [String]?
+}
+
+/// References a candidate by its index in the request's `poiCandidates`,
+/// not by re-sending name/coordinates — the client resolves this back into
+/// its own already-held `[POIPlace]` array from that same turn.
+struct POIRecommendationIndex: Decodable {
+    var index: Int
+    var aiReason: String
+}
+
+struct RecommendPOIResponse: Decodable {
+    var answer: String
+    var recommendations: [POIRecommendationIndex]
+}
+
 struct ExplainRequest: Encodable {
     var placeId: String
     var userProfile: PersonalizationProfile?

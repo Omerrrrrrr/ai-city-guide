@@ -2,64 +2,70 @@ import Foundation
 import Observation
 
 private struct SavedPlacesState: Codable {
-    var favoritePlaceIds: Set<String> = []
-    var planPlaceIds: [String] = []
+    var favorites: [SavedPOIReference] = []
+    var plan: [SavedPOIReference] = []
 }
 
 /// Port of `mobile/src/store/saved-places.ts`. Backed by Keychain, like the
 /// RN store's `expo-secure-store` adapter — favorites/plan are treated as
-/// the closest thing this account-less app has to personal data.
+/// the closest thing this account-less app has to personal data. Stores
+/// `SavedPOIReference` snapshots (Apple POI data) rather than curated place
+/// ids, since there's no curated database left to re-fetch from.
 @Observable
 final class SavedPlacesStore {
-    private(set) var favoritePlaceIds: Set<String> = []
-    private(set) var planPlaceIds: [String] = []
+    private(set) var favorites: [SavedPOIReference] = []
+    private(set) var plan: [SavedPOIReference] = []
 
     private let persistence = KeychainStore<SavedPlacesState>(key: "ai-city-guide.saved-places")
 
     init() {
         if let saved = persistence.load() {
-            favoritePlaceIds = saved.favoritePlaceIds
-            planPlaceIds = saved.planPlaceIds
+            favorites = saved.favorites
+            plan = saved.plan
         }
     }
 
-    func isFavorite(_ placeId: String) -> Bool {
-        favoritePlaceIds.contains(placeId)
+    func isFavorite(_ identifier: String) -> Bool {
+        favorites.contains { $0.identifier == identifier }
     }
 
-    func toggleFavorite(_ placeId: String) {
-        if favoritePlaceIds.contains(placeId) {
-            favoritePlaceIds.remove(placeId)
+    /// No-op if `poi.asReference` is `nil` (identifier unavailable) —
+    /// nothing to persist in that case.
+    func toggleFavorite(_ poi: POIPlace) {
+        guard let reference = poi.asReference else { return }
+        if let index = favorites.firstIndex(where: { $0.identifier == reference.identifier }) {
+            favorites.remove(at: index)
         } else {
-            favoritePlaceIds.insert(placeId)
+            favorites.append(reference)
         }
         persist()
     }
 
-    func isInPlan(_ placeId: String) -> Bool {
-        planPlaceIds.contains(placeId)
+    func isInPlan(_ identifier: String) -> Bool {
+        plan.contains { $0.identifier == identifier }
     }
 
-    func togglePlan(_ placeId: String) {
-        if let index = planPlaceIds.firstIndex(of: placeId) {
-            planPlaceIds.remove(at: index)
+    func togglePlan(_ poi: POIPlace) {
+        guard let reference = poi.asReference else { return }
+        if let index = plan.firstIndex(where: { $0.identifier == reference.identifier }) {
+            plan.remove(at: index)
         } else {
-            planPlaceIds.append(placeId)
+            plan.append(reference)
         }
         persist()
     }
 
     func clearFavorites() {
-        favoritePlaceIds = []
+        favorites = []
         persist()
     }
 
     func clearPlan() {
-        planPlaceIds = []
+        plan = []
         persist()
     }
 
     private func persist() {
-        persistence.save(SavedPlacesState(favoritePlaceIds: favoritePlaceIds, planPlaceIds: planPlaceIds))
+        persistence.save(SavedPlacesState(favorites: favorites, plan: plan))
     }
 }

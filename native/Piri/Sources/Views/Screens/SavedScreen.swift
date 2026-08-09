@@ -5,24 +5,28 @@ enum SavedTab: Hashable, Identifiable {
     var id: Self { self }
 }
 
-/// Port of `mobile/app/(tabs)/saved.tsx`.
+/// Port of `mobile/app/(tabs)/saved.tsx`. Rows are `SavedPOIReference`
+/// snapshots (Apple POI data) — tapping one resolves the live `MKMapItem`
+/// on demand and opens `POIExplainSheet`, the one detail view used
+/// app-wide now that there's no curated place-detail page to route to.
 struct SavedScreen: View {
-    @Environment(PlacesQuery.self) private var placesQuery
     @Environment(SavedPlacesStore.self) private var savedPlacesStore
     @Environment(RecentlyViewedStore.self) private var recentlyViewedStore
     @Environment(TabSelection.self) private var tabSelection
 
     @State private var tab: SavedTab
+    @State private var selectedPOI: POIPlace?
+    @State private var resolvingIdentifier: String?
 
     init(initialTab: SavedTab = .favorites) {
         _tab = State(initialValue: initialTab)
     }
 
-    private var favorites: [Place] { placesQuery.places.filter { savedPlacesStore.isFavorite($0.id) } }
-    private var plan: [Place] { savedPlacesStore.planPlaceIds.compactMap(placesQuery.place) }
-    private var visited: [Place] { recentlyViewedStore.viewedIds.compactMap(placesQuery.place) }
+    private var favorites: [SavedPOIReference] { savedPlacesStore.favorites }
+    private var plan: [SavedPOIReference] { savedPlacesStore.plan }
+    private var visited: [SavedPOIReference] { recentlyViewedStore.viewed }
 
-    private var list: [Place] {
+    private var list: [SavedPOIReference] {
         switch tab {
         case .favorites: return favorites
         case .plan: return plan
@@ -43,11 +47,8 @@ struct SavedScreen: View {
                     emptyState
                 } else {
                     VStack(spacing: 12) {
-                        ForEach(list) { place in
-                            NavigationLink(destination: PlaceDetailScreen(placeId: place.id)) {
-                                PlaceRowView(place: place)
-                            }
-                            .buttonStyle(.plain)
+                        ForEach(list) { reference in
+                            referenceRow(reference)
                         }
                     }
                     .padding(.horizontal, 16)
@@ -55,12 +56,45 @@ struct SavedScreen: View {
             }
             .padding(.bottom, 40)
         }
-        .task {
-            if placesQuery.places.isEmpty {
-                await placesQuery.load(cityName: nil, lat: nil, lng: nil)
-            }
-        }
         .navigationBarHidden(true)
+        .sheet(item: $selectedPOI) { poi in POIExplainSheet(poi: poi) }
+    }
+
+    private func referenceRow(_ reference: SavedPOIReference) -> some View {
+        Button {
+            Task { await open(reference) }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: POICategoryGroups.icon(for: reference.category))
+                    .font(.system(size: 18))
+                    .foregroundStyle(Theme.gold)
+                    .frame(width: 36, height: 36)
+                    .background(Circle().fill(Theme.gold.opacity(0.12)))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(reference.name).font(.system(size: 16, weight: .semibold)).foregroundStyle(.primary)
+                    if let category = reference.category?.rawValue {
+                        Text(category.replacingOccurrences(of: "MKPOICategory", with: ""))
+                            .font(.system(size: 13)).foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                if resolvingIdentifier == reference.identifier {
+                    ProgressView()
+                } else {
+                    Text("›").font(.system(size: 20)).foregroundStyle(.secondary)
+                }
+            }
+            .padding(14)
+            .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemBackground)))
+        }
+        .buttonStyle(.plain)
+        .disabled(resolvingIdentifier != nil)
+    }
+
+    private func open(_ reference: SavedPOIReference) async {
+        resolvingIdentifier = reference.identifier
+        selectedPOI = await reference.resolve()
+        resolvingIdentifier = nil
     }
 
     private var header: some View {

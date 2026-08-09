@@ -1,6 +1,10 @@
 import SwiftUI
 
-/// Port of `mobile/app/city-picker.tsx`.
+/// Port of `mobile/app/city-picker.tsx`. Apple POI data needs no per-city
+/// "discovery" the way the curated database did, so picking any search
+/// result just sets the active city immediately — no more
+/// ready/discovering/queued/failed status, no discovery push-token
+/// registration. `/cities/discover` stays intact server-side, just unused.
 struct CityPickerScreen: View {
     @Environment(CityStore.self) private var cityStore
     @Environment(\.dismiss) private var dismiss
@@ -9,7 +13,6 @@ struct CityPickerScreen: View {
     @State private var results: [CityResult] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
-    @State private var discoveringCityName: String?
     @State private var searchTask: Task<Void, Never>?
 
     var body: some View {
@@ -123,9 +126,6 @@ struct CityPickerScreen: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("cityPicker.results").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary).textCase(.uppercase)
             ForEach(Array(results.enumerated()), id: \.offset) { _, city in
-                let isDiscovering = discoveringCityName == city.name
-                let isReady = (city.isKnown ?? false) && city.status == "ready"
-
                 Button {
                     select(city)
                 } label: {
@@ -135,39 +135,17 @@ struct CityPickerScreen: View {
                             if let country = city.country {
                                 Text(country).font(.system(size: 13)).foregroundStyle(.secondary)
                             }
-                            if let placeCount = city.placeCount, (city.isKnown ?? false) {
-                                Text(LPlural("cityPicker.placeCount", count: placeCount)).font(.system(size: 12)).foregroundStyle(.secondary.opacity(0.8))
-                            }
                         }
                         Spacer()
-                        if isDiscovering {
-                            ProgressView()
-                        } else {
-                            Text(isReady ? statusLabel(city.status) : String(localized: "cityPicker.status.discover"))
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(isReady ? Theme.openGreen : .white)
-                                .padding(.horizontal, 12).padding(.vertical, 6)
-                                .background(RoundedRectangle(cornerRadius: 8).fill(isReady ? Theme.openGreen.opacity(0.08) : Theme.navy))
-                        }
+                        Text("›").font(.system(size: 20)).foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 4)
                 }
                 .buttonStyle(.plain)
-                .disabled(isDiscovering)
             }
         }
         .padding(16)
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(.secondary.opacity(0.15)))
-    }
-
-    private func statusLabel(_ status: String?) -> String {
-        switch status {
-        case "ready": return String(localized: "cityPicker.status.ready")
-        case "discovering": return String(localized: "cityPicker.status.discovering")
-        case "pending": return String(localized: "cityPicker.status.queued")
-        case "failed": return String(localized: "cityPicker.status.failed")
-        default: return String(localized: "cityPicker.status.discover")
-        }
     }
 
     // Nominatim's usage policy prohibits autocomplete/type-ahead search — wait
@@ -198,31 +176,11 @@ struct CityPickerScreen: View {
     }
 
     private func select(_ city: CityResult) {
-        guard (city.isKnown ?? false), city.status == "ready", let id = city.id else {
-            Task { await discover(city) }
-            return
-        }
+        // No curated-DB "known city" concept left — every geocoded result is
+        // immediately usable with Apple POI data. Fall back to a coordinate-
+        // derived id when the backend didn't have one on file.
+        let id = city.id ?? "\(city.name.lowercased().replacingOccurrences(of: " ", with: "-"))-\(city.centerLat)-\(city.centerLng)"
         cityStore.setCity(id: id, name: city.name, lat: city.centerLat, lng: city.centerLng)
         dismiss()
-    }
-
-    private func discover(_ city: CityResult) async {
-        discoveringCityName = city.name
-        errorMessage = nil
-        do {
-            let result = try await CitiesAPI.discover(DiscoverCityRequest(
-                name: city.name,
-                lat: city.centerLat,
-                lng: city.centerLng,
-                country: city.country,
-                pushToken: await PushNotificationManager.shared.deviceToken(),
-                locale: Locale.current.language.languageCode?.identifier
-            ))
-            cityStore.setCity(id: result.id, name: city.name, lat: city.centerLat, lng: city.centerLng)
-            dismiss()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-        discoveringCityName = nil
     }
 }
