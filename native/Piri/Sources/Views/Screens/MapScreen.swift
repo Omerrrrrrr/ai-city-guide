@@ -331,6 +331,25 @@ struct MapScreen: View {
                 }
             }
 
+            // AI explanation first — the reason this card is showing at
+            // all — before any of Apple's own place data below.
+            if poiExplainLoading {
+                VStack(alignment: .leading, spacing: 8) {
+                    SkeletonBox().frame(width: 180, height: 14)
+                    SkeletonBox().frame(height: 12)
+                    SkeletonBox().frame(width: 220, height: 12)
+                }
+            } else if let poiExplainResult {
+                Text(poiExplainResult.headline).font(.subheadline.bold()).foregroundStyle(Theme.gold)
+                Text(poiExplainResult.body).font(.footnote)
+                ForEach(poiExplainResult.highlights, id: \.self) { highlight in
+                    HStack(alignment: .top, spacing: 6) {
+                        Circle().fill(Theme.gold).frame(width: 5, height: 5).padding(.top, 6)
+                        Text(highlight).font(.caption)
+                    }
+                }
+            }
+
             // Phone/website are plain `MKMapItem` properties — shown
             // directly on this card rather than behind Apple's own Place
             // Card sheet/popover, which would open as a second, separate
@@ -357,23 +376,6 @@ struct MapScreen: View {
 
             if let lookAroundScene {
                 LookAroundCard(scene: lookAroundScene, height: 140)
-            }
-
-            if poiExplainLoading {
-                VStack(alignment: .leading, spacing: 8) {
-                    SkeletonBox().frame(width: 180, height: 14)
-                    SkeletonBox().frame(height: 12)
-                    SkeletonBox().frame(width: 220, height: 12)
-                }
-            } else if let poiExplainResult {
-                Text(poiExplainResult.headline).font(.subheadline.bold()).foregroundStyle(Theme.gold)
-                Text(poiExplainResult.body).font(.footnote)
-                ForEach(poiExplainResult.highlights, id: \.self) { highlight in
-                    HStack(alignment: .top, spacing: 6) {
-                        Circle().fill(Theme.gold).frame(width: 5, height: 5).padding(.top, 6)
-                        Text(highlight).font(.caption)
-                    }
-                }
             }
         }
         .padding()

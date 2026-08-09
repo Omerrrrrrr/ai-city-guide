@@ -69,6 +69,28 @@ struct POIExplainSheet: View {
                                 }
                             }
 
+                            // AI explanation first — the reason someone opens
+                            // this sheet at all — before any of Apple's own
+                            // place data further down.
+                            if loading {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    SkeletonBox().frame(width: 180, height: 14)
+                                    SkeletonBox().frame(height: 12)
+                                    SkeletonBox().frame(width: 220, height: 12)
+                                }
+                            } else if let result {
+                                Text(result.headline).font(.subheadline.bold()).foregroundStyle(Theme.gold)
+                                Text(result.body).font(.footnote)
+                                ForEach(result.highlights, id: \.self) { highlight in
+                                    HStack(alignment: .top, spacing: 6) {
+                                        Circle().fill(Theme.gold).frame(width: 5, height: 5).padding(.top, 6)
+                                        Text(highlight).font(.caption)
+                                    }
+                                }
+                            } else if let errorMessage {
+                                Text(errorMessage).font(.footnote).foregroundStyle(Theme.closedRed)
+                            }
+
                             // Apple's own native Place Card (hours, rating),
                             // embedded right in this scroll content — not a
                             // separate sheet on top of this one.
@@ -101,25 +123,6 @@ struct POIExplainSheet: View {
                             // than showing an empty/broken placeholder.
                             if let lookAroundScene {
                                 LookAroundCard(scene: lookAroundScene, height: 180)
-                            }
-
-                            if loading {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    SkeletonBox().frame(width: 180, height: 14)
-                                    SkeletonBox().frame(height: 12)
-                                    SkeletonBox().frame(width: 220, height: 12)
-                                }
-                            } else if let result {
-                                Text(result.headline).font(.subheadline.bold()).foregroundStyle(Theme.gold)
-                                Text(result.body).font(.footnote)
-                                ForEach(result.highlights, id: \.self) { highlight in
-                                    HStack(alignment: .top, spacing: 6) {
-                                        Circle().fill(Theme.gold).frame(width: 5, height: 5).padding(.top, 6)
-                                        Text(highlight).font(.caption)
-                                    }
-                                }
-                            } else if let errorMessage {
-                                Text(errorMessage).font(.footnote).foregroundStyle(Theme.closedRed)
                             }
 
                             if !chatHistory.isEmpty {
