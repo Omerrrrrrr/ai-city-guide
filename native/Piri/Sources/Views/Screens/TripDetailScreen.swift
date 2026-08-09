@@ -210,11 +210,23 @@ struct TripDetailScreen: View {
         )
     }
 
+    /// Bounding-box fit, not just a centroid with a fixed span — a fixed
+    /// 0.05° span silently clips stops on any trip that actually covers more
+    /// ground than that (same bug already fixed for `MapScreen`'s live route
+    /// tracking; this screen's post-trip summary map had the identical gap).
     private func averageRegion(_ coordinates: [CLLocationCoordinate2D]) -> MKCoordinateRegion? {
         guard !coordinates.isEmpty else { return nil }
-        let lat = coordinates.map(\.latitude).reduce(0, +) / Double(coordinates.count)
-        let lng = coordinates.map(\.longitude).reduce(0, +) / Double(coordinates.count)
-        return MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: lat, longitude: lng), span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05))
+        let lats = coordinates.map(\.latitude)
+        let lngs = coordinates.map(\.longitude)
+        let center = CLLocationCoordinate2D(
+            latitude: (lats.min()! + lats.max()!) / 2,
+            longitude: (lngs.min()! + lngs.max()!) / 2
+        )
+        let span = MKCoordinateSpan(
+            latitudeDelta: max((lats.max()! - lats.min()!) * 1.6, 0.02),
+            longitudeDelta: max((lngs.max()! - lngs.min()!) * 1.6, 0.02)
+        )
+        return MKCoordinateRegion(center: center, span: span)
     }
 
     private func startPlayback(_ trip: Trip) {
