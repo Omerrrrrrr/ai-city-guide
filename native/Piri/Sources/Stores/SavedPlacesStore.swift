@@ -2,73 +2,29 @@ import Foundation
 import Observation
 
 private struct SavedPlacesState: Codable {
-    var favorites: [SavedPOIReference] = []
-    var plan: [SavedPOIReference] = []
     var collections: [SavedCollection] = []
 }
 
-/// Port of `mobile/src/store/saved-places.ts`. Backed by Keychain, like the
-/// RN store's `expo-secure-store` adapter — favorites/plan are treated as
-/// the closest thing this account-less app has to personal data. Stores
-/// `SavedPOIReference` snapshots (Apple POI data) rather than curated place
-/// ids, since there's no curated database left to re-fetch from.
-///
-/// `collections` are user-named groups on top of favorites/plan (e.g.
-/// "Weekend trip") — a place can be in any number of them at once, same
-/// tagging-not-filing model favorites/plan already use relative to each
-/// other (a place can be both favorited and planned).
+/// Port of `mobile/src/store/saved-places.ts`, since generalized: the app
+/// used to have exactly one "Favorites" bucket and one "Plan" bucket, but
+/// per the user's explicit choice both are now just user-named
+/// `SavedCollection`s — someone can make as many named lists as they want
+/// ("Weekend trip", "Cafes to try", ...), and any list of 2+ places can be
+/// turned into an AI-optimized suggestion or an actual map route
+/// (`CollectionDetailScreen`), not just a specially-named "Plan" one.
+/// Backed by Keychain, like the RN store's `expo-secure-store` adapter —
+/// saved places are treated as the closest thing this account-less app has
+/// to personal data.
 @Observable
 final class SavedPlacesStore {
-    private(set) var favorites: [SavedPOIReference] = []
-    private(set) var plan: [SavedPOIReference] = []
     private(set) var collections: [SavedCollection] = []
 
     private let persistence = KeychainStore<SavedPlacesState>(key: "ai-city-guide.saved-places")
 
     init() {
         if let saved = persistence.load() {
-            favorites = saved.favorites
-            plan = saved.plan
             collections = saved.collections
         }
-    }
-
-    func isFavorite(_ identifier: String) -> Bool {
-        favorites.contains { $0.identifier == identifier }
-    }
-
-    func toggleFavorite(_ poi: POIPlace) {
-        let reference = poi.asReference
-        if let index = favorites.firstIndex(where: { $0.identifier == reference.identifier }) {
-            favorites.remove(at: index)
-        } else {
-            favorites.append(reference)
-        }
-        persist()
-    }
-
-    func isInPlan(_ identifier: String) -> Bool {
-        plan.contains { $0.identifier == identifier }
-    }
-
-    func togglePlan(_ poi: POIPlace) {
-        let reference = poi.asReference
-        if let index = plan.firstIndex(where: { $0.identifier == reference.identifier }) {
-            plan.remove(at: index)
-        } else {
-            plan.append(reference)
-        }
-        persist()
-    }
-
-    func clearFavorites() {
-        favorites = []
-        persist()
-    }
-
-    func clearPlan() {
-        plan = []
-        persist()
     }
 
     @discardableResult
@@ -90,8 +46,18 @@ final class SavedPlacesStore {
         persist()
     }
 
+    /// True if the given place is in *any* list — drives the bookmark
+    /// icon's filled/outline state on a place's detail page.
+    func isSaved(_ identifier: String) -> Bool {
+        for collection in collections {
+            if collection.places.contains(where: { $0.identifier == identifier }) { return true }
+        }
+        return false
+    }
+
     func isIn(collection id: String, identifier: String) -> Bool {
-        collections.first { $0.id == id }?.places.contains { $0.identifier == identifier } ?? false
+        guard let collection = collections.first(where: { $0.id == id }) else { return false }
+        return collection.places.contains { $0.identifier == identifier }
     }
 
     func toggle(_ poi: POIPlace, inCollection id: String) {
@@ -112,6 +78,6 @@ final class SavedPlacesStore {
     }
 
     private func persist() {
-        persistence.save(SavedPlacesState(favorites: favorites, plan: plan, collections: collections))
+        persistence.save(SavedPlacesState(collections: collections))
     }
 }

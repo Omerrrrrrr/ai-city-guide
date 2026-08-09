@@ -1,9 +1,11 @@
 import Foundation
 
 /// A user-named group of saved places — e.g. "Weekend trip" or "Restaurants
-/// to try" — independent of the built-in Favorites/Plan buckets. A place can
-/// be in any number of collections at once (not exclusive membership), same
-/// tagging-not-filing model `SavedPlacesStore.favorites`/`.plan` already use.
+/// to try". This is the *only* way a place is saved now — the app used to
+/// also have separate built-in "Favorites" and "Plan" buckets, but per the
+/// user's explicit choice both became just user-named collections like any
+/// other. A place can be in any number of collections at once (not
+/// exclusive membership).
 struct SavedCollection: Codable, Identifiable, Hashable {
     var id: String
     var name: String

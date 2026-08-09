@@ -4,10 +4,16 @@ import SwiftUI
 /// places, delete the whole list. Presented as a `.sheet` from `SavedScreen`,
 /// same pattern as `TripDetailScreen`: a custom header row instead of a
 /// `NavigationStack`, since there's no ambient navigation bar to hide here.
+///
+/// Any list with 2+ places can be turned into an AI-optimized suggestion or
+/// an actual map route — not just a specially-named "Plan" list, since
+/// there's no such special list anymore (the user's explicit choice:
+/// Favorites and Plan both became these general-purpose named lists).
 struct CollectionDetailScreen: View {
     let collectionId: String
 
     @Environment(SavedPlacesStore.self) private var savedPlacesStore
+    @Environment(TabSelection.self) private var tabSelection
     @Environment(\.dismiss) private var dismiss
 
     @State private var isEditingName = false
@@ -40,6 +46,11 @@ struct CollectionDetailScreen: View {
             header(collection)
             ScrollView {
                 VStack(spacing: 12) {
+                    if collection.places.count >= 2 {
+                        optimizeButton(collection)
+                        createRouteButton(collection)
+                    }
+
                     if collection.places.isEmpty {
                         emptyState
                     } else {
@@ -53,6 +64,57 @@ struct CollectionDetailScreen: View {
         }
         .sheet(item: $selectedPOI) { poi in POIExplainSheet(poi: poi) }
         .onAppear { nameInput = collection.name }
+    }
+
+    private func optimizeButton(_ collection: SavedCollection) -> some View {
+        Button {
+            let placeNames = collection.places.map(\.name).joined(separator: ", ")
+            tabSelection.pendingAIQuery = L("saved.optimize.query", placeNames)
+            tabSelection.selection = 3
+            // Presented as a `.sheet` (from SavedScreen, itself a `.sheet`
+            // from ProfileScreen) — switching `tabSelection.selection` alone
+            // changes the tab underneath, invisibly, while these sheets
+            // keep covering the whole screen. Dismissing is what actually
+            // makes the tab switch to Ask Piri visible.
+            dismiss()
+        } label: {
+            HStack(spacing: 14) {
+                Text("◈").font(.system(size: 26)).foregroundStyle(Theme.gold)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("saved.optimize.title").font(.system(size: 15, weight: .bold)).foregroundStyle(.white)
+                    Text(LPlural("saved.optimize.sub", count: collection.places.count)).font(.system(size: 13)).foregroundStyle(.white.opacity(0.6))
+                }
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 18).fill(Theme.navy))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func createRouteButton(_ collection: SavedCollection) -> some View {
+        Button {
+            // `/routes/directions` caps at 10 coordinates server-side —
+            // matched here so a large list doesn't get silently rejected.
+            tabSelection.pendingRouteStops = Array(collection.places.prefix(10))
+            tabSelection.selection = 2
+            dismiss()
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "point.topleft.down.curvedto.point.bottomright.up")
+                    .font(.system(size: 22))
+                    .foregroundStyle(Theme.gold)
+                Text("saved.createRoute.title")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.primary)
+                Spacer()
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 18).fill(Color(.secondarySystemBackground)))
+            .overlay(RoundedRectangle(cornerRadius: 18).stroke(Theme.gold.opacity(0.3), lineWidth: 1.5))
+        }
+        .buttonStyle(.plain)
     }
 
     private func header(_ collection: SavedCollection) -> some View {

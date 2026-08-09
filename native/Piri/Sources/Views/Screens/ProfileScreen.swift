@@ -221,22 +221,16 @@ struct ProfileScreen: View {
     }
 
     private var savedDataCard: some View {
-        let favoriteCount = savedPlacesStore.favorites.count
-        let planCount = savedPlacesStore.plan.count
+        let listsCount = savedPlacesStore.collections.count
         let recentCount = recentlyViewedStore.viewed.count
 
         return card(titleKey: "settings.savedPlaces", trailing: {
-            Button("settings.viewAll") { showingSaved = .favorites }
+            Button("settings.viewAll") { showingSaved = .lists }
                 .font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.gold)
         }) {
             HStack(spacing: 12) {
-                statButton(count: favoriteCount, labelKey: "settings.stats.saved") { showingSaved = .favorites }
-                statButton(count: planCount, labelKey: "settings.stats.inPlan") { showingSaved = .plan }
+                statButton(count: listsCount, labelKey: "settings.stats.lists") { showingSaved = .lists }
                 statButton(count: recentCount, labelKey: "settings.stats.visited") { showingSaved = .visited }
-            }
-            HStack(spacing: 10) {
-                clearButton(titleKey: "settings.clearFavorites", disabled: favoriteCount == 0) { savedPlacesStore.clearFavorites() }
-                clearButton(titleKey: "settings.clearPlan", disabled: planCount == 0) { savedPlacesStore.clearPlan() }
             }
             clearButton(titleKey: "settings.clearHistory", disabled: recentCount == 0) { recentlyViewedStore.clearHistory() }
         }

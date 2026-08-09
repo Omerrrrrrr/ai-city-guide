@@ -49,36 +49,16 @@ struct POIExplainSheet: View {
                                 Spacer()
                                 // `poi.mapItem.identifier` is nil for some
                                 // POIs (a known Apple gap, not a bug here) —
-                                // gating these buttons on it made them
-                                // silently vanish for exactly those places.
                                 // `asReference.identifier` is never nil (it
-                                // falls back to a synthetic id), so use that
-                                // instead, same fix already applied to
-                                // favorites/plan/Route Mode stop-picking
-                                // elsewhere in the app.
+                                // falls back to a synthetic id), so
+                                // `isSaved` checks always work regardless.
                                 let identifier = poi.asReference.identifier
-                                HStack(spacing: 14) {
-                                    Button {
-                                        Haptics.medium()
-                                        savedPlacesStore.toggleFavorite(poi)
-                                    } label: {
-                                        Image(systemName: savedPlacesStore.isFavorite(identifier) ? "heart.fill" : "heart")
-                                            .foregroundStyle(savedPlacesStore.isFavorite(identifier) ? Theme.gold : .secondary)
-                                    }
-                                    Button {
-                                        Haptics.light()
-                                        savedPlacesStore.togglePlan(poi)
-                                    } label: {
-                                        Image(systemName: savedPlacesStore.isInPlan(identifier) ? "checkmark.circle.fill" : "plus.circle")
-                                            .foregroundStyle(savedPlacesStore.isInPlan(identifier) ? Theme.gold : .secondary)
-                                    }
-                                    Button {
-                                        Haptics.light()
-                                        showingAddToCollection = true
-                                    } label: {
-                                        Image(systemName: "list.bullet.circle")
-                                            .foregroundStyle(.secondary)
-                                    }
+                                Button {
+                                    Haptics.light()
+                                    showingAddToCollection = true
+                                } label: {
+                                    Image(systemName: savedPlacesStore.isSaved(identifier) ? "bookmark.fill" : "bookmark")
+                                        .foregroundStyle(savedPlacesStore.isSaved(identifier) ? Theme.gold : .secondary)
                                 }
                                 .font(.title3)
                             }

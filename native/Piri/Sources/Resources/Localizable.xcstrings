@@ -10173,6 +10173,29 @@
         }
       }
     },
+    "settings.stats.lists": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lists"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lister"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listeler"
+          }
+        }
+      }
+    },
     "settings.stats.saved": {
       "extractionState": "stale",
       "localizations": {
