@@ -40,6 +40,7 @@ struct MapScreen: View {
     /// its plain phone/website fields and offer the full Place Card sheet.
     @State private var resolvedMapFeatureItem: MKMapItem?
     @State private var showingMapItemDetail = false
+    @State private var addToCollectionKind: SavedCollectionKind?
     @State private var lookAroundScene: MKLookAroundScene?
     @State private var routeCoordinates: [CLLocationCoordinate2D] = []
     @State var initialRegion: MKCoordinateRegion?
@@ -97,7 +98,7 @@ struct MapScreen: View {
                         initialRegion: activeTripDisplayRegion(for: activeTrip) ?? initialRegion,
                         showsUserLocation: true
                     )
-                    .ignoresSafeArea(edges: .bottom)
+                    .ignoresSafeArea()
                 } else {
                     // Route-mode stop-picking reuses this same Apple-POI base
                     // map — tapping a POI feature toggles it as a stop
@@ -124,7 +125,7 @@ struct MapScreen: View {
                         centerOnce: initialRegion,
                         recenterTrigger: recenterTrigger
                     )
-                    .ignoresSafeArea(edges: .bottom)
+                    .ignoresSafeArea()
                 }
             } else {
                 ProgressView()
@@ -158,7 +159,12 @@ struct MapScreen: View {
         .overlay(alignment: .bottomTrailing) {
             routeModeToggleButton.padding(20)
         }
-        .navigationTitle("tabs.map")
+        // Not `.navigationTitle` — the system nav bar/large-title reserved a
+        // big, unstyled blank band above the map (inconsistent with every
+        // other screen's custom `Theme.navy` header, and wasteful here since
+        // the map should fill the screen edge-to-edge like Apple's own Maps
+        // app, with the search bar floating directly below the status bar).
+        .navigationBarHidden(true)
         .task {
             locationManager.requestWhenInUseAuthorization()
             await setInitialRegionIfNeeded()
@@ -284,6 +290,7 @@ struct MapScreen: View {
         lookAroundScene = nil
         resolvedMapFeatureItem = nil
         showingMapItemDetail = false
+        addToCollectionKind = nil
         poiExplainTask?.cancel()
         poiExplainTask = Task { await explainMapFeature(feature) }
         Task { lookAroundScene = try? await MKLookAroundSceneRequest(coordinate: feature.coordinate).scene }
@@ -294,6 +301,7 @@ struct MapScreen: View {
         poiExplainResult = nil
         lookAroundScene = nil
         showingMapItemDetail = false
+        addToCollectionKind = nil
         poiExplainTask?.cancel()
     }
 
@@ -336,12 +344,52 @@ struct MapScreen: View {
     /// with just what `MKMapItemRequest` gives us (name/category/coordinate)
     /// and shows the same personalized-blurb UI `PlaceDetailScreen`'s
     /// "Piri's Take" card uses, without ever persisting anything.
+    /// `resolvedMapFeatureItem`, packaged as a `POIPlace` for the
+    /// bookmark/flag buttons and `AddToCollectionSheet` — `nil` until
+    /// `explainMapFeature` resolves it, same as those buttons' visibility.
+    private func resolvedMapFeaturePOI(for feature: MKMapFeatureAnnotation) -> POIPlace? {
+        guard let resolvedMapFeatureItem else { return nil }
+        return POIPlace(
+            name: resolvedMapFeatureItem.name ?? feature.title ?? "",
+            category: resolvedMapFeatureItem.pointOfInterestCategory,
+            coordinate: feature.coordinate,
+            mapItem: resolvedMapFeatureItem
+        )
+    }
+
     private func mapFeatureCard(for feature: MKMapFeatureAnnotation) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        let poi = resolvedMapFeaturePOI(for: feature)
+
+        return VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("◈").foregroundStyle(Theme.gold)
                 Text(feature.title ?? "").font(.headline).lineLimit(1)
                 Spacer()
+                // Same bookmark/flag pair as POIExplainSheet — this card
+                // floats over the map itself so there was nowhere to save
+                // or plan a tapped POI from without leaving the map.
+                if let poi {
+                    let identifier = poi.asReference.identifier
+                    Button {
+                        Haptics.light()
+                        addToCollectionKind = .saved
+                    } label: {
+                        Image(systemName: savedPlacesStore.isSaved(identifier) ? "bookmark.fill" : "bookmark")
+                            .foregroundStyle(savedPlacesStore.isSaved(identifier) ? Theme.gold : .secondary)
+                    }
+                    Button {
+                        Haptics.light()
+                        addToCollectionKind = .plan
+                    } label: {
+                        // Not "flag" — that's already `routeModeToggleButton`'s
+                        // icon on this same screen, and reusing it here for
+                        // "add to Plan" made the two concepts (start Route
+                        // Mode vs. save this POI into a Plan list) look like
+                        // the same action.
+                        Image(systemName: savedPlacesStore.isPlanned(identifier) ? "suitcase.fill" : "suitcase")
+                            .foregroundStyle(savedPlacesStore.isPlanned(identifier) ? Theme.gold : .secondary)
+                    }
+                }
                 Button {
                     dismissMapFeature()
                 } label: {
@@ -414,6 +462,9 @@ struct MapScreen: View {
         }
         .padding()
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .sheet(item: $addToCollectionKind) { kind in
+            if let poi { AddToCollectionSheet(poi: poi, kind: kind) }
+        }
     }
 
     private func setInitialRegionIfNeeded() async {

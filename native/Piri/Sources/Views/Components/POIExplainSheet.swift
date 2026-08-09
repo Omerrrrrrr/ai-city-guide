@@ -65,7 +65,11 @@ struct POIExplainSheet: View {
                                         Haptics.light()
                                         addToCollectionKind = .plan
                                     } label: {
-                                        Image(systemName: savedPlacesStore.isPlanned(identifier) ? "flag.fill" : "flag")
+                                        // Not "flag" — that's MapScreen's
+                                        // Route Mode toggle icon; kept
+                                        // distinct so the two concepts don't
+                                        // look like the same action there.
+                                        Image(systemName: savedPlacesStore.isPlanned(identifier) ? "suitcase.fill" : "suitcase")
                                             .foregroundStyle(savedPlacesStore.isPlanned(identifier) ? Theme.gold : .secondary)
                                     }
                                 }
