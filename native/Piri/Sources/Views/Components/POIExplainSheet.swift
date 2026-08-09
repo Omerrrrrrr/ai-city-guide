@@ -106,11 +106,11 @@ struct POIExplainSheet: View {
                             ) {
                                 Marker(item: poi.mapItem)
                                     .tag(MapSelection(poi.mapItem))
-                                    .mapItemDetailSelectionAccessory(.callout(.full))
+                                    .mapItemDetailSelectionAccessory(.callout(.compact))
                             }
                             .frame(height: 260)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .onAppear { placeCardSelection = MapSelection(poi.mapItem) }
+                            .task { placeCardSelection = MapSelection(poi.mapItem) }
 
                             // Phone/website/address are plain `MKMapItem`
                             // properties — shown directly too, as a
