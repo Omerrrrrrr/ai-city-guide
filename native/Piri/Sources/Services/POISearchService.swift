@@ -27,11 +27,27 @@ enum POISearchService {
 
         do {
             let response = try await MKLocalSearch(request: request).start()
-            return response.mapItems.map { item in
-                POIPlace(
+            // `request.region` is only a ranking hint, not a hard filter —
+            // confirmed live: searching "Başka" (Turkish for "other/another",
+            // sent as a natural-language query from a conversational
+            // follow-up) actually matched Baška, a real town on the island
+            // of Krk, Croatia, ~1500km from Kristiansand, and MKLocalSearch
+            // happily returned it. Drop anything wildly outside the
+            // requested radius rather than trusting Apple's own relevance
+            // ranking not to reach for a strong name match on the other
+            // side of a continent. A generous multiple of the requested
+            // radius, not the radius itself — this is still meant to allow
+            // normal ranking slack, just reject the far outliers.
+            let maxDistanceKm = radiusMeters * 3 / 1000
+            return response.mapItems.compactMap { item -> POIPlace? in
+                let itemCoordinate = item.placemark.coordinate
+                guard geoDistanceKm(coordinate.latitude, coordinate.longitude, itemCoordinate.latitude, itemCoordinate.longitude) <= maxDistanceKm else {
+                    return nil
+                }
+                return POIPlace(
                     name: item.name ?? "",
                     category: item.pointOfInterestCategory,
-                    coordinate: item.placemark.coordinate,
+                    coordinate: itemCoordinate,
                     mapItem: item
                 )
             }
