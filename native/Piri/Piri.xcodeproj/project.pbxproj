@@ -62,6 +62,7 @@
 		A2D65D1C6851A7802697F3BE /* TripPhotoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D8F55E9E6F23F30F9323E2F /* TripPhotoStore.swift */; };
 		A785BBB4AFF5DC51F15C29A3 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = E712507F714C68342D7027E7 /* Localizable.xcstrings */; };
 		AA0513F0B8654D68605A9DCE /* LocationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E67959451EFC53E9B89AEE8 /* LocationManager.swift */; };
+		ABC4236A1C18ED878A9206C7 /* TripAdvisorRatingRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 642AE03D91D3B2C9EC654135 /* TripAdvisorRatingRow.swift */; };
 		B0B5862CD4E82B308AFDE8CD /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 671A824ED89E058394F705D9 /* KeychainStore.swift */; };
 		B1CE3778A30DDE3281136DAE /* PlaceFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03AA8FC29DF1B7AFBACE82E /* PlaceFixtures.swift */; };
 		B32A7E5F97F0950A4DDC57EC /* SavedScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A6344FD16ACEE6A9600CDCC /* SavedScreen.swift */; };
@@ -138,6 +139,7 @@
 		5D0AAD7772B7FF41780137D3 /* ExploreScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreScreen.swift; sourceTree = "<group>"; };
 		5DD8BEE6C2632619EE84A762 /* AdminAuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminAuthStore.swift; sourceTree = "<group>"; };
 		5EF08414F55178EA12A29A4A /* PluralsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluralsTests.swift; sourceTree = "<group>"; };
+		642AE03D91D3B2C9EC654135 /* TripAdvisorRatingRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripAdvisorRatingRow.swift; sourceTree = "<group>"; };
 		671A824ED89E058394F705D9 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		674770D930511AA70C53CCF8 /* POICategoryGroups.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POICategoryGroups.swift; sourceTree = "<group>"; };
 		6993AA4D03C823EF1D3DCFEE /* ProfileOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileOptions.swift; sourceTree = "<group>"; };
@@ -258,6 +260,7 @@
 				F88D9297E5E64646338B6975 /* PlaceMiniMap.swift */,
 				A564A59EA1164A5FCB99DDF9 /* POIExplainSheet.swift */,
 				70E1DF84B9EB0D5E98A9BA27 /* StatusBadge.swift */,
+				642AE03D91D3B2C9EC654135 /* TripAdvisorRatingRow.swift */,
 				AAC41208BF2D68EC120AB9AC /* TripMapView.swift */,
 				2AD9D3415FA1CE99CB46112B /* TripMiniMap.swift */,
 			);
@@ -587,6 +590,7 @@
 				5AA6F51FFA86B9EA366E41E4 /* TabSelection.swift in Sources */,
 				100F6128B1DA42E96537D83B /* Theme.swift in Sources */,
 				B76B20B3FEABC73E69373793 /* Trip.swift in Sources */,
+				ABC4236A1C18ED878A9206C7 /* TripAdvisorRatingRow.swift in Sources */,
 				CAAA7C3A09A77D4DDEA49CAC /* TripDetailScreen.swift in Sources */,
 				EEA660AEBC9717682E73353A /* TripMapView.swift in Sources */,
 				2543E63D0C2DA553A725C458 /* TripMiniMap.swift in Sources */,

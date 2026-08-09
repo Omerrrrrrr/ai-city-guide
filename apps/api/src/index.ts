@@ -51,6 +51,7 @@ import {
   type UserProfileInput,
 } from './user-context';
 import { haversineKm } from './geo';
+import { fetchTripAdvisorRating } from './tripadvisor';
 import { places, cities, liveGridCellStatus, livePlaceCache } from './schema';
 
 const PORT = Number(process.env.PORT ?? 4000);
@@ -1310,7 +1311,7 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         return reply.code(400).send({ error: 'Invalid request' });
       }
 
-      const { name, category, address, locale, userProfile, recentlyViewedPlaceIds } = parsed.data;
+      const { name, category, lat, lng, address, locale, userProfile, recentlyViewedPlaceIds } = parsed.data;
       const aiProvider = getAiProviderConfig();
       if (!aiProvider) {
         return reply.code(503).send({ error: 'AI not configured' });
@@ -1338,29 +1339,32 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         : '';
 
       try {
-        const { object } = await generateObject({
-          model: aiProvider.client.chat(aiProvider.model),
-          maxOutputTokens: 300,
-          schema: z.object({
-            headline: z
-              .string()
-              .describe('One punchy sentence that connects this place to who the user is. Max 12 words.'),
-            body: z
-              .string()
-              .describe('2-3 sentences of personalized insight. Speak directly to this person\'s expertise or interests.'),
-            highlights: z
-              .array(z.string())
-              .min(2)
-              .max(3)
-              .describe('2-3 specific things this particular person would find most interesting here.'),
-          }),
-          system: `You are Piri, a deeply knowledgeable personal travel guide. Your job is to explain a place in a way that speaks directly to who the user is — their profession, interests, and worldview. Only the place's name, category, and address are given below — you have no verified facts beyond that, so rely on general knowledge about places of this type and this name; don't invent specific unverifiable claims (exact founding dates, named owners, awards) about it.${NO_HYPE_GUARD}${profileContext}
+        const [{ object }, rating] = await Promise.all([
+          generateObject({
+            model: aiProvider.client.chat(aiProvider.model),
+            maxOutputTokens: 300,
+            schema: z.object({
+              headline: z
+                .string()
+                .describe('One punchy sentence that connects this place to who the user is. Max 12 words.'),
+              body: z
+                .string()
+                .describe('2-3 sentences of personalized insight. Speak directly to this person\'s expertise or interests.'),
+              highlights: z
+                .array(z.string())
+                .min(2)
+                .max(3)
+                .describe('2-3 specific things this particular person would find most interesting here.'),
+            }),
+            system: `You are Piri, a deeply knowledgeable personal travel guide. Your job is to explain a place in a way that speaks directly to who the user is — their profession, interests, and worldview. Only the place's name, category, and address are given below — you have no verified facts beyond that, so rely on general knowledge about places of this type and this name; don't invent specific unverifiable claims (exact founding dates, named owners, awards) about it.${NO_HYPE_GUARD}${profileContext}
 
 ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
-          prompt: `Explain this place:\n\n${placeContext}`,
-        } as any);
+            prompt: `Explain this place:\n\n${placeContext}`,
+          } as any),
+          lat !== undefined && lng !== undefined ? fetchTripAdvisorRating(name, lat, lng) : Promise.resolve(null),
+        ]);
 
-        return reply.send(object);
+        return reply.send({ ...(object as Record<string, unknown>), rating });
       } catch (e: any) {
         app.log.error(e);
         return reply.code(500).send({ error: e.message || 'Failed to explain place' });

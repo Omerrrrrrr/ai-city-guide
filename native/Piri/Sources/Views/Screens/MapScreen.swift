@@ -344,6 +344,9 @@ struct MapScreen: View {
                 }
             } else if let poiExplainResult {
                 Text(poiExplainResult.headline).font(.subheadline.bold()).foregroundStyle(Theme.gold)
+                if let rating = poiExplainResult.rating {
+                    TripAdvisorRatingRow(rating: rating)
+                }
                 Text(poiExplainResult.body).font(.footnote)
                 ForEach(poiExplainResult.highlights, id: \.self) { highlight in
                     HStack(alignment: .top, spacing: 6) {

@@ -78,6 +78,9 @@ struct POIExplainSheet: View {
                                 }
                             } else if let result {
                                 Text(result.headline).font(.subheadline.bold()).foregroundStyle(Theme.gold)
+                                if let rating = result.rating {
+                                    TripAdvisorRatingRow(rating: rating)
+                                }
                                 Text(result.body).font(.footnote)
                                 ForEach(result.highlights, id: \.self) { highlight in
                                     HStack(alignment: .top, spacing: 6) {

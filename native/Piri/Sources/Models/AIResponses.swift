@@ -127,6 +127,20 @@ struct ExplainResult: Codable {
     var headline: String
     var body: String
     var highlights: [String]
+    /// Only ever present from `/places/explain-poi` — `nil` whenever
+    /// `TRIPADVISOR_API_KEY` is unset server-side or no matching Tripadvisor
+    /// location was found nearby.
+    var rating: TripAdvisorRating?
+}
+
+/// Tripadvisor's own bubble-rating icon URL is used as-is (`iconUrl`) rather
+/// than a custom rating widget — their display terms require using the
+/// rating graphic they provide, not a home-grown one.
+struct TripAdvisorRating: Codable {
+    var score: Double
+    var reviewCount: Int
+    var url: String
+    var iconUrl: String
 }
 
 /// Port-side request for `/places/explain-poi` — same personalized-blurb
