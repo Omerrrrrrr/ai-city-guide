@@ -1,0 +1,514 @@
+import MapKit
+import SwiftUI
+
+/// Port of `mobile/app/(tabs)/map.tsx`. The RN version had to gate live-pin
+/// fetching behind a manual "Discover this area" button and a hard
+/// server-side cap (`MAX_LIVE_PINS_RESPONSE = 25`) because bulk marker churn
+/// crashed `react-native-maps` under Fabric's legacy-interop bridge. MKMapView
+/// has no such ceiling, so here the fetch just runs — debounced — on every
+/// settled region change, same as panning any other native maps app.
+///
+/// 2026-08-08: at the user's request, Piri's own curated/live pin data is
+/// switched off here in favor of Apple's native MapKit POI layer (every POI
+/// on the map is tappable, category chips filter Apple's own categories via
+/// `pointOfInterestFilter`, and tapping any POI gets an ephemeral
+/// AI-personalized blurb from `/places/explain-poi` instead of a curated
+/// description). This is a deliberate, reversible toggle, not a deletion —
+/// the curated fetch/render path below is intact, just gated off. Revisit
+/// this decision later; flip `useCuratedMapData` back to `true` to restore it.
+struct MapScreen: View {
+    private static let useCuratedMapData = false
+
+    // Not `private` — `MapScreen+RouteMode.swift` (an extension, so it can't
+    // declare its own stored/environment properties) needs access to these.
+    @Environment(CityStore.self) var cityStore
+    @Environment(SavedPlacesStore.self) private var savedPlacesStore
+    @Environment(UserProfileStore.self) private var userProfileStore
+    @Environment(TripsStore.self) var tripsStore
+
+    @State var locationManager = LocationManager()
+    @State private var places: [Place] = []
+    @State private var livePins: [LivePin] = []
+    @State private var selectedCategoryGroup: POICategoryGroup?
+    @State private var selectedPlace: Place?
+    @State private var selectedLivePin: LivePin?
+    @State private var selectedMapFeature: MKMapFeatureAnnotation?
+    @State private var poiExplainResult: ExplainResult?
+    @State private var poiExplainLoading = false
+    @State private var lookAroundScene: MKLookAroundScene?
+    @State private var routeCoordinates: [CLLocationCoordinate2D] = []
+    @State private var initialRegion: MKCoordinateRegion?
+    @State private var recenterTrigger: UUID?
+    @State private var searchQuery = ""
+    @State private var searchTask: Task<Void, Never>?
+    @State private var liveFetchTask: Task<Void, Never>?
+    @State private var poiExplainTask: Task<Void, Never>?
+    @State private var errorMessage: String?
+
+    // MARK: Route mode (`MapScreen+RouteMode.swift`)
+    @State var routeMode = false
+    /// Loaded on demand for stop-picking regardless of `useCuratedMapData` —
+    /// route planning needs real curated `Place`s with stable ids even while
+    /// the base map itself only shows Apple's POI layer.
+    @State var routeCandidatePlaces: [Place] = []
+    @State var plannedStopIds: [String] = []
+    @State var routeGeometry: [[Double]]?
+    @State var routeDistanceMeters: Double?
+    @State var routeDurationSeconds: Double?
+    @State var isFetchingRoute = false
+    @State var routeError: String?
+    @State var showTripPhotoCapture = false
+    /// Guards against re-running rehydration/re-starting breadcrumb recording
+    /// every time this view re-evaluates its body while a trip is active.
+    @State var hydratedTripId: String?
+
+    /// Session-only cache so re-tapping the same POI doesn't re-call the AI
+    /// (and re-spend the LLM call) — not persisted, matches the "doesn't
+    /// need to be saved, just needs to be fast" requirement. Plain `static`
+    /// (not `@State`, which only applies to instance properties) since it's
+    /// a shared, non-observed cache rather than view-identity-bound state.
+    private static var poiExplainCache: [String: ExplainResult] = [:]
+
+    /// Matches `LIVE_PINS_MAX_LATITUDE_DELTA` in the RN app — live pins only
+    /// make sense at city/district zoom, not zoomed out to country level.
+    private let maxLiveFetchLatitudeDelta = 0.04
+
+    var filteredPlaces: [Place] {
+        guard Self.useCuratedMapData else { return [] }
+        guard let selectedCategoryGroup, selectedCategoryGroup.categories != nil else { return places }
+        // Curated places use Piri's own category taxonomy, not Apple's
+        // MKPointOfInterestCategory — there's no clean mapping between the
+        // two, so a POI category chip only filters Apple's own layer while
+        // curated data (if re-enabled) stays unfiltered by it.
+        return places
+    }
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            if let initialRegion {
+                if routeMode, let activeTrip = tripsStore.trips.first(where: { $0.id == tripsStore.activeTripId }) {
+                    TripMapView(
+                        routeCoordinates: (activeTrip.routeGeometry ?? routeGeometry ?? []).compactMap(coordinate(fromPair:)),
+                        breadcrumbCoordinates: activeTrip.breadcrumb.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng) },
+                        stops: routeStopAnnotations,
+                        initialRegion: initialRegion,
+                        showsUserLocation: true
+                    )
+                    .ignoresSafeArea(edges: .bottom)
+                } else if routeMode {
+                    PiriMapView(
+                        places: routeCandidatePlaces,
+                        livePins: [],
+                        routeCoordinates: [],
+                        showsUserLocation: true,
+                        onRegionChange: { _ in },
+                        onSelectPlace: { toggleStop($0.id) },
+                        onSelectLivePin: { _ in },
+                        onSelectMapFeature: { _ in },
+                        pointOfInterestCategories: nil,
+                        selectedPlaceIds: Set(plannedStopIds),
+                        centerOnce: initialRegion
+                    )
+                    .ignoresSafeArea(edges: .bottom)
+                } else {
+                    PiriMapView(
+                        places: filteredPlaces,
+                        livePins: Self.useCuratedMapData ? livePins : [],
+                        routeCoordinates: routeCoordinates,
+                        showsUserLocation: true,
+                        onRegionChange: handleRegionChange,
+                        onSelectPlace: { selectPlace($0) },
+                        onSelectLivePin: { selectLivePin($0) },
+                        onSelectMapFeature: { selectMapFeature($0) },
+                        pointOfInterestCategories: selectedCategoryGroup?.categories,
+                        centerOnce: initialRegion,
+                        recenterTrigger: recenterTrigger
+                    )
+                    .ignoresSafeArea(edges: .bottom)
+                }
+            } else {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+
+            VStack(spacing: 12) {
+                if !routeMode {
+                    searchBar
+                    categoryChips
+                }
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(.footnote)
+                        .padding(8)
+                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8))
+                }
+                Spacer()
+                if routeMode {
+                    routeModeSheet
+                } else if let selectedPlace {
+                    placeCard(for: selectedPlace)
+                } else if let selectedLivePin {
+                    livePinCard(for: selectedLivePin)
+                } else if let selectedMapFeature {
+                    mapFeatureCard(for: selectedMapFeature)
+                }
+            }
+            .padding()
+        }
+        .overlay(alignment: .bottomTrailing) {
+            routeModeToggleButton.padding(20)
+        }
+        .navigationTitle("tabs.map")
+        .task {
+            locationManager.requestWhenInUseAuthorization()
+            await setInitialRegionIfNeeded()
+            if Self.useCuratedMapData {
+                await loadCuratedPlaces()
+            }
+        }
+        .task(id: routeMode) {
+            guard routeMode else { return }
+            await loadRouteCandidatesIfNeeded()
+            rehydrateActiveTripIfNeeded()
+        }
+        .onChange(of: locationManager.breadcrumb) { _, points in
+            guard let activeTripId = tripsStore.activeTripId, let last = points.last else { return }
+            tripsStore.addBreadcrumb(activeTripId, point: last)
+        }
+        .sheet(isPresented: $showTripPhotoCapture) {
+            TripPhotoCaptureSheet { data in
+                Task { await attachTripPhoto(data) }
+            }
+        }
+    }
+
+    private var searchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+            TextField(String(localized: "common.searchPlaces"), text: $searchQuery)
+                .textFieldStyle(.plain)
+                .autocorrectionDisabled()
+                .onSubmit {
+                    searchTask?.cancel()
+                    searchTask = Task { await searchAndCenterMap(searchQuery) }
+                }
+            if !searchQuery.isEmpty {
+                Button {
+                    searchQuery = ""
+                    searchTask?.cancel()
+                } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func searchAndCenterMap(_ query: String) async {
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = trimmed
+        if let initialRegion {
+            request.region = initialRegion
+        }
+
+        do {
+            let response = try await MKLocalSearch(request: request).start()
+            guard !Task.isCancelled, let coordinate = response.mapItems.first?.placemark.coordinate else { return }
+            initialRegion = MKCoordinateRegion(
+                center: coordinate,
+                span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+            )
+            recenterTrigger = UUID()
+        } catch {
+            guard !Task.isCancelled else { return }
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private var categoryChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(POICategoryGroups.all) { group in
+                    let active = selectedCategoryGroup?.id == group.id
+                    Button(String(localized: String.LocalizationValue(group.labelKey))) {
+                        selectedCategoryGroup = active ? nil : group
+                    }
+                    .font(.footnote.weight(.medium))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(active ? Color.accentColor : Color(.secondarySystemBackground), in: Capsule())
+                    .foregroundStyle(active ? .white : .primary)
+                }
+            }
+        }
+    }
+
+    private func selectPlace(_ place: Place) {
+        selectedPlace = place
+        selectedLivePin = nil
+        selectedMapFeature = nil
+        poiExplainTask?.cancel()
+    }
+
+    private func selectLivePin(_ pin: LivePin) {
+        selectedLivePin = pin
+        selectedPlace = nil
+        selectedMapFeature = nil
+        poiExplainTask?.cancel()
+    }
+
+    private func selectMapFeature(_ feature: MKMapFeatureAnnotation) {
+        selectedMapFeature = feature
+        selectedPlace = nil
+        selectedLivePin = nil
+        poiExplainResult = nil
+        lookAroundScene = nil
+        poiExplainTask?.cancel()
+        poiExplainTask = Task { await explainMapFeature(feature) }
+        Task { lookAroundScene = try? await MKLookAroundSceneRequest(coordinate: feature.coordinate).scene }
+    }
+
+    private func dismissMapFeature() {
+        selectedMapFeature = nil
+        poiExplainResult = nil
+        lookAroundScene = nil
+        poiExplainTask?.cancel()
+    }
+
+    private func placeCard(for place: Place) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                VStack(alignment: .leading) {
+                    Text(place.name).font(.headline)
+                    Text(place.category).font(.subheadline).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button {
+                    savedPlacesStore.toggleFavorite(place.id)
+                } label: {
+                    Image(systemName: savedPlacesStore.isFavorite(place.id) ? "heart.fill" : "heart")
+                }
+                Button {
+                    savedPlacesStore.togglePlan(place.id)
+                } label: {
+                    Image(systemName: savedPlacesStore.isInPlan(place.id) ? "plus.circle.fill" : "plus.circle")
+                }
+            }
+            Button("common.openInMaps") {
+                Task { await fetchDirections(to: place) }
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding()
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func livePinCard(for pin: LivePin) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(pin.name).font(.headline)
+            Text(pin.category).font(.subheadline).foregroundStyle(.secondary)
+            Button("common.showAll") {
+                Task { await enrichLivePin(pin) }
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding()
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    /// Card for ANY tapped map POI — Piri's own pins have a stable DB record
+    /// to explain, but most pins on the map are Apple's own base-tile POIs
+    /// with nothing in our backend at all. This calls `/places/explain-poi`
+    /// with just what `MKMapItemRequest` gives us (name/category/coordinate)
+    /// and shows the same personalized-blurb UI `PlaceDetailScreen`'s
+    /// "Piri's Take" card uses, without ever persisting anything.
+    private func mapFeatureCard(for feature: MKMapFeatureAnnotation) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("◈").foregroundStyle(Theme.gold)
+                Text(feature.title ?? "").font(.headline).lineLimit(1)
+                Spacer()
+                Button {
+                    dismissMapFeature()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if let lookAroundScene {
+                LookAroundCard(scene: lookAroundScene, height: 140)
+            }
+
+            if poiExplainLoading {
+                VStack(alignment: .leading, spacing: 8) {
+                    SkeletonBox().frame(width: 180, height: 14)
+                    SkeletonBox().frame(height: 12)
+                    SkeletonBox().frame(width: 220, height: 12)
+                }
+            } else if let poiExplainResult {
+                Text(poiExplainResult.headline).font(.subheadline.bold()).foregroundStyle(Theme.gold)
+                Text(poiExplainResult.body).font(.footnote)
+                ForEach(poiExplainResult.highlights, id: \.self) { highlight in
+                    HStack(alignment: .top, spacing: 6) {
+                        Circle().fill(Theme.gold).frame(width: 5, height: 5).padding(.top, 6)
+                        Text(highlight).font(.caption)
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func setInitialRegionIfNeeded() async {
+        guard initialRegion == nil else { return }
+
+        if let lat = cityStore.lat, let lng = cityStore.lng {
+            initialRegion = MKCoordinateRegion(
+                center: CLLocationCoordinate2D(latitude: lat, longitude: lng),
+                span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+            )
+            return
+        }
+
+        // No saved city yet — wait briefly for CoreLocation, matching the
+        // RN app's fall-through-to-GPS behavior in `use-weather.ts`/`use-places.ts`.
+        for _ in 0..<20 {
+            if let location = locationManager.currentLocation {
+                initialRegion = MKCoordinateRegion(center: location, span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05))
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(250))
+        }
+
+        // Last resort so the map always renders something.
+        initialRegion = MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: 41.0082, longitude: 28.9784),
+            span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+        )
+    }
+
+    private func loadCuratedPlaces() async {
+        do {
+            places = try await PlacesAPI.fetchPlaces(city: cityStore.cityName, lat: cityStore.lat, lng: cityStore.lng)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func handleRegionChange(_ region: MKCoordinateRegion) {
+        guard Self.useCuratedMapData else { return }
+        liveFetchTask?.cancel()
+        guard region.span.latitudeDelta <= maxLiveFetchLatitudeDelta else {
+            livePins = []
+            return
+        }
+
+        liveFetchTask = Task {
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return }
+
+            let minLat = region.center.latitude - region.span.latitudeDelta / 2
+            let maxLat = region.center.latitude + region.span.latitudeDelta / 2
+            let minLng = region.center.longitude - region.span.longitudeDelta / 2
+            let maxLng = region.center.longitude + region.span.longitudeDelta / 2
+
+            do {
+                let pins = try await LivePlacesAPI.fetchNearbyLive(minLat: minLat, maxLat: maxLat, minLng: minLng, maxLng: maxLng)
+                guard !Task.isCancelled else { return }
+                livePins = pins
+                errorMessage = nil
+            } catch {
+                guard !Task.isCancelled else { return }
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func fetchDirections(to place: Place) async {
+        guard let location = place.location, let userLocation = locationManager.currentLocation else { return }
+        do {
+            let result = try await RoutesAPI.directions(coordinates: [
+                PlaceCoordinate(lat: userLocation.latitude, lng: userLocation.longitude),
+                PlaceCoordinate(lat: location.lat, lng: location.lng),
+            ])
+            routeCoordinates = result.route.map { CLLocationCoordinate2D(latitude: $0[0], longitude: $0[1]) }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func enrichLivePin(_ pin: LivePin) async {
+        do {
+            let place = try await LivePlacesAPI.enrichLive(overtureId: pin.id)
+            places.append(place)
+            selectedLivePin = nil
+            selectedPlace = place
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func poiCacheKey(_ feature: MKMapFeatureAnnotation) -> String {
+        "\(feature.title ?? "")|\(String(format: "%.5f", feature.coordinate.latitude))|\(String(format: "%.5f", feature.coordinate.longitude))"
+    }
+
+    private func explainMapFeature(_ feature: MKMapFeatureAnnotation) async {
+        let cacheKey = poiCacheKey(feature)
+        if let cached = Self.poiExplainCache[cacheKey] {
+            poiExplainResult = cached
+            return
+        }
+
+        poiExplainLoading = true
+        defer { poiExplainLoading = false }
+
+        var category: String?
+        var address: String?
+        // Best-effort enrichment — the annotation alone only has a title and
+        // coordinate, `MKMapItemRequest` gets the rest (category, address).
+        // Never block the AI call on this; a plain name is enough to ask for.
+        if let mapItem = try? await MKMapItemRequest(mapFeatureAnnotation: feature).mapItem {
+            category = mapItem.pointOfInterestCategory?.rawValue.replacingOccurrences(of: "MKPOICategory", with: "")
+            address = mapItem.placemark.title
+        }
+
+        guard !Task.isCancelled else { return }
+
+        let profile = userProfileStore.profile
+        let request = ExplainPOIRequest(
+            name: feature.title ?? "",
+            category: category,
+            lat: feature.coordinate.latitude,
+            lng: feature.coordinate.longitude,
+            address: address,
+            locale: Locale.current.language.languageCode?.identifier,
+            userProfile: PersonalizationProfile(
+                name: profile.name,
+                profession: profile.profession?.rawValue,
+                interests: profile.interests.map(\.rawValue),
+                faith: profile.faith?.rawValue,
+                budget: profile.budget?.rawValue,
+                groupType: profile.groupType?.rawValue,
+                pace: profile.pace?.rawValue
+            ),
+            recentlyViewedPlaceIds: nil
+        )
+
+        do {
+            let result = try await PlacesAPI.explainPOI(request)
+            guard !Task.isCancelled else { return }
+            poiExplainResult = result
+            Self.poiExplainCache[cacheKey] = result
+        } catch {
+            guard !Task.isCancelled else { return }
+            errorMessage = error.localizedDescription
+        }
+    }
+}

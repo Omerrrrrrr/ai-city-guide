@@ -2,50 +2,17 @@ import { randomUUID } from 'node:crypto';
 
 import { eq } from 'drizzle-orm';
 
+import { sendApnsMessages } from './apns';
 import { db } from './db';
 import { pushSubscriptions } from './schema';
 
-const EXPO_PUSH_ENDPOINT = 'https://exp.host/--/api/v2/push/send';
-const EXPO_PUSH_TOKEN_PATTERN = /^Expo(nent)?PushToken\[.+\]$/;
-const MAX_MESSAGES_PER_REQUEST = 100;
+// APNs device tokens are 64 hex chars in practice, but that's not a
+// documented Apple guarantee -- validate loosely (hex, reasonable length)
+// rather than pinning to an exact count.
+const DEVICE_TOKEN_PATTERN = /^[0-9a-f]{32,}$/i;
 
-type ExpoPushMessage = {
-  to: string;
-  sound: 'default';
-  title: string;
-  body: string;
-  data: Record<string, unknown>;
-};
-
-function isExpoPushToken(token: string) {
-  return EXPO_PUSH_TOKEN_PATTERN.test(token);
-}
-
-function chunk<T>(items: T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < items.length; i += size) {
-    chunks.push(items.slice(i, i + size));
-  }
-  return chunks;
-}
-
-async function sendExpoPushMessages(messages: ExpoPushMessage[]) {
-  for (const batch of chunk(messages, MAX_MESSAGES_PER_REQUEST)) {
-    const response = await fetch(EXPO_PUSH_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        'Accept-Encoding': 'gzip, deflate',
-      },
-      body: JSON.stringify(batch),
-    });
-
-    if (!response.ok) {
-      const text = await response.text().catch(() => '');
-      throw new Error(`Expo push API returned ${response.status}: ${text}`);
-    }
-  }
+function isDeviceToken(token: string) {
+  return DEVICE_TOKEN_PATTERN.test(token);
 }
 
 const COPY: Record<string, { ready: (city: string, count: number) => { title: string; body: string }; failed: (city: string) => { title: string; body: string } }> = {
@@ -85,23 +52,23 @@ function copyFor(locale: string) {
   return COPY[locale] ?? COPY.en;
 }
 
-export async function subscribeToCityDiscovery(cityId: string, expoPushToken: string, locale?: string) {
-  if (!isExpoPushToken(expoPushToken)) return;
+export async function subscribeToCityDiscovery(cityId: string, deviceToken: string, locale?: string) {
+  if (!isDeviceToken(deviceToken)) return;
 
   // A user re-tapping "discover" for a city already in progress (e.g. the
   // /cities/discover retry path) would otherwise insert a second row for the
   // same city+token pair and get the completion push twice. The unique index
-  // on (cityId, expoPushToken) makes this a safe no-op instead.
+  // on (cityId, deviceToken) makes this a safe no-op instead.
   await db
     .insert(pushSubscriptions)
     .values({
       id: randomUUID(),
       cityId,
-      expoPushToken,
+      deviceToken,
       locale: locale && locale in COPY ? locale : 'en',
       createdAt: new Date().toISOString(),
     })
-    .onConflictDoNothing({ target: [pushSubscriptions.cityId, pushSubscriptions.expoPushToken] });
+    .onConflictDoNothing({ target: [pushSubscriptions.cityId, pushSubscriptions.deviceToken] });
 }
 
 async function sendAndClearSubscriptions(
@@ -112,13 +79,12 @@ async function sendAndClearSubscriptions(
   const subs = await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.cityId, cityId));
   if (subs.length === 0) return;
 
-  const messages: ExpoPushMessage[] = subs
-    .filter((sub) => isExpoPushToken(sub.expoPushToken))
+  const messages = subs
+    .filter((sub) => isDeviceToken(sub.deviceToken))
     .map((sub) => {
       const { title, body } = buildMessage(sub.locale);
       return {
-        to: sub.expoPushToken,
-        sound: 'default' as const,
+        deviceToken: sub.deviceToken,
         title,
         body,
         data: { type: 'city-discovery', cityId, cityName },
@@ -126,7 +92,7 @@ async function sendAndClearSubscriptions(
     });
 
   try {
-    await sendExpoPushMessages(messages);
+    await sendApnsMessages(messages);
   } catch (error) {
     console.error(`Failed to send push notifications for city ${cityId}:`, error);
   }

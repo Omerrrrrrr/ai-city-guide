@@ -1,11 +1,11 @@
 # AI City Guide
 
-AI City Guide is a Kristiansand-focused city guide with an Expo mobile client and a Fastify API backed by Postgres.
+AI City Guide is a Kristiansand-focused city guide with a native iOS (SwiftUI) client and a Fastify API backed by Postgres.
 
 ## Workspace
 
 - `apps/api`: Fastify API, Drizzle schema, seed data, optional AI recommendation route
-- `mobile`: Expo app with home, explore, map, saved, settings, and AI screens
+- `native/Piri`: native iOS app (SwiftUI/MapKit, XcodeGen-managed) with home, explore, map, saved, profile, scan, and Ask Piri screens
 - `infrastructure/db`: local Postgres via Docker Compose
 
 ## Local Setup
@@ -35,16 +35,19 @@ Notes:
 - If both AI providers are configured, `AI_PROVIDER=openai` or `AI_PROVIDER=openrouter` can force the backend choice
 - `GOOGLE_MAPS_API_KEY` is optional until you want Google-based opening-hours preview in `Settings -> Open Hours Review`
 
-### 3. Start the Mobile App
+### 3. Start the Native App
+
+Open `native/Piri/Piri.xcodeproj` in Xcode and build/run the `Piri` scheme, or from the command line:
 
 ```bash
-cd mobile
-cp .env.example .env
-npm install
-npm run start
+cd native/Piri
+xcodegen generate   # only needed after editing project.yml
+xcodebuild -project Piri.xcodeproj -scheme Piri -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
 ```
 
-If you are testing on a physical device, set `EXPO_PUBLIC_API_URL` in `mobile/.env` to your machine's LAN address, for example `http://192.168.1.20:4000`.
+The app talks to `http://localhost:4000` by default (`APIConfig.swift`). If you're testing on a physical device, point it at your machine's LAN address instead.
+
+Push notifications require an APNs Auth Key from your Apple Developer account — see `APNS_*` in `apps/api/.env.example`. Without it, the backend logs pushes instead of sending them.
 
 ## Validation
 
@@ -57,12 +60,11 @@ npm run build
 npm run test
 ```
 
-### Mobile
+### Native app
 
 ```bash
-cd mobile
-npm run typecheck
-npm run lint
+cd native/Piri
+xcodebuild test -project Piri.xcodeproj -scheme Piri -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 ```
 
 ## Current Status
@@ -76,7 +78,7 @@ npm run lint
 
 ## Hours Review Workflow
 
-The mobile app includes a safe hours workflow under `Settings -> Open Hours Review`:
+The app includes a safe hours workflow under `Profile -> Open Hours Review` (admin-gated):
 
 1. Open a place in Hours Review
 2. Optionally press `Fetch Google Preview`
@@ -140,4 +142,4 @@ Notes:
 - Discovery only creates `pending` candidates. Nothing is shown in the app until you approve and apply.
 - `npm run seed` resets the `places` table back to the curated seed data. Candidate records remain available for review.
 - Wikimedia discovery is intentionally semi-automatic. Some places return perfect building shots, others return adjacent or overly narrow photos, so manual approval still matters.
-- The mobile app now includes a basic in-app review screen under `Settings -> Open Image Review`.
+- The app also includes a basic in-app review screen under `Profile -> Open Image Review` (admin-gated).

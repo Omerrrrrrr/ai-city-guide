@@ -1,0 +1,77 @@
+name: Piri
+options:
+  bundleIdPrefix: com.piriapp
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+configs:
+  Debug: debug
+  Release: release
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    DEVELOPMENT_LANGUAGE: en
+packages:
+  Sentry:
+    url: https://github.com/getsentry/sentry-cocoa
+    from: 8.40.1
+targets:
+  Piri:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Sources
+    dependencies:
+      - package: Sentry
+        product: Sentry
+    info:
+      path: Generated/Info.plist
+      properties:
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        NSLocationWhenInUseUsageDescription: "Piri uses your location to show nearby places and give you city-specific recommendations."
+        NSCameraUsageDescription: "Piri uses your camera to identify places and give you personalized explanations."
+        NSPhotoLibraryAddUsageDescription: "Piri can save trip photos to your library."
+        CFBundleShortVersionString: "1.0.0"
+        CFBundleVersion: "1"
+    entitlements:
+      path: Piri.entitlements
+      properties:
+        aps-environment: development
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.piriapp.piri
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: NO
+  PiriTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Tests
+    dependencies:
+      - target: Piri
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_STYLE: Automatic
+        # Hosted (not standalone) unit tests: the test bundle loads into the
+        # Piri.app process, so `Bundle.main` inside tests resolves to the
+        # actual app bundle — needed for `String(localized:)` to find
+        # Localizable.xcstrings at all, rather than silently falling back
+        # to returning the raw key (which is invisible unless you assert on
+        # the resolved string, as the plural tests do).
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Piri.app/Piri"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+schemes:
+  Piri:
+    build:
+      targets:
+        Piri: all
+        PiriTests: [test]
+    test:
+      targets:
+        - PiriTests

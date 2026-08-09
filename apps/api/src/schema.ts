@@ -90,12 +90,15 @@ export const cities = pgTable('cities', {
 export const pushSubscriptions = pgTable('push_subscriptions', {
   id: varchar('id', { length: 64 }).primaryKey(),
   cityId: varchar('city_id', { length: 96 }).notNull(),
-  expoPushToken: varchar('expo_push_token', { length: 255 }).notNull(),
+  // Raw APNs device token (hex string) as of the native-Swift cutover --
+  // was an Expo push token (`ExponentPushToken[...]`) sent through Expo's
+  // push relay before that. Column name/length carried over unchanged.
+  deviceToken: varchar('device_token', { length: 255 }).notNull(),
   locale: varchar('locale', { length: 8 }).notNull().default('en'),
   createdAt: varchar('created_at', { length: 64 }).notNull(),
 }, (table) => [
   index('idx_push_subscriptions_city_id').on(table.cityId),
-  uniqueIndex('idx_push_subscriptions_city_token').on(table.cityId, table.expoPushToken),
+  uniqueIndex('idx_push_subscriptions_city_token').on(table.cityId, table.deviceToken),
 ]);
 
 // Raw (un-enriched) Overture candidates cached per grid cell so a live

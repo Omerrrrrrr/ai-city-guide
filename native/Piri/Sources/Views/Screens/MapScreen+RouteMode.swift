@@ -1,0 +1,381 @@
+import CoreLocation
+import MapKit
+import PhotosUI
+import SwiftUI
+
+/// Route/trip creation, port of the `routeMode` parts of
+/// `mobile/app/(tabs)/map.tsx`: pick ≥2 stops by tapping place pins, fetch a
+/// walking route, start a trip, record a GPS breadcrumb while it's active,
+/// optionally attach photos, then end it. Split into its own file (still the
+/// same `MapScreen` type — extensions can't add stored properties, so the
+/// `@State` itself stays declared on the struct in `MapScreen.swift`) purely
+/// to keep that file from growing unmanageably.
+extension MapScreen {
+    var stopsChangedFromActiveTrip: Bool {
+        guard let activeTrip = tripsStore.trips.first(where: { $0.id == tripsStore.activeTripId }) else { return false }
+        return activeTrip.placeIds != plannedStopIds
+    }
+
+    var routeStopAnnotations: [(index: Int, coordinate: CLLocationCoordinate2D)] {
+        Array(plannedStopIds.enumerated()).compactMap { index, id in
+            routeCandidatePlaces.first(where: { $0.id == id })?.location.map {
+                (index, CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng))
+            }
+        }
+    }
+
+    func coordinate(fromPair pair: [Double]) -> CLLocationCoordinate2D? {
+        guard pair.count == 2 else { return nil }
+        return CLLocationCoordinate2D(latitude: pair[0], longitude: pair[1])
+    }
+
+    var routeModeToggleButton: some View {
+        Button {
+            if tripsStore.activeTripId != nil {
+                routeMode = true
+                return
+            }
+            routeMode.toggle()
+            if !routeMode {
+                plannedStopIds = []
+                routeGeometry = nil
+                routeDistanceMeters = nil
+                routeDurationSeconds = nil
+                routeError = nil
+            }
+        } label: {
+            Image(systemName: "flag.fill")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(routeMode ? Theme.navy : .primary)
+                .frame(width: 48, height: 48)
+                .background(Circle().fill(routeMode ? AnyShapeStyle(Theme.gold) : AnyShapeStyle(.thinMaterial)))
+                .shadow(radius: 3)
+        }
+    }
+
+    func loadRouteCandidatesIfNeeded() async {
+        guard routeCandidatePlaces.isEmpty else { return }
+        do {
+            routeCandidatePlaces = try await PlacesAPI.fetchPlaces(city: cityStore.cityName, lat: cityStore.lat, lng: cityStore.lng)
+        } catch {
+            routeError = error.localizedDescription
+        }
+    }
+
+    /// Mirrors `map.tsx`'s hydration effect: resync local planning state from
+    /// a trip that's already active (e.g. the user left the Map tab mid-trip
+    /// and came back), and make sure breadcrumb recording is running.
+    func rehydrateActiveTripIfNeeded() {
+        guard let activeTripId = tripsStore.activeTripId, hydratedTripId != activeTripId,
+              let activeTrip = tripsStore.trips.first(where: { $0.id == activeTripId }) else { return }
+        plannedStopIds = activeTrip.placeIds
+        routeGeometry = activeTrip.routeGeometry
+        routeDistanceMeters = activeTrip.distanceMeters
+        routeDurationSeconds = activeTrip.durationSeconds
+        hydratedTripId = activeTripId
+        if !locationManager.isRecordingBreadcrumb {
+            locationManager.startBreadcrumbRecording()
+        }
+    }
+
+    func toggleStop(_ placeId: String) {
+        if let index = plannedStopIds.firstIndex(of: placeId) {
+            plannedStopIds.remove(at: index)
+        } else {
+            plannedStopIds.append(placeId)
+        }
+    }
+
+    func moveStop(from index: Int, direction: Int) {
+        let target = index + direction
+        guard plannedStopIds.indices.contains(index), plannedStopIds.indices.contains(target) else { return }
+        plannedStopIds.swapAt(index, target)
+    }
+
+    func removeStop(_ placeId: String) {
+        plannedStopIds.removeAll { $0 == placeId }
+    }
+
+    private func stopCoordinates() -> [PlaceCoordinate] {
+        plannedStopIds.compactMap { id in routeCandidatePlaces.first(where: { $0.id == id })?.location }
+    }
+
+    func startRoute() async {
+        guard plannedStopIds.count >= 2 else { return }
+        isFetchingRoute = true
+        routeError = nil
+        defer { isFetchingRoute = false }
+        do {
+            let result = try await RoutesAPI.directions(coordinates: stopCoordinates())
+            routeGeometry = result.route
+            routeDistanceMeters = result.distanceMeters
+            routeDurationSeconds = result.durationSeconds
+            let tripId = tripsStore.startTrip(
+                placeIds: plannedStopIds,
+                route: RouteInfo(routeGeometry: result.route, distanceMeters: result.distanceMeters, durationSeconds: result.durationSeconds)
+            )
+            hydratedTripId = tripId
+            locationManager.startBreadcrumbRecording()
+        } catch {
+            routeError = String(localized: "map.route.failed")
+        }
+    }
+
+    func updateRoute() async {
+        guard let activeTripId = tripsStore.activeTripId, plannedStopIds.count >= 2 else { return }
+        isFetchingRoute = true
+        routeError = nil
+        defer { isFetchingRoute = false }
+        do {
+            let result = try await RoutesAPI.directions(coordinates: stopCoordinates())
+            routeGeometry = result.route
+            routeDistanceMeters = result.distanceMeters
+            routeDurationSeconds = result.durationSeconds
+            tripsStore.updateTripStops(
+                activeTripId,
+                placeIds: plannedStopIds,
+                route: RouteInfo(routeGeometry: result.route, distanceMeters: result.distanceMeters, durationSeconds: result.durationSeconds)
+            )
+        } catch {
+            routeError = String(localized: "map.route.failed")
+        }
+    }
+
+    func endRoute() {
+        if let activeTripId = tripsStore.activeTripId {
+            tripsStore.endTrip(activeTripId)
+        }
+        locationManager.stopBreadcrumbRecording()
+        hydratedTripId = nil
+        plannedStopIds = []
+        routeGeometry = nil
+        routeDistanceMeters = nil
+        routeDurationSeconds = nil
+        routeMode = false
+    }
+
+    /// Best-effort location tag, matching RN's `attachTripPhoto`: reads
+    /// whatever position is already available without prompting for
+    /// permission (the map screen already requested it on appear).
+    func attachTripPhoto(_ data: Data) async {
+        guard let activeTripId = tripsStore.activeTripId, let url = TripPhotoStore.save(data) else { return }
+        let location = locationManager.currentLocation
+        tripsStore.addPhoto(activeTripId, photo: TripPhoto(
+            uri: url.absoluteString,
+            timestamp: Date().timeIntervalSince1970 * 1000,
+            lat: location?.latitude,
+            lng: location?.longitude
+        ))
+    }
+
+    @ViewBuilder
+    var routeModeSheet: some View {
+        let activeTrip = tripsStore.trips.first(where: { $0.id == tripsStore.activeTripId })
+
+        VStack(alignment: .leading, spacing: 12) {
+            if let routeError {
+                Text(routeError).font(.footnote).foregroundStyle(Theme.closedRed)
+            }
+
+            if let activeTrip {
+                HStack(spacing: 8) {
+                    Circle().fill(Theme.closedRed).frame(width: 8, height: 8)
+                    Text(LPlural("map.route.tracking", count: activeTrip.breadcrumb.count)).font(.footnote.weight(.semibold))
+                }
+            }
+
+            if plannedStopIds.isEmpty {
+                Text("map.route.hint").font(.footnote).foregroundStyle(.secondary)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(Array(plannedStopIds.enumerated()), id: \.element) { index, placeId in
+                            stopChip(index: index, placeId: placeId)
+                        }
+                    }
+                }
+            }
+
+            if let activeTrip, !activeTrip.photos.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(activeTrip.photos) { photo in
+                            CachedAsyncImage(url: URL(string: photo.uri), maxPixelSize: 200) {
+                                $0.resizable().aspectRatio(contentMode: .fill)
+                            } placeholder: {
+                                Color(.secondarySystemBackground)
+                            }
+                            .frame(width: 44, height: 44)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
+                    }
+                }
+            }
+
+            HStack(spacing: 10) {
+                if activeTrip != nil {
+                    Button {
+                        showTripPhotoCapture = true
+                    } label: {
+                        Text("map.route.addPhoto")
+                            .font(.footnote.weight(.semibold))
+                            .padding(.horizontal, 14).padding(.vertical, 10)
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(.secondary.opacity(0.3)))
+                    }
+                }
+
+                primaryRouteButton(activeTrip: activeTrip)
+            }
+        }
+        .padding(16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+    }
+
+    @ViewBuilder
+    private func primaryRouteButton(activeTrip: Trip?) -> some View {
+        if activeTrip == nil {
+            Button {
+                Task { await startRoute() }
+            } label: {
+                HStack {
+                    if isFetchingRoute { ProgressView().tint(.white) }
+                    Text("map.route.start")
+                }
+                .font(.footnote.weight(.bold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Theme.navy))
+            }
+            .disabled(plannedStopIds.count < 2 || isFetchingRoute)
+            .opacity(plannedStopIds.count < 2 ? 0.5 : 1)
+        } else {
+            HStack(spacing: 10) {
+                if stopsChangedFromActiveTrip, plannedStopIds.count >= 2 {
+                    Button {
+                        Task { await updateRoute() }
+                    } label: {
+                        Text("map.route.update")
+                            .font(.footnote.weight(.bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 14).padding(.vertical, 12)
+                            .background(RoundedRectangle(cornerRadius: 10).fill(Theme.navy))
+                    }
+                    .disabled(isFetchingRoute)
+                }
+                Button {
+                    endRoute()
+                } label: {
+                    Text("map.route.end")
+                        .font(.footnote.weight(.bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14).padding(.vertical, 12)
+                        .background(RoundedRectangle(cornerRadius: 10).fill(Theme.closedRed))
+                }
+            }
+        }
+    }
+
+    private func stopChip(index: Int, placeId: String) -> some View {
+        let name = routeCandidatePlaces.first(where: { $0.id == placeId })?.name ?? placeId
+        return HStack(spacing: 6) {
+            Button { moveStop(from: index, direction: -1) } label: {
+                Image(systemName: "chevron.up").font(.caption2)
+            }
+            .disabled(index == 0)
+
+            Button { moveStop(from: index, direction: 1) } label: {
+                Image(systemName: "chevron.down").font(.caption2)
+            }
+            .disabled(index == plannedStopIds.count - 1)
+
+            Text("\(index + 1)").font(.caption.weight(.bold)).foregroundStyle(Theme.gold)
+            Text(name).font(.caption.weight(.semibold)).lineLimit(1)
+
+            Button { removeStop(placeId) } label: {
+                Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Capsule().fill(Color(.secondarySystemBackground)))
+    }
+}
+
+/// Minimal capture UI reusing `ScanScreen`'s camera/gallery idiom, stripped
+/// of the identify pipeline — hands raw JPEG data back to `MapScreen` via a
+/// closure so it stays free of `TripsStore`/`LocationManager` dependencies.
+struct TripPhotoCaptureSheet: View {
+    let onCapture: (Data) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var camera = CameraController()
+    @State private var galleryItem: PhotosPickerItem?
+    @State private var isCapturing = false
+
+    var body: some View {
+        ZStack {
+            if camera.isAuthorized {
+                CameraPreviewView(session: camera.session).ignoresSafeArea()
+            } else {
+                Color.black.ignoresSafeArea()
+            }
+
+            VStack {
+                HStack {
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark").foregroundStyle(.white).padding(10).background(Circle().fill(.black.opacity(0.35)))
+                    }
+                    Spacer()
+                }
+                .padding(20)
+
+                Spacer()
+
+                HStack(spacing: 40) {
+                    PhotosPicker(selection: $galleryItem, matching: .images) {
+                        Text("map.route.photoGallery")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.white)
+                    }
+
+                    Button {
+                        Task { await capture() }
+                    } label: {
+                        Circle().fill(.white).frame(width: 60, height: 60)
+                            .padding(8)
+                            .overlay(Circle().stroke(.white, lineWidth: 3))
+                    }
+                    .disabled(isCapturing || !camera.isAuthorized)
+
+                    Text("map.route.photoCamera")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.4))
+                }
+                .padding(.bottom, 48)
+            }
+        }
+        .task { await camera.requestAuthorizationAndStart() }
+        .onDisappear { camera.stop() }
+        .onChange(of: galleryItem) { _, newItem in
+            Task { await handleGalleryPick(newItem) }
+        }
+    }
+
+    private func capture() async {
+        guard !isCapturing else { return }
+        Haptics.medium()
+        isCapturing = true
+        defer { isCapturing = false }
+        guard let data = await camera.capturePhoto() else { return }
+        onCapture(data)
+        dismiss()
+    }
+
+    private func handleGalleryPick(_ item: PhotosPickerItem?) async {
+        guard let item, let data = try? await item.loadTransferable(type: Data.self) else { return }
+        galleryItem = nil
+        onCapture(data)
+        dismiss()
+    }
+}
