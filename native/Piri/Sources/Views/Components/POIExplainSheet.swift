@@ -46,25 +46,33 @@ struct POIExplainSheet: View {
                                     }
                                 }
                                 Spacer()
-                                if let identifier = poi.mapItem.identifier?.rawValue {
-                                    HStack(spacing: 14) {
-                                        Button {
-                                            Haptics.medium()
-                                            savedPlacesStore.toggleFavorite(poi)
-                                        } label: {
-                                            Image(systemName: savedPlacesStore.isFavorite(identifier) ? "heart.fill" : "heart")
-                                                .foregroundStyle(savedPlacesStore.isFavorite(identifier) ? Theme.gold : .secondary)
-                                        }
-                                        Button {
-                                            Haptics.light()
-                                            savedPlacesStore.togglePlan(poi)
-                                        } label: {
-                                            Image(systemName: savedPlacesStore.isInPlan(identifier) ? "checkmark.circle.fill" : "plus.circle")
-                                                .foregroundStyle(savedPlacesStore.isInPlan(identifier) ? Theme.gold : .secondary)
-                                        }
+                                // `poi.mapItem.identifier` is nil for some
+                                // POIs (a known Apple gap, not a bug here) —
+                                // gating these buttons on it made them
+                                // silently vanish for exactly those places.
+                                // `asReference.identifier` is never nil (it
+                                // falls back to a synthetic id), so use that
+                                // instead, same fix already applied to
+                                // favorites/plan/Route Mode stop-picking
+                                // elsewhere in the app.
+                                let identifier = poi.asReference.identifier
+                                HStack(spacing: 14) {
+                                    Button {
+                                        Haptics.medium()
+                                        savedPlacesStore.toggleFavorite(poi)
+                                    } label: {
+                                        Image(systemName: savedPlacesStore.isFavorite(identifier) ? "heart.fill" : "heart")
+                                            .foregroundStyle(savedPlacesStore.isFavorite(identifier) ? Theme.gold : .secondary)
                                     }
-                                    .font(.title3)
+                                    Button {
+                                        Haptics.light()
+                                        savedPlacesStore.togglePlan(poi)
+                                    } label: {
+                                        Image(systemName: savedPlacesStore.isInPlan(identifier) ? "checkmark.circle.fill" : "plus.circle")
+                                            .foregroundStyle(savedPlacesStore.isInPlan(identifier) ? Theme.gold : .secondary)
+                                    }
                                 }
+                                .font(.title3)
                             }
 
                             // AI explanation first — the reason someone opens
