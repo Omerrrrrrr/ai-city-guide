@@ -42,6 +42,7 @@ struct SavedScreen: View {
 
                 if tab == .plan, plan.count >= 2 {
                     optimizeButton
+                    createRouteButton
                 }
 
                 if list.isEmpty {
@@ -164,6 +165,32 @@ struct SavedScreen: View {
             .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(RoundedRectangle(cornerRadius: 18).fill(Theme.navy))
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
+    }
+
+    private var createRouteButton: some View {
+        Button {
+            // `/routes/directions` caps at 10 coordinates server-side —
+            // matched here so a large plan doesn't get silently rejected.
+            tabSelection.pendingRouteStops = Array(plan.prefix(10))
+            tabSelection.selection = 2
+            dismiss()
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "point.topleft.down.curvedto.point.bottomright.up")
+                    .font(.system(size: 22))
+                    .foregroundStyle(Theme.gold)
+                Text("saved.createRoute.title")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.primary)
+                Spacer()
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 18).fill(Color(.secondarySystemBackground)))
+            .overlay(RoundedRectangle(cornerRadius: 18).stroke(Theme.gold.opacity(0.3), lineWidth: 1.5))
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 16)

@@ -25,6 +25,7 @@ struct MapScreen: View {
     @Environment(SavedPlacesStore.self) private var savedPlacesStore
     @Environment(UserProfileStore.self) private var userProfileStore
     @Environment(TripsStore.self) var tripsStore
+    @Environment(TabSelection.self) private var tabSelection
 
     @State var locationManager = LocationManager()
     @State private var places: [Place] = []
@@ -168,6 +169,11 @@ struct MapScreen: View {
         .task(id: routeMode) {
             guard routeMode else { return }
             rehydrateActiveTripIfNeeded()
+        }
+        .onChange(of: tabSelection.pendingRouteStops) { _, newValue in
+            guard let stops = newValue else { return }
+            tabSelection.pendingRouteStops = nil
+            Task { await startPendingRoute(stops) }
         }
         .onChange(of: locationManager.breadcrumb) { _, points in
             guard let activeTripId = tripsStore.activeTripId, let last = points.last else { return }

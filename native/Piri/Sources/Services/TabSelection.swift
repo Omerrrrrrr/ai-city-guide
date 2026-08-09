@@ -13,4 +13,9 @@ final class TabSelection {
     /// which a `TabView` switch has no equivalent for on its own. `AIScreen`
     /// consumes and clears this on appearance.
     var pendingAIQuery: String?
+    /// Set alongside `selection = 2` when a screen (SavedScreen's "Haritada
+    /// Rota Oluştur") wants Map to start Route Mode with these stops already
+    /// planned and a real route already fetched. Same cross-tab hand-off
+    /// pattern as `pendingAIQuery` — `MapScreen` consumes and clears this.
+    var pendingRouteStops: [SavedPOIReference]?
 }

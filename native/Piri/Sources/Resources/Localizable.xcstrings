@@ -8741,6 +8741,29 @@
         }
       }
     },
+    "saved.createRoute.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create Route on Map"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lag rute på kartet"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Haritada Rota Oluştur"
+          }
+        }
+      }
+    },
     "saved.empty.favoritesBody": {
       "extractionState": "stale",
       "localizations": {

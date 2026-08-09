@@ -130,6 +130,23 @@ extension MapScreen {
         plannedStops.map { PlaceCoordinate(lat: $0.lat, lng: $0.lng) }
     }
 
+    /// Entry point for "Haritada Rota Oluştur" (SavedScreen's Plan tab) —
+    /// hands off a set of stops from another tab and immediately fetches a
+    /// real route through them, instead of requiring the user to re-tap
+    /// each place on the map one by one.
+    func startPendingRoute(_ stops: [SavedPOIReference]) async {
+        guard tripsStore.activeTripId == nil else {
+            // Already mid-trip — don't silently overwrite it. Same
+            // invariant `routeModeToggleButton` already enforces: only ever
+            // show the existing active trip until it's ended.
+            routeMode = true
+            return
+        }
+        plannedStops = stops
+        routeMode = true
+        await startRoute()
+    }
+
     func startRoute() async {
         guard plannedStops.count >= 2 else { return }
         isFetchingRoute = true
