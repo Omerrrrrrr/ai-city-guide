@@ -21,16 +21,16 @@ struct POIExplainSheet: View {
     @State private var chatInput = ""
     @State private var chatSending = false
     @State private var lookAroundScene: MKLookAroundScene?
-    /// Drives Apple's own native Place Card content (hours, rating) via
-    /// `mapItemDetailSelectionAccessory` on a single-marker `Map`, embedded
-    /// directly in this scroll content (not a separate sheet/popover). The
-    /// earlier attempt at this left `initialPosition` unset and relied on
-    /// the marker's own auto-fit once `selection` was set asynchronously in
-    /// `.task` — that raced the map's first layout and rendered with no
-    /// tiles loaded. Setting `initialPosition` synchronously from
-    /// `poi.coordinate` (known immediately, no `.task` wait needed) avoids
-    /// that race.
-    @State private var placeCardSelection: MapSelection<MKMapItem>?
+    /// Drives Apple's own full Place Card via `mapItemDetailSheet` — the
+    /// only place hours show up. `MKMapItem` has no `hours`/`openingHours`
+    /// property at all (confirmed against the SDK header directly, not just
+    /// docs) — `phoneNumber`/`url` are real plain values we can lay out as
+    /// text ourselves, hours genuinely is not, in any form, on any OS
+    /// version. Every embedded-map variant tried this session (full/compact
+    /// callout, sync/async selection) either rendered blank or showed a
+    /// plain name-only bubble with no hours inside it — this sheet is the
+    /// only surface Apple actually renders that data on.
+    @State private var showingMapItemDetail = false
 
     var body: some View {
         NavigationStack {
@@ -89,39 +89,30 @@ struct POIExplainSheet: View {
                                 Text(errorMessage).font(.footnote).foregroundStyle(Theme.closedRed)
                             }
 
-                            // Apple's own native Place Card (hours, rating),
-                            // embedded right in this scroll content.
-                            // `initialPosition` is set synchronously (no
-                            // `.task` delay) so the map has real content to
-                            // render from its very first layout pass.
-                            // `interactionModes: []` stops pan/zoom/rotate
-                            // from fighting the outer ScrollView while
-                            // leaving the card's own buttons tappable.
-                            Map(
-                                initialPosition: .region(
-                                    MKCoordinateRegion(center: poi.coordinate, span: MKCoordinateSpan(latitudeDelta: 0.006, longitudeDelta: 0.006))
-                                ),
-                                interactionModes: [],
-                                selection: $placeCardSelection
-                            ) {
-                                Marker(item: poi.mapItem)
-                                    .tag(MapSelection(poi.mapItem))
-                                    .mapItemDetailSelectionAccessory(.callout(.compact))
-                            }
-                            .frame(height: 260)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .task { placeCardSelection = MapSelection(poi.mapItem) }
-
-                            // Phone/website/address are plain `MKMapItem`
-                            // properties — shown directly too, as a
-                            // guaranteed fallback if the card above doesn't
-                            // surface them.
+                            // Phone/website/address — real plain values,
+                            // laid out as text right here next to each
+                            // other, same section as everything else on
+                            // this page.
                             placeDetailsRows
 
-                            Button("common.openInMaps") {
-                                poi.mapItem.openInMaps()
+                            // Hours has no plain-value form to put in the
+                            // section above (see note on `showingMapItemDetail`)
+                            // — this is the only way to see it at all.
+                            HStack(spacing: 10) {
+                                Button {
+                                    showingMapItemDetail = true
+                                } label: {
+                                    Label("poiExplain.fullDetails", systemImage: "info.circle.fill")
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(Theme.gold)
+                                .mapItemDetailSheet(isPresented: $showingMapItemDetail, item: poi.mapItem)
+
+                                Button("common.openInMaps") {
+                                    poi.mapItem.openInMaps()
+                                }
+                                .buttonStyle(.bordered)
                             }
-                            .buttonStyle(.bordered)
 
                             // Apple's own street-level imagery — silently
                             // omitted where Look Around has no coverage
