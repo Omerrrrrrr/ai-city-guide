@@ -13,6 +13,7 @@ struct SavedScreen: View {
     @Environment(SavedPlacesStore.self) private var savedPlacesStore
     @Environment(RecentlyViewedStore.self) private var recentlyViewedStore
     @Environment(TabSelection.self) private var tabSelection
+    @Environment(\.dismiss) private var dismiss
 
     @State private var tab: SavedTab
     @State private var selectedPOI: POIPlace?
@@ -146,6 +147,12 @@ struct SavedScreen: View {
             let placeNames = plan.map(\.name).joined(separator: ", ")
             tabSelection.pendingAIQuery = L("saved.optimize.query", placeNames)
             tabSelection.selection = 3
+            // SavedScreen is presented as a `.sheet` from ProfileScreen —
+            // switching `tabSelection.selection` alone changes the tab
+            // underneath, invisibly, while this sheet keeps covering the
+            // whole screen. Dismissing it is what actually makes the tab
+            // switch to Ask Piri visible.
+            dismiss()
         } label: {
             HStack(spacing: 14) {
                 Text("◈").font(.system(size: 26)).foregroundStyle(Theme.gold)
