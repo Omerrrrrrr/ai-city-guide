@@ -31,6 +31,7 @@ struct POIExplainSheet: View {
     /// plain name-only bubble with no hours inside it — this sheet is the
     /// only surface Apple actually renders that data on.
     @State private var showingMapItemDetail = false
+    @State private var showingAddToCollection = false
 
     var body: some View {
         NavigationStack {
@@ -70,6 +71,13 @@ struct POIExplainSheet: View {
                                     } label: {
                                         Image(systemName: savedPlacesStore.isInPlan(identifier) ? "checkmark.circle.fill" : "plus.circle")
                                             .foregroundStyle(savedPlacesStore.isInPlan(identifier) ? Theme.gold : .secondary)
+                                    }
+                                    Button {
+                                        Haptics.light()
+                                        showingAddToCollection = true
+                                    } label: {
+                                        Image(systemName: "list.bullet.circle")
+                                            .foregroundStyle(.secondary)
                                     }
                                 }
                                 .font(.title3)
@@ -165,6 +173,7 @@ struct POIExplainSheet: View {
                 }
             }
         }
+        .sheet(isPresented: $showingAddToCollection) { AddToCollectionSheet(poi: poi) }
         .task { await explain() }
         .task { await loadLookAroundScene() }
     }
