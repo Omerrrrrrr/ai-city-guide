@@ -284,15 +284,17 @@ struct ProfileScreen: View {
     }
 
     private var savedDataCard: some View {
-        let listsCount = savedPlacesStore.collections.count
+        let savedListsCount = savedPlacesStore.savedLists.count
+        let plansCount = savedPlacesStore.plans.count
         let recentCount = recentlyViewedStore.viewed.count
 
         return card(titleKey: "settings.savedPlaces", trailing: {
-            Button("settings.viewAll") { showingSaved = .lists }
+            Button("settings.viewAll") { showingSaved = .saved }
                 .font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.gold)
         }) {
             HStack(spacing: 12) {
-                statButton(count: listsCount, labelKey: "settings.stats.lists") { showingSaved = .lists }
+                statButton(count: savedListsCount, labelKey: "settings.stats.lists") { showingSaved = .saved }
+                statButton(count: plansCount, labelKey: "settings.stats.plans") { showingSaved = .plan }
                 statButton(count: recentCount, labelKey: "settings.stats.visited") { showingSaved = .visited }
             }
             clearButton(titleKey: "settings.clearHistory", disabled: recentCount == 0) { recentlyViewedStore.clearHistory() }

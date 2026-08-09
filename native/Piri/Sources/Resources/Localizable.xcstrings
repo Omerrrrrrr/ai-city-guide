@@ -9246,6 +9246,98 @@
         }
       }
     },
+    "saved.plan.addToPlan": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add to Plan"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legg til i plan"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plana Ekle"
+          }
+        }
+      }
+    },
+    "saved.plan.new": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create New Plan"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lag ny plan"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yeni Plan Oluştur"
+          }
+        }
+      }
+    },
+    "saved.plan.noPlansBody": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create a named plan to build a route from — like \"Weekend trip\" or \"Summer holiday\"."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lag en navngitt plan for å bygge en rute fra — som \"Helgetur\" eller \"Sommerferie\"."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bir rota oluşturmak için isimli bir plan yap — \"Hafta sonu gezisi\" veya \"Yaz tatili\" gibi."
+          }
+        }
+      }
+    },
+    "saved.plan.noPlansTitle": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No plans yet"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen planer ennå"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Henüz plan yok"
+          }
+        }
+      }
+    },
     "saved.tabs.collections": {
       "extractionState": "manual",
       "localizations": {
@@ -10192,6 +10284,29 @@
           "stringUnit": {
             "state": "translated",
             "value": "Listeler"
+          }
+        }
+      }
+    },
+    "settings.stats.plans": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plans"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planer"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planlar"
           }
         }
       }

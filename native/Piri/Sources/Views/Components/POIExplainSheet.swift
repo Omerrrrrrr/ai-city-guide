@@ -31,7 +31,7 @@ struct POIExplainSheet: View {
     /// plain name-only bubble with no hours inside it — this sheet is the
     /// only surface Apple actually renders that data on.
     @State private var showingMapItemDetail = false
-    @State private var showingAddToCollection = false
+    @State private var addToCollectionKind: SavedCollectionKind?
 
     var body: some View {
         NavigationStack {
@@ -51,14 +51,23 @@ struct POIExplainSheet: View {
                                 // POIs (a known Apple gap, not a bug here) —
                                 // `asReference.identifier` is never nil (it
                                 // falls back to a synthetic id), so
-                                // `isSaved` checks always work regardless.
+                                // `isSaved`/`isPlanned` checks always work.
                                 let identifier = poi.asReference.identifier
-                                Button {
-                                    Haptics.light()
-                                    showingAddToCollection = true
-                                } label: {
-                                    Image(systemName: savedPlacesStore.isSaved(identifier) ? "bookmark.fill" : "bookmark")
-                                        .foregroundStyle(savedPlacesStore.isSaved(identifier) ? Theme.gold : .secondary)
+                                HStack(spacing: 14) {
+                                    Button {
+                                        Haptics.light()
+                                        addToCollectionKind = .saved
+                                    } label: {
+                                        Image(systemName: savedPlacesStore.isSaved(identifier) ? "bookmark.fill" : "bookmark")
+                                            .foregroundStyle(savedPlacesStore.isSaved(identifier) ? Theme.gold : .secondary)
+                                    }
+                                    Button {
+                                        Haptics.light()
+                                        addToCollectionKind = .plan
+                                    } label: {
+                                        Image(systemName: savedPlacesStore.isPlanned(identifier) ? "flag.fill" : "flag")
+                                            .foregroundStyle(savedPlacesStore.isPlanned(identifier) ? Theme.gold : .secondary)
+                                    }
                                 }
                                 .font(.title3)
                             }
@@ -153,7 +162,7 @@ struct POIExplainSheet: View {
                 }
             }
         }
-        .sheet(isPresented: $showingAddToCollection) { AddToCollectionSheet(poi: poi) }
+        .sheet(item: $addToCollectionKind) { kind in AddToCollectionSheet(poi: poi, kind: kind) }
         .task { await explain() }
         .task { await loadLookAroundScene() }
     }

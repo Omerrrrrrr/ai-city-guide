@@ -1,10 +1,12 @@
 import SwiftUI
 
-/// Lets the user toggle a POI into any number of their named collections
-/// (`SavedPlacesStore.collections`), or create a new one on the spot — same
-/// tagging-not-filing model favorites/plan already use.
+/// Lets the user toggle a POI into any of their named lists of the given
+/// `kind` (saved or plan), or create a new one on the spot — same
+/// tagging-not-filing model favorites/plan already used before both became
+/// user-named collections.
 struct AddToCollectionSheet: View {
     let poi: POIPlace
+    let kind: SavedCollectionKind
 
     @Environment(SavedPlacesStore.self) private var savedPlacesStore
     @Environment(\.dismiss) private var dismiss
@@ -13,11 +15,14 @@ struct AddToCollectionSheet: View {
     @State private var showingNewCollectionField = false
 
     private var identifier: String { poi.asReference.identifier }
+    private var collections: [SavedCollection] {
+        kind == .plan ? savedPlacesStore.plans : savedPlacesStore.savedLists
+    }
 
     var body: some View {
         NavigationStack {
             List {
-                ForEach(savedPlacesStore.collections) { collection in
+                ForEach(collections) { collection in
                     let inCollection = savedPlacesStore.isIn(collection: collection.id, identifier: identifier)
                     Button {
                         Haptics.light()
@@ -44,11 +49,11 @@ struct AddToCollectionSheet: View {
                         newCollectionName = ""
                         showingNewCollectionField = true
                     } label: {
-                        Label(String(localized: "saved.collections.new"), systemImage: "plus.circle.fill")
+                        Label(String(localized: kind == .plan ? "saved.plan.new" : "saved.collections.new"), systemImage: "plus.circle.fill")
                     }
                 }
             }
-            .navigationTitle(String(localized: "saved.collections.addToList"))
+            .navigationTitle(String(localized: kind == .plan ? "saved.plan.addToPlan" : "saved.collections.addToList"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -61,7 +66,7 @@ struct AddToCollectionSheet: View {
     private func createAndAdd() {
         let trimmed = newCollectionName.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
-        let id = savedPlacesStore.createCollection(name: trimmed)
+        let id = savedPlacesStore.createCollection(name: trimmed, kind: kind)
         savedPlacesStore.toggle(poi, inCollection: id)
         newCollectionName = ""
         showingNewCollectionField = false

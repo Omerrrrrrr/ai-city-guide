@@ -5,10 +5,8 @@ import SwiftUI
 /// same pattern as `TripDetailScreen`: a custom header row instead of a
 /// `NavigationStack`, since there's no ambient navigation bar to hide here.
 ///
-/// Any list with 2+ places can be turned into an AI-optimized suggestion or
-/// an actual map route — not just a specially-named "Plan" list, since
-/// there's no such special list anymore (the user's explicit choice:
-/// Favorites and Plan both became these general-purpose named lists).
+/// Only `.plan`-kind collections with 2+ places get the AI-optimize/
+/// create-route buttons — `.saved`-kind lists are just for keeping places.
 struct CollectionDetailScreen: View {
     let collectionId: String
 
@@ -46,7 +44,7 @@ struct CollectionDetailScreen: View {
             header(collection)
             ScrollView {
                 VStack(spacing: 12) {
-                    if collection.places.count >= 2 {
+                    if collection.kind == .plan, collection.places.count >= 2 {
                         optimizeButton(collection)
                         createRouteButton(collection)
                     }

@@ -1,16 +1,17 @@
 import SwiftUI
 
 enum SavedTab: Hashable, Identifiable {
-    case lists, visited
+    case saved, plan, visited
     var id: Self { self }
 }
 
-/// Port of `mobile/app/(tabs)/saved.tsx`, since generalized: there's no more
-/// single "Favorites" or "Plan" bucket — per the user's explicit choice,
-/// both became user-named `SavedCollection`s (`.lists` tab), each of which
-/// can independently be turned into an AI-optimized suggestion or an actual
-/// map route once it has 2+ places (see `CollectionDetailScreen`). `.visited`
-/// (recently viewed, automatic history) is unaffected.
+/// Port of `mobile/app/(tabs)/saved.tsx`, since generalized: "Kaydedilen"
+/// and "Plan" used to each be a single flat list — per the user's explicit
+/// choice, both are now collections of user-named `SavedCollection`s
+/// instead, so someone can make multiple named saved-lists *and* multiple
+/// named plans ("Hafta Sonu", "Yaz Tatili"), then pick whichever one to open
+/// (`CollectionDetailScreen`). `.visited` (recently viewed, automatic
+/// history) is unaffected — still one flat list.
 struct SavedScreen: View {
     @Environment(SavedPlacesStore.self) private var savedPlacesStore
     @Environment(RecentlyViewedStore.self) private var recentlyViewedStore
@@ -22,20 +23,37 @@ struct SavedScreen: View {
     @State private var showingNewCollectionField = false
     @State private var newCollectionName = ""
 
-    init(initialTab: SavedTab = .lists) {
+    init(initialTab: SavedTab = .saved) {
         _tab = State(initialValue: initialTab)
     }
 
     private var visited: [SavedPOIReference] { recentlyViewedStore.viewed }
-    private var collections: [SavedCollection] { savedPlacesStore.collections }
+    private var savedLists: [SavedCollection] { savedPlacesStore.savedLists }
+    private var plans: [SavedCollection] { savedPlacesStore.plans }
+
+    private var currentKind: SavedCollectionKind? {
+        switch tab {
+        case .saved: return .saved
+        case .plan: return .plan
+        case .visited: return nil
+        }
+    }
+
+    private var currentCollections: [SavedCollection] {
+        switch tab {
+        case .saved: return savedLists
+        case .plan: return plans
+        case .visited: return []
+        }
+    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 header
 
-                if tab == .lists {
-                    collectionsSection
+                if let kind = currentKind {
+                    collectionsSection(kind: kind)
                 } else if visited.isEmpty {
                     emptyState
                 } else {
@@ -54,14 +72,14 @@ struct SavedScreen: View {
         .sheet(item: $selectedCollection) { collection in CollectionDetailScreen(collectionId: collection.id) }
     }
 
-    private var collectionsSection: some View {
+    private func collectionsSection(kind: SavedCollectionKind) -> some View {
         VStack(spacing: 12) {
             if showingNewCollectionField {
                 HStack(spacing: 10) {
                     TextField(String(localized: "saved.collections.namePlaceholder"), text: $newCollectionName)
                         .textFieldStyle(.plain)
-                        .onSubmit { createCollection() }
-                    Button("common.done") { createCollection() }
+                        .onSubmit { createCollection(kind: kind) }
+                    Button("common.done") { createCollection(kind: kind) }
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(Theme.gold)
                 }
@@ -74,7 +92,8 @@ struct SavedScreen: View {
                 } label: {
                     HStack(spacing: 10) {
                         Image(systemName: "plus.circle.fill").foregroundStyle(Theme.gold)
-                        Text("saved.collections.new").font(.system(size: 15, weight: .semibold)).foregroundStyle(.primary)
+                        Text(kind == .plan ? "saved.plan.new" : "saved.collections.new")
+                            .font(.system(size: 15, weight: .semibold)).foregroundStyle(.primary)
                         Spacer()
                     }
                     .padding(14)
@@ -83,22 +102,24 @@ struct SavedScreen: View {
                 .buttonStyle(.plain)
             }
 
-            if collections.isEmpty {
+            if currentCollections.isEmpty {
                 VStack(spacing: 12) {
                     Text("◈").font(.system(size: 48)).opacity(0.25)
-                    Text("saved.collections.noListsTitle").font(.system(size: 20, weight: .bold)).multilineTextAlignment(.center)
-                    Text("saved.collections.noListsBody").font(.system(size: 15)).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    Text(kind == .plan ? "saved.plan.noPlansTitle" : "saved.collections.noListsTitle")
+                        .font(.system(size: 20, weight: .bold)).multilineTextAlignment(.center)
+                    Text(kind == .plan ? "saved.plan.noPlansBody" : "saved.collections.noListsBody")
+                        .font(.system(size: 15)).foregroundStyle(.secondary).multilineTextAlignment(.center)
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 40)
                 .frame(maxWidth: .infinity)
             } else {
-                ForEach(collections) { collection in
+                ForEach(currentCollections) { collection in
                     Button {
                         selectedCollection = collection
                     } label: {
                         HStack(spacing: 12) {
-                            Image(systemName: "list.bullet")
+                            Image(systemName: kind == .plan ? "point.topleft.down.curvedto.point.bottomright.up" : "list.bullet")
                                 .font(.system(size: 18))
                                 .foregroundStyle(Theme.gold)
                                 .frame(width: 36, height: 36)
@@ -121,10 +142,10 @@ struct SavedScreen: View {
         .padding(.horizontal, 16)
     }
 
-    private func createCollection() {
+    private func createCollection(kind: SavedCollectionKind) {
         let trimmed = newCollectionName.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
-        savedPlacesStore.createCollection(name: trimmed)
+        savedPlacesStore.createCollection(name: trimmed, kind: kind)
         newCollectionName = ""
         showingNewCollectionField = false
     }
@@ -177,7 +198,8 @@ struct SavedScreen: View {
                 }
             }
             HStack(spacing: 3) {
-                segmentButton(.lists, label: String(localized: "saved.tabs.collections"), count: collections.count)
+                segmentButton(.saved, label: String(localized: "saved.tabs.favorites"), count: savedLists.count)
+                segmentButton(.plan, label: String(localized: "saved.tabs.plan"), count: plans.count)
                 segmentButton(.visited, label: String(localized: "saved.tabs.visited"), count: visited.count)
             }
             .padding(3)

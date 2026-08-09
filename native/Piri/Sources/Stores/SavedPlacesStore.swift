@@ -5,19 +5,20 @@ private struct SavedPlacesState: Codable {
     var collections: [SavedCollection] = []
 }
 
-/// Port of `mobile/src/store/saved-places.ts`, since generalized: the app
-/// used to have exactly one "Favorites" bucket and one "Plan" bucket, but
-/// per the user's explicit choice both are now just user-named
-/// `SavedCollection`s — someone can make as many named lists as they want
-/// ("Weekend trip", "Cafes to try", ...), and any list of 2+ places can be
-/// turned into an AI-optimized suggestion or an actual map route
-/// (`CollectionDetailScreen`), not just a specially-named "Plan" one.
-/// Backed by Keychain, like the RN store's `expo-secure-store` adapter —
-/// saved places are treated as the closest thing this account-less app has
-/// to personal data.
+/// Port of `mobile/src/store/saved-places.ts`, since generalized: "Kaydedilen"
+/// and "Plan" both used to be exactly one flat bucket each — per the user's
+/// explicit choice, both are now user-named `SavedCollection`s instead, so
+/// someone can make multiple named saved-lists *and* multiple named plans
+/// ("Hafta Sonu", "Yaz Tatili"), then pick whichever one to act on. Backed
+/// by Keychain, like the RN store's `expo-secure-store` adapter — saved
+/// places are treated as the closest thing this account-less app has to
+/// personal data.
 @Observable
 final class SavedPlacesStore {
     private(set) var collections: [SavedCollection] = []
+
+    var savedLists: [SavedCollection] { collections.filter { $0.kind == .saved } }
+    var plans: [SavedCollection] { collections.filter { $0.kind == .plan } }
 
     private let persistence = KeychainStore<SavedPlacesState>(key: "ai-city-guide.saved-places")
 
@@ -28,9 +29,9 @@ final class SavedPlacesStore {
     }
 
     @discardableResult
-    func createCollection(name: String) -> String {
+    func createCollection(name: String, kind: SavedCollectionKind) -> String {
         let id = "collection-\(Int(Date().timeIntervalSince1970 * 1000))"
-        collections.append(SavedCollection(id: id, name: name, createdAt: Date().timeIntervalSince1970 * 1000, places: []))
+        collections.append(SavedCollection(id: id, name: name, kind: kind, createdAt: Date().timeIntervalSince1970 * 1000, places: []))
         persist()
         return id
     }
@@ -46,10 +47,19 @@ final class SavedPlacesStore {
         persist()
     }
 
-    /// True if the given place is in *any* list — drives the bookmark
+    /// True if the given place is in any *saved* list — drives the bookmark
     /// icon's filled/outline state on a place's detail page.
     func isSaved(_ identifier: String) -> Bool {
-        for collection in collections {
+        for collection in savedLists {
+            if collection.places.contains(where: { $0.identifier == identifier }) { return true }
+        }
+        return false
+    }
+
+    /// True if the given place is in any *plan* — drives the plan icon's
+    /// filled/outline state on a place's detail page.
+    func isPlanned(_ identifier: String) -> Bool {
+        for collection in plans {
             if collection.places.contains(where: { $0.identifier == identifier }) { return true }
         }
         return false
