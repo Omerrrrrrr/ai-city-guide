@@ -36,8 +36,9 @@ struct MapScreen: View {
     @State private var poiExplainResult: ExplainResult?
     @State private var poiExplainLoading = false
     /// Resolved alongside the AI explain call so `mapFeatureCard` can show
-    /// its plain phone/website fields.
+    /// its plain phone/website fields and offer the full Place Card sheet.
     @State private var resolvedMapFeatureItem: MKMapItem?
+    @State private var showingMapItemDetail = false
     @State private var lookAroundScene: MKLookAroundScene?
     @State private var routeCoordinates: [CLLocationCoordinate2D] = []
     @State var initialRegion: MKCoordinateRegion?
@@ -266,6 +267,7 @@ struct MapScreen: View {
         poiExplainResult = nil
         lookAroundScene = nil
         resolvedMapFeatureItem = nil
+        showingMapItemDetail = false
         poiExplainTask?.cancel()
         poiExplainTask = Task { await explainMapFeature(feature) }
         Task { lookAroundScene = try? await MKLookAroundSceneRequest(coordinate: feature.coordinate).scene }
@@ -275,6 +277,7 @@ struct MapScreen: View {
         selectedMapFeature = nil
         poiExplainResult = nil
         lookAroundScene = nil
+        showingMapItemDetail = false
         poiExplainTask?.cancel()
     }
 
@@ -368,10 +371,21 @@ struct MapScreen: View {
                 if let website = resolvedMapFeatureItem.url {
                     Link(website.host ?? website.absoluteString, destination: website).font(.footnote)
                 }
-                Button("common.openInMaps") {
-                    resolvedMapFeatureItem.openInMaps()
+                HStack(spacing: 10) {
+                    Button {
+                        showingMapItemDetail = true
+                    } label: {
+                        Label("poiExplain.fullDetails", systemImage: "info.circle.fill")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.gold)
+                    .mapItemDetailSheet(isPresented: $showingMapItemDetail, item: resolvedMapFeatureItem)
+
+                    Button("common.openInMaps") {
+                        resolvedMapFeatureItem.openInMaps()
+                    }
+                    .buttonStyle(.bordered)
                 }
-                .buttonStyle(.bordered)
             }
 
             if let lookAroundScene {
