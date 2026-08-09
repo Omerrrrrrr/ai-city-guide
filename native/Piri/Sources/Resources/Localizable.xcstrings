@@ -8925,8 +8925,31 @@
         }
       }
     },
-    "saved.optimize.sub": {
-      "extractionState": "stale",
+    "saved.optimize.sub.one": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Best order, timings & travel tips for %1$lld place →"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beste rekkefølge, tider og reisetips for %1$lld sted →"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld yer için en iyi sıra, zamanlama ve seyahat ipuçları →"
+          }
+        }
+      }
+    },
+    "saved.optimize.sub.other": {
+      "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
