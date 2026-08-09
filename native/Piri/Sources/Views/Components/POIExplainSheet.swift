@@ -21,15 +21,18 @@ struct POIExplainSheet: View {
     @State private var chatInput = ""
     @State private var chatSending = false
     @State private var lookAroundScene: MKLookAroundScene?
-    /// Drives Apple's own full native Place Card (hours, ratings/reviews,
-    /// photos, "useful info") via `mapItemDetailSheet` — opened
-    /// automatically as soon as this page appears (see `.task` below) rather
-    /// than waiting on a tap. No public API exposes this data as plain
-    /// values (confirmed via research); the full sheet is the only surface
-    /// that renders Apple's actual rich card — a smaller
-    /// `mapItemDetailSelectionAccessory` callout was tried first but only
-    /// exposes a much thinner subset (no photos/reviews).
-    @State private var showingMapItemDetail = false
+    /// Drives Apple's own native Place Card content (hours, ratings) via
+    /// `mapItemDetailSelectionAccessory` on a single-marker `Map`, embedded
+    /// directly in this scroll content and pre-selected so it renders
+    /// immediately. `mapItemDetailSheet`/`Popover` show a richer version of
+    /// this (photos, reviews) but always as a second, separate modal
+    /// stacked on top of this one — the user explicitly wants one page, not
+    /// two, so this in-content accessory (plus the plain phone/website/
+    /// address rows below) is the trade-off: everything on this page, at
+    /// the cost of the photo/review section only a truly separate surface
+    /// can render (confirmed via research — no plain data API exists for
+    /// any of this).
+    @State private var placeCardSelection: MapSelection<MKMapItem>?
 
     var body: some View {
         NavigationStack {
@@ -66,17 +69,26 @@ struct POIExplainSheet: View {
                                 }
                             }
 
-                            // Apple's own full native Place Card — hours,
-                            // ratings/reviews, photos, "useful info" — opens
-                            // automatically as soon as this page appears (see
-                            // `.task` below), no tap needed. It's still a
-                            // system sheet (the only surface with this much
-                            // content, confirmed via research) rather than
-                            // literally laid out on this page, but it opens
-                            // itself instead of waiting behind a button.
-                            Color.clear.frame(height: 0)
-                                .mapItemDetailSheet(isPresented: $showingMapItemDetail, item: poi.mapItem)
-                                .task { showingMapItemDetail = true }
+                            // Apple's own native Place Card (hours, rating),
+                            // embedded right in this scroll content — not a
+                            // separate sheet on top of this one.
+                            // `interactionModes: []` stops pan/zoom/rotate
+                            // from fighting the outer ScrollView while
+                            // leaving the card's own buttons tappable.
+                            Map(interactionModes: [], selection: $placeCardSelection) {
+                                Marker(item: poi.mapItem)
+                                    .tag(MapSelection(poi.mapItem))
+                                    .mapItemDetailSelectionAccessory(.callout(.full))
+                            }
+                            .frame(height: 260)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .task { placeCardSelection = MapSelection(poi.mapItem) }
+
+                            // Phone/website/address are plain `MKMapItem`
+                            // properties (unlike hours/ratings) — shown
+                            // directly so this page always has them even if
+                            // the embedded card above doesn't surface them.
+                            placeDetailsRows
 
                             Button("common.openInMaps") {
                                 poi.mapItem.openInMaps()
@@ -143,6 +155,28 @@ struct POIExplainSheet: View {
         }
         .task { await explain() }
         .task { await loadLookAroundScene() }
+    }
+
+    @ViewBuilder
+    private var placeDetailsRows: some View {
+        let phoneNumber = poi.mapItem.phoneNumber
+        let website = poi.mapItem.url
+        let address = poi.mapItem.placemark.title
+
+        if phoneNumber != nil || website != nil || address != nil {
+            VStack(alignment: .leading, spacing: 6) {
+                if let phoneNumber, let telURL = URL(string: "tel:\(phoneNumber.filter { !$0.isWhitespace })") {
+                    Link(phoneNumber, destination: telURL)
+                }
+                if let website {
+                    Link(website.host ?? website.absoluteString, destination: website)
+                }
+                if let address {
+                    Text(address).foregroundStyle(.secondary)
+                }
+            }
+            .font(.footnote)
+        }
     }
 
     private func loadLookAroundScene() async {

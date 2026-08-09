@@ -35,13 +35,9 @@ struct MapScreen: View {
     @State private var selectedMapFeature: MKMapFeatureAnnotation?
     @State private var poiExplainResult: ExplainResult?
     @State private var poiExplainLoading = false
-    /// Resolved alongside the AI explain call so `mapFeatureCard` can offer
-    /// Apple's own native Place Card (hours, ratings, phone/website) via
-    /// `mapItemDetailPopover` — a mini embedded Map (like POIExplainSheet
-    /// uses) looked broken here since it duplicates the real map already
-    /// behind this card.
+    /// Resolved alongside the AI explain call so `mapFeatureCard` can show
+    /// its plain phone/website fields.
     @State private var resolvedMapFeatureItem: MKMapItem?
-    @State private var showingMapItemDetail = false
     @State private var lookAroundScene: MKLookAroundScene?
     @State private var routeCoordinates: [CLLocationCoordinate2D] = []
     @State var initialRegion: MKCoordinateRegion?
@@ -270,7 +266,6 @@ struct MapScreen: View {
         poiExplainResult = nil
         lookAroundScene = nil
         resolvedMapFeatureItem = nil
-        showingMapItemDetail = false
         poiExplainTask?.cancel()
         poiExplainTask = Task { await explainMapFeature(feature) }
         Task { lookAroundScene = try? await MKLookAroundSceneRequest(coordinate: feature.coordinate).scene }
@@ -280,7 +275,6 @@ struct MapScreen: View {
         selectedMapFeature = nil
         poiExplainResult = nil
         lookAroundScene = nil
-        showingMapItemDetail = false
         poiExplainTask?.cancel()
     }
 
@@ -337,18 +331,28 @@ struct MapScreen: View {
                 }
             }
 
-            // Apple's own full native Place Card (hours, ratings/reviews,
-            // photos, "useful info") — opens itself as soon as it resolves,
-            // same as tapping a POI in Apple Maps itself does. An embedded
-            // mini map for the selection-accessory callout was tried first
-            // but rendered as a messy duplicate on top of the real map
-            // already behind this card, and only exposed a thinner subset
-            // of the data anyway (no photos/reviews) — the system sheet is
-            // the only surface with the full card (confirmed via research).
+            // Phone/website are plain `MKMapItem` properties — shown
+            // directly on this card rather than behind Apple's own Place
+            // Card sheet/popover, which would open as a second, separate
+            // page stacked on top of this one (confirmed broken both ways:
+            // an embedded mini map for the selection-accessory callout
+            // rendered as a messy duplicate over the real map already
+            // behind this card; the sheet/popover is a fine surface but
+            // always its own disconnected screen). Hours/ratings/photos
+            // have no plain data API (confirmed via research) — "Haritalarda
+            // Aç" below is how to reach those from here.
             if let resolvedMapFeatureItem {
-                Color.clear.frame(height: 0)
-                    .mapItemDetailPopover(isPresented: $showingMapItemDetail, item: resolvedMapFeatureItem)
-                    .task(id: resolvedMapFeatureItem) { showingMapItemDetail = true }
+                if let phoneNumber = resolvedMapFeatureItem.phoneNumber,
+                   let telURL = URL(string: "tel:\(phoneNumber.filter { !$0.isWhitespace })") {
+                    Link(phoneNumber, destination: telURL).font(.footnote)
+                }
+                if let website = resolvedMapFeatureItem.url {
+                    Link(website.host ?? website.absoluteString, destination: website).font(.footnote)
+                }
+                Button("common.openInMaps") {
+                    resolvedMapFeatureItem.openInMaps()
+                }
+                .buttonStyle(.bordered)
             }
 
             if let lookAroundScene {
