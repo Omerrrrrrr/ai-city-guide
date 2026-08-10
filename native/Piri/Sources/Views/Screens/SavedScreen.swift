@@ -22,6 +22,7 @@ struct SavedScreen: View {
     @State private var selectedCollection: SavedCollection?
     @State private var showingNewCollectionField = false
     @State private var newCollectionName = ""
+    @State private var showingPlanBuilder = false
 
     init(initialTab: SavedTab = .saved) {
         _tab = State(initialValue: initialTab)
@@ -70,6 +71,7 @@ struct SavedScreen: View {
         .navigationBarHidden(true)
         .sheet(item: $selectedPOI) { poi in POIExplainSheet(poi: poi) }
         .sheet(item: $selectedCollection) { collection in CollectionDetailScreen(collectionId: collection.id) }
+        .sheet(isPresented: $showingPlanBuilder) { PlanBuilderScreen() }
     }
 
     private func collectionsSection(kind: SavedCollectionKind) -> some View {
@@ -98,6 +100,25 @@ struct SavedScreen: View {
                     }
                     .padding(14)
                     .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemBackground)))
+                }
+                .buttonStyle(.plain)
+            }
+
+            if kind == .plan, !showingNewCollectionField {
+                Button {
+                    Haptics.light()
+                    showingPlanBuilder = true
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "suitcase.fill").foregroundStyle(Theme.gold)
+                        Text("saved.plan.aiBuild")
+                            .font(.system(size: 15, weight: .semibold)).foregroundStyle(.primary)
+                        Spacer()
+                        Image(systemName: "sparkles").foregroundStyle(Theme.gold).font(.system(size: 13))
+                    }
+                    .padding(14)
+                    .background(RoundedRectangle(cornerRadius: 14).fill(Theme.gold.opacity(0.1)))
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.gold.opacity(0.3)))
                 }
                 .buttonStyle(.plain)
             }

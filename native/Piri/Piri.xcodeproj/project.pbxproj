@@ -37,6 +37,7 @@
 		428E0E0666A84BA0366D0AA4 /* PlaceMiniMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = F88D9297E5E64646338B6975 /* PlaceMiniMap.swift */; };
 		43BB82F44992911849EBCF73 /* Place.swift in Sources */ = {isa = PBXBuildFile; fileRef = D51DBC290790323812C65938 /* Place.swift */; };
 		46BF181ED5C32670F9475103 /* PlaceHoursTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57103CE5924DEF3637376683 /* PlaceHoursTests.swift */; };
+		475E18A765EBE2CB149976B6 /* PlanThemes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 627629055B808FB73F268A0F /* PlanThemes.swift */; };
 		47AB0C4FD2F7C0A3F1D3ED47 /* PlaceFiltersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A38B8B967050DA7D5EAE0DF7 /* PlaceFiltersTests.swift */; };
 		48790D92967906C9FC6A3E14 /* AdminModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A62E305A14B628DFA79318E3 /* AdminModels.swift */; };
 		523FD7D67E6F2B9EAC7AE7BE /* TripsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A434588E21EEFBF99EDD0A1B /* TripsStoreTests.swift */; };
@@ -53,6 +54,7 @@
 		737D514619BDEF84E89EE64A /* PlaceImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09D28590C586B93899BAF76D /* PlaceImageView.swift */; };
 		7DFB7CABF5BF0E2C456052FA /* PlaceDetailScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91B07B83A416DD09A796DDAB /* PlaceDetailScreen.swift */; };
 		83A34611A8A0EB78E6C9B2AC /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31BFBA845700A3D94868AF4F /* UserProfile.swift */; };
+		8766FA14D2D37DCAAEC3485F /* PlanBuilderScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = E14279B087BC9A6DFFCFE55E /* PlanBuilderScreen.swift */; };
 		8C641DB8EDA02A613A484622 /* TripsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B77BE47CE50CC6B0329712C3 /* TripsStore.swift */; };
 		8E8E9452E97550073183CC67 /* HomeScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92330389545E4A09616C146D /* HomeScreen.swift */; };
 		930282A9E0A3C4532DCF9212 /* AIScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A276DBEE24596CAF26AA7FE /* AIScreen.swift */; };
@@ -143,6 +145,7 @@
 		5D0AAD7772B7FF41780137D3 /* ExploreScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreScreen.swift; sourceTree = "<group>"; };
 		5DD8BEE6C2632619EE84A762 /* AdminAuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminAuthStore.swift; sourceTree = "<group>"; };
 		5EF08414F55178EA12A29A4A /* PluralsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluralsTests.swift; sourceTree = "<group>"; };
+		627629055B808FB73F268A0F /* PlanThemes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanThemes.swift; sourceTree = "<group>"; };
 		642AE03D91D3B2C9EC654135 /* TripAdvisorRatingRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripAdvisorRatingRow.swift; sourceTree = "<group>"; };
 		671A824ED89E058394F705D9 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		674770D930511AA70C53CCF8 /* POICategoryGroups.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POICategoryGroups.swift; sourceTree = "<group>"; };
@@ -191,6 +194,7 @@
 		D81083A6ED959FC685F77BB0 /* SavedPOIReference.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedPOIReference.swift; sourceTree = "<group>"; };
 		DB354EEA308416A9AB05BE5B /* TripsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripsScreen.swift; sourceTree = "<group>"; };
 		DB62061C800BEF24D07A2C43 /* PushNotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotificationManager.swift; sourceTree = "<group>"; };
+		E14279B087BC9A6DFFCFE55E /* PlanBuilderScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanBuilderScreen.swift; sourceTree = "<group>"; };
 		E712507F714C68342D7027E7 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		E75B93DCE842287CB76F2A2F /* POIPhotoGallery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POIPhotoGallery.swift; sourceTree = "<group>"; };
 		E77D183D7629F4D1786105CE /* PiriTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = PiriTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -229,6 +233,7 @@
 				9C03701EFE9483DB178D3A66 /* MapScreen+RouteMode.swift */,
 				A3652D871ED8EF7E7997CC36 /* OnboardingScreen.swift */,
 				91B07B83A416DD09A796DDAB /* PlaceDetailScreen.swift */,
+				E14279B087BC9A6DFFCFE55E /* PlanBuilderScreen.swift */,
 				EE6342530F052E87F0BEA86F /* ProfileScreen.swift */,
 				3A6344FD16ACEE6A9600CDCC /* SavedScreen.swift */,
 				0484B04B4522F9407DDAAFC0 /* ScanScreen.swift */,
@@ -249,6 +254,7 @@
 				02E923D5ACCD81DBBA0233C5 /* PlaceDirections.swift */,
 				2D599D1F2D04446888B8C6DD /* PlaceFilters.swift */,
 				717A345206E0678E81ADF461 /* PlaceHours.swift */,
+				627629055B808FB73F268A0F /* PlanThemes.swift */,
 				674770D930511AA70C53CCF8 /* POICategoryGroups.swift */,
 				6993AA4D03C823EF1D3DCFEE /* ProfileOptions.swift */,
 			);
@@ -591,6 +597,8 @@
 				428E0E0666A84BA0366D0AA4 /* PlaceMiniMap.swift in Sources */,
 				143884C22161F00A193C7395 /* PlacesAPI.swift in Sources */,
 				D09AFCB4A512C4A011C0FD1B /* PlacesQuery.swift in Sources */,
+				8766FA14D2D37DCAAEC3485F /* PlanBuilderScreen.swift in Sources */,
+				475E18A765EBE2CB149976B6 /* PlanThemes.swift in Sources */,
 				B6C5F6E5EA18F5B5C8BA032D /* ProfileOptions.swift in Sources */,
 				9558015CF2CE4C6AC4AEE174 /* ProfileScreen.swift in Sources */,
 				C4571C5476BB6CECDD2B4F47 /* PushNotificationManager.swift in Sources */,
