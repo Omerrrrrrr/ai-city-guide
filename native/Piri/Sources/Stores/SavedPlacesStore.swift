@@ -87,6 +87,19 @@ final class SavedPlacesStore {
         persist()
     }
 
+    /// Manual reordering (not drag-and-drop — these rows live in a plain
+    /// `VStack`/`ScrollView`, not a `List`, matching every other card list
+    /// in the app) so a Plan's visiting order is actually editable, not just
+    /// its membership.
+    func moveInCollection(_ id: String, identifier: String, offset: Int) {
+        guard let collectionIndex = collections.firstIndex(where: { $0.id == id }) else { return }
+        guard let placeIndex = collections[collectionIndex].places.firstIndex(where: { $0.identifier == identifier }) else { return }
+        let targetIndex = placeIndex + offset
+        guard collections[collectionIndex].places.indices.contains(targetIndex) else { return }
+        collections[collectionIndex].places.swapAt(placeIndex, targetIndex)
+        persist()
+    }
+
     private func persist() {
         persistence.save(SavedPlacesState(collections: collections))
     }

@@ -52,8 +52,8 @@ struct CollectionDetailScreen: View {
                     if collection.places.isEmpty {
                         emptyState
                     } else {
-                        ForEach(collection.places) { reference in
-                            referenceRow(reference)
+                        ForEach(Array(collection.places.enumerated()), id: \.element.id) { index, reference in
+                            referenceRow(reference, isFirst: index == 0, isLast: index == collection.places.count - 1)
                         }
                     }
                 }
@@ -163,7 +163,7 @@ struct CollectionDetailScreen: View {
         isEditingName = false
     }
 
-    private func referenceRow(_ reference: SavedPOIReference) -> some View {
+    private func referenceRow(_ reference: SavedPOIReference, isFirst: Bool, isLast: Bool) -> some View {
         HStack(spacing: 12) {
             Button {
                 Task { await open(reference) }
@@ -191,6 +191,32 @@ struct CollectionDetailScreen: View {
             .disabled(resolvingIdentifier != nil)
 
             if resolvingIdentifier != reference.identifier {
+                // Plain up/down buttons, not drag-and-drop — this list is a
+                // `VStack` in a `ScrollView` (matches every other card list
+                // in the app), not a `List`, which is what SwiftUI's native
+                // `.onMove` drag reordering requires.
+                VStack(spacing: 2) {
+                    Button {
+                        Haptics.light()
+                        savedPlacesStore.moveInCollection(collectionId, identifier: reference.identifier, offset: -1)
+                    } label: {
+                        Image(systemName: "chevron.up").font(.system(size: 12, weight: .bold))
+                    }
+                    .disabled(isFirst)
+                    .opacity(isFirst ? 0.25 : 1)
+
+                    Button {
+                        Haptics.light()
+                        savedPlacesStore.moveInCollection(collectionId, identifier: reference.identifier, offset: 1)
+                    } label: {
+                        Image(systemName: "chevron.down").font(.system(size: 12, weight: .bold))
+                    }
+                    .disabled(isLast)
+                    .opacity(isLast ? 0.25 : 1)
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+
                 Button {
                     savedPlacesStore.removeFromCollection(collectionId, identifier: reference.identifier)
                 } label: {

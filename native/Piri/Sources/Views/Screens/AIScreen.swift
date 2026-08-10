@@ -33,6 +33,7 @@ private enum ConversationTurn: Identifiable {
 struct AIScreen: View {
     @Environment(UserProfileStore.self) private var userProfileStore
     @Environment(RecentlyViewedStore.self) private var recentlyViewedStore
+    @Environment(SavedPlacesStore.self) private var savedPlacesStore
     @Environment(CityStore.self) private var cityStore
     @Environment(TabSelection.self) private var tabSelection
     @Environment(\.dismiss) private var dismiss
@@ -47,6 +48,11 @@ struct AIScreen: View {
     @State private var attachedImage: UIImage?
     @State private var hasAutoSubmitted = false
     @State private var selectedPOI: POIPlace?
+    /// Turn ids already saved as a Plan collection — keyed separately from
+    /// `conversation` (an enum, so its cases can't carry mutable state)
+    /// so the "Plan olarak kaydet" button can flip to a done state and stay
+    /// there instead of creating a duplicate collection on a second tap.
+    @State private var savedPlanTurnIds: Set<String> = []
 
     private let initialQuery: String?
 
@@ -253,7 +259,7 @@ struct AIScreen: View {
             .background(RoundedRectangle(cornerRadius: 18).fill(Theme.navy))
             .frame(maxWidth: .infinity, alignment: .trailing)
 
-        case .assistant(_, let content, let recommendations):
+        case .assistant(let id, let content, let recommendations):
             VStack(alignment: .leading, spacing: 12) {
                 Text(content)
                     .padding(.horizontal, 14).padding(.vertical, 12)
@@ -270,9 +276,41 @@ struct AIScreen: View {
                         }
                         .buttonStyle(.plain)
                     }
+                    // A single suggestion is just an answer to a question —
+                    // this only makes sense to offer once there's an actual
+                    // multi-stop itinerary worth keeping and editing later.
+                    if recommendations.count >= 2 {
+                        saveAsPlanButton(turnId: id, recommendations: recommendations)
+                    }
                 }
             }
         }
+    }
+
+    private func saveAsPlanButton(turnId: String, recommendations: [POIRecommendation]) -> some View {
+        let saved = savedPlanTurnIds.contains(turnId)
+        return Button {
+            guard !saved else { return }
+            Haptics.light()
+            let name = cityStore.cityName.map { L("ai.savedPlan.name", $0) } ?? String(localized: "ai.savedPlan.nameFallback")
+            let collectionId = savedPlacesStore.createCollection(name: name, kind: .plan)
+            for recommendation in recommendations {
+                savedPlacesStore.toggle(recommendation.poi, inCollection: collectionId)
+            }
+            savedPlanTurnIds.insert(turnId)
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: saved ? "checkmark.circle.fill" : "suitcase.fill")
+                Text(saved ? "ai.savedPlan.done" : "ai.savedPlan.cta")
+            }
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(saved ? .secondary : Theme.gold)
+            .padding(.horizontal, 14).padding(.vertical, 10)
+            .frame(maxWidth: .infinity)
+            .background(RoundedRectangle(cornerRadius: 12).fill(saved ? Color(.secondarySystemBackground) : Theme.gold.opacity(0.12)))
+        }
+        .buttonStyle(.plain)
+        .disabled(saved)
     }
 
     private func distanceLabel(_ distanceKm: Double) -> String {
