@@ -106,9 +106,14 @@ struct RecommendPOIRequest: Encodable {
 /// References a candidate by its index in the request's `poiCandidates`,
 /// not by re-sending name/coordinates — the client resolves this back into
 /// its own already-held `[POIPlace]` array from that same turn.
+enum POIRecommendationConfidence: String, Decodable {
+    case strong, weak
+}
+
 struct POIRecommendationIndex: Decodable {
     var index: Int
     var aiReason: String
+    var confidence: POIRecommendationConfidence
 }
 
 struct RecommendPOIResponse: Decodable {

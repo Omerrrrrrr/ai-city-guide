@@ -2446,6 +2446,29 @@
         }
       }
     },
+    "ai.weakMatch": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not an exact match"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ikke helt treff"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tam eşleşme değil"
+          }
+        }
+      }
+    },
     "categories.beach": {
       "extractionState": "stale",
       "localizations": {

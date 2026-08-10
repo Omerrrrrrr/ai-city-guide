@@ -1879,8 +1879,29 @@ ${placeContext.length > 0 ? `Available shortlist:\n${JSON.stringify(placeContext
       });
     }
 
+    // Beyond name/category/address, the model has nothing to distinguish
+    // candidates on — every reason it writes ends up a generic category
+    // paraphrase ("a great spot for a relaxing time"). Enriching only the
+    // first few (not all 30) with a real Tripadvisor rating/description
+    // keeps the added latency bounded (these run concurrently) and gives
+    // the model something to actually cite instead of restating the name.
+    const ENRICH_CANDIDATE_COUNT = 6;
+    const enrichments = await Promise.all(
+      poiCandidates.slice(0, ENRICH_CANDIDATE_COUNT).map(async (c) => {
+        if (c.lat == null || c.lng == null) return null;
+        return fetchTripAdvisorInfo(c.name, c.lat, c.lng);
+      })
+    );
+
     const candidateList = poiCandidates
-      .map((c, i) => `[${i}] ${c.name}${c.category ? ` — ${c.category}` : ''}${c.address ? ` (${c.address})` : ''}`)
+      .map((c, i) => {
+        const enrichment = enrichments[i];
+        const ratingText = enrichment?.rating
+          ? ` — ★${enrichment.rating.score} (${enrichment.rating.reviewCount} reviews)`
+          : '';
+        const descriptionText = enrichment?.description ? `: ${enrichment.description.slice(0, 160)}` : '';
+        return `[${i}] ${c.name}${c.category ? ` — ${c.category}` : ''}${c.address ? ` (${c.address})` : ''}${ratingText}${descriptionText}`;
+      })
       .join('\n');
 
     try {
@@ -1911,15 +1932,32 @@ ${placeContext.length > 0 ? `Available shortlist:\n${JSON.stringify(placeContext
             z.object({
               index: z.number().int().describe('Index of the candidate from the numbered list'),
               reason: z.string().describe('1-2 sentence custom explanation of match'),
+              confidence: z
+                .enum(['strong', 'weak'])
+                .describe(
+                  '"strong" if this genuinely matches what the user asked for, "weak" if it is only the closest available option from a limited candidate list and not a great fit'
+                ),
             })
           ),
         }) as any,
-        system: `You are Piri, a personal travel guide.${profileContext}${weatherContext}
+        // Static instructions first, request-specific content (profile,
+        // weather, image, candidate list) appended last — OpenAI/OpenRouter
+        // cache the KV state of a shared prompt *prefix* automatically, at
+        // up to 90% lower input-token cost and 80% lower first-token
+        // latency, but only for requests that share the exact same opening
+        // text. With the per-user profile/weather blurb interpolated at the
+        // very start (the old layout), virtually no two requests shared a
+        // prefix at all — every request paid full price. This layout has
+        // exactly two stable variants (candidates present/absent) crossed
+        // with locale (~3 values), so the huge rule block below is now
+        // reused across every user hitting this endpoint, not just re-runs
+        // by the same one.
+        system: `You are Piri, a personal travel guide.
 Continue the conversation naturally using the recent chat history when provided.
-Keep answers concise (1–3 sentences) and personalized to the user.${imageInstructions}${languageInstruction(locale)}
+Keep answers concise (1–3 sentences) and personalized to the user.${languageInstruction(locale)}
 
 ${poiCandidates.length > 0
-  ? `You have ${poiCandidates.length} nearby points of interest, from Apple Maps, numbered below. Only fill "recommendations" when the user's message is actually asking for a place, suggestion, itinerary idea, or something to do/see/eat — pick 3-5 when there are several strong matches, fewer when matches are narrow. For greetings, thanks, follow-up chit-chat, or questions that don't call for a place suggestion, return an EMPTY recommendations array and just answer naturally. Don't force a recommendation that doesn't fit the question. Return ONLY candidates from the numbered list using their exact index.
+  ? `You have nearby points of interest, from Apple Maps, numbered below. Only fill "recommendations" when the user's message is actually asking for a place, suggestion, itinerary idea, or something to do/see/eat — pick 3-5 when there are several strong matches, fewer when matches are narrow. For greetings, thanks, follow-up chit-chat, or questions that don't call for a place suggestion, return an EMPTY recommendations array and just answer naturally. Don't force a recommendation that doesn't fit the question. Return ONLY candidates from the numbered list using their exact index.
 
 GROUNDING RULE: never name a specific venue in your answer text that is not one of the numbered candidates below — not a real place you happen to know from general knowledge, not a plausible-sounding invented name, none of that. Every specific place name in your answer must be the exact name of a candidate you also return by index in "recommendations." If nothing below fits well, don't invent or recall one from memory — speak generically instead ("a cozy cafe nearby", "a scenic walking spot") or say you don't have a great match for that yet.
 
@@ -1929,17 +1967,22 @@ DECISIVENESS RULE (found via testing: the model was asking "what kind of food?" 
 
 CONTINUATION RULE (found via testing: the model once answered "there's a lot to discover in Başka" — treating the Turkish word for "other/another" as if it were a place name): a short message like "başka"/"diğer"/"more"/"another"/"something else" is never a place, city, or topic — it always means "give me different options than what you just suggested," using the ORIGINAL topic from earlier in this conversation (visible in the chat history above), not the literal text of this message. Never echo a word like this back as if it were a location or noun in your answer.
 
-ITINERARY RULE: if the user is asking for a plan, itinerary, or "things to do" for a stretch of time (a day, an afternoon, a visit) rather than one specific need, favor a diverse spread across categories (e.g. a sight, a place to eat, a viewpoint or park, a cultural stop) over 3-5 near-duplicates of the same category — a plan of five identical cafes isn't useful. Order "recommendations" in a sensible visiting order given their positions if that's inferable, earliest/most central first.`
+ITINERARY RULE: if the user is asking for a plan, itinerary, or "things to do" for a stretch of time (a day, an afternoon, a visit) rather than one specific need, favor a diverse spread across categories (e.g. a sight, a place to eat, a viewpoint or park, a cultural stop) over 3-5 near-duplicates of the same category — a plan of five identical cafes isn't useful. Order "recommendations" in a sensible visiting order given their positions if that's inferable, earliest/most central first.
+
+CONFIDENCE RULE: be honest about fit, not just present. Mark a recommendation "weak" whenever it's really just the closest thing available rather than a genuine match — e.g. recommending a restaurant for an "art experience" request because no museum or gallery was in the candidate list. Don't silently upgrade a weak fallback to sound like a strong match just to fill the recommendation count.`
   : `You have no nearby points of interest available right now (location may be unknown, or Apple Maps has little POI data for this exact spot). Answer from your own knowledge, don't recommend a specific unverifiable venue by name, and return an empty recommendations array.`
 }
+${PROMPT_INJECTION_GUARD}
 
-${poiCandidates.length > 0 ? `Candidates:\n${candidateList}` : ''}${PROMPT_INJECTION_GUARD}`,
+${profileContext}${weatherContext}${imageInstructions}
+
+${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidateList}` : ''}`,
         messages: [...priorTurnMessages, finalUserMessage],
       } as any);
 
       const rawRecommendations = (object as any).recommendations ?? [];
       const seenIndices = new Set<number>();
-      const validated: { index: number; aiReason: string }[] = rawRecommendations
+      const validated: { index: number; aiReason: string; confidence: 'strong' | 'weak' }[] = rawRecommendations
         .filter(
           (rec: { index: number }) =>
             Number.isInteger(rec.index) && rec.index >= 0 && rec.index < poiCandidates.length
@@ -1949,10 +1992,16 @@ ${poiCandidates.length > 0 ? `Candidates:\n${candidateList}` : ''}${PROMPT_INJEC
           seenIndices.add(rec.index);
           return true;
         })
-        .map((rec: { index: number; reason: string }) => ({ index: rec.index, aiReason: rec.reason }));
+        .map((rec: { index: number; reason: string; confidence?: string }) => ({
+          index: rec.index,
+          aiReason: rec.reason,
+          confidence: rec.confidence === 'weak' ? 'weak' : 'strong',
+        }));
 
       // Same safety net as /places/recommend: the model sometimes names a
       // candidate in the answer text but leaves it out of "recommendations".
+      // Never explicitly rated by the model in this path, so treated as
+      // "weak" rather than assumed strong.
       const answerText: string = (object as any).answer ?? '';
       if (answerText) {
         poiCandidates.forEach((candidate, index) => {
@@ -1960,7 +2009,7 @@ ${poiCandidates.length > 0 ? `Candidates:\n${candidateList}` : ''}${PROMPT_INJEC
           if (candidate.name.length < 4) return;
           if (!answerText.toLowerCase().includes(candidate.name.toLowerCase())) return;
           if (validated.some((rec) => rec.index === index)) return;
-          validated.push({ index, aiReason: 'Mentioned above.' });
+          validated.push({ index, aiReason: 'Mentioned above.', confidence: 'weak' });
         });
       }
 

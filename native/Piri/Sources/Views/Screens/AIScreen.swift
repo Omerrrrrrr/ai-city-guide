@@ -8,6 +8,7 @@ import SwiftUI
 private struct POIRecommendation: Identifiable {
     let poi: POIPlace
     let aiReason: String
+    let confidence: POIRecommendationConfidence
     /// Distance from the anchor used for that turn's POI search — the
     /// user's actual GPS position if no city is being browsed, or the
     /// browsed city's center otherwise (see `search()`). Either way "how far
@@ -336,7 +337,7 @@ struct AIScreen: View {
                     .foregroundStyle(Theme.gold)
                     .frame(width: 36, height: 36)
                     .background(Circle().fill(Theme.gold.opacity(0.12)))
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(poi.name).font(.system(size: 18, weight: .bold))
                     Text(
                         [poi.categoryLabel.isEmpty ? nil : poi.categoryLabel, distanceLabel(recommendation.distanceKm)]
@@ -344,6 +345,18 @@ struct AIScreen: View {
                             .joined(separator: " · ")
                     )
                     .font(.system(size: 14)).foregroundStyle(.secondary)
+                    // Honest labeling for the "closest available option, not
+                    // a great fit" case — the CONFIDENCE RULE server-side
+                    // asks the model not to dress up a fallback pick as a
+                    // strong match, so the UI shouldn't either.
+                    if recommendation.confidence == .weak {
+                        Text("ai.weakMatch")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(Capsule().fill(Color(.secondarySystemBackground)))
+                            .overlay(Capsule().stroke(Color(.separator), lineWidth: 1))
+                    }
                 }
             }
             HStack(alignment: .top, spacing: 8) {
@@ -430,16 +443,49 @@ struct AIScreen: View {
         // choose from, regardless of how the free-text match went.
         async let textResults = POISearchService.search(near: coordinate, categories: nil, naturalLanguageQuery: query)
         async let browseResults = POISearchService.search(near: coordinate, categories: nil)
-        var combined = await textResults
-        let existingNames = Set(combined.map { $0.name.lowercased() })
-        combined += await browseResults.filter { !existingNames.contains($0.name.lowercased()) }
-        return combined
-            .sorted {
+        // A themed ask ("sanatsal bir deneyim") has no chance against a
+        // plain nearest-first browse in a city with thousands of POIs — the
+        // nearest 24 things of any kind are almost never mostly museums.
+        // `inferredCategories` maps the query's own words to the relevant
+        // Apple categories so there's an actually-targeted search feeding
+        // the pool, not just a bigger pile of the same generic nearby noise.
+        async let themedResults = fetchThemedCandidates(
+            POICategoryGroups.inferredCategories(fromQuery: query),
+            near: coordinate
+        )
+
+        func sortedByDistance(_ items: [POIPlace]) -> [POIPlace] {
+            items.sorted {
                 geoDistanceKm($0.coordinate.latitude, $0.coordinate.longitude, coordinate.latitude, coordinate.longitude)
                     < geoDistanceKm($1.coordinate.latitude, $1.coordinate.longitude, coordinate.latitude, coordinate.longitude)
             }
-            .prefix(24)
-            .map { $0 }
+        }
+
+        var seenNames = Set<String>()
+        var prioritized: [POIPlace] = []
+        func appendUnique(_ items: [POIPlace]) {
+            for item in items {
+                let key = item.name.lowercased()
+                guard !seenNames.contains(key) else { continue }
+                seenNames.insert(key)
+                prioritized.append(item)
+            }
+        }
+
+        // Themed matches go first and survive the cap even when they're
+        // farther away than a pile of unrelated nearby places — a flat
+        // distance sort across everything would bury them below the cutoff
+        // before the model ever sees them.
+        appendUnique(sortedByDistance(await themedResults))
+        appendUnique(sortedByDistance(await textResults))
+        appendUnique(sortedByDistance(await browseResults))
+
+        return Array(prioritized.prefix(30))
+    }
+
+    private func fetchThemedCandidates(_ categories: Set<MKPointOfInterestCategory>?, near coordinate: CLLocationCoordinate2D) async -> [POIPlace] {
+        guard let categories else { return [] }
+        return await POISearchService.search(near: coordinate, categories: categories)
     }
 
     private func search(overrideQuery: String? = nil) async {
@@ -519,7 +565,7 @@ struct AIScreen: View {
                 let distanceKm = coordinate.map {
                     geoDistanceKm(poi.coordinate.latitude, poi.coordinate.longitude, $0.latitude, $0.longitude)
                 } ?? 0
-                return POIRecommendation(poi: poi, aiReason: rec.aiReason, distanceKm: distanceKm)
+                return POIRecommendation(poi: poi, aiReason: rec.aiReason, confidence: rec.confidence, distanceKm: distanceKm)
             }
             conversation.append(.assistant(id: "\(Date().timeIntervalSince1970)-assistant", content: response.answer, recommendations: resolved))
         } catch {

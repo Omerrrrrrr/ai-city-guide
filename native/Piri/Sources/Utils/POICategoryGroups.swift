@@ -37,4 +37,37 @@ enum POICategoryGroups {
         guard let category else { return "mappin.circle.fill" }
         return all.first { $0.categories?.contains(category) == true }?.icon ?? "mappin.circle.fill"
     }
+
+    /// Turkish/English/Norwegian keyword → category set, so a themed Ask
+    /// Piri question ("sanatsal bir deneyim") can bias the candidate search
+    /// toward relevant venues instead of "nearest 24 of anything" — a plain
+    /// distance browse has no way to know "sanatsal" means museums/theaters,
+    /// not restaurants. Substring match against the raw query; returns `nil`
+    /// (not an empty set) when nothing matches so callers can tell "no
+    /// theme detected" apart from "detected theme has zero categories."
+    private static let queryKeywordCategories: [(keywords: [String], categories: Set<MKPointOfInterestCategory>)] = [
+        (["sanat", "sanatsal", "galeri", "art", "gallery", "kunst"], [.museum, .theater, .musicVenue, .library]),
+        (["tarih", "tarihi", "tarihsel", "history", "historic", "antik", "historisk"], [.museum, .landmark, .nationalMonument, .castle, .fortress]),
+        (["müze", "museum", "museer"], [.museum, .planetarium, .aquarium]),
+        (["doğa", "doga", "nature", "natur", "yürüyüş", "yuruyus", "hiking"], [.park, .nationalPark, .campground, .hiking, .zoo]),
+        (["eğlence", "eglence", "fun", "entertainment", "underholdning"], [.amusementPark, .bowling, .miniGolf, .goKart, .skatePark, .zoo, .aquarium]),
+        (["gece hayatı", "gece", "nightlife", "bar", "natteliv"], [.nightlife, .musicVenue, .brewery, .winery, .distillery]),
+        (["yemek", "restoran", "food", "dining", "mat", "kafe", "cafe", "coffee", "kaffe"], [.restaurant, .foodMarket, .bakery, .cafe, .brewery, .winery]),
+        (["alışveriş", "alisveris", "shopping", "handel"], [.store]),
+        (["spor", "sport", "idman", "gym", "fitness"], [.stadium, .fitnessCenter, .golf, .tennis, .soccer, .swimming]),
+        (["aile", "family", "familie", "çocuk", "cocuk", "kids"], [.zoo, .aquarium, .amusementPark, .park]),
+        (["macera", "adventure", "eventyr"], [.hiking, .rockClimbing, .kayaking, .surfing, .skiing]),
+        (["manzara", "view", "utsikt"], [.park, .landmark, .nationalMonument]),
+    ]
+
+    static func inferredCategories(fromQuery query: String) -> Set<MKPointOfInterestCategory>? {
+        let normalized = query.lowercased()
+        var matched: Set<MKPointOfInterestCategory> = []
+        for entry in queryKeywordCategories {
+            if entry.keywords.contains(where: { normalized.contains($0) }) {
+                matched.formUnion(entry.categories)
+            }
+        }
+        return matched.isEmpty ? nil : matched
+    }
 }
