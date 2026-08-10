@@ -1928,6 +1928,11 @@ ${placeContext.length > 0 ? `Available shortlist:\n${JSON.stringify(placeContext
         maxOutputTokens: 420,
         schema: z.object({
           answer: z.string().describe('A short conversational reply in 1-2 sentences'),
+          isItinerary: z
+            .boolean()
+            .describe(
+              'True only if the user is asking for a plan, itinerary, or several things to do over a stretch of time (a day, an afternoon, a visit). False for a single specific request like "best cafe nearby", "open now", or a one-off follow-up question — even if several candidates happen to be returned for it.'
+            ),
           recommendations: z.array(
             z.object({
               index: z.number().int().describe('Index of the candidate from the numbered list'),
@@ -1967,7 +1972,7 @@ DECISIVENESS RULE (found via testing: the model was asking "what kind of food?" 
 
 CONTINUATION RULE (found via testing: the model once answered "there's a lot to discover in Başka" — treating the Turkish word for "other/another" as if it were a place name): a short message like "başka"/"diğer"/"more"/"another"/"something else" is never a place, city, or topic — it always means "give me different options than what you just suggested," using the ORIGINAL topic from earlier in this conversation (visible in the chat history above), not the literal text of this message. Never echo a word like this back as if it were a location or noun in your answer.
 
-ITINERARY RULE: if the user is asking for a plan, itinerary, or "things to do" for a stretch of time (a day, an afternoon, a visit) rather than one specific need, favor a diverse spread across categories (e.g. a sight, a place to eat, a viewpoint or park, a cultural stop) over 3-5 near-duplicates of the same category — a plan of five identical cafes isn't useful. Order "recommendations" in a sensible visiting order given their positions if that's inferable, earliest/most central first.
+ITINERARY RULE: if the user is asking for a plan, itinerary, or "things to do" for a stretch of time (a day, an afternoon, a visit) rather than one specific need, favor a diverse spread across categories (e.g. a sight, a place to eat, a viewpoint or park, a cultural stop) over 3-5 near-duplicates of the same category — a plan of five identical cafes isn't useful. Order "recommendations" in a sensible visiting order given their positions if that's inferable, earliest/most central first. Set "isItinerary" to true only for this case — a plain request like "best cafes open now" is not an itinerary just because it happens to return multiple candidates.
 
 CONFIDENCE RULE: be honest about fit, not just present. Mark a recommendation "weak" whenever it's really just the closest thing available rather than a genuine match — e.g. recommending a restaurant for an "art experience" request because no museum or gallery was in the candidate list. Don't silently upgrade a weak fallback to sound like a strong match just to fill the recommendation count.`
   : `You have no nearby points of interest available right now (location may be unknown, or Apple Maps has little POI data for this exact spot). Answer from your own knowledge, don't recommend a specific unverifiable venue by name, and return an empty recommendations array.`
@@ -2024,6 +2029,7 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
 
       return {
         answer: answerText,
+        isItinerary: (object as any).isItinerary === true,
         recommendations: deduped.slice(0, MAX_AI_RECOMMENDATIONS),
       };
     } catch (e: any) {

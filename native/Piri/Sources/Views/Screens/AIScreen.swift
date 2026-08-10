@@ -20,7 +20,7 @@ private struct POIRecommendation: Identifiable {
 
 private enum ConversationTurn: Identifiable {
     case user(id: String, content: String, image: UIImage?)
-    case assistant(id: String, content: String, recommendations: [POIRecommendation])
+    case assistant(id: String, content: String, recommendations: [POIRecommendation], isItinerary: Bool)
     // Distinct from `.assistant` (not just an assistant turn with an error
     // string as content) so it doesn't get sent back to the backend as fake
     // prior assistant history, and so `turnView` can skip the "no matches"
@@ -30,7 +30,7 @@ private enum ConversationTurn: Identifiable {
     var id: String {
         switch self {
         case .user(let id, _, _): return id
-        case .assistant(let id, _, _): return id
+        case .assistant(let id, _, _, _): return id
         case .error(let id, _): return id
         }
     }
@@ -104,7 +104,7 @@ struct AIScreen: View {
         conversation.compactMap { turn in
             switch turn {
             case .user(_, let content, _): return AIConversationMessage(role: .user, content: content)
-            case .assistant(_, let content, _): return AIConversationMessage(role: .assistant, content: content)
+            case .assistant(_, let content, _, _): return AIConversationMessage(role: .assistant, content: content)
             case .error: return nil
             }
         }
@@ -257,7 +257,7 @@ struct AIScreen: View {
             .background(RoundedRectangle(cornerRadius: 18).fill(Theme.navy))
             .frame(maxWidth: .infinity, alignment: .trailing)
 
-        case .assistant(let id, let content, let recommendations):
+        case .assistant(let id, let content, let recommendations, let isItinerary):
             VStack(alignment: .leading, spacing: 12) {
                 Text(content)
                     .padding(.horizontal, 14).padding(.vertical, 12)
@@ -274,10 +274,13 @@ struct AIScreen: View {
                         }
                         .buttonStyle(.plain)
                     }
-                    // A single suggestion is just an answer to a question —
-                    // this only makes sense to offer once there's an actual
-                    // multi-stop itinerary worth keeping and editing later.
-                    if recommendations.count >= 2 {
+                    // Only offer to save as a Plan when the backend itself
+                    // judged this an itinerary-style request (its own
+                    // ITINERARY RULE) — a plain "best cafes open now"
+                    // answer isn't a plan just because it returned 2+
+                    // candidates, and showing the button there every time
+                    // was noise unrelated to what was actually asked.
+                    if recommendations.count >= 2, isItinerary {
                         saveAsPlanButton(turnId: id, recommendations: recommendations)
                     }
                 }
@@ -567,7 +570,7 @@ struct AIScreen: View {
                 } ?? 0
                 return POIRecommendation(poi: poi, aiReason: rec.aiReason, confidence: rec.confidence, distanceKm: distanceKm)
             }
-            conversation.append(.assistant(id: "\(Date().timeIntervalSince1970)-assistant", content: response.answer, recommendations: resolved))
+            conversation.append(.assistant(id: "\(Date().timeIntervalSince1970)-assistant", content: response.answer, recommendations: resolved, isItinerary: response.isItinerary))
         } catch {
             query = nextQuery
             conversation.append(.error(id: "\(Date().timeIntervalSince1970)-error", message: error.localizedDescription))

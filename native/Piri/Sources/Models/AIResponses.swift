@@ -118,6 +118,7 @@ struct POIRecommendationIndex: Decodable {
 
 struct RecommendPOIResponse: Decodable {
     var answer: String
+    var isItinerary: Bool
     var recommendations: [POIRecommendationIndex]
 }
 
