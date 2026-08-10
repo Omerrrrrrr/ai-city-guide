@@ -34,6 +34,7 @@
 		35707013756F5B160304F9AB /* TripsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB354EEA308416A9AB05BE5B /* TripsScreen.swift */; };
 		37343655509BE28F9E393CCC /* AdminAuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DD8BEE6C2632619EE84A762 /* AdminAuthStore.swift */; };
 		382E98FD71A9A15914AEA4BA /* CachedAsyncImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0235E9B64832A4922FD3451D /* CachedAsyncImage.swift */; };
+		41036D1BB9344639267F7DAE /* AppSmokeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB671448AA1226B18D624218 /* AppSmokeUITests.swift */; };
 		428E0E0666A84BA0366D0AA4 /* PlaceMiniMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = F88D9297E5E64646338B6975 /* PlaceMiniMap.swift */; };
 		43BB82F44992911849EBCF73 /* Place.swift in Sources */ = {isa = PBXBuildFile; fileRef = D51DBC290790323812C65938 /* Place.swift */; };
 		46BF181ED5C32670F9475103 /* PlaceHoursTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57103CE5924DEF3637376683 /* PlaceHoursTests.swift */; };
@@ -197,6 +198,7 @@
 		B77BE47CE50CC6B0329712C3 /* TripsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripsStore.swift; sourceTree = "<group>"; };
 		C03AA8FC29DF1B7AFBACE82E /* PlaceFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceFixtures.swift; sourceTree = "<group>"; };
 		C808B025C8E9ED7515733584 /* SavedCollection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedCollection.swift; sourceTree = "<group>"; };
+		CB671448AA1226B18D624218 /* AppSmokeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSmokeUITests.swift; sourceTree = "<group>"; };
 		CCBB2212BE6B65176747BC8F /* MapScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapScreen.swift; sourceTree = "<group>"; };
 		D207ADFEE3A017CC4579BF6E /* ChipGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChipGrid.swift; sourceTree = "<group>"; };
 		D51DBC290790323812C65938 /* Place.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Place.swift; sourceTree = "<group>"; };
@@ -445,6 +447,7 @@
 		F1FC6B1CAFF4670AC72A4766 /* UITests */ = {
 			isa = PBXGroup;
 			children = (
+				CB671448AA1226B18D624218 /* AppSmokeUITests.swift */,
 				86DB5417C3A05EBAEE7EB68E /* PlanBuilderUITests.swift */,
 			);
 			path = UITests;
@@ -585,6 +588,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				41036D1BB9344639267F7DAE /* AppSmokeUITests.swift in Sources */,
 				E640521527F5AC8FD9D572B9 /* PlanBuilderUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
