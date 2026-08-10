@@ -16,7 +16,8 @@
     "images:reject": "ts-node-dev --exit-child --transpile-only src/images-reject.ts",
     "images:apply": "ts-node-dev --exit-child --transpile-only src/images-apply.ts",
     "prewarm:live-pins": "ts-node-dev --exit-child --transpile-only src/live-pins-prewarm.ts",
-    "test": "npm run build && node --test \"dist/**/*.test.js\""
+    "test": "npm run build && node --test \"dist/**/*.test.js\"",
+    "eval": "promptfoo eval -c evals/promptfooconfig.yaml"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.41",
@@ -34,6 +35,7 @@
   "devDependencies": {
     "@types/node": "^22.10.2",
     "drizzle-kit": "^0.31.10",
+    "promptfoo": "^0.122.0",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.9.2"
   }

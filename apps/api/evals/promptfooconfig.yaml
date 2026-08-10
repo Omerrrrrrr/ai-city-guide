@@ -1,0 +1,223 @@
+# Golden-query regression suite for /places/recommend-poi — the report's
+# "Öneri 6": catches prompt regressions (like the "Başka" bug, or the
+# themed-query-buried-in-restaurants bug) automatically instead of only via
+# a screenshot after the fact. Run against a live local server:
+#
+#   npm run dev          (separate terminal, from apps/api/)
+#   npm run eval          (from apps/api/)
+#
+# Every test case sends a hand-picked, fixed `poiCandidates` list so results
+# don't depend on live Apple MapKit / Tripadvisor data — the point is to
+# regression-test the PROMPT and selection logic, not the real world.
+
+providers:
+  - id: https
+    config:
+      url: 'http://127.0.0.1:4000/places/recommend-poi'
+      method: POST
+      headers:
+        Content-Type: application/json
+      body:
+        query: '{{query}}'
+        locale: '{{locale}}'
+        lat: 59.9139
+        lng: 10.7522
+        messages: '{{messages | dump}}'
+        poiCandidates: '{{poiCandidates | dump}}'
+      transformResponse: 'json'
+
+defaultTest:
+  vars:
+    locale: tr
+    messages: []
+
+tests:
+  # ── Themed queries: candidate pool has both an on-theme and several
+  # off-theme places — the model must not just grab the nearest restaurant.
+  - description: 'sanatsal istekte müze aday varsa onu seçmeli'
+    vars:
+      query: 'Sanatsal bir deneyim yaşamak istiyorum'
+      poiCandidates:
+        - { name: 'Nasjonalmuseet', category: 'Museum', lat: 59.9133, lng: 10.7280 }
+        - { name: 'Delarosa Downtown', category: 'Restaurant', lat: 59.9140, lng: 10.7530 }
+        - { name: 'The Public Izakaya', category: 'Restaurant', lat: 59.9150, lng: 10.7500 }
+    assert:
+      - type: javascript
+        value: 'output.recommendations.length > 0'
+      - type: javascript
+        value: 'output.recommendations.some(r => r.index === 0)'
+
+  - description: 'sanatsal istekte hiç sanat mekanı yoksa dürüst olmalı (boş dön ya da weak işaretle)'
+    vars:
+      query: 'Sanatsal bir deneyim yaşamak istiyorum'
+      poiCandidates:
+        - { name: 'Delarosa Downtown', category: 'Restaurant', lat: 59.9140, lng: 10.7530 }
+        - { name: 'The Public Izakaya', category: 'Restaurant', lat: 59.9150, lng: 10.7500 }
+    assert:
+      - type: javascript
+        value: 'output.recommendations.length === 0 || output.recommendations.every(r => r.confidence === "weak")'
+
+  - description: 'itinerary isteğinde kategori çeşitliliği olmalı, 5 aynı kategori değil'
+    vars:
+      query: 'Bugün için tam günlük bir gezi planı yap'
+      poiCandidates:
+        - { name: 'Akershus Fortress', category: 'Fortress', lat: 59.9075, lng: 10.7360 }
+        - { name: 'Frogner Park', category: 'Park', lat: 59.9270, lng: 10.7000 }
+        - { name: 'Mathallen', category: 'Food Market', lat: 59.9230, lng: 10.7530 }
+        - { name: 'Munch Museum', category: 'Museum', lat: 59.9058, lng: 10.7561 }
+        - { name: 'Fuglen Oslo', category: 'Cafe', lat: 59.9166, lng: 10.7350 }
+    assert:
+      - type: javascript
+        value: |
+          const cats = new Set(output.recommendations.map(r => ['Fortress','Park','Food Market','Museum','Cafe'][r.index]));
+          return cats.size >= 2;
+
+  # ── Continuation words must never be treated as a place name (the
+  # "Başka" bug: the model once answered "there's a lot to discover in
+  # Başka", literally treating the Turkish word for "other" as a city).
+  - description: '"başka" bir yer adı gibi ele alınmamalı'
+    vars:
+      query: 'başka'
+      messages:
+        - { role: 'user', content: 'İyi bir kafe önerir misin' }
+        - { role: 'assistant', content: 'Fuglen Oslo harika bir kahve mekanı.' }
+      poiCandidates:
+        - { name: 'Fuglen Oslo', category: 'Cafe', lat: 59.9166, lng: 10.7350 }
+        - { name: 'Tim Wendelboe', category: 'Cafe', lat: 59.9280, lng: 10.7620 }
+    assert:
+      - type: not-contains
+        value: 'Başka'
+      - type: javascript
+        value: '!/\bbaşka\b/i.test(output.answer.replace(/başka bir|başka bi/gi, ""))'
+
+  - description: '"diğer" bir yer adı gibi ele alınmamalı (İngilizce sohbet geçmişiyle)'
+    vars:
+      query: 'diğer'
+      locale: tr
+      messages:
+        - { role: 'user', content: 'Akşam yemeği için restoran öner' }
+        - { role: 'assistant', content: 'The Public Izakaya iyi bir seçenek.' }
+      poiCandidates:
+        - { name: 'The Public Izakaya', category: 'Restaurant', lat: 59.9150, lng: 10.7500 }
+        - { name: 'Delarosa Downtown', category: 'Restaurant', lat: 59.9140, lng: 10.7530 }
+        - { name: '606', category: 'Restaurant', lat: 59.9200, lng: 10.7400 }
+    assert:
+      - type: javascript
+        value: '!/\bdiğer\b/i.test(output.answer)'
+
+  - description: '"more" bir yer adı gibi ele alınmamalı (İngilizce)'
+    vars:
+      query: 'more'
+      locale: en
+      messages:
+        - { role: 'user', content: 'Suggest a good coffee shop' }
+        - { role: 'assistant', content: 'Fuglen Oslo is a great pick.' }
+      poiCandidates:
+        - { name: 'Fuglen Oslo', category: 'Cafe', lat: 59.9166, lng: 10.7350 }
+        - { name: 'Tim Wendelboe', category: 'Cafe', lat: 59.9280, lng: 10.7620 }
+    assert:
+      - type: javascript
+        value: '!/\bmore\b/i.test(output.answer.replace(/\bfind more\b|\bshow more\b/gi, ""))'
+
+  # ── DECISIVENESS: a single generic word is enough to recommend from,
+  # not a reason to ask a clarifying question first.
+  - description: 'tek kelimelik "yemek" isteğinde direkt öneri gelmeli, soru sorulmamalı'
+    vars:
+      query: 'yemek'
+      poiCandidates:
+        - { name: 'Delarosa Downtown', category: 'Restaurant', lat: 59.9140, lng: 10.7530 }
+        - { name: 'The Public Izakaya', category: 'Restaurant', lat: 59.9150, lng: 10.7500 }
+    assert:
+      - type: javascript
+        value: 'output.recommendations.length > 0'
+
+  - description: 'tek kelimelik "food" isteğinde direkt öneri gelmeli (İngilizce)'
+    vars:
+      query: 'food'
+      locale: en
+      poiCandidates:
+        - { name: 'Delarosa Downtown', category: 'Restaurant', lat: 59.9140, lng: 10.7530 }
+        - { name: '606', category: 'Restaurant', lat: 59.9200, lng: 10.7400 }
+    assert:
+      - type: javascript
+        value: 'output.recommendations.length > 0'
+
+  - description: 'tek kelimelik "coffee" isteğinde direkt öneri gelmeli'
+    vars:
+      query: 'coffee'
+      locale: en
+      poiCandidates:
+        - { name: 'Fuglen Oslo', category: 'Cafe', lat: 59.9166, lng: 10.7350 }
+        - { name: 'Tim Wendelboe', category: 'Cafe', lat: 59.9280, lng: 10.7620 }
+    assert:
+      - type: javascript
+        value: 'output.recommendations.length > 0'
+
+  # ── Chit-chat must not force a place recommendation.
+  - description: 'selamlaşmada öneri zorlanmamalı'
+    vars:
+      query: 'Merhaba!'
+      poiCandidates:
+        - { name: 'Delarosa Downtown', category: 'Restaurant', lat: 59.9140, lng: 10.7530 }
+        - { name: 'Fuglen Oslo', category: 'Cafe', lat: 59.9166, lng: 10.7350 }
+    assert:
+      - type: javascript
+        value: 'output.recommendations.length === 0'
+
+  - description: 'teşekkürde öneri zorlanmamalı'
+    vars:
+      query: 'Teşekkürler, çok yardımcı oldun'
+      poiCandidates:
+        - { name: 'Delarosa Downtown', category: 'Restaurant', lat: 59.9140, lng: 10.7530 }
+    assert:
+      - type: javascript
+        value: 'output.recommendations.length === 0'
+
+  # ── GROUNDING: never invent a venue not in the candidate list.
+  - description: 'aday listesinde olmayan bir yer uydurulmamalı'
+    vars:
+      query: 'En iyi İtalyan restoranı hangisi?'
+      poiCandidates:
+        - { name: 'Delarosa Downtown', category: 'Restaurant', lat: 59.9140, lng: 10.7530 }
+        - { name: 'The Public Izakaya', category: 'Restaurant', lat: 59.9150, lng: 10.7500 }
+    assert:
+      - type: javascript
+        value: |
+          const names = ['Delarosa Downtown', 'The Public Izakaya'];
+          return output.recommendations.every(r => names[r.index] !== undefined);
+
+  # ── Empty candidate pool: must fall back gracefully, never crash or
+  # hallucinate a specific unverifiable place.
+  - description: 'aday yokken çökmemeli ve yer uydurmamalı'
+    vars:
+      query: 'Yakınımda güzel bir kafe var mı?'
+      poiCandidates: []
+    assert:
+      - type: javascript
+        value: 'output.recommendations.length === 0'
+      - type: javascript
+        value: 'typeof output.answer === "string" && output.answer.length > 0'
+
+  # ── Norwegian locale sanity.
+  - description: 'Norveççe sorguda da öneri ve dil doğru olmalı'
+    vars:
+      query: 'Hvor kan jeg spise middag?'
+      locale: nb
+      poiCandidates:
+        - { name: 'Delarosa Downtown', category: 'Restaurant', lat: 59.9140, lng: 10.7530 }
+        - { name: 'The Public Izakaya', category: 'Restaurant', lat: 59.9150, lng: 10.7500 }
+    assert:
+      - type: javascript
+        value: 'output.recommendations.length > 0'
+
+  # ── Every returned recommendation must carry a valid confidence value
+  # (schema/plumbing regression check for Öneri 4).
+  - description: 'her önerinin confidence alanı strong veya weak olmalı'
+    vars:
+      query: 'gece hayatı için bir yer öner'
+      poiCandidates:
+        - { name: 'Bar Boca', category: 'Nightlife', lat: 59.9200, lng: 10.7450 }
+        - { name: 'Delarosa Downtown', category: 'Restaurant', lat: 59.9140, lng: 10.7530 }
+    assert:
+      - type: javascript
+        value: 'output.recommendations.every(r => r.confidence === "strong" || r.confidence === "weak")'
