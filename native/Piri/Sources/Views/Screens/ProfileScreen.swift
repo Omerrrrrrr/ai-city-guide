@@ -135,7 +135,7 @@ struct ProfileScreen: View {
         .padding(.top, 12)
         .padding(.bottom, 16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.navy)
+        .piriGlassSurface()
         .padding(.horizontal, -20)
         .padding(.top, -20)
     }

@@ -256,7 +256,7 @@ struct ScanScreen: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
-            .background(Theme.navy)
+            .piriGlassSurface()
         }
         .task {
             if let matchedPlaceId = result.matchedPlaceId {

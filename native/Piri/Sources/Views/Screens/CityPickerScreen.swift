@@ -93,7 +93,7 @@ struct CityPickerScreen: View {
         }
         .padding(.top, 12)
         .padding(.bottom, 14)
-        .background(Theme.navy)
+        .piriGlassSurface()
         .onChange(of: query) { _, newValue in
             scheduleSearch(newValue)
         }

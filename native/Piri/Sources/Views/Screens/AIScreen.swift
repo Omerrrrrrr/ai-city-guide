@@ -213,7 +213,7 @@ struct AIScreen: View {
         .padding(.horizontal, 20)
         .padding(.top, 12)
         .padding(.bottom, 16)
-        .background(Theme.navy)
+        .piriGlassSurface()
     }
 
     private var emptyState: some View {

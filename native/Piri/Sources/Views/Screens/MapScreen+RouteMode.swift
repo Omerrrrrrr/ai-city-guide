@@ -308,7 +308,7 @@ extension MapScreen {
             }
         }
         .padding(16)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+        .piriGlassCard(cornerRadius: 18)
     }
 
     @ViewBuilder

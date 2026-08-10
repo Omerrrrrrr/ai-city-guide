@@ -229,7 +229,7 @@ struct SavedScreen: View {
         .padding(.horizontal, 20)
         .padding(.top, 12)
         .padding(.bottom, 16)
-        .background(Theme.navy)
+        .piriGlassSurface()
     }
 
     private func segmentButton(_ value: SavedTab, label: String, count: Int) -> some View {

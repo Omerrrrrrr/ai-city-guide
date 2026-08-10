@@ -228,7 +228,7 @@ struct MapScreen: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .piriGlassCard(cornerRadius: 12)
     }
 
     private func searchAndCenterMap(_ query: String) async {
@@ -327,7 +327,7 @@ struct MapScreen: View {
             .buttonStyle(.bordered)
         }
         .padding()
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .piriGlassCard(cornerRadius: 16)
     }
 
     private func livePinCard(for pin: LivePin) -> some View {
@@ -340,7 +340,7 @@ struct MapScreen: View {
             .buttonStyle(.borderedProminent)
         }
         .padding()
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .piriGlassCard(cornerRadius: 16)
     }
 
     /// Card for ANY tapped map POI — Piri's own pins have a stable DB record
@@ -466,7 +466,7 @@ struct MapScreen: View {
             }
         }
         .padding()
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .piriGlassCard(cornerRadius: 16)
         .sheet(item: $addToCollectionKind) { kind in
             if let poi { AddToCollectionSheet(poi: poi, kind: kind) }
         }

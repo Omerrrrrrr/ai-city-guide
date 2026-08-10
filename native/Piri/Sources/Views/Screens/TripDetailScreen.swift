@@ -186,7 +186,7 @@ struct TripDetailScreen: View {
         .padding(.horizontal, 20)
         .padding(.top, 12)
         .padding(.bottom, 16)
-        .background(Theme.navy)
+        .piriGlassSurface()
     }
 
     private func tripDateLabel(_ trip: Trip) -> String {
