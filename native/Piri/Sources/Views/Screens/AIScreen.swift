@@ -20,11 +20,17 @@ private struct POIRecommendation: Identifiable {
 private enum ConversationTurn: Identifiable {
     case user(id: String, content: String, image: UIImage?)
     case assistant(id: String, content: String, recommendations: [POIRecommendation])
+    // Distinct from `.assistant` (not just an assistant turn with an error
+    // string as content) so it doesn't get sent back to the backend as fake
+    // prior assistant history, and so `turnView` can skip the "no matches"
+    // subtext that only makes sense for a real, empty AI answer.
+    case error(id: String, message: String)
 
     var id: String {
         switch self {
         case .user(let id, _, _): return id
         case .assistant(let id, _, _): return id
+        case .error(let id, _): return id
         }
     }
 }
@@ -42,7 +48,6 @@ struct AIScreen: View {
     @State private var locationManager = LocationManager()
     @State private var query: String
     @State private var loading = false
-    @State private var errorMessage: String?
     @State private var conversation: [ConversationTurn] = []
     @State private var attachedItem: PhotosPickerItem?
     @State private var attachedImage: UIImage?
@@ -95,10 +100,11 @@ struct AIScreen: View {
     }
 
     private var history: [AIConversationMessage] {
-        conversation.map { turn in
+        conversation.compactMap { turn in
             switch turn {
             case .user(_, let content, _): return AIConversationMessage(role: .user, content: content)
             case .assistant(_, let content, _): return AIConversationMessage(role: .assistant, content: content)
+            case .error: return nil
             }
         }
     }
@@ -109,14 +115,6 @@ struct AIScreen: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
-                        if let errorMessage {
-                            Text(errorMessage)
-                                .foregroundStyle(Theme.closedRed)
-                                .padding(16)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(RoundedRectangle(cornerRadius: 12).fill(Theme.closedRed.opacity(0.08)))
-                        }
-
                         if conversation.isEmpty {
                             emptyState
                         } else {
@@ -207,7 +205,6 @@ struct AIScreen: View {
             if !conversation.isEmpty {
                 Button("common.clear") {
                     conversation = []
-                    errorMessage = nil
                 }
                 .foregroundStyle(.white.opacity(0.55))
             }
@@ -284,6 +281,15 @@ struct AIScreen: View {
                     }
                 }
             }
+
+        case .error(_, let message):
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.closedRed)
+                Text(message).foregroundStyle(Theme.closedRed)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 18).fill(Theme.closedRed.opacity(0.08)))
         }
     }
 
@@ -442,7 +448,6 @@ struct AIScreen: View {
 
         let imageForRequest = overrideQuery == nil ? attachedImage : nil
         loading = true
-        errorMessage = nil
         query = ""
         attachedImage = nil
         attachedItem = nil
@@ -519,7 +524,7 @@ struct AIScreen: View {
             conversation.append(.assistant(id: "\(Date().timeIntervalSince1970)-assistant", content: response.answer, recommendations: resolved))
         } catch {
             query = nextQuery
-            errorMessage = error.localizedDescription
+            conversation.append(.error(id: "\(Date().timeIntervalSince1970)-error", message: error.localizedDescription))
         }
         loading = false
     }
