@@ -129,9 +129,14 @@ extension MapScreen {
     }
 
     /// Entry point for "Haritada Rota Oluştur" (SavedScreen's Plan tab) —
-    /// hands off a set of stops from another tab and immediately fetches a
-    /// real route through them, instead of requiring the user to re-tap
-    /// each place on the map one by one.
+    /// hands off a set of stops from another tab and shows the calculated
+    /// route as a preview, instead of requiring the user to re-tap each
+    /// place on the map one by one. Previously called `startRoute()`
+    /// directly, which immediately committed to a live, breadcrumb-
+    /// recording trip the instant a plan's route was opened — now it only
+    /// previews the path; the existing "Rotayı Başlat" button in
+    /// `routeModeSheet` (already shown whenever there's no active trip and
+    /// 2+ stops) is what actually starts it.
     func startPendingRoute(_ stops: [SavedPOIReference]) async {
         guard tripsStore.activeTripId == nil else {
             // Already mid-trip — don't silently overwrite it. Same
@@ -142,7 +147,26 @@ extension MapScreen {
         }
         plannedStops = stops
         routeMode = true
-        await startRoute()
+        await previewRoute()
+    }
+
+    /// Fetches and displays the route line for the current `plannedStops`
+    /// without starting a live trip — `startRoute()` is the separate,
+    /// explicit "commit" step (creates the `Trip`, starts breadcrumb
+    /// recording) triggered by the user actually tapping "Rotayı Başlat".
+    func previewRoute() async {
+        guard plannedStops.count >= 2 else { return }
+        isFetchingRoute = true
+        routeError = nil
+        defer { isFetchingRoute = false }
+        do {
+            let result = try await RoutesAPI.directions(coordinates: stopCoordinates())
+            routeGeometry = result.route
+            routeDistanceMeters = result.distanceMeters
+            routeDurationSeconds = result.durationSeconds
+        } catch {
+            routeError = String(localized: "map.route.failed")
+        }
     }
 
     func startRoute() async {

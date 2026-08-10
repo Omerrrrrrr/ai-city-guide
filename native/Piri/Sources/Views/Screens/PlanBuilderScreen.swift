@@ -19,29 +19,32 @@ struct PlanBuilderScreen: View {
     @State private var selectedThemes: Set<PlanTheme> = []
     @State private var pace: Pace = .balanced
     @State private var allCandidates: [POIPlace] = []
-    @State private var removedIdentifiers: Set<String> = []
-    @State private var visibleCount = 6
+    @State private var addedIdentifiers: Set<String> = []
+    /// Grows each time the list scrolls near its end and re-searches at a
+    /// wider radius — an actual new search for more real places, not just
+    /// revealing more of an already-fetched fixed batch.
+    @State private var searchRadius: CLLocationDistance = PlanBuilderScreen.baseSearchRadius
     @State private var isSearching = false
+    @State private var isLoadingMore = false
     @State private var searchTask: Task<Void, Never>?
     @State private var landmark: POIPlace?
     @State private var landmarkIncluded = false
     @State private var landmarkDismissed = false
     @State private var selectedPOI: POIPlace?
 
+    private static let baseSearchRadius: CLLocationDistance = 6000
+    private static let maxSearchRadius: CLLocationDistance = 20000
+
     private var themeOptions: [ProfileOption<PlanTheme>] {
         PlanThemes.all.map { ProfileOption(value: $0, labelKey: $0.labelKey, icon: $0.icon) }
     }
 
-    private var draftPlaces: [POIPlace] {
-        Array(allCandidates.filter { !removedIdentifiers.contains($0.asReference.identifier) }.prefix(visibleCount))
-    }
-
-    private var hasMoreToShow: Bool {
-        allCandidates.filter { !removedIdentifiers.contains($0.asReference.identifier) }.count > visibleCount
+    private var addedPlaces: [POIPlace] {
+        allCandidates.filter { addedIdentifiers.contains($0.asReference.identifier) }
     }
 
     private var totalDraftCount: Int {
-        draftPlaces.count + (landmarkIncluded ? 1 : 0)
+        addedPlaces.count + (landmarkIncluded ? 1 : 0)
     }
 
     var body: some View {
@@ -70,9 +73,6 @@ struct PlanBuilderScreen: View {
         .sheet(item: $selectedPOI) { poi in POIExplainSheet(poi: poi) }
         .task { await loadLandmark() }
         .onChange(of: selectedThemes) { _, _ in scheduleSearch() }
-        .onChange(of: pace) { _, newValue in
-            visibleCount = baselineCount(for: newValue)
-        }
     }
 
     private var header: some View {
@@ -174,7 +174,15 @@ struct PlanBuilderScreen: View {
     @ViewBuilder
     private var draftSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("planBuilder.draftLabel").font(.system(size: 12, weight: .bold)).foregroundStyle(.secondary).tracking(0.6)
+            HStack {
+                Text("planBuilder.draftLabel").font(.system(size: 12, weight: .bold)).foregroundStyle(.secondary).tracking(0.6)
+                Spacer()
+                if !addedPlaces.isEmpty {
+                    Text(LPlural("planBuilder.addedCount", count: addedPlaces.count))
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Theme.gold)
+                }
+            }
 
             if selectedThemes.isEmpty {
                 Text("planBuilder.draftEmpty").font(.system(size: 14)).foregroundStyle(.secondary)
@@ -183,31 +191,33 @@ struct PlanBuilderScreen: View {
                     SkeletonBox().frame(height: 60)
                     SkeletonBox().frame(height: 60)
                 }
-            } else if draftPlaces.isEmpty {
+            } else if allCandidates.isEmpty {
                 Text("planBuilder.draftNoResults").font(.system(size: 14)).foregroundStyle(.secondary)
             } else {
-                ForEach(draftPlaces) { poi in
-                    draftRow(poi)
+                ForEach(allCandidates) { poi in
+                    candidateRow(poi)
+                        // Reaching the last row (well before the max search
+                        // radius is hit) triggers a real new search at a
+                        // wider radius — an infinite-scroll feed the system
+                        // keeps extending, not a button that just reveals
+                        // more of a fixed batch.
+                        .onAppear { loadMoreIfNeeded(after: poi) }
                 }
-                if hasMoreToShow {
-                    Button {
-                        Haptics.light()
-                        visibleCount += baselineCount(for: pace)
-                    } label: {
-                        Label("planBuilder.showMore", systemImage: "arrow.down.circle")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Theme.gold)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
+                if isLoadingMore {
+                    HStack {
+                        Spacer()
+                        ProgressView().tint(Theme.gold)
+                        Spacer()
                     }
-                    .buttonStyle(.plain)
+                    .padding(.vertical, 8)
                 }
             }
         }
     }
 
-    private func draftRow(_ poi: POIPlace) -> some View {
-        HStack(spacing: 12) {
+    private func candidateRow(_ poi: POIPlace) -> some View {
+        let added = addedIdentifiers.contains(poi.asReference.identifier)
+        return HStack(spacing: 12) {
             Button {
                 selectedPOI = poi
             } label: {
@@ -231,14 +241,21 @@ struct PlanBuilderScreen: View {
 
             Button {
                 Haptics.light()
-                removedIdentifiers.insert(poi.asReference.identifier)
+                if added {
+                    addedIdentifiers.remove(poi.asReference.identifier)
+                } else {
+                    addedIdentifiers.insert(poi.asReference.identifier)
+                }
             } label: {
-                Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                Image(systemName: added ? "checkmark.circle.fill" : "plus.circle")
+                    .font(.system(size: 22))
+                    .foregroundStyle(added ? Theme.gold : .secondary)
             }
             .buttonStyle(.borderless)
         }
         .padding(12)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemBackground)))
+        .background(RoundedRectangle(cornerRadius: 12).fill(added ? Theme.gold.opacity(0.08) : Color(.secondarySystemBackground)))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(added ? Theme.gold.opacity(0.35) : .clear, lineWidth: 1.5))
     }
 
     private var createButton: some View {
@@ -261,16 +278,9 @@ struct PlanBuilderScreen: View {
         .background(.regularMaterial)
     }
 
-    private func baselineCount(for pace: Pace) -> Int {
-        switch pace {
-        case .relaxed: return 4
-        case .balanced: return 6
-        case .packed: return 8
-        }
-    }
-
     private func scheduleSearch() {
         searchTask?.cancel()
+        searchRadius = Self.baseSearchRadius
         guard let lat = cityStore.lat, let lng = cityStore.lng, !selectedThemes.isEmpty else {
             allCandidates = []
             return
@@ -281,13 +291,40 @@ struct PlanBuilderScreen: View {
         searchTask = Task {
             // Wider than the default 4km — this is meant to sweep a whole
             // city for a themed plan, not just "what's nearby right now".
-            let results = await POISearchService.search(near: coordinate, categories: categories, radiusMeters: 6000)
+            let results = await POISearchService.search(near: coordinate, categories: categories, radiusMeters: searchRadius)
             guard !Task.isCancelled else { return }
             allCandidates = results.sorted {
                 geoDistanceKm($0.coordinate.latitude, $0.coordinate.longitude, coordinate.latitude, coordinate.longitude)
                     < geoDistanceKm($1.coordinate.latitude, $1.coordinate.longitude, coordinate.latitude, coordinate.longitude)
             }
             isSearching = false
+        }
+    }
+
+    /// Triggered by the last visible row's `.onAppear` — re-searches at a
+    /// wider radius and merges in only the genuinely new places, so
+    /// scrolling to the bottom keeps extending the list with real results
+    /// instead of just paginating through what was already fetched.
+    private func loadMoreIfNeeded(after poi: POIPlace) {
+        guard poi.id == allCandidates.last?.id else { return }
+        guard !isSearching, !isLoadingMore, searchRadius < Self.maxSearchRadius else { return }
+        guard let lat = cityStore.lat, let lng = cityStore.lng, !selectedThemes.isEmpty else { return }
+
+        let coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+        let categories = selectedThemes.reduce(into: Set<MKPointOfInterestCategory>()) { $0.formUnion($1.categories) }
+        searchRadius = min(searchRadius * 1.7, Self.maxSearchRadius)
+        isLoadingMore = true
+
+        Task {
+            defer { isLoadingMore = false }
+            let results = await POISearchService.search(near: coordinate, categories: categories, radiusMeters: searchRadius)
+            let existingIdentifiers = Set(allCandidates.map { $0.asReference.identifier })
+            let newOnes = results.filter { !existingIdentifiers.contains($0.asReference.identifier) }
+            guard !newOnes.isEmpty else { return }
+            allCandidates = (allCandidates + newOnes).sorted {
+                geoDistanceKm($0.coordinate.latitude, $0.coordinate.longitude, coordinate.latitude, coordinate.longitude)
+                    < geoDistanceKm($1.coordinate.latitude, $1.coordinate.longitude, coordinate.latitude, coordinate.longitude)
+            }
         }
     }
 
@@ -309,7 +346,7 @@ struct PlanBuilderScreen: View {
         Haptics.medium()
         let name = cityStore.cityName.map { L("ai.savedPlan.name", $0) } ?? String(localized: "ai.savedPlan.nameFallback")
         let collectionId = savedPlacesStore.createCollection(name: name, kind: .plan)
-        for poi in draftPlaces {
+        for poi in addedPlaces {
             savedPlacesStore.toggle(poi, inCollection: collectionId)
         }
         if landmarkIncluded, let landmark {

@@ -109,7 +109,12 @@ struct MapScreen: View {
                     PiriMapView(
                         places: filteredPlaces,
                         livePins: Self.useCuratedMapData ? livePins : [],
-                        routeCoordinates: routeCoordinates,
+                        // In route mode, a fetched-but-not-yet-started route
+                        // (`previewRoute()`) draws here as a preview line —
+                        // this is still the plain picking map, not
+                        // `TripMapView`, since no trip exists until "Rotayı
+                        // Başlat" is actually tapped.
+                        routeCoordinates: routeMode ? (routeGeometry ?? []).compactMap(coordinate(fromPair:)) : routeCoordinates,
                         showsUserLocation: true,
                         onRegionChange: handleRegionChange,
                         onSelectPlace: { selectPlace($0) },

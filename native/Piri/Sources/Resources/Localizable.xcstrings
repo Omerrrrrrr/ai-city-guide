@@ -7978,6 +7978,52 @@
         }
       }
     },
+    "planBuilder.addedCount.one": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld added"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld lagt til"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld eklendi"
+          }
+        }
+      }
+    },
+    "planBuilder.addedCount.other": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld added"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld lagt til"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld eklendi"
+          }
+        }
+      }
+    },
     "planBuilder.createButton.one": {
       "extractionState": "manual",
       "localizations": {
@@ -8030,19 +8076,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pick a theme above and places will start showing up here."
+            "value": "Pick a theme above and places will start showing up here to add."
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Velg et tema over, så begynner steder å dukke opp her."
+            "value": "Velg et tema over, så begynner steder å dukke opp her for å legges til."
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Yukarıdan bir tema seç, sana uygun yerler burada belirmeye başlasın."
+            "value": "Yukarıdan bir tema seç, eklemek için yerler burada belirmeye başlasın."
           }
         }
       }
@@ -8053,19 +8099,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "YOUR DRAFT PLAN"
+            "value": "SUGGESTED PLACES"
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "DITT UTKAST TIL PLAN"
+            "value": "FORESLÅTTE STEDER"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "TASLAK PLANIN"
+            "value": "ÖNERİLEN YERLER"
           }
         }
       }
@@ -8250,29 +8296,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "NASIL BİR TEMPO"
-          }
-        }
-      }
-    },
-    "planBuilder.showMore": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Show more places"
-          }
-        },
-        "nb": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Vis flere steder"
-          }
-        },
-        "tr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Daha fazla yer göster"
           }
         }
       }
