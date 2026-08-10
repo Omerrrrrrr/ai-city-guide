@@ -164,7 +164,7 @@ struct TripDetailScreen: View {
                 } label: {
                     HStack(spacing: 6) {
                         Text(tripTitle(trip)).font(.system(size: 17, weight: .bold)).foregroundStyle(.white).lineLimit(1)
-                        Text("✎").font(.system(size: 12)).foregroundStyle(.white.opacity(0.5))
+                        Image(systemName: "pencil").font(.system(size: 12)).foregroundStyle(.white.opacity(0.5))
                     }
                 }
             }

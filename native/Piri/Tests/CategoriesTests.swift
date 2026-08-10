@@ -3,13 +3,13 @@ import XCTest
 
 /// Port of `mobile/src/utils/__tests__/categories.test.ts`.
 final class CategoriesTests: XCTestCase {
-    func testEmojiForKnownCategory() {
-        XCTAssertEqual(Categories.emoji(for: "museum"), "🏛️")
-        XCTAssertEqual(Categories.emoji(for: "nature"), "🌿")
+    func testIconForKnownCategory() {
+        XCTAssertEqual(Categories.icon(for: "museum"), "building.columns.fill")
+        XCTAssertEqual(Categories.icon(for: "nature"), "leaf.fill")
     }
 
-    func testEmojiFallsBackToPinForUnknownCategory() {
-        XCTAssertEqual(Categories.emoji(for: "not-a-real-category"), "📍")
+    func testIconFallsBackToPinForUnknownCategory() {
+        XCTAssertEqual(Categories.icon(for: "not-a-real-category"), "mappin.circle.fill")
     }
 
     func testLabelResolvesKnownCategoryThroughCatalog() {

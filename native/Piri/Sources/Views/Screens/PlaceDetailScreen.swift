@@ -161,7 +161,7 @@ struct PlaceDetailScreen: View {
                     .padding(.horizontal, 10).padding(.vertical, 3)
                     .background(Capsule().fill((open ? Color.green : Color.red).opacity(0.25)))
                 Text(place.name).font(.system(size: 28, weight: .heavy)).foregroundStyle(.white)
-                Text("\(Categories.emoji(for: place.category)) \(Categories.label(for: place.category))" + (place.verifiedFacts.address.map { " · \($0)" } ?? ""))
+                (Text(Image(systemName: Categories.icon(for: place.category))) + Text(" \(Categories.label(for: place.category))" + (place.verifiedFacts.address.map { " · \($0)" } ?? "")))
                     .font(.system(size: 14)).foregroundStyle(.white.opacity(0.75))
             }
             .padding(20)

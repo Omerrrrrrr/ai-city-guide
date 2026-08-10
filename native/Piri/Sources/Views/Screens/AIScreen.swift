@@ -187,8 +187,11 @@ struct AIScreen: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("ai.title").font(.system(size: 26, weight: .heavy)).tracking(1).foregroundStyle(Theme.gold)
                 if let weather = weatherQuery.weather {
-                    Text(L("ai.headerSub.withWeather", weather.condition.emoji, String(Int(weather.temp)), cityStore.cityName ?? String(localized: "common.everywhere")))
-                        .font(.system(size: 14)).foregroundStyle(.white.opacity(0.65))
+                    HStack(spacing: 4) {
+                        Image(systemName: weather.condition.icon)
+                        Text(L("ai.headerSub.withWeather", String(Int(weather.temp)), cityStore.cityName ?? String(localized: "common.everywhere")))
+                    }
+                    .font(.system(size: 14)).foregroundStyle(.white.opacity(0.65))
                 } else {
                     Text(cityStore.cityName ?? String(localized: "ai.headerSub.fallback"))
                         .font(.system(size: 14)).foregroundStyle(.white.opacity(0.65))
@@ -300,7 +303,7 @@ struct AIScreen: View {
                 }
             }
             HStack(alignment: .top, spacing: 8) {
-                Text("✨")
+                Image(systemName: "sparkles").foregroundStyle(Color(red: 0.61, green: 0.48, blue: 0.1))
                 Text(recommendation.aiReason).font(.system(size: 14, weight: .medium)).foregroundStyle(Color(red: 0.61, green: 0.48, blue: 0.1))
             }
             .padding(12)

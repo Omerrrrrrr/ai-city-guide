@@ -2,19 +2,19 @@ import Foundation
 
 /// Port of `mobile/src/utils/categories.ts`.
 enum Categories {
-    static let emoji: [String: String] = [
-        "museum": "🏛️",
-        "landmark": "🗿",
-        "cultural-spot": "🎭",
-        "beach": "🏖️",
-        "walking-area": "🚶",
-        "cafe": "☕",
-        "restaurant": "🍽️",
-        "viewpoint": "🌅",
-        "nature": "🌿",
-        "shopping-area": "🛍️",
-        "lodging": "🏨",
-        "square-street": "🏙️",
+    static let icon: [String: String] = [
+        "museum": "building.columns.fill",
+        "landmark": "mappin.and.ellipse",
+        "cultural-spot": "theatermasks.fill",
+        "beach": "beach.umbrella.fill",
+        "walking-area": "figure.walk",
+        "cafe": "cup.and.saucer.fill",
+        "restaurant": "fork.knife",
+        "viewpoint": "sun.horizon.fill",
+        "nature": "leaf.fill",
+        "shopping-area": "bag.fill",
+        "lodging": "bed.double.fill",
+        "square-street": "building.2.fill",
     ]
 
     private static let labelKeys: [String: String] = [
@@ -32,8 +32,8 @@ enum Categories {
         "nature": "categories.nature",
     ]
 
-    static func emoji(for category: String) -> String {
-        emoji[category] ?? "📍"
+    static func icon(for category: String) -> String {
+        icon[category] ?? "mappin.circle.fill"
     }
 
     static func label(for category: String) -> String {
@@ -47,22 +47,22 @@ enum Categories {
 /// Port of `mobile/src/constants/category-filters.ts`.
 struct CategoryFilter {
     let id: String
-    let emoji: String?
+    let icon: String?
     let labelKey: String
 }
 
 enum CategoryFilters {
     static let all: [CategoryFilter] = [
-        CategoryFilter(id: "all", emoji: nil, labelKey: "categoryFilters.all"),
-        CategoryFilter(id: "museum", emoji: "🏛️", labelKey: "categoryFilters.museums"),
-        CategoryFilter(id: "landmark", emoji: "🗿", labelKey: "categoryFilters.landmarks"),
-        CategoryFilter(id: "cultural-spot", emoji: "🎭", labelKey: "categoryFilters.culture"),
-        CategoryFilter(id: "walking-area", emoji: "🚶", labelKey: "categoryFilters.walks"),
-        CategoryFilter(id: "beach", emoji: "🏖️", labelKey: "categoryFilters.beaches"),
-        CategoryFilter(id: "cafe", emoji: "☕", labelKey: "categoryFilters.cafes"),
-        CategoryFilter(id: "restaurant", emoji: "🍽️", labelKey: "categoryFilters.food"),
-        CategoryFilter(id: "viewpoint", emoji: "🌅", labelKey: "categoryFilters.views"),
-        CategoryFilter(id: "nature", emoji: "🌿", labelKey: "categoryFilters.nature"),
-        CategoryFilter(id: "shopping-area", emoji: "🛍️", labelKey: "categoryFilters.shopping"),
+        CategoryFilter(id: "all", icon: nil, labelKey: "categoryFilters.all"),
+        CategoryFilter(id: "museum", icon: "building.columns.fill", labelKey: "categoryFilters.museums"),
+        CategoryFilter(id: "landmark", icon: "mappin.and.ellipse", labelKey: "categoryFilters.landmarks"),
+        CategoryFilter(id: "cultural-spot", icon: "theatermasks.fill", labelKey: "categoryFilters.culture"),
+        CategoryFilter(id: "walking-area", icon: "figure.walk", labelKey: "categoryFilters.walks"),
+        CategoryFilter(id: "beach", icon: "beach.umbrella.fill", labelKey: "categoryFilters.beaches"),
+        CategoryFilter(id: "cafe", icon: "cup.and.saucer.fill", labelKey: "categoryFilters.cafes"),
+        CategoryFilter(id: "restaurant", icon: "fork.knife", labelKey: "categoryFilters.food"),
+        CategoryFilter(id: "viewpoint", icon: "sun.horizon.fill", labelKey: "categoryFilters.views"),
+        CategoryFilter(id: "nature", icon: "leaf.fill", labelKey: "categoryFilters.nature"),
+        CategoryFilter(id: "shopping-area", icon: "bag.fill", labelKey: "categoryFilters.shopping"),
     ]
 }

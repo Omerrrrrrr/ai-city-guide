@@ -31,7 +31,7 @@ struct PlaceRowView: View {
                 .frame(width: 60, height: 60)
             VStack(alignment: .leading, spacing: 4) {
                 Text(place.name).font(.system(size: 15, weight: .semibold)).lineLimit(1)
-                Text("\(Categories.emoji(for: place.category)) \(Categories.label(for: place.category))\(place.tags.first.map { " · \($0)" } ?? "")")
+                (Text(Image(systemName: Categories.icon(for: place.category))) + Text(" \(Categories.label(for: place.category))\(place.tags.first.map { " · \($0)" } ?? "")"))
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -54,7 +54,7 @@ struct FeaturedCardView: View {
                 .frame(width: 180, height: 130)
             StatusBadge(place: place)
             Text(place.name).font(.system(size: 15, weight: .bold)).lineLimit(2)
-            Text("\(Categories.emoji(for: place.category)) \(Categories.label(for: place.category))")
+            (Text(Image(systemName: Categories.icon(for: place.category))) + Text(" \(Categories.label(for: place.category))"))
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)

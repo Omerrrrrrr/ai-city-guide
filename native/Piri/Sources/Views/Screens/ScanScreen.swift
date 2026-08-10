@@ -160,7 +160,7 @@ struct ScanScreen: View {
             }
             Rectangle().fill(Theme.navy.opacity(0.82)).ignoresSafeArea()
             VStack(spacing: 20) {
-                Text("⚠️").font(.system(size: 40))
+                Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 40)).foregroundStyle(.white.opacity(0.9))
                 Text(message).foregroundStyle(.white.opacity(0.9)).multilineTextAlignment(.center)
                 Button {
                     reset()

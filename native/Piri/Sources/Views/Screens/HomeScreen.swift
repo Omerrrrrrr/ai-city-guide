@@ -145,15 +145,18 @@ struct HomeScreen: View {
                     Button {
                         showingCityPicker = true
                     } label: {
-                        Text((cityStore.cityName.map { L("home.cityPill", $0) } ?? String(localized: "common.everywhere")) + " ›")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.55))
+                        HStack(spacing: 3) {
+                            Image(systemName: cityStore.cityName != nil ? "mappin" : "globe")
+                            Text((cityStore.cityName.map { L("home.cityPill", $0) } ?? String(localized: "common.everywhere")) + " ›")
+                        }
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.55))
                     }
                 }
                 Spacer()
                 if let weather = weatherQuery.weather {
                     HStack(spacing: 4) {
-                        Text(weather.condition.emoji)
+                        Image(systemName: weather.condition.icon).foregroundStyle(.white.opacity(0.9))
                         Text("\(Int(weather.temp))°").font(.system(size: 15, weight: .bold)).foregroundStyle(.white.opacity(0.9))
                         Text(weather.city).font(.system(size: 13)).foregroundStyle(.white.opacity(0.55))
                     }
@@ -300,7 +303,7 @@ struct HomeScreen: View {
             tabSelection.selection = 3
         } label: {
             HStack(alignment: .top, spacing: 12) {
-                Text(weather.condition.emoji).font(.system(size: 28))
+                Image(systemName: weather.condition.icon).font(.system(size: 28)).foregroundStyle(Theme.gold)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(weatherBannerMessage(weather)).font(.system(size: 14, weight: .medium)).foregroundStyle(.white)
                     Text("home.weatherBanner.cta").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.gold)

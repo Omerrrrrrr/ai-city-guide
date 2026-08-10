@@ -31,7 +31,7 @@ struct PlaceImageView: View {
     private var placeholder: some View {
         ZStack {
             Color(.secondarySystemBackground)
-            Text(Categories.emoji(for: place.category))
+            Image(systemName: Categories.icon(for: place.category))
                 .font(.system(size: 28))
         }
     }

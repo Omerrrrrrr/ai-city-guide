@@ -16,7 +16,7 @@ struct ChipGrid<Value: Hashable>: View {
                     onSelect(option.value)
                 } label: {
                     HStack(spacing: 5) {
-                        if let emoji = option.emoji { Text(emoji) }
+                        if let icon = option.icon { Image(systemName: icon) }
                         Text(String(localized: String.LocalizationValue(option.labelKey)))
                     }
                     .font(.system(size: 14, weight: .medium))

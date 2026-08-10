@@ -1,10 +1,14 @@
 import SwiftUI
 
-private let languageOptions: [(code: String?, emoji: String, labelKey: String)] = [
-    (nil, "🌐", "settings.language.system"),
-    ("en", "🇬🇧", "settings.language.en"),
-    ("tr", "🇹🇷", "settings.language.tr"),
-    ("nb", "🇳🇴", "settings.language.nb"),
+// Not country flags — Apple's HIG explicitly discourages flags for language
+// pickers (a flag represents a country, not a language, and several
+// languages have no single flag that fits), so every row uses the same
+// "globe" icon and lets the label text tell them apart.
+private let languageOptions: [(code: String?, icon: String, labelKey: String)] = [
+    (nil, "globe", "settings.language.system"),
+    ("en", "globe", "settings.language.en"),
+    ("tr", "globe", "settings.language.tr"),
+    ("nb", "globe", "settings.language.nb"),
 ]
 
 /// Groups the same way `OnboardingScreen`'s wizard steps already do:
@@ -110,7 +114,7 @@ struct ProfileScreen: View {
                     } label: {
                         HStack(spacing: 4) {
                             Text(displayName).font(.system(size: 20, weight: .bold)).foregroundStyle(.white)
-                            Text("✎").font(.system(size: 16)).foregroundStyle(.white.opacity(0.35))
+                            Image(systemName: "pencil").font(.system(size: 16)).foregroundStyle(.white.opacity(0.35))
                         }
                     }
                 }
@@ -242,7 +246,7 @@ struct ProfileScreen: View {
                         showingRestartHint = true
                     } label: {
                         HStack(spacing: 5) {
-                            Text(option.emoji)
+                            Image(systemName: option.icon)
                             Text(String(localized: String.LocalizationValue(option.labelKey)))
                         }
                         .font(.system(size: 14, weight: .medium))
@@ -272,6 +276,8 @@ struct ProfileScreen: View {
                 showingCityPicker = true
             } label: {
                 HStack {
+                    Image(systemName: cityStore.cityName != nil ? "mappin" : "globe")
+                        .foregroundStyle(.primary)
                     Text(cityStore.cityName.map { L("home.cityPill", $0) } ?? String(localized: "common.everywhere"))
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(.primary)

@@ -21,14 +21,14 @@ struct Weather: Codable, Hashable {
 }
 
 extension WeatherCondition {
-    var emoji: String {
+    var icon: String {
         switch self {
-        case .sunny: return "☀️"
-        case .cloudy: return "⛅"
-        case .rainy: return "🌧️"
-        case .snowy: return "❄️"
-        case .stormy: return "⛈️"
-        case .foggy: return "🌫️"
+        case .sunny: return "sun.max.fill"
+        case .cloudy: return "cloud.sun.fill"
+        case .rainy: return "cloud.rain.fill"
+        case .snowy: return "cloud.snow.fill"
+        case .stormy: return "cloud.bolt.rain.fill"
+        case .foggy: return "cloud.fog.fill"
         }
     }
 
