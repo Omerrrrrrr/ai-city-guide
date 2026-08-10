@@ -92,6 +92,7 @@
 		E27160D6486A583B1B94CFD5 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8058473616284E6CA48CAEFB /* APIClient.swift */; };
 		E39D60A5812D0B843C6BCF04 /* MapScreen+RouteMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C03701EFE9483DB178D3A66 /* MapScreen+RouteMode.swift */; };
 		E460983310B7C6A7B087B2F8 /* AdminAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EA57B06A6E01213B556B858 /* AdminAPI.swift */; };
+		E640521527F5AC8FD9D572B9 /* PlanBuilderUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86DB5417C3A05EBAEE7EB68E /* PlanBuilderUITests.swift */; };
 		EEA660AEBC9717682E73353A /* TripMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAC41208BF2D68EC120AB9AC /* TripMapView.swift */; };
 		F0F144BF16851A2F462FDD25 /* POISearchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86C75B0218F5B71CC3B5E384 /* POISearchService.swift */; };
 		F182CDE70C48E7D2EFF150DF /* UserDefaultsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A815DA9290E4BCF581F66E2 /* UserDefaultsStore.swift */; };
@@ -102,6 +103,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		43CB4F170C94449556308D0D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B5E05CAE1866D8C5210DF9A4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1DEB4A178B5A4276F51E08A0;
+			remoteInfo = Piri;
+		};
 		CBC969CD7F7621AEDACA9CD6 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = B5E05CAE1866D8C5210DF9A4 /* Project object */;
@@ -114,6 +122,7 @@
 /* Begin PBXFileReference section */
 		0235E9B64832A4922FD3451D /* CachedAsyncImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedAsyncImage.swift; sourceTree = "<group>"; };
 		02E923D5ACCD81DBBA0233C5 /* PlaceDirections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceDirections.swift; sourceTree = "<group>"; };
+		03735B6E0A5406A42F0505F3 /* PiriUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = PiriUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		0484B04B4522F9407DDAAFC0 /* ScanScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanScreen.swift; sourceTree = "<group>"; };
 		05C12B028A3AA7D0966851D5 /* AIResponses.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIResponses.swift; sourceTree = "<group>"; };
 		05E08798A1304146E73129B0 /* Directions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Directions.swift; sourceTree = "<group>"; };
@@ -159,6 +168,7 @@
 		8058473616284E6CA48CAEFB /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		82D25734E2D392D33ACFF247 /* CollectionDetailScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionDetailScreen.swift; sourceTree = "<group>"; };
 		86C75B0218F5B71CC3B5E384 /* POISearchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POISearchService.swift; sourceTree = "<group>"; };
+		86DB5417C3A05EBAEE7EB68E /* PlanBuilderUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanBuilderUITests.swift; sourceTree = "<group>"; };
 		87F73CC75224053CA8BFDFEB /* TabSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabSelection.swift; sourceTree = "<group>"; };
 		8DDB1F8B09EEB0E1E5A7C23D /* City.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = City.swift; sourceTree = "<group>"; };
 		8F1514436FA3675EF8BA0636 /* CityStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CityStore.swift; sourceTree = "<group>"; };
@@ -343,6 +353,7 @@
 			children = (
 				6FB8FF2D89FF40831A8FF725 /* Sources */,
 				EC1D8DAA647FA0412F45B9E4 /* Tests */,
+				F1FC6B1CAFF4670AC72A4766 /* UITests */,
 				940A6CAD076E6DEFE43DC9C8 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -374,6 +385,7 @@
 			children = (
 				393739D613FFAA494380B5A7 /* Piri.app */,
 				E77D183D7629F4D1786105CE /* PiriTests.xctest */,
+				03735B6E0A5406A42F0505F3 /* PiriUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -430,6 +442,14 @@
 			path = Resources;
 			sourceTree = "<group>";
 		};
+		F1FC6B1CAFF4670AC72A4766 /* UITests */ = {
+			isa = PBXGroup;
+			children = (
+				86DB5417C3A05EBAEE7EB68E /* PlanBuilderUITests.swift */,
+			);
+			path = UITests;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -471,6 +491,24 @@
 			productReference = E77D183D7629F4D1786105CE /* PiriTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		EC076B6C16E8E6363B16EC16 /* PiriUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 96FF4CB001D61E1FA71B59B8 /* Build configuration list for PBXNativeTarget "PiriUITests" */;
+			buildPhases = (
+				A25B838A17DCF9097E2E1B38 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				F1D5615028F2D66935205D5C /* PBXTargetDependency */,
+			);
+			name = PiriUITests;
+			packageProductDependencies = (
+			);
+			productName = PiriUITests;
+			productReference = 03735B6E0A5406A42F0505F3 /* PiriUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -485,6 +523,10 @@
 					};
 					5330D50F31234749D554CDBD = {
 						ProvisioningStyle = Automatic;
+					};
+					EC076B6C16E8E6363B16EC16 = {
+						ProvisioningStyle = Automatic;
+						TestTargetID = 1DEB4A178B5A4276F51E08A0;
 					};
 				};
 			};
@@ -509,6 +551,7 @@
 			targets = (
 				1DEB4A178B5A4276F51E08A0 /* Piri */,
 				5330D50F31234749D554CDBD /* PiriTests */,
+				EC076B6C16E8E6363B16EC16 /* PiriUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -535,6 +578,14 @@
 				46BF181ED5C32670F9475103 /* PlaceHoursTests.swift in Sources */,
 				14516CB2A06F8B88397BCB10 /* PluralsTests.swift in Sources */,
 				523FD7D67E6F2B9EAC7AE7BE /* TripsStoreTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A25B838A17DCF9097E2E1B38 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E640521527F5AC8FD9D572B9 /* PlanBuilderUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -637,6 +688,11 @@
 			target = 1DEB4A178B5A4276F51E08A0 /* Piri */;
 			targetProxy = CBC969CD7F7621AEDACA9CD6 /* PBXContainerItemProxy */;
 		};
+		F1D5615028F2D66935205D5C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1DEB4A178B5A4276F51E08A0 /* Piri */;
+			targetProxy = 43CB4F170C94449556308D0D /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
@@ -676,6 +732,44 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.piriapp.piri;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		9B606C5EA577D8C52921562B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.piriapp.PiriUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Piri;
+			};
+			name = Release;
+		};
+		A52C587087845AAE27B47161 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.piriapp.PiriUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Piri;
 			};
 			name = Debug;
 		};
@@ -865,6 +959,15 @@
 			buildConfigurations = (
 				5864328FB1DCAB57F6040A52 /* Debug */,
 				BEB859882C6C4DD936F5476B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		96FF4CB001D61E1FA71B59B8 /* Build configuration list for PBXNativeTarget "PiriUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A52C587087845AAE27B47161 /* Debug */,
+				9B606C5EA577D8C52921562B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

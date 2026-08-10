@@ -225,6 +225,7 @@ struct PlanBuilderScreen: View {
                     }
                     Spacer()
                 }
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
 

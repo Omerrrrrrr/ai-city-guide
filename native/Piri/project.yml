@@ -66,6 +66,27 @@ targets:
         # the resolved string, as the plural tests do).
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Piri.app/Piri"
         BUNDLE_LOADER: "$(TEST_HOST)"
+  # Drives the simulator via XCTest's own automation (testmanagerd), not
+  # host-level Accessibility APIs — the only way to actually tap through
+  # the app from this environment, which has no Accessibility permission
+  # for AppleScript/System Events UI scripting. Kept in its own scheme
+  # (not bundled into the `Piri` scheme's regular `test` action) since
+  # full-app UI tests are much slower than the plain unit tests and aren't
+  # meant to run on every build/test cycle — only when actually verifying
+  # a UI flow end-to-end.
+  PiriUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: UITests
+    dependencies:
+      - target: Piri
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_STYLE: Automatic
+        TEST_TARGET_NAME: Piri
 schemes:
   Piri:
     build:
@@ -75,3 +96,11 @@ schemes:
     test:
       targets:
         - PiriTests
+  PiriUITests:
+    build:
+      targets:
+        Piri: all
+        PiriUITests: [test]
+    test:
+      targets:
+        - PiriUITests

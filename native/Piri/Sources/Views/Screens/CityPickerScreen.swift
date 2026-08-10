@@ -140,6 +140,11 @@ struct CityPickerScreen: View {
                         Text("›").font(.system(size: 20)).foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 4)
+                    // Same fix as `ProfileScreen.cityCard` — the
+                    // `Spacer()`-filled middle of the row isn't part of any
+                    // subview's rendered bounds, so it's otherwise a dead
+                    // tap zone.
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }

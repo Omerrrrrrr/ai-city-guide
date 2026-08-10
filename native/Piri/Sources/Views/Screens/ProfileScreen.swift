@@ -284,6 +284,13 @@ struct ProfileScreen: View {
                     Spacer()
                     Text("settings.changeCity").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.gold)
                 }
+                // Without this, only the icon/text/label glyphs themselves
+                // are tappable — the `Spacer()`-filled middle of the row
+                // isn't part of any subview's rendered bounds, so a tap
+                // there (found via a UI test computing its tap point from
+                // the accessibility frame's center, which lands in exactly
+                // that gap) silently misses the button entirely.
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         }
