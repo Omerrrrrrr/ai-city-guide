@@ -20,4 +20,11 @@ struct SavedCollection: Codable, Identifiable, Hashable {
     var kind: SavedCollectionKind
     var createdAt: Double
     var places: [SavedPOIReference]
+    /// Optional target date for a `.plan` collection (epoch seconds,
+    /// day-granularity — the time-of-day component is ignored). Never
+    /// meaningful for `.saved`-kind lists. `CollectionDetailScreen` fetches
+    /// weather/hours fresh against this date each time it's opened rather
+    /// than persisting them here — a forecast baked in once would just go
+    /// stale.
+    var targetDate: Double? = nil
 }

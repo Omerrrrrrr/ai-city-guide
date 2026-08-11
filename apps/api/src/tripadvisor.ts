@@ -33,7 +33,7 @@ interface OpeningHoursPayload {
  * after midnight (still within last night's overnight hours) would
  * incorrectly read as closed. Edge case, not the common venue.
  */
-function computeOpenNow(hours: OpeningHoursPayload | undefined): boolean | undefined {
+function computeOpenNow(hours: OpeningHoursPayload | undefined, referenceDate: Date = new Date()): boolean | undefined {
   if (!hours?.timezone || !hours.periods?.length) return undefined;
 
   try {
@@ -43,7 +43,7 @@ function computeOpenNow(hours: OpeningHoursPayload | undefined): boolean | undef
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,
-    }).formatToParts(new Date());
+    }).formatToParts(referenceDate);
 
     const weekday = parts.find((p) => p.type === 'weekday')?.value;
     const hour = parts.find((p) => p.type === 'hour')?.value;
@@ -122,8 +122,20 @@ const emptyInfo: TripAdvisorInfo = { rating: null, description: null, photoUrls:
  * key, no match, network error, malformed response) — this is a nice-to-
  * have addition to the AI blurb, never something the POI explain flow
  * should fail over.
+ *
+ * `referenceDate` controls what instant `rating.isOpenNow` is computed
+ * against — defaults to the actual current time, but a Plan's target date
+ * can be passed to ask "will this be open *then*" instead. `includePhotos`
+ * skips the extra photos network call entirely for callers (like a bulk
+ * hours check across a whole plan) that only need the rating/hours.
  */
-export async function fetchTripAdvisorInfo(name: string, lat: number, lng: number): Promise<TripAdvisorInfo> {
+export async function fetchTripAdvisorInfo(
+  name: string,
+  lat: number,
+  lng: number,
+  referenceDate: Date = new Date(),
+  includePhotos: boolean = true
+): Promise<TripAdvisorInfo> {
   if (!TRIPADVISOR_API_KEY) return emptyInfo;
 
   try {
@@ -161,7 +173,7 @@ export async function fetchTripAdvisorInfo(name: string, lat: number, lng: numbe
 
     const description = match?.location?.descriptions?.[0]?.value ?? null;
     const locationId = match?.location?.id;
-    const photoUrls = locationId ? await fetchTripAdvisorPhotos(locationId) : [];
+    const photoUrls = includePhotos && locationId ? await fetchTripAdvisorPhotos(locationId) : [];
 
     const overall = match?.location?.traveler_ratings?.overall;
     if (!overall?.rating || !overall?.count) return { rating: null, description, photoUrls };
@@ -175,7 +187,7 @@ export async function fetchTripAdvisorInfo(name: string, lat: number, lng: numbe
         url: match?.location?.urls?.tripadvisor?.main ?? '',
         iconUrl: overall.icon_url ?? '',
         hoursFormatted: hours?.formatted,
-        isOpenNow: computeOpenNow(hours),
+        isOpenNow: computeOpenNow(hours, referenceDate),
       },
       description,
       photoUrls,

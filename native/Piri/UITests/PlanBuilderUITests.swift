@@ -70,6 +70,35 @@ final class PlanBuilderUITests: XCTestCase {
             Thread.sleep(forTimeInterval: 3)
             attach(app, name: "06-theme-selected")
         }
+
+        // Dismiss back to Saved > Plan tab and open whichever plan already
+        // exists there (earlier runs/manual testing leave at least one) to
+        // reach CollectionDetailScreen and verify the new date/weather/
+        // hours schedule feature — a fresh empty plan has nothing to
+        // navigate into, so this reuses existing state rather than
+        // fighting SF Symbol accessibility-label guesses to automate the
+        // "+" add-to-plan tap here too.
+        app.swipeDown(velocity: .fast)
+        Thread.sleep(forTimeInterval: 1)
+        attach(app, name: "07-back-to-plan-tab")
+
+        let firstPlanRow = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "yer")).firstMatch
+        if firstPlanRow.waitForExistence(timeout: 5) {
+            firstPlanRow.tap()
+            attach(app, name: "08-collection-detail")
+
+            let pickDateRow = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "Tarih")).firstMatch
+            if pickDateRow.waitForExistence(timeout: 5) {
+                pickDateRow.tap()
+                attach(app, name: "09-date-picker-opened")
+
+                let cancelButton = app.navigationBars.buttons.firstMatch
+                if cancelButton.waitForExistence(timeout: 3) {
+                    cancelButton.tap()
+                }
+                attach(app, name: "10-date-picker-closed")
+            }
+        }
     }
 
     private func attach(_ app: XCUIApplication, name: String) {

@@ -1402,6 +1402,56 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
     }
   );
 
+  // ── /places/hours-check — bulk "will these be open on this date" lookup ────
+  // Built for a Plan's target-date feature: checking hours for a whole
+  // plan one place at a time through /places/explain-poi would also pay for
+  // an unwanted AI generation per place. This is pure Tripadvisor lookup,
+  // run concurrently, no LLM call, no photos fetched.
+  app.post<{
+    Body: {
+      places: { name: string; lat: number; lng: number }[];
+      date: string;
+    };
+  }>('/places/hours-check', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const parsedBody = z
+      .object({
+        places: z
+          .array(
+            z.object({
+              name: z.string().trim().min(1).max(200),
+              lat: z.number(),
+              lng: z.number(),
+            })
+          )
+          .min(1)
+          .max(15),
+        date: z.string(),
+      })
+      .safeParse(request.body);
+
+    if (!parsedBody.success) {
+      return reply.code(400).send({ error: parsedBody.error.issues[0]?.message ?? 'Invalid request' });
+    }
+
+    const targetDate = new Date(parsedBody.data.date);
+    if (isNaN(targetDate.getTime())) {
+      return reply.code(400).send({ error: 'date must be a valid ISO date' });
+    }
+
+    const results = await Promise.all(
+      parsedBody.data.places.map(async (place) => {
+        const info = await fetchTripAdvisorInfo(place.name, place.lat, place.lng, targetDate, false);
+        return {
+          name: place.name,
+          willBeOpen: info.rating?.isOpenNow ?? null,
+          hoursFormatted: info.rating?.hoursFormatted ?? null,
+        };
+      })
+    );
+
+    return reply.send({ results });
+  });
+
   // ── /places/explain-poi/chat — follow-up Q&A about a POI card ──────────────
   // Lets the user keep asking questions under the AI explanation shown for a
   // tapped map/home POI, instead of it being a dead-end one-shot blurb.
@@ -2082,6 +2132,77 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
       } catch (e: any) {
         app.log.error(e);
         return reply.code(500).send({ error: 'Failed to fetch weather' });
+      }
+    }
+  );
+
+  // ── /weather/forecast — Proxy OpenWeatherMap's 5-day/3-hour forecast ─────────
+  // For a Plan's target date: only meaningfully covers the next ~5 days (the
+  // free-tier forecast horizon), which the client is responsible for
+  // checking before calling this — a date further out just gets whatever
+  // OpenWeatherMap happens to return for the closest slot it has, which may
+  // be misleadingly stale. Same response shape as /weather so the client
+  // reuses the same decoding.
+  app.get<{ Querystring: { lat: string; lng: string; date: string } }>(
+    '/weather/forecast',
+    { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const parsedLat = parseFloat(request.query.lat ?? '');
+      const parsedLng = parseFloat(request.query.lng ?? '');
+      const targetDate = new Date(request.query.date ?? '');
+
+      if (isNaN(parsedLat) || isNaN(parsedLng)) {
+        return reply.code(400).send({ error: 'lat and lng query params are required' });
+      }
+      if (isNaN(targetDate.getTime())) {
+        return reply.code(400).send({ error: 'date query param must be a valid ISO date' });
+      }
+
+      if (!OPENWEATHER_API_KEY) {
+        return reply.code(503).send({ error: 'Weather not configured' });
+      }
+
+      try {
+        const owUrl = `https://api.openweathermap.org/data/2.5/forecast?lat=${parsedLat}&lon=${parsedLng}&units=metric&appid=${OPENWEATHER_API_KEY}`;
+        const res = await fetch(owUrl);
+        if (!res.ok) throw new Error(`OpenWeather ${res.status}`);
+        const data = (await res.json()) as any;
+
+        const slots: { dt: number; main: { temp: number; humidity: number }; weather: { id: number; description: string }[]; wind?: { speed: number } }[] =
+          data.list ?? [];
+        if (slots.length === 0) throw new Error('No forecast slots returned');
+
+        // Closest 3-hour slot to the target instant — favors actually
+        // matching the requested date/time over always picking midday,
+        // since the client already decides what time-of-day to ask for.
+        const targetMs = targetDate.getTime();
+        const closest = slots.reduce((best, slot) =>
+          Math.abs(slot.dt * 1000 - targetMs) < Math.abs(best.dt * 1000 - targetMs) ? slot : best
+        );
+
+        const weatherId = closest.weather?.[0]?.id ?? 800;
+        type WeatherCondition = 'sunny' | 'cloudy' | 'rainy' | 'snowy' | 'stormy' | 'foggy';
+        let condition: WeatherCondition;
+        if (weatherId >= 200 && weatherId < 300) condition = 'stormy';
+        else if (weatherId >= 300 && weatherId < 600) condition = 'rainy';
+        else if (weatherId >= 600 && weatherId < 700) condition = 'snowy';
+        else if (weatherId >= 700 && weatherId < 800) condition = 'foggy';
+        else if (weatherId === 800) condition = 'sunny';
+        else condition = 'cloudy';
+
+        return reply.send({
+          city: (data.city?.name ?? '') as string,
+          temp: Math.round(closest.main.temp),
+          feels_like: Math.round(closest.main.temp),
+          condition,
+          description: closest.weather?.[0]?.description ?? '',
+          humidity: closest.main.humidity,
+          wind_speed: Math.round(closest.wind?.speed ?? 0),
+          forecastTime: new Date(closest.dt * 1000).toISOString(),
+        });
+      } catch (e: any) {
+        app.log.error(e);
+        return reply.code(500).send({ error: 'Failed to fetch weather forecast' });
       }
     }
   );

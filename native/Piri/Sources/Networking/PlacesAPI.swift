@@ -91,4 +91,43 @@ enum WeatherAPI {
     static func fetch(lat: Double, lng: Double) async throws -> Weather {
         try await APIClient.shared.get("/weather", query: ["lat": String(lat), "lng": String(lng)])
     }
+
+    /// Only meaningfully accurate within OpenWeatherMap's free-tier ~5-day
+    /// forecast horizon — callers (`CollectionDetailScreen`) are expected to
+    /// check the target date is within that window before calling this.
+    static func forecast(lat: Double, lng: Double, date: Date) async throws -> Weather {
+        try await APIClient.shared.get("/weather/forecast", query: [
+            "lat": String(lat),
+            "lng": String(lng),
+            "date": ISO8601DateFormatter().string(from: date),
+        ])
+    }
+}
+
+struct HoursCheckPlace: Encodable {
+    var name: String
+    var lat: Double
+    var lng: Double
+}
+
+struct HoursCheckRequest: Encodable {
+    var places: [HoursCheckPlace]
+    var date: String
+}
+
+struct HoursCheckResult: Decodable, Identifiable {
+    var name: String
+    var willBeOpen: Bool?
+    var hoursFormatted: [String]?
+    var id: String { name }
+}
+
+struct HoursCheckResponse: Decodable {
+    var results: [HoursCheckResult]
+}
+
+enum PlanSchedulingAPI {
+    static func checkHours(_ request: HoursCheckRequest) async throws -> HoursCheckResponse {
+        try await APIClient.shared.post("/places/hours-check", body: request)
+    }
 }

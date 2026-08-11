@@ -47,6 +47,12 @@ final class SavedPlacesStore {
         persist()
     }
 
+    func setTargetDate(_ id: String, date: Double?) {
+        guard let index = collections.firstIndex(where: { $0.id == id }) else { return }
+        collections[index].targetDate = date
+        persist()
+    }
+
     /// True if the given place is in any *saved* list — drives the bookmark
     /// icon's filled/outline state on a place's detail page.
     func isSaved(_ identifier: String) -> Bool {
