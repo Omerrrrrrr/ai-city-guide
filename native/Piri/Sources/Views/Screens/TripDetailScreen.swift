@@ -17,6 +17,10 @@ struct TripDetailScreen: View {
     @State private var viewerIndex: Int?
     @State private var selectedPOI: POIPlace?
     @State private var resolvingStopIdentifier: String?
+    /// Keyed by stop name, same empty-string-sentinel contract
+    /// `ExploreScreen`/`HomeScreen` already use for their own photo grids —
+    /// an empty string means "checked, no photo found," not "not asked yet."
+    @State private var photoURLs: [String: String] = [:]
 
     private let playbackStepMs = 50.0
     private let playbackSegmentMs = 450.0
@@ -82,33 +86,16 @@ struct TripDetailScreen: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
+                    statsRow(trip)
+                        .padding(.bottom, 6)
+
                     Text("trips.stopsLabel").font(.system(size: 12, weight: .bold)).opacity(0.45).textCase(.uppercase)
-                    ForEach(Array(stops.enumerated()), id: \.element.identifier) { index, stop in
-                        Button {
-                            Task { await openStop(stop) }
-                        } label: {
-                            HStack(spacing: 10) {
-                                ZStack {
-                                    Circle().fill(Theme.gold.opacity(0.15))
-                                    Text("\(index + 1)").font(.system(size: 11, weight: .heavy)).foregroundStyle(Theme.gold)
-                                }
-                                .frame(width: 22, height: 22)
-                                ZStack {
-                                    Color(.secondarySystemBackground)
-                                    Image(systemName: POICategoryGroups.icon(for: stop.category)).foregroundStyle(Theme.gold)
-                                }
-                                .frame(width: 44, height: 44)
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                                Text(stop.name).font(.system(size: 14, weight: .semibold)).lineLimit(1)
-                                Spacer()
-                                if resolvingStopIdentifier == stop.identifier {
-                                    ProgressView()
-                                }
-                            }
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(Array(stops.enumerated()), id: \.element.identifier) { index, stop in
+                            timelineStopRow(index, stop, isLast: index == stops.count - 1)
                         }
-                        .buttonStyle(.plain)
-                        .disabled(resolvingStopIdentifier != nil)
                     }
+                    .onAppear { loadPhotosIfNeeded(for: stops) }
 
                     if !trip.photos.isEmpty {
                         Text("trips.photosLabel").font(.system(size: 12, weight: .bold)).opacity(0.45).textCase(.uppercase).padding(.top, 8)
@@ -142,6 +129,146 @@ struct TripDetailScreen: View {
         resolvingStopIdentifier = stop.identifier
         selectedPOI = await stop.resolve()
         resolvingStopIdentifier = nil
+    }
+
+    /// Distance/duration/stop-count summary — data `Trip` has carried since
+    /// the very first route-mode trip, but this screen never actually
+    /// showed any of it. Same three-stat-card language Polarsteps and
+    /// nearly every trip-tracking app use for a journey's headline numbers.
+    private func statsRow(_ trip: Trip) -> some View {
+        HStack(spacing: 0) {
+            statItem(value: distanceText(trip), label: String(localized: "trips.stat.distance"))
+            Divider().frame(height: 30)
+            statItem(value: durationText(trip), label: String(localized: "trips.stat.duration"))
+            Divider().frame(height: 30)
+            statItem(value: "\(trip.stops.count)", label: String(localized: "trips.stat.stops"))
+        }
+        .padding(.vertical, 14)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemGroupedBackground)))
+    }
+
+    private func statItem(value: String, label: String) -> some View {
+        VStack(spacing: 3) {
+            Text(value).font(.system(size: 17, weight: .bold))
+            Text(label).font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary).textCase(.uppercase)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func distanceText(_ trip: Trip) -> String {
+        guard let meters = trip.distanceMeters, meters > 0 else { return "—" }
+        return String(format: "%.1f km", meters / 1000)
+    }
+
+    /// Falls back to `endedAt - startedAt` when `durationSeconds` wasn't
+    /// recorded (older/interrupted trips) rather than showing nothing.
+    /// Abbreviated unit letters (localized) instead of spelled-out "hours"/
+    /// "days" sidestep needing plural-form handling for a value that's
+    /// otherwise just a compact number pair.
+    private func durationText(_ trip: Trip) -> String {
+        let seconds = trip.durationSeconds ?? trip.endedAt.map { $0 - trip.startedAt }.map { $0 / 1000 }
+        guard let seconds, seconds > 0 else { return "—" }
+
+        let totalMinutes = Int(seconds / 60)
+        let hourUnit = String(localized: "trips.unit.hour")
+        let minuteUnit = String(localized: "trips.unit.minute")
+        let dayUnit = String(localized: "trips.unit.day")
+
+        if totalMinutes < 60 {
+            return "\(totalMinutes)\(minuteUnit)"
+        }
+        let totalHours = totalMinutes / 60
+        if totalHours < 24 {
+            return "\(totalHours)\(hourUnit) \(totalMinutes % 60)\(minuteUnit)"
+        }
+        return "\(totalHours / 24)\(dayUnit) \(totalHours % 24)\(hourUnit)"
+    }
+
+    /// A continuous vertical line behind the step badges, connecting each
+    /// stop to the next — the one visual element that turns "a list of
+    /// places" into "a journey," the same device Polarsteps' own step
+    /// timeline is built around.
+    private func timelineStopRow(_ index: Int, _ stop: SavedPOIReference, isLast: Bool) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(spacing: 0) {
+                ZStack {
+                    Circle().fill(Theme.navy)
+                    Text("\(index + 1)").font(.system(size: 12, weight: .heavy)).foregroundStyle(Theme.gold)
+                }
+                .frame(width: 26, height: 26)
+
+                if !isLast {
+                    Rectangle().fill(Theme.gold.opacity(0.3)).frame(width: 2)
+                }
+            }
+            .frame(width: 26)
+
+            Button {
+                Task { await openStop(stop) }
+            } label: {
+                HStack(spacing: 12) {
+                    timelinePhoto(for: stop)
+                        .frame(width: 64, height: 64)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(stop.name).font(.system(size: 15, weight: .semibold)).lineLimit(2)
+                        if let category = stop.category {
+                            Text(category.rawValue.replacingOccurrences(of: "MKPOICategory", with: ""))
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Spacer()
+
+                    if resolvingStopIdentifier == stop.identifier {
+                        ProgressView()
+                    }
+                }
+                .padding(.bottom, isLast ? 4 : 20)
+            }
+            .buttonStyle(.plain)
+            .disabled(resolvingStopIdentifier != nil)
+        }
+    }
+
+    @ViewBuilder
+    private func timelinePhoto(for stop: SavedPOIReference) -> some View {
+        let urlString = photoURLs[stop.name]
+        if let urlString, !urlString.isEmpty, let url = URL(string: urlString) {
+            CachedAsyncImage(url: url, maxPixelSize: 200) { image in
+                image.resizable().aspectRatio(contentMode: .fill)
+            } placeholder: {
+                categoryFallback(stop)
+            }
+            .clipped()
+        } else {
+            categoryFallback(stop)
+        }
+    }
+
+    private func categoryFallback(_ stop: SavedPOIReference) -> some View {
+        ZStack {
+            POICategoryGroups.gradient(for: stop.category)
+            Image(systemName: POICategoryGroups.icon(for: stop.category))
+                .font(.system(size: 20))
+                .foregroundStyle(.white.opacity(0.92))
+        }
+    }
+
+    private func loadPhotosIfNeeded(for stops: [SavedPOIReference]) {
+        let missing = stops.filter { photoURLs[$0.name] == nil }.prefix(20)
+        guard !missing.isEmpty else { return }
+        let request = PhotoBulkRequest(places: missing.map {
+            PhotoBulkPlace(name: $0.name, lat: $0.lat, lng: $0.lng, category: $0.category.map { $0.rawValue.replacingOccurrences(of: "MKPOICategory", with: "") })
+        })
+        Task {
+            guard let response = try? await PlacesAPI.photosBulk(request) else { return }
+            for result in response.results {
+                photoURLs[result.name] = result.photoUrl ?? ""
+            }
+        }
     }
 
     private func header(_ trip: Trip) -> some View {
