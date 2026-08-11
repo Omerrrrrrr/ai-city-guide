@@ -432,14 +432,6 @@ struct AIScreen: View {
     /// each turn's `[POIPlace]` array only ever needs to outlive that one
     /// exchange (see `POIRecommendation`, which embeds the resolved
     /// `POIPlace` directly into the conversation turn).
-    /// A city's headline sights — always searched alongside whatever the
-    /// query itself asks for (see the always-on `coreSightResults` below),
-    /// unlike `queryKeywordCategories`'s theme inference which only fires
-    /// when the query text actually mentions one.
-    private static let coreSightCategories: Set<MKPointOfInterestCategory> = [
-        .museum, .landmark, .nationalMonument, .castle, .fortress, .religiousSite,
-    ]
-
     private func nearbyPOICandidates(query: String, near coordinate: CLLocationCoordinate2D) async -> [POIPlace] {
         // Always merge in a plain category-less browse, not just when the
         // text search comes up short — `naturalLanguageQuery` is built for
@@ -473,7 +465,7 @@ struct AIScreen: View {
         // always runs regardless of query wording, since a city's core
         // sights are relevant background for nearly any Ask Piri request,
         // not just explicitly themed ones.
-        async let coreSightResults = fetchThemedCandidates(Self.coreSightCategories, near: coordinate)
+        async let coreSightResults = fetchThemedCandidates(POICategoryGroups.coreSightCategories, near: coordinate)
 
         func sortedByDistance(_ items: [POIPlace]) -> [POIPlace] {
             items.sorted {

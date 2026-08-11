@@ -126,4 +126,36 @@ enum POICategoryGroups {
         }
         return matched.isEmpty ? nil : matched
     }
+
+    /// A city's headline sights — shared with `AIScreen`, which searches
+    /// this set directly so a generic "plan my day" request always has a
+    /// city's landmarks as candidates (see its own doc comment for why:
+    /// Apple's plain nearby-browse can bury a city's own cathedral below
+    /// the ~25-result cap entirely). Explore/Home reuse the same set here
+    /// for a lighter purpose — reordering, not searching.
+    static let coreSightCategories: Set<MKPointOfInterestCategory> = [
+        .museum, .landmark, .nationalMonument, .castle, .fortress, .religiousSite,
+    ]
+
+    /// Moves sight-category places (museum, landmark, monument, ...) ahead
+    /// of everything else, without disturbing the relative order within
+    /// either group -- so Apple's own relevance/distance ordering still
+    /// decides *which* sights come first among themselves, and which
+    /// cafes/shops/etc. come first among themselves.
+    ///
+    /// Same principle the accuracy report already established for
+    /// `/places/recommend-poi`'s enrichment order (see the SIGNAL RULE):
+    /// comparing a landmark against a restaurant on a single popularity
+    /// score is comparing two different things, since Tripadvisor's review
+    /// volume structurally favors hospitality. Category-priority ordering
+    /// sidesteps that without needing any rating data at all -- useful here
+    /// specifically because Explore/Home's plain browse has none in hand
+    /// for what's on screen (only fetched lazily, per-card, for photos).
+    static func prioritizingSights(_ items: [POIPlace]) -> [POIPlace] {
+        let sights = items.filter { $0.category.map(coreSightCategories.contains) ?? false }
+        guard !sights.isEmpty, sights.count < items.count else { return items }
+        let sightIdentifiers = Set(sights.map(\.id))
+        let rest = items.filter { !sightIdentifiers.contains($0.id) }
+        return sights + rest
+    }
 }

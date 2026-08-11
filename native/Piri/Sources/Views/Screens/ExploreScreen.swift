@@ -221,12 +221,17 @@ struct ExploreScreen: View {
         searchRadius = 4000
 
         let trimmed = query.trimmingCharacters(in: .whitespaces)
-        results = await POISearchService.search(
+        let fetched = await POISearchService.search(
             near: coordinate,
             categories: selectedCategoryGroup?.categories,
             naturalLanguageQuery: trimmed.isEmpty ? nil : trimmed,
             radiusMeters: searchRadius
         )
+        // Only reorder the plain "everything nearby" browse — once a
+        // category filter is active the list is already one category, and
+        // a text search's own relevance order (what actually matched the
+        // words typed) matters more than category grouping.
+        results = (selectedCategoryGroup == nil && trimmed.isEmpty) ? POICategoryGroups.prioritizingSights(fetched) : fetched
         loadPhotosIfNeeded(for: results)
     }
 

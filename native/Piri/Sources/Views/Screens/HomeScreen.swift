@@ -270,7 +270,11 @@ struct HomeScreen: View {
         guard let coordinate else { return }
         poiLoading = true
         defer { poiLoading = false }
-        poiResults = await POISearchService.search(near: coordinate, categories: selectedCategoryGroup?.categories)
+        let fetched = await POISearchService.search(near: coordinate, categories: selectedCategoryGroup?.categories)
+        // Same principle as ExploreScreen: only reorder the unfiltered
+        // "everything nearby" browse, not an already-homogeneous category
+        // filter.
+        poiResults = selectedCategoryGroup == nil ? POICategoryGroups.prioritizingSights(fetched) : fetched
         loadNearbyPhotosIfNeeded()
     }
 
