@@ -171,10 +171,10 @@ struct ExploreScreen: View {
 
     private func categoryTile(for poi: POIPlace) -> some View {
         ZStack {
-            Color(.secondarySystemBackground)
+            POICategoryGroups.gradient(for: poi.category)
             Image(systemName: POICategoryGroups.icon(for: poi.category))
-                .font(.system(size: 28))
-                .foregroundStyle(Theme.gold)
+                .font(.system(size: 26))
+                .foregroundStyle(.white.opacity(0.92))
         }
     }
 

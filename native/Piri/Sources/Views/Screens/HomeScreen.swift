@@ -294,10 +294,10 @@ struct HomeScreen: View {
 
     private func nearbyIconFallback(for poi: POIPlace) -> some View {
         ZStack {
-            Color(.secondarySystemBackground)
+            POICategoryGroups.gradient(for: poi.category)
             Image(systemName: POICategoryGroups.icon(for: poi.category))
                 .font(.system(size: 16))
-                .foregroundStyle(Theme.gold)
+                .foregroundStyle(.white.opacity(0.92))
         }
     }
 

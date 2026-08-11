@@ -1,4 +1,5 @@
 import MapKit
+import SwiftUI
 
 /// Groups of Apple's own `MKPointOfInterestCategory` values behind the map's
 /// category chips, applied via `MKMapView.pointOfInterestFilter` — this is
@@ -36,6 +37,42 @@ enum POICategoryGroups {
     static func icon(for category: MKPointOfInterestCategory?) -> String {
         guard let category else { return "mappin.circle.fill" }
         return all.first { $0.categories?.contains(category) == true }?.icon ?? "mappin.circle.fill"
+    }
+
+    /// Deterministic per-category gradient, not a flat grey fill — the
+    /// pragmatic middle ground when there's no real photo: no image-
+    /// generation tool available here to produce actual per-category
+    /// illustrations (the visual-identity report's Finding B), so this is
+    /// the code-only version of the same idea — generated once per
+    /// *category*, not per place, and never dressed up to look like a real
+    /// photo of anything specific.
+    static func gradient(for category: MKPointOfInterestCategory?) -> LinearGradient {
+        let colors: [Color]
+        switch category {
+        case .museum, .landmark, .nationalMonument, .castle, .fortress, .library:
+            colors = [Color(red: 0.55, green: 0.42, blue: 0.20), Color(red: 0.82, green: 0.68, blue: 0.38)]
+        case .park, .nationalPark, .campground, .hiking, .zoo:
+            colors = [Color(red: 0.14, green: 0.36, blue: 0.24), Color(red: 0.38, green: 0.58, blue: 0.36)]
+        case .theater, .movieTheater, .musicVenue, .planetarium, .aquarium:
+            colors = [Color(red: 0.38, green: 0.16, blue: 0.42), Color(red: 0.62, green: 0.32, blue: 0.58)]
+        case .beach, .marina, .surfing, .kayaking:
+            colors = [Color(red: 0.09, green: 0.36, blue: 0.48), Color(red: 0.32, green: 0.66, blue: 0.72)]
+        case .cafe, .bakery:
+            colors = [Color(red: 0.42, green: 0.28, blue: 0.16), Color(red: 0.68, green: 0.48, blue: 0.30)]
+        case .restaurant, .brewery, .winery, .foodMarket, .distillery:
+            colors = [Color(red: 0.55, green: 0.22, blue: 0.16), Color(red: 0.82, green: 0.44, blue: 0.24)]
+        case .store:
+            colors = [Color(red: 0.16, green: 0.30, blue: 0.46), Color(red: 0.34, green: 0.52, blue: 0.68)]
+        case .nightlife:
+            colors = [Color(red: 0.24, green: 0.14, blue: 0.42), Color(red: 0.46, green: 0.28, blue: 0.68)]
+        case .stadium, .fitnessCenter, .golf, .tennis, .soccer, .swimming:
+            colors = [Color(red: 0.10, green: 0.40, blue: 0.34), Color(red: 0.28, green: 0.62, blue: 0.50)]
+        case .hotel:
+            colors = [Color(red: 0.17, green: 0.20, blue: 0.36), Color(red: 0.32, green: 0.36, blue: 0.56)]
+        default:
+            colors = [Color(red: 0.30, green: 0.30, blue: 0.34), Color(red: 0.52, green: 0.52, blue: 0.56)]
+        }
+        return LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 
     /// Turkish/English/Norwegian keyword → category set, so a themed Ask
