@@ -11415,19 +11415,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Plan"
+            "value": "Preferences"
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Plan"
+            "value": "Preferanser"
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Plan"
+            "value": "Tercihler"
           }
         }
       }

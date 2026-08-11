@@ -13,8 +13,12 @@ private let languageOptions: [(code: String?, icon: String, labelKey: String)] =
 
 /// Groups the same way `OnboardingScreen`'s wizard steps already do:
 /// interests+faith together, pace+budget+group ("who are you traveling
-/// with") together under "Plan" — mirrored here as tabs instead of one long
-/// scroll of stacked cards.
+/// with") together under "Preferences" — mirrored here as tabs instead of
+/// one long scroll of stacked cards. Named "Preferences," not "Plan" —
+/// this tab holds travel-style settings, not a saved itinerary, and
+/// sharing the word with `SavedCollectionKind.plan`'s actual saved plans
+/// (shown a few cards below as the "Planlar" stat) read as the same
+/// feature when it very much isn't.
 private enum ProfileTab: Hashable, Identifiable {
     case language, profession, interests, plan
     var id: Self { self }
@@ -211,7 +215,7 @@ struct ProfileScreen: View {
 
     // Grouped the same way `OnboardingScreen.travelStyleStep` already
     // groups them — pace, budget, and "who are you traveling with" (group
-    // type) all under one "Plan" heading.
+    // type) all under one "Preferences" heading.
     @ViewBuilder
     private var planTabContent: some View {
         card(titleKey: "onboarding.travelStyle.paceLabel") {
