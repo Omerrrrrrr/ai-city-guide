@@ -36,7 +36,7 @@ struct TripAdvisorRatingRow: View {
 
             if let hoursFormatted = rating.hoursFormatted {
                 ForEach(hoursFormatted, id: \.self) { line in
-                    Text(line).font(.caption).foregroundStyle(.secondary)
+                    Text(TripAdvisorHours.humanize(line)).font(.caption).foregroundStyle(.secondary)
                 }
             }
         }

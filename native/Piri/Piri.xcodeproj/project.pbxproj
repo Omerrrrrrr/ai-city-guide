@@ -68,6 +68,7 @@
 		9DDC6A7D2595EB487B32DFA3 /* SavedCollection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C808B025C8E9ED7515733584 /* SavedCollection.swift */; };
 		A2D65D1C6851A7802697F3BE /* TripPhotoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D8F55E9E6F23F30F9323E2F /* TripPhotoStore.swift */; };
 		A785BBB4AFF5DC51F15C29A3 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = E712507F714C68342D7027E7 /* Localizable.xcstrings */; };
+		A9C92E48B29B6A75FF48802E /* TripAdvisorHours.swift in Sources */ = {isa = PBXBuildFile; fileRef = 156E198E679C89FCF3886BE8 /* TripAdvisorHours.swift */; };
 		AA0513F0B8654D68605A9DCE /* LocationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E67959451EFC53E9B89AEE8 /* LocationManager.swift */; };
 		ABC4236A1C18ED878A9206C7 /* TripAdvisorRatingRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 642AE03D91D3B2C9EC654135 /* TripAdvisorRatingRow.swift */; };
 		B0B5862CD4E82B308AFDE8CD /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 671A824ED89E058394F705D9 /* KeychainStore.swift */; };
@@ -132,6 +133,7 @@
 		0DCA1094E66C258A4211AC15 /* APIConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIConfig.swift; sourceTree = "<group>"; };
 		11883AE4B6ACC73CC45E883E /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		135A602CC00ED4B1E83016AB /* MapAnnotations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapAnnotations.swift; sourceTree = "<group>"; };
+		156E198E679C89FCF3886BE8 /* TripAdvisorHours.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripAdvisorHours.swift; sourceTree = "<group>"; };
 		1DCFDD9F1851FFE86FE769D0 /* MapRegion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapRegion.swift; sourceTree = "<group>"; };
 		1E67959451EFC53E9B89AEE8 /* LocationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationManager.swift; sourceTree = "<group>"; };
 		23F9EF44F5F072D5B4D893D3 /* CategoriesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoriesTests.swift; sourceTree = "<group>"; };
@@ -269,6 +271,7 @@
 				627629055B808FB73F268A0F /* PlanThemes.swift */,
 				674770D930511AA70C53CCF8 /* POICategoryGroups.swift */,
 				6993AA4D03C823EF1D3DCFEE /* ProfileOptions.swift */,
+				156E198E679C89FCF3886BE8 /* TripAdvisorHours.swift */,
 			);
 			path = Utils;
 			sourceTree = "<group>";
@@ -669,6 +672,7 @@
 				5AA6F51FFA86B9EA366E41E4 /* TabSelection.swift in Sources */,
 				100F6128B1DA42E96537D83B /* Theme.swift in Sources */,
 				B76B20B3FEABC73E69373793 /* Trip.swift in Sources */,
+				A9C92E48B29B6A75FF48802E /* TripAdvisorHours.swift in Sources */,
 				ABC4236A1C18ED878A9206C7 /* TripAdvisorRatingRow.swift in Sources */,
 				CAAA7C3A09A77D4DDEA49CAC /* TripDetailScreen.swift in Sources */,
 				EEA660AEBC9717682E73353A /* TripMapView.swift in Sources */,
