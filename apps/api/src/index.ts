@@ -51,7 +51,7 @@ import {
   type UserProfileInput,
 } from './user-context';
 import { haversineKm } from './geo';
-import { fetchTripAdvisorInfo, normalizeName, type TripAdvisorInfo } from './tripadvisor';
+import { fetchTripAdvisorInfo, fetchTripAdvisorReviews, normalizeName, type TripAdvisorInfo } from './tripadvisor';
 import { fetchWikipediaPhoto, WIKIPEDIA_PLAUSIBLE_CATEGORIES } from './wiki-photo';
 import { places, cities, liveGridCellStatus, livePlaceCache, poiPhotoCache } from './schema';
 
@@ -1545,6 +1545,41 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
 
     return reply.send({ results });
   });
+
+  // ── /places/reviews — real Tripadvisor traveler reviews for a POI ──────────
+  // Separate from /places/explain-poi (which only ever surfaces a rating
+  // number + AI-written blurb) so browsing real review text stays an
+  // on-demand, opt-in fetch instead of bloating the initial card load with
+  // data most taps into a place never actually need. Runs the same
+  // nearby-search + name-match `fetchTripAdvisorInfo` already does to find
+  // the location id, then fetches reviews for it -- no separate matching
+  // logic to keep in sync with the rest of this file's Tripadvisor calls.
+  app.post<{ Body: { name: string; lat: number; lng: number } }>(
+    '/places/reviews',
+    { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const parsed = z
+        .object({
+          name: z.string().trim().min(1).max(200),
+          lat: z.number(),
+          lng: z.number(),
+        })
+        .safeParse(request.body);
+
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'Invalid request' });
+      }
+
+      const { name, lat, lng } = parsed.data;
+      const info = await fetchTripAdvisorInfo(name, lat, lng, new Date(), false);
+      if (!info.locationId) {
+        return reply.send({ reviews: [], tripadvisorUrl: null });
+      }
+
+      const reviews = await fetchTripAdvisorReviews(info.locationId, 10);
+      return reply.send({ reviews, tripadvisorUrl: info.rating?.url ?? null });
+    }
+  );
 
   // ── /places/explain-poi/chat — follow-up Q&A about a POI card ──────────────
   // Lets the user keep asking questions under the AI explanation shown for a

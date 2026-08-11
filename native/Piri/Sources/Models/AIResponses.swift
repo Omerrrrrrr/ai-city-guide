@@ -176,6 +176,33 @@ struct TripAdvisorRating: Codable {
     var isOpenNow: Bool?
 }
 
+/// A single real Tripadvisor traveler review — user-written text, not an
+/// AI summary of it. Fetched on demand via `/places/reviews`, separate
+/// from `ExplainResult` so browsing full review text isn't paid for on
+/// every card load, only when someone actually opens the reviews sheet.
+struct TripAdvisorReview: Codable, Identifiable {
+    var id: Int
+    var rating: Int
+    var publishedAt: String
+    var title: String?
+    var text: String
+    var authorName: String
+    var authorLocation: String?
+    var authorAvatarUrl: String?
+    var url: String
+}
+
+struct ReviewsRequest: Encodable {
+    var name: String
+    var lat: Double
+    var lng: Double
+}
+
+struct ReviewsResponse: Decodable {
+    var reviews: [TripAdvisorReview]
+    var tripadvisorUrl: String?
+}
+
 /// Port-side request for `/places/explain-poi` — same personalized-blurb
 /// shape as `/places/explain`, but for a place that only exists as an Apple
 /// Maps POI (or any other ad-hoc tapped point), not a placeId in our DB.

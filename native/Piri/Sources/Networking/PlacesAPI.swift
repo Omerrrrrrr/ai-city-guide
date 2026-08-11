@@ -166,4 +166,10 @@ extension PlacesAPI {
     static func photosBulk(_ request: PhotoBulkRequest) async throws -> PhotoBulkResponse {
         try await APIClient.shared.post("/places/photos-bulk", body: request)
     }
+
+    /// On-demand only — called when the reviews sheet actually opens, not
+    /// as part of the initial POI card load.
+    static func reviews(_ request: ReviewsRequest) async throws -> ReviewsResponse {
+        try await APIClient.shared.post("/places/reviews", body: request)
+    }
 }

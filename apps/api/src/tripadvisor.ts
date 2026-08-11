@@ -90,6 +90,74 @@ export async function fetchTripAdvisorPhotos(locationId: number): Promise<string
   }
 }
 
+export interface TripAdvisorReview {
+  id: number;
+  rating: number;
+  publishedAt: string;
+  title: string | null;
+  text: string;
+  authorName: string;
+  authorLocation: string | null;
+  authorAvatarUrl: string | null;
+  url: string;
+}
+
+/**
+ * Fetches Tripadvisor's own traveler reviews for a location — real,
+ * user-written text, not an AI summary of it. Returns `[]` on any failure
+ * (missing key, no reviews, network error), same best-effort contract as
+ * the rest of this module. Picks the English-language text/title variant
+ * when more than one language is present; falls back to whichever is
+ * first rather than dropping the review entirely.
+ */
+export async function fetchTripAdvisorReviews(locationId: number, size: number = 10): Promise<TripAdvisorReview[]> {
+  if (!TRIPADVISOR_API_KEY) return [];
+
+  try {
+    const url = new URL(`https://terra.tripadvisor.com/api/locations/${locationId}/reviews`);
+    url.searchParams.set('size', String(size));
+
+    const res = await fetch(url, {
+      headers: { 'X-API-Key': TRIPADVISOR_API_KEY },
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) return [];
+
+    const data = (await res.json()) as {
+      data?: {
+        id?: number;
+        rating?: number;
+        publish_ts?: string;
+        url?: string;
+        title?: { language?: string; value?: string }[];
+        text?: { language?: string; value?: string }[];
+        user?: { username?: string; geo?: string; avatar_url?: { url?: string } };
+      }[];
+    };
+
+    const pickText = (entries: { language?: string; value?: string }[] | undefined): string | null => {
+      if (!entries?.length) return null;
+      return entries.find((e) => e.language === 'en')?.value ?? entries[0]?.value ?? null;
+    };
+
+    return (data.data ?? [])
+      .filter((review) => review.id && review.rating && pickText(review.text))
+      .map((review) => ({
+        id: review.id!,
+        rating: review.rating!,
+        publishedAt: review.publish_ts ?? '',
+        title: pickText(review.title),
+        text: pickText(review.text)!,
+        authorName: review.user?.username ?? 'Tripadvisor user',
+        authorLocation: review.user?.geo ?? null,
+        authorAvatarUrl: review.user?.avatar_url?.url ?? null,
+        url: review.url ?? '',
+      }));
+  } catch {
+    return [];
+  }
+}
+
 export function normalizeName(name: string): string {
   return name
     .toLowerCase()
@@ -111,9 +179,13 @@ export interface TripAdvisorInfo {
   /// since the caller tags these with their source when merging with other
   /// photo providers (e.g. Wikipedia).
   photoUrls: string[];
+  /// The matched location's own Tripadvisor id, when there was a match —
+  /// lets a caller fetch reviews (`fetchTripAdvisorReviews`) or photos
+  /// without re-running the nearby-search + name-match here a second time.
+  locationId: number | null;
 }
 
-const emptyInfo: TripAdvisorInfo = { rating: null, description: null, photoUrls: [] };
+const emptyInfo: TripAdvisorInfo = { rating: null, description: null, photoUrls: [], locationId: null };
 
 /**
  * Looks up the nearest Tripadvisor location within 300m whose name overlaps
@@ -184,7 +256,7 @@ export async function fetchTripAdvisorInfo(
     const photoUrls = includePhotos && locationId ? await fetchTripAdvisorPhotos(locationId) : [];
 
     const overall = match?.location?.traveler_ratings?.overall;
-    if (!overall?.rating || !overall?.count) return { rating: null, description, photoUrls };
+    if (!overall?.rating || !overall?.count) return { rating: null, description, photoUrls, locationId: locationId ?? null };
 
     const hours = match?.location?.opening_hours;
 
@@ -199,6 +271,7 @@ export async function fetchTripAdvisorInfo(
       },
       description,
       photoUrls,
+      locationId: locationId ?? null,
     };
   } catch {
     return emptyInfo;

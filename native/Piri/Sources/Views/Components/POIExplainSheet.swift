@@ -32,6 +32,7 @@ struct POIExplainSheet: View {
     /// only surface Apple actually renders that data on.
     @State private var showingMapItemDetail = false
     @State private var addToCollectionKind: SavedCollectionKind?
+    @State private var showingReviews = false
 
     var body: some View {
         NavigationStack {
@@ -89,6 +90,18 @@ struct POIExplainSheet: View {
                                 Text(result.headline).font(.subheadline.bold()).foregroundStyle(Theme.gold)
                                 if let rating = result.rating {
                                     TripAdvisorRatingRow(rating: rating)
+                                    // Only offered when we already know
+                                    // Tripadvisor has a matched location for
+                                    // this place (i.e. `rating` resolved at
+                                    // all) -- avoids a dead-end tap that
+                                    // fetches reviews for a place with none.
+                                    Button {
+                                        Haptics.light()
+                                        showingReviews = true
+                                    } label: {
+                                        Label(L("poiReviews.seeAll", rating.reviewCount), systemImage: "text.bubble")
+                                            .font(.footnote.weight(.semibold))
+                                    }
                                 }
                                 POIPhotoGallery(photos: result.photos)
                                 Text(result.body).font(.footnote)
@@ -167,6 +180,7 @@ struct POIExplainSheet: View {
             }
         }
         .sheet(item: $addToCollectionKind) { kind in AddToCollectionSheet(poi: poi, kind: kind) }
+        .sheet(isPresented: $showingReviews) { TripAdvisorReviewsSheet(poi: poi) }
         .task { await explain() }
         .task { await loadLookAroundScene() }
     }
