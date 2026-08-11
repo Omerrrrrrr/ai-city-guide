@@ -1990,6 +1990,7 @@ ${placeContext.length > 0 ? `Available shortlist:\n${JSON.stringify(placeContext
 
     const {
       query,
+      city,
       imageBase64,
       mimeType,
       locale,
@@ -2183,14 +2184,28 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
       // candidate in the answer text but leaves it out of "recommendations".
       // Never explicitly rated by the model in this path, so treated as
       // "weak" rather than assumed strong.
+      //
+      // Confirmed live this needs two guards, not just a length check: a
+      // Kristiansand user got a Kristiansand *bus station* recommended for
+      // a leisurely afternoon because the answer's own prose said
+      // "Kristiansand'da..." — a candidate literally named after the city
+      // will match almost any answer that mentions the city at all, which
+      // is nearly every answer. Anything infrastructure-only (transit,
+      // parking, banking, fuel) is also never a real leisure mention even
+      // when it does genuinely match by name.
+      const NON_LEISURE_CATEGORIES = new Set(['publictransport', 'parking', 'atm', 'bank', 'gasstation', 'automotiverepair']);
       const answerText: string = (object as any).answer ?? '';
       if (answerText) {
         poiCandidates.forEach((candidate, index) => {
           if (validated.length >= MAX_AI_RECOMMENDATIONS) return;
           if (candidate.name.length < 4) return;
+          if (city && candidate.name.trim().toLowerCase() === city.trim().toLowerCase()) return;
+          if (candidate.category && NON_LEISURE_CATEGORIES.has(candidate.category.toLowerCase())) return;
           if (!answerText.toLowerCase().includes(candidate.name.toLowerCase())) return;
           if (validated.some((rec) => rec.index === index)) return;
-          validated.push({ index, aiReason: 'Mentioned above.', confidence: 'weak' });
+          const mentionedAboveText =
+            locale === 'tr' ? 'Yukarıda bahsedildi.' : locale === 'nb' ? 'Nevnt over.' : 'Mentioned above.';
+          validated.push({ index, aiReason: mentionedAboveText, confidence: 'weak' });
         });
       }
 
