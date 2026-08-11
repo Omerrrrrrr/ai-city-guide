@@ -1,6 +1,18 @@
 import MapKit
 import SwiftUI
 
+extension MKPointOfInterestCategory {
+    /// Missing from the public SDK header (`MKPointOfInterestCategory.h`
+    /// only goes up to what Apple's documented as of this SDK) despite
+    /// being a real, live category MKLocalSearch actually returns —
+    /// confirmed live, Kristiansand's own cathedral came back tagged
+    /// exactly `MKPOICategoryReligiousSite`. Safe to construct from the raw
+    /// string Apple's own API already uses: this type is just a string
+    /// wrapper (`NS_TYPED_ENUM`), not a closed Swift enum, so an
+    /// unrecognized-by-the-header value still round-trips correctly.
+    static let religiousSite = MKPointOfInterestCategory(rawValue: "MKPOICategoryReligiousSite")
+}
+
 /// Groups of Apple's own `MKPointOfInterestCategory` values behind the map's
 /// category chips, applied via `MKMapView.pointOfInterestFilter` — this is
 /// what makes the *base-map* POI layer (not just Piri's own pins) respond to
@@ -19,6 +31,12 @@ enum POICategoryGroups {
     static let all: [POICategoryGroup] = [
         POICategoryGroup(labelKey: "mapPoiCategories.all", categories: nil, icon: "mappin.circle.fill"),
         POICategoryGroup(labelKey: "mapPoiCategories.museums", categories: [.museum], icon: "building.columns.fill"),
+        // Nothing above covered `.religiousSite`/`.landmark`/etc at all
+        // before this group existed -- confirmed live, Kristiansand's own
+        // cathedral (`.religiousSite`) had no chip that could ever surface
+        // it, on top of Apple's plain nearby-browse already burying it below
+        // the ~25-result cap (see `AIScreen.coreSightCategories`).
+        POICategoryGroup(labelKey: "mapPoiCategories.landmarks", categories: [.landmark, .nationalMonument, .castle, .fortress, .religiousSite], icon: "star.circle.fill"),
         POICategoryGroup(labelKey: "mapPoiCategories.nature", categories: [.park, .nationalPark, .campground], icon: "leaf.fill"),
         POICategoryGroup(labelKey: "mapPoiCategories.culture", categories: [.theater, .movieTheater], icon: "theatermasks.fill"),
         POICategoryGroup(labelKey: "mapPoiCategories.beaches", categories: [.beach, .marina], icon: "beach.umbrella.fill"),
@@ -49,7 +67,7 @@ enum POICategoryGroups {
     static func gradient(for category: MKPointOfInterestCategory?) -> LinearGradient {
         let colors: [Color]
         switch category {
-        case .museum, .landmark, .nationalMonument, .castle, .fortress, .library:
+        case .museum, .landmark, .nationalMonument, .castle, .fortress, .library, .religiousSite:
             colors = [Color(red: 0.55, green: 0.42, blue: 0.20), Color(red: 0.82, green: 0.68, blue: 0.38)]
         case .park, .nationalPark, .campground, .hiking, .zoo:
             colors = [Color(red: 0.14, green: 0.36, blue: 0.24), Color(red: 0.38, green: 0.58, blue: 0.36)]
@@ -84,7 +102,8 @@ enum POICategoryGroups {
     /// theme detected" apart from "detected theme has zero categories."
     private static let queryKeywordCategories: [(keywords: [String], categories: Set<MKPointOfInterestCategory>)] = [
         (["sanat", "sanatsal", "galeri", "art", "gallery", "kunst"], [.museum, .theater, .musicVenue, .library]),
-        (["tarih", "tarihi", "tarihsel", "history", "historic", "antik", "historisk"], [.museum, .landmark, .nationalMonument, .castle, .fortress]),
+        (["tarih", "tarihi", "tarihsel", "history", "historic", "antik", "historisk"], [.museum, .landmark, .nationalMonument, .castle, .fortress, .religiousSite]),
+        (["kilise", "katedral", "cami", "sinagog", "tapınak", "tapinak", "church", "cathedral", "mosque", "synagogue", "temple", "kirke", "domkirke"], [.religiousSite]),
         (["müze", "museum", "museer"], [.museum, .planetarium, .aquarium]),
         (["doğa", "doga", "nature", "natur", "yürüyüş", "yuruyus", "hiking"], [.park, .nationalPark, .campground, .hiking, .zoo]),
         (["eğlence", "eglence", "fun", "entertainment", "underholdning"], [.amusementPark, .bowling, .miniGolf, .goKart, .skatePark, .zoo, .aquarium]),

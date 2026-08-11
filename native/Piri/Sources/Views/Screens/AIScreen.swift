@@ -432,6 +432,14 @@ struct AIScreen: View {
     /// each turn's `[POIPlace]` array only ever needs to outlive that one
     /// exchange (see `POIRecommendation`, which embeds the resolved
     /// `POIPlace` directly into the conversation turn).
+    /// A city's headline sights — always searched alongside whatever the
+    /// query itself asks for (see the always-on `coreSightResults` below),
+    /// unlike `queryKeywordCategories`'s theme inference which only fires
+    /// when the query text actually mentions one.
+    private static let coreSightCategories: Set<MKPointOfInterestCategory> = [
+        .museum, .landmark, .nationalMonument, .castle, .fortress, .religiousSite,
+    ]
+
     private func nearbyPOICandidates(query: String, near coordinate: CLLocationCoordinate2D) async -> [POIPlace] {
         // Always merge in a plain category-less browse, not just when the
         // text search comes up short — `naturalLanguageQuery` is built for
@@ -456,6 +464,16 @@ struct AIScreen: View {
             POICategoryGroups.inferredCategories(fromQuery: query),
             near: coordinate
         )
+        // Confirmed live: Apple's own un-filtered nearby ranking can bury a
+        // city's own cathedral below the ~25-result cap entirely (Kristiansand
+        // Domkirke never appeared in a plain radius browse, only when
+        // searched by name directly) — so a generic "plan my day" request,
+        // with no theme keyword to trigger `themedResults` above, would
+        // never even have it as an option. Unlike `themedResults`, this
+        // always runs regardless of query wording, since a city's core
+        // sights are relevant background for nearly any Ask Piri request,
+        // not just explicitly themed ones.
+        async let coreSightResults = fetchThemedCandidates(Self.coreSightCategories, near: coordinate)
 
         func sortedByDistance(_ items: [POIPlace]) -> [POIPlace] {
             items.sorted {
@@ -478,8 +496,12 @@ struct AIScreen: View {
         // Themed matches go first and survive the cap even when they're
         // farther away than a pile of unrelated nearby places — a flat
         // distance sort across everything would bury them below the cutoff
-        // before the model ever sees them.
+        // before the model ever sees them. Core sights come right after —
+        // still ahead of the generic text/browse noise, but yielding to an
+        // explicit theme match (e.g. a "sanat" query's museum-heavy results)
+        // when there is one.
         appendUnique(sortedByDistance(await themedResults))
+        appendUnique(sortedByDistance(await coreSightResults))
         appendUnique(sortedByDistance(await textResults))
         appendUnique(sortedByDistance(await browseResults))
 

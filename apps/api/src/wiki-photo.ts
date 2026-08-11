@@ -33,7 +33,7 @@ export interface WikiPhoto {
 // to put on a missing rating.
 export const WIKIPEDIA_PLAUSIBLE_CATEGORIES = new Set([
   'museum', 'landmark', 'nationalmonument', 'castle', 'fortress', 'library',
-  'park', 'nationalpark', 'campground', 'hiking', 'zoo',
+  'park', 'nationalpark', 'campground', 'hiking', 'zoo', 'religioussite',
   'theater', 'movietheater', 'musicvenue', 'planetarium', 'aquarium',
   'beach', 'marina',
 ]);
