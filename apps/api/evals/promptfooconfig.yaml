@@ -210,6 +210,29 @@ tests:
       - type: javascript
         value: 'output.recommendations.length > 0'
 
+  # ── NO-INVENTED-FACTS: none of these candidates carry a rating, so the
+  # model has no rating/review data at all for them — found via live
+  # testing against a stronger model (see the AI-quality report) that a
+  # rule banning invented *numbers* ("4.6 stars") wasn't enough on its own;
+  # the same model switched to equally false qualitative claims ("highly
+  # rated", "iyi puanlı") for the exact same unrated candidates instead.
+  # This checks both forms, in Turkish and English, across every returned
+  # reason — not just the literal example phrases already in the prompt,
+  # since a model could still reach for a synonym.
+  - description: 'puan verisi olmayan adaylar için puan/yorum uydurulmamalı (sayısal ya da niteliksel)'
+    vars:
+      query: 'yemek'
+      poiCandidates:
+        - { name: 'Bistro Fourrage', category: 'Restaurant', lat: 59.9180, lng: 10.7560 }
+        - { name: 'Egon Byporten', category: 'Restaurant', lat: 59.9120, lng: 10.7510 }
+        - { name: 'Diosmío', category: 'Restaurant', lat: 59.9120, lng: 10.7510 }
+        - { name: 'Grains Frysja', category: 'Restaurant', lat: 59.9120, lng: 10.7510 }
+    assert:
+      - type: javascript
+        value: |
+          const ratingWords = /(puan|yıldız|★|yorum|değerlend|rated|rating|star|review|popular)/i;
+          return output.recommendations.every(r => !ratingWords.test(r.aiReason));
+
   # ── Every returned recommendation must carry a valid confidence value
   # (schema/plumbing regression check for Öneri 4).
   - description: 'her önerinin confidence alanı strong veya weak olmalı'
