@@ -51,8 +51,8 @@ import {
   type UserProfileInput,
 } from './user-context';
 import { haversineKm } from './geo';
-import { fetchTripAdvisorInfo, normalizeName } from './tripadvisor';
-import { fetchWikipediaPhoto } from './wiki-photo';
+import { fetchTripAdvisorInfo, normalizeName, type TripAdvisorInfo } from './tripadvisor';
+import { fetchWikipediaPhoto, WIKIPEDIA_PLAUSIBLE_CATEGORIES } from './wiki-photo';
 import { places, cities, liveGridCellStatus, livePlaceCache, poiPhotoCache } from './schema';
 
 const PORT = Number(process.env.PORT ?? 4000);
@@ -2029,11 +2029,34 @@ ${placeContext.length > 0 ? `Available shortlist:\n${JSON.stringify(placeContext
     // first few (not all 30) with a real Tripadvisor rating/description
     // keeps the added latency bounded (these run concurrently) and gives
     // the model something to actually cite instead of restating the name.
+    //
+    // Which 6 get that slot matters: Tripadvisor's review volume is
+    // structurally hospitality-biased (nearly every hotel/restaurant guest
+    // reviews the transaction; most landmark visitors never review the
+    // free thing they just walked around) -- confirmed live via the photo
+    // work in this same file, Oslo Cathedral has essentially no
+    // Tripadvisor footprint while it's a strong Wikipedia match. Filling
+    // the 6 slots in plain list order (itself distance-sorted) would let a
+    // cluster of nearby cafes crowd out the one landmark a plan actually
+    // wants featured. Sight-category candidates (the same
+    // `WIKIPEDIA_PLAUSIBLE_CATEGORIES` split the photo pipeline already
+    // uses) go first for enrichment priority; everyone else fills the rest
+    // in original order. Indices are preserved either way -- only which
+    // ones get enriched changes, never `poiCandidates`'s own order.
     const ENRICH_CANDIDATE_COUNT = 6;
-    const enrichments = await Promise.all(
-      poiCandidates.slice(0, ENRICH_CANDIDATE_COUNT).map(async (c) => {
-        if (c.lat == null || c.lng == null) return null;
-        return fetchTripAdvisorInfo(c.name, c.lat, c.lng);
+    const isSightCategory = (category: string | null | undefined) =>
+      !!category && WIKIPEDIA_PLAUSIBLE_CATEGORIES.has(category.toLowerCase());
+    const sightIndices: number[] = [];
+    const otherIndices: number[] = [];
+    poiCandidates.forEach((c, i) => (isSightCategory(c.category) ? sightIndices : otherIndices).push(i));
+    const enrichIndices = [...sightIndices, ...otherIndices].slice(0, ENRICH_CANDIDATE_COUNT);
+
+    const enrichments: (TripAdvisorInfo | null)[] = new Array(poiCandidates.length).fill(null);
+    await Promise.all(
+      enrichIndices.map(async (i) => {
+        const c = poiCandidates[i];
+        if (c.lat == null || c.lng == null) return;
+        enrichments[i] = await fetchTripAdvisorInfo(c.name, c.lat, c.lng);
       })
     );
 
@@ -2044,7 +2067,14 @@ ${placeContext.length > 0 ? `Available shortlist:\n${JSON.stringify(placeContext
           ? ` — ★${enrichment.rating.score} (${enrichment.rating.reviewCount} reviews)`
           : '';
         const descriptionText = enrichment?.description ? `: ${enrichment.description.slice(0, 160)}` : '';
-        return `[${i}] ${c.name}${c.category ? ` — ${c.category}` : ''}${c.address ? ` (${c.address})` : ''}${ratingText}${descriptionText}`;
+        // Explicit so the model doesn't read "no rating shown" as "we
+        // checked and it's mediocre" for a category where that number is
+        // usually just missing, not low.
+        const sightHint =
+          isSightCategory(c.category) && !enrichment?.rating
+            ? ' [landmark/sight — a missing rating here is normal, not a sign of low quality]'
+            : '';
+        return `[${i}] ${c.name}${c.category ? ` — ${c.category}` : ''}${c.address ? ` (${c.address})` : ''}${ratingText}${descriptionText}${sightHint}`;
       })
       .join('\n');
 
@@ -2117,6 +2147,8 @@ DECISIVENESS RULE (found via testing: the model was asking "what kind of food?" 
 CONTINUATION RULE (found via testing: the model once answered "there's a lot to discover in Başka" — treating the Turkish word for "other/another" as if it were a place name): a short message like "başka"/"diğer"/"more"/"another"/"something else" is never a place, city, or topic — it always means "give me different options than what you just suggested," using the ORIGINAL topic from earlier in this conversation (visible in the chat history above), not the literal text of this message. Never echo a word like this back as if it were a location or noun in your answer.
 
 ITINERARY RULE: if the user is asking for a plan, itinerary, or "things to do" for a stretch of time (a day, an afternoon, a visit) rather than one specific need, favor a diverse spread across categories (e.g. a sight, a place to eat, a viewpoint or park, a cultural stop) over 3-5 near-duplicates of the same category — a plan of five identical cafes isn't useful. Order "recommendations" in a sensible visiting order given their positions if that's inferable, earliest/most central first. Set "isItinerary" to true only for this case — a plain request like "best cafes open now" is not an itinerary just because it happens to return multiple candidates.
+
+SIGNAL RULE (found via testing: Tripadvisor's review volume structurally favors hotels and restaurants — nearly every guest reviews where they stayed or ate, while most visitors to a free landmark never leave a Tripadvisor review at all): a high review count is not proof a place matters more, and a landmark/museum/park/sight with no rating shown next to it (sometimes flagged below as "a missing rating here is normal") is not proof it's obscure or low quality — it usually just means Tripadvisor's coverage is thin for that category, not that the place itself is. For itinerary-style requests especially, don't let a well-reviewed hotel or restaurant crowd out an unrated but clearly relevant landmark just because the landmark lacks a number next to it — someone building a plan is there for the city's sights first, its hospitality second.
 
 CONFIDENCE RULE: be honest about fit, not just present. Mark a recommendation "weak" whenever it's really just the closest thing available rather than a genuine match — e.g. recommending a restaurant for an "art experience" request because no museum or gallery was in the candidate list. Don't silently upgrade a weak fallback to sound like a strong match just to fill the recommendation count.`
   : `You have no nearby points of interest available right now (location may be unknown, or Apple Maps has little POI data for this exact spot). Answer from your own knowledge, don't recommend a specific unverifiable venue by name, and return an empty recommendations array.`

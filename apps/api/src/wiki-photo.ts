@@ -24,7 +24,14 @@ export interface WikiPhoto {
 // inherit that landmark's photo just because it's nearby. Matches
 // `MKPointOfInterestCategory` raw values with the "MKPOICategory" prefix
 // stripped, lowercased (the client's `POIPlace.categoryLabel` shape).
-const WIKIPEDIA_PLAUSIBLE_CATEGORIES = new Set([
+// Exported because `/places/recommend-poi` reuses the exact same
+// distinction for a different reason: Tripadvisor's review volume is
+// structurally biased toward these categories' opposite (hotels,
+// restaurants -- see the export site for the full rationale), so the same
+// "is this a sight, not a transaction" split is also how that endpoint
+// decides which candidates deserve enrichment priority and how much weight
+// to put on a missing rating.
+export const WIKIPEDIA_PLAUSIBLE_CATEGORIES = new Set([
   'museum', 'landmark', 'nationalmonument', 'castle', 'fortress', 'library',
   'park', 'nationalpark', 'campground', 'hiking', 'zoo',
   'theater', 'movietheater', 'musicvenue', 'planetarium', 'aquarium',
