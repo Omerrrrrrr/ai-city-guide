@@ -51,9 +51,9 @@ import {
   type UserProfileInput,
 } from './user-context';
 import { haversineKm } from './geo';
-import { fetchTripAdvisorInfo } from './tripadvisor';
+import { fetchTripAdvisorInfo, normalizeName } from './tripadvisor';
 import { fetchWikipediaPhoto } from './wiki-photo';
-import { places, cities, liveGridCellStatus, livePlaceCache } from './schema';
+import { places, cities, liveGridCellStatus, livePlaceCache, poiPhotoCache } from './schema';
 
 const PORT = Number(process.env.PORT ?? 4000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY?.trim();
@@ -1446,6 +1446,86 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
           willBeOpen: info.rating?.isOpenNow ?? null,
           hoursFormatted: info.rating?.hoursFormatted ?? null,
         };
+      })
+    );
+
+    return reply.send({ results });
+  });
+
+  // ── /places/photos-bulk — cached grid/list thumbnail photos ─────────────────
+  // Explore/Home/Plan Builder show 15-20+ places at once — fetching
+  // Tripadvisor + Wikipedia live for every one, on every screen load, would
+  // be slow and would hammer Tripadvisor's rate limit for a photo that
+  // rarely changes. Checks poi_photo_cache first; only calls the live
+  // providers on a genuine miss/expiry, and writes back a cached "no photo
+  // found" too (photoUrl: null) so a place that genuinely has none doesn't
+  // get re-queried on every single request forever.
+  const PHOTO_CACHE_TTL_DAYS = 30;
+
+  app.post<{
+    Body: { places: { name: string; lat: number; lng: number }[] };
+  }>('/places/photos-bulk', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const parsedBody = z
+      .object({
+        places: z
+          .array(
+            z.object({
+              name: z.string().trim().min(1).max(200),
+              lat: z.number(),
+              lng: z.number(),
+            })
+          )
+          .min(1)
+          .max(20),
+      })
+      .safeParse(request.body);
+
+    if (!parsedBody.success) {
+      return reply.code(400).send({ error: parsedBody.error.issues[0]?.message ?? 'Invalid request' });
+    }
+
+    const results = await Promise.all(
+      parsedBody.data.places.map(async (place) => {
+        const nameNormalized = normalizeName(place.name);
+        // Rounded to ~111m — the same POI queried from a slightly different
+        // exact coordinate (a fresh MKMapItem vs. an earlier geocode) still
+        // lands on the same cache row.
+        const latRounded = Math.round(place.lat * 1000) / 1000;
+        const lngRounded = Math.round(place.lng * 1000) / 1000;
+        const cacheId = `${nameNormalized}|${latRounded}|${lngRounded}`;
+
+        const [cached] = await db.select().from(poiPhotoCache).where(eq(poiPhotoCache.id, cacheId)).limit(1);
+        const cacheAgeDays = cached ? (Date.now() - new Date(cached.fetchedAt).getTime()) / (1000 * 60 * 60 * 24) : Infinity;
+
+        if (cached && cacheAgeDays < PHOTO_CACHE_TTL_DAYS) {
+          return { name: place.name, photoUrl: cached.photoUrl, source: cached.source, attributionUrl: cached.attributionUrl };
+        }
+
+        // Wikipedia first, matching /places/explain-poi's own priority — a
+        // real Wikimedia Commons photo over a Tripadvisor one when both exist.
+        const wiki = await fetchWikipediaPhoto(place.name, place.lat, place.lng);
+        let photoUrl: string | null = wiki?.url ?? null;
+        let source: 'wikipedia' | 'tripadvisor' | null = wiki ? 'wikipedia' : null;
+        let attributionUrl: string | null = wiki?.pageUrl ?? null;
+
+        if (!photoUrl) {
+          const info = await fetchTripAdvisorInfo(place.name, place.lat, place.lng);
+          if (info.photoUrls[0]) {
+            photoUrl = info.photoUrls[0];
+            source = 'tripadvisor';
+          }
+        }
+
+        const fetchedAt = new Date().toISOString();
+        await db
+          .insert(poiPhotoCache)
+          .values({ id: cacheId, nameNormalized, latRounded, lngRounded, photoUrl, source, attributionUrl, fetchedAt })
+          .onConflictDoUpdate({
+            target: poiPhotoCache.id,
+            set: { photoUrl, source, attributionUrl, fetchedAt },
+          });
+
+        return { name: place.name, photoUrl, source, attributionUrl };
       })
     );
 

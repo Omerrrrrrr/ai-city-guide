@@ -137,7 +137,30 @@ export const liveGridCellStatus = pgTable('live_grid_cell_status', {
   candidateCount: integer('candidate_count').notNull().default(0),
 });
 
+// Caches the TripAdvisor/Wikipedia photo lookup already built for
+// /places/explain-poi so grid/list views (Explore, Home, Plan Builder) can
+// show real photos without one live third-party call per card on every
+// screen load. Keyed on a rounded coordinate (not the exact one) so the
+// same POI queried from slightly different exact coordinates (a fresh
+// MKMapItem vs. a previous geocode) still hits the same cache row. Negative
+// results (no photo found anywhere) are cached too, as `photoUrl: null` --
+// otherwise every small/unlisted business with genuinely no photo would
+// get re-queried against TripAdvisor on every single grid load forever.
+export const poiPhotoCache = pgTable('poi_photo_cache', {
+  id: varchar('id', { length: 300 }).primaryKey(), // `${nameNormalized}|${latRounded}|${lngRounded}`
+  nameNormalized: varchar('name_normalized', { length: 256 }).notNull(),
+  latRounded: doublePrecision('lat_rounded').notNull(),
+  lngRounded: doublePrecision('lng_rounded').notNull(),
+  photoUrl: text('photo_url'),
+  source: varchar('source', { length: 32 }), // 'tripadvisor' | 'wikipedia' | null
+  attributionUrl: text('attribution_url'),
+  fetchedAt: varchar('fetched_at', { length: 64 }).notNull(),
+}, (table) => [
+  index('idx_poi_photo_cache_name').on(table.nameNormalized),
+]);
+
 export type PlaceRow = typeof places.$inferSelect;
+export type PoiPhotoCacheRow = typeof poiPhotoCache.$inferSelect;
 export type PlaceImageCandidateRow = typeof placeImageCandidates.$inferSelect;
 export type CityRow = typeof cities.$inferSelect;
 export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;

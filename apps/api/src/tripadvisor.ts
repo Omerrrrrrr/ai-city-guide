@@ -90,7 +90,7 @@ export async function fetchTripAdvisorPhotos(locationId: number): Promise<string
   }
 }
 
-function normalizeName(name: string): string {
+export function normalizeName(name: string): string {
   return name
     .toLowerCase()
     .normalize('NFD')
