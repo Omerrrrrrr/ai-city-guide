@@ -46,6 +46,15 @@ struct ScanScreen: View {
             }
 
             VStack {
+                // A live camera feed is almost never pure white, so this
+                // white-on-viewfinder text/icon design normally has enough
+                // contrast without help -- but a bright scene (sky, snow, a
+                // white wall/ceiling, direct glare) is a real, if
+                // occasional, case where it wouldn't. A soft black
+                // gradient behind just the control bars (not the whole
+                // frame, so the viewfinder itself stays clear) is the same
+                // fix virtually every camera app already uses, and costs
+                // nothing when the feed is already dark enough to not need it.
                 HStack {
                     Button {
                         camera.toggleFlash()
@@ -62,6 +71,11 @@ struct ScanScreen: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
+                .padding(.bottom, 14)
+                .background(
+                    LinearGradient(colors: [.black.opacity(0.4), .clear], startPoint: .top, endPoint: .bottom)
+                        .allowsHitTesting(false)
+                )
 
                 viewfinder
 
@@ -90,8 +104,12 @@ struct ScanScreen: View {
                     .frame(width: 70)
                 }
                 .padding(.horizontal, 40)
-                .padding(.bottom, 48)
                 .padding(.top, 16)
+                .padding(.bottom, 48)
+                .background(
+                    LinearGradient(colors: [.clear, .black.opacity(0.45)], startPoint: .top, endPoint: .bottom)
+                        .allowsHitTesting(false)
+                )
             }
 
             if !camera.isAuthorized {
