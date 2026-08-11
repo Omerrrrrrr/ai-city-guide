@@ -40,6 +40,7 @@ struct ProfileScreen: View {
     @State private var showingSaved: SavedTab?
     @State private var showingRestartHint = false
     @State private var profileTab: ProfileTab = .language
+    @State private var newInterestText = ""
 
     private var profile: UserProfile { userProfileStore.profile }
     private var displayName: String {
@@ -186,7 +187,83 @@ struct ProfileScreen: View {
                 Haptics.light()
                 userProfileStore.update { $0.profession = value }
             }
+            if profile.profession == .other {
+                professionOtherField
+            }
         }
+    }
+
+    // Ten presets can't cover everyone's actual interests -- this lets
+    // someone add their own ("wine tasting", "street art", whatever isn't
+    // one of the chips above) instead of settling for the closest fit or
+    // nothing. Merged into `UserProfile.interestsText` alongside the presets.
+    private var customInterestsField: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if !profile.customInterests.isEmpty {
+                FlowLayout(spacing: 8) {
+                    ForEach(profile.customInterests, id: \.self) { interest in
+                        HStack(spacing: 5) {
+                            Text(interest)
+                            Button {
+                                Haptics.light()
+                                userProfileStore.update { $0.customInterests.removeAll { $0 == interest } }
+                            } label: {
+                                Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
+                            }
+                        }
+                        .font(.system(size: 14, weight: .medium))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Capsule().fill(Theme.navy))
+                        .foregroundStyle(.white)
+                    }
+                }
+            }
+
+            HStack(spacing: 8) {
+                TextField(String(localized: "profileOptions.interests.addPlaceholder"), text: $newInterestText)
+                    .textInputAutocapitalization(.never)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 11)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemBackground)))
+                    .onSubmit(addCustomInterest)
+
+                Button(action: addCustomInterest) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 26))
+                        .foregroundStyle(newInterestText.trimmingCharacters(in: .whitespaces).isEmpty ? Color.secondary.opacity(0.4) : Theme.gold)
+                }
+                .disabled(newInterestText.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        }
+        .padding(.top, 10)
+    }
+
+    private func addCustomInterest() {
+        let trimmed = newInterestText.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        Haptics.light()
+        userProfileStore.update { profile in
+            if !profile.customInterests.contains(where: { $0.caseInsensitiveCompare(trimmed) == .orderedSame }) {
+                profile.customInterests.append(trimmed)
+            }
+        }
+        newInterestText = ""
+    }
+
+    // Picking "Other" used to be a dead end -- see `UserProfile.professionText`
+    // -- so the AI never learned anything beyond "not one of the ten presets."
+    // This is the only place that text actually gets captured.
+    private var professionOtherField: some View {
+        TextField(String(localized: "profileOptions.professions.otherPlaceholder"), text: Binding(
+            get: { profile.professionOther },
+            set: { newValue in userProfileStore.update { $0.professionOther = newValue } }
+        ))
+        .textInputAutocapitalization(.words)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemBackground)))
+        .padding(.top, 10)
     }
 
     // Grouped the same way `OnboardingScreen.faithInterestsStep` already
@@ -204,6 +281,7 @@ struct ProfileScreen: View {
                     }
                 }
             }
+            customInterestsField
         }
         card(titleKey: "onboarding.faithInterests.faithLabel", noteKey: "settings.faithNote") {
             ChipGrid(options: ProfileOptions.faiths, isSelected: { profile.faith == $0 }) { value in

@@ -28,12 +28,42 @@ enum Pace: String, Codable, CaseIterable {
 struct UserProfile: Codable, Equatable {
     var name: String = ""
     var profession: Profession?
+    /// Free text, only meaningful when `profession == .other` — picking
+    /// "Other" used to be a dead end: `professionText` below dropped it
+    /// entirely rather than sending the literal word "other" to the AI, so
+    /// anyone outside the ten preset options got zero personalization at
+    /// all. This is what they actually typed instead.
+    var professionOther: String = ""
     var interests: [Interest] = []
+    /// Free-text interests beyond the ten presets — same idea as
+    /// `professionOther`, but for a multi-select field: presets stay a
+    /// single fast tap, this covers whatever isn't one of them.
+    var customInterests: [String] = []
     var faith: Faith?
     var budget: Budget?
     var groupType: GroupType?
     var pace: Pace?
     var onboardingCompleted: Bool = false
+
+    /// What actually reaches the AI prompt for profession — the preset's
+    /// raw value normally, or the user's own typed text when they picked
+    /// "Other" (and nothing at all if they picked "Other" but never typed
+    /// anything, same as picking nothing).
+    var professionText: String? {
+        if profession == .other {
+            let trimmed = professionOther.trimmingCharacters(in: .whitespaces)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+        return profession?.rawValue
+    }
+
+    /// Preset interests plus whatever custom ones were typed in, merged
+    /// into the one flat list of strings the AI prompt actually wants.
+    var interestsText: [String] {
+        interests.map(\.rawValue) + customInterests
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+    }
 }
 
 /// Port of `buildProfileContext` in `mobile/src/store/user-profile.ts` —
@@ -44,12 +74,12 @@ func buildProfileContext(_ profile: UserProfile) -> String {
     if !profile.name.isEmpty {
         parts.append("The user's name is \(profile.name).")
     }
-    if let profession = profile.profession, profession != .other {
-        parts.append("They work as a \(profession.rawValue).")
+    if let profession = profile.professionText {
+        parts.append("They work as a \(profession).")
     }
-    if !profile.interests.isEmpty {
-        let interests = profile.interests.map(\.rawValue).joined(separator: ", ")
-        parts.append("Their interests include: \(interests).")
+    let interestsText = profile.interestsText
+    if !interestsText.isEmpty {
+        parts.append("Their interests include: \(interestsText.joined(separator: ", ")).")
     }
     if let faith = profile.faith, faith != .preferNotToSay {
         if faith == .secular {

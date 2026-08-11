@@ -58,8 +58,8 @@ struct PlaceDetailScreen: View {
             placeId: place.id,
             userProfile: PersonalizationProfile(
                 name: profile.name,
-                profession: profile.profession?.rawValue,
-                interests: profile.interests.map(\.rawValue),
+                profession: profile.professionText,
+                interests: profile.interestsText,
                 faith: profile.faith?.rawValue,
                 budget: profile.budget?.rawValue,
                 groupType: profile.groupType?.rawValue,

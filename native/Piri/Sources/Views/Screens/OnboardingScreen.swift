@@ -9,7 +9,10 @@ struct OnboardingScreen: View {
     @State private var step = 0
     @State private var name = ""
     @State private var profession: Profession?
+    @State private var professionOther = ""
     @State private var interests: [Interest] = []
+    @State private var customInterests: [String] = []
+    @State private var newInterestText = ""
     @State private var faith: Faith?
     @State private var budget: Budget?
     @State private var groupType: GroupType?
@@ -128,6 +131,14 @@ struct OnboardingScreen: View {
                 Haptics.light()
                 profession = value
             }
+            if profession == .other {
+                TextField(String(localized: "profileOptions.professions.otherPlaceholder"), text: $professionOther)
+                    .textInputAutocapitalization(.words)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 16)
+                    .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemBackground)))
+                    .padding(.top, 10)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -142,6 +153,40 @@ struct OnboardingScreen: View {
                 Haptics.light()
                 if let index = interests.firstIndex(of: value) { interests.remove(at: index) } else { interests.append(value) }
             }
+
+            if !customInterests.isEmpty {
+                FlowLayout(spacing: 8) {
+                    ForEach(customInterests, id: \.self) { interest in
+                        HStack(spacing: 5) {
+                            Text(interest)
+                            Button { customInterests.removeAll { $0 == interest } } label: {
+                                Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
+                            }
+                        }
+                        .font(.system(size: 14, weight: .medium))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Capsule().fill(Theme.navy))
+                        .foregroundStyle(.white)
+                    }
+                }
+                .padding(.top, 8)
+            }
+            HStack(spacing: 8) {
+                TextField(String(localized: "profileOptions.interests.addPlaceholder"), text: $newInterestText)
+                    .textInputAutocapitalization(.never)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 11)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemBackground)))
+                    .onSubmit(addOnboardingCustomInterest)
+                Button(action: addOnboardingCustomInterest) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 26))
+                        .foregroundStyle(newInterestText.trimmingCharacters(in: .whitespaces).isEmpty ? Color.secondary.opacity(0.4) : Theme.gold)
+                }
+                .disabled(newInterestText.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            .padding(.top, 8)
             .padding(.bottom, 10)
 
             Text("onboarding.faithInterests.faithLabel").font(.system(size: 13, weight: .semibold)).foregroundStyle(.secondary).textCase(.uppercase).padding(.top, 18)
@@ -180,6 +225,16 @@ struct OnboardingScreen: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private func addOnboardingCustomInterest() {
+        let trimmed = newInterestText.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        Haptics.light()
+        if !customInterests.contains(where: { $0.caseInsensitiveCompare(trimmed) == .orderedSame }) {
+            customInterests.append(trimmed)
+        }
+        newInterestText = ""
+    }
+
     private func advance() {
         if step < totalSteps {
             step += 1
@@ -192,7 +247,9 @@ struct OnboardingScreen: View {
         userProfileStore.update { profile in
             profile.name = name.trimmingCharacters(in: .whitespaces)
             profile.profession = profession
+            profile.professionOther = professionOther
             profile.interests = interests
+            profile.customInterests = customInterests
             profile.faith = faith
             profile.budget = budget
             profile.groupType = groupType
