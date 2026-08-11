@@ -22,6 +22,9 @@ struct HomeScreen: View {
     @State private var selectedCategoryGroup: POICategoryGroup?
     @State private var poiResults: [POIPlace] = []
     @State private var poiLoading = false
+    /// See `ExploreScreen`'s identical field for why an empty string (not
+    /// a missing key) means "checked, no photo found".
+    @State private var poiPhotoURLs: [String: String] = [:]
     @State private var selectedPOI: POIPlace?
 
     private var profile: UserProfile { userProfileStore.profile }
@@ -231,7 +234,8 @@ struct HomeScreen: View {
                         Button {
                             selectedPOI = poi
                         } label: {
-                            HStack {
+                            HStack(spacing: 12) {
+                                nearbyThumbnail(for: poi)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(poi.name).font(.system(size: 16, weight: .semibold)).foregroundStyle(.primary)
                                     if !poi.categoryLabel.isEmpty {
@@ -267,6 +271,48 @@ struct HomeScreen: View {
         poiLoading = true
         defer { poiLoading = false }
         poiResults = await POISearchService.search(near: coordinate, categories: selectedCategoryGroup?.categories)
+        loadNearbyPhotosIfNeeded()
+    }
+
+    @ViewBuilder
+    private func nearbyThumbnail(for poi: POIPlace) -> some View {
+        let urlString = poiPhotoURLs[poi.name]
+        if let urlString, !urlString.isEmpty, let url = URL(string: urlString) {
+            CachedAsyncImage(url: url, maxPixelSize: 120) { image in
+                image.resizable().aspectRatio(contentMode: .fill)
+            } placeholder: {
+                nearbyIconFallback(for: poi)
+            }
+            .frame(width: 44, height: 44)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+        } else {
+            nearbyIconFallback(for: poi)
+                .frame(width: 44, height: 44)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+    }
+
+    private func nearbyIconFallback(for poi: POIPlace) -> some View {
+        ZStack {
+            Color(.secondarySystemBackground)
+            Image(systemName: POICategoryGroups.icon(for: poi.category))
+                .font(.system(size: 16))
+                .foregroundStyle(Theme.gold)
+        }
+    }
+
+    private func loadNearbyPhotosIfNeeded() {
+        let missing = poiResults.filter { poiPhotoURLs[$0.name] == nil }.prefix(20)
+        guard !missing.isEmpty else { return }
+        let request = PhotoBulkRequest(places: missing.map {
+            PhotoBulkPlace(name: $0.name, lat: $0.coordinate.latitude, lng: $0.coordinate.longitude)
+        })
+        Task {
+            guard let response = try? await PlacesAPI.photosBulk(request) else { return }
+            for result in response.results {
+                poiPhotoURLs[result.name] = result.photoUrl ?? ""
+            }
+        }
     }
 
     private func errorBanner(_ message: String) -> some View {

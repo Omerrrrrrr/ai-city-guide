@@ -30,6 +30,13 @@ struct ExploreScreen: View {
     @State private var searchRadius: CLLocationDistance = 4000
     @State private var searchCoordinate: CLLocationCoordinate2D?
     private static let maxSearchRadius: CLLocationDistance = 20000
+    /// Keyed by POI name. An empty string is a real, distinct value here —
+    /// "already checked, no photo found" — not just "haven't asked yet",
+    /// since `[String: String?]`'s subscript setter can't actually store
+    /// `Optional.none` as a value (assigning nil removes the key instead),
+    /// which would otherwise make every no-photo place get re-requested on
+    /// every scroll.
+    @State private var photoURLs: [String: String] = [:]
 
     var body: some View {
         ScrollView {
@@ -114,13 +121,8 @@ struct ExploreScreen: View {
                         selectedPOI = poi
                     } label: {
                         VStack(alignment: .leading, spacing: 5) {
-                            ZStack {
-                                Color(.secondarySystemBackground)
-                                Image(systemName: POICategoryGroups.icon(for: poi.category))
-                                    .font(.system(size: 28))
-                                    .foregroundStyle(Theme.gold)
-                            }
-                            .frame(height: 100)
+                            tileImage(for: poi)
+                                .frame(height: 100)
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(poi.name).font(.system(size: 15, weight: .bold)).lineLimit(2)
                                 if !poi.categoryLabel.isEmpty {
@@ -145,6 +147,51 @@ struct ExploreScreen: View {
                     Spacer()
                 }
                 .padding(.top, 4)
+            }
+        }
+    }
+
+    /// Real photo when the cache/live lookup found one; the category icon
+    /// tile (today's only option) otherwise — never a broken-image state,
+    /// same silent-degrade contract `POISearchService` already uses.
+    @ViewBuilder
+    private func tileImage(for poi: POIPlace) -> some View {
+        let urlString = photoURLs[poi.name]
+        if let urlString, !urlString.isEmpty, let url = URL(string: urlString) {
+            CachedAsyncImage(url: url, maxPixelSize: 300) { image in
+                image.resizable().aspectRatio(contentMode: .fill)
+            } placeholder: {
+                categoryTile(for: poi)
+            }
+            .clipped()
+        } else {
+            categoryTile(for: poi)
+        }
+    }
+
+    private func categoryTile(for poi: POIPlace) -> some View {
+        ZStack {
+            Color(.secondarySystemBackground)
+            Image(systemName: POICategoryGroups.icon(for: poi.category))
+                .font(.system(size: 28))
+                .foregroundStyle(Theme.gold)
+        }
+    }
+
+    /// Batches up to 20 places at once (matches `/places/photos-bulk`'s own
+    /// cap) and skips anything already resolved — including a confirmed
+    /// "no photo" — so scrolling through a long list doesn't re-request the
+    /// same names over and over.
+    private func loadPhotosIfNeeded(for items: [POIPlace]) {
+        let missing = items.filter { photoURLs[$0.name] == nil }.prefix(20)
+        guard !missing.isEmpty else { return }
+        let request = PhotoBulkRequest(places: missing.map {
+            PhotoBulkPlace(name: $0.name, lat: $0.coordinate.latitude, lng: $0.coordinate.longitude)
+        })
+        Task {
+            guard let response = try? await PlacesAPI.photosBulk(request) else { return }
+            for result in response.results {
+                photoURLs[result.name] = result.photoUrl ?? ""
             }
         }
     }
@@ -180,6 +227,7 @@ struct ExploreScreen: View {
             naturalLanguageQuery: trimmed.isEmpty ? nil : trimmed,
             radiusMeters: searchRadius
         )
+        loadPhotosIfNeeded(for: results)
     }
 
     private func loadMoreIfNeeded(after poi: POIPlace) {
@@ -203,6 +251,7 @@ struct ExploreScreen: View {
             let newOnes = more.filter { !existingIdentifiers.contains($0.asReference.identifier) }
             guard !newOnes.isEmpty else { return }
             results += newOnes
+            loadPhotosIfNeeded(for: newOnes)
         }
     }
 }

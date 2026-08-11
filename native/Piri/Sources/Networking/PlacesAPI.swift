@@ -131,3 +131,34 @@ enum PlanSchedulingAPI {
         try await APIClient.shared.post("/places/hours-check", body: request)
     }
 }
+
+struct PhotoBulkPlace: Encodable {
+    var name: String
+    var lat: Double
+    var lng: Double
+}
+
+struct PhotoBulkRequest: Encodable {
+    var places: [PhotoBulkPlace]
+}
+
+struct PhotoBulkResult: Decodable {
+    var name: String
+    var photoUrl: String?
+    var source: String?
+    var attributionUrl: String?
+}
+
+struct PhotoBulkResponse: Decodable {
+    var results: [PhotoBulkResult]
+}
+
+extension PlacesAPI {
+    /// Cache-first — the same request shape hitting the same places
+    /// repeatedly (any two people browsing the same city) resolves from
+    /// `poi_photo_cache` server-side after the first live lookup, not one
+    /// live Tripadvisor/Wikipedia call per card per screen load.
+    static func photosBulk(_ request: PhotoBulkRequest) async throws -> PhotoBulkResponse {
+        try await APIClient.shared.post("/places/photos-bulk", body: request)
+    }
+}
