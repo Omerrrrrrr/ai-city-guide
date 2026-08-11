@@ -1382,7 +1382,7 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
 ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
             prompt: `Explain this place:\n\n${placeContext}`,
           } as any),
-          lat !== undefined && lng !== undefined ? fetchWikipediaPhoto(name, lat, lng) : Promise.resolve(null),
+          lat !== undefined && lng !== undefined ? fetchWikipediaPhoto(name, lat, lng, category) : Promise.resolve(null),
         ]);
 
         // Wikipedia first — the user's explicit priority — then Tripadvisor.
@@ -1463,7 +1463,7 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
   const PHOTO_CACHE_TTL_DAYS = 30;
 
   app.post<{
-    Body: { places: { name: string; lat: number; lng: number }[] };
+    Body: { places: { name: string; lat: number; lng: number; category?: string }[] };
   }>('/places/photos-bulk', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (request, reply) => {
     const parsedBody = z
       .object({
@@ -1473,6 +1473,7 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
               name: z.string().trim().min(1).max(200),
               lat: z.number(),
               lng: z.number(),
+              category: z.string().trim().max(100).nullable().optional(),
             })
           )
           .min(1)
@@ -1484,50 +1485,63 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
       return reply.code(400).send({ error: parsedBody.error.issues[0]?.message ?? 'Invalid request' });
     }
 
-    const results = await Promise.all(
-      parsedBody.data.places.map(async (place) => {
-        const nameNormalized = normalizeName(place.name);
-        // Rounded to ~111m — the same POI queried from a slightly different
-        // exact coordinate (a fresh MKMapItem vs. an earlier geocode) still
-        // lands on the same cache row.
-        const latRounded = Math.round(place.lat * 1000) / 1000;
-        const lngRounded = Math.round(place.lng * 1000) / 1000;
-        const cacheId = `${nameNormalized}|${latRounded}|${lngRounded}`;
+    // Bounded concurrency, not one big Promise.all — confirmed live that
+    // firing all 20 places at once (each doing a Wikipedia call and,
+    // on a miss, a Tripadvisor call) silently drops real matches: Terra's
+    // Discover tier caps at 10 QPS, and a burst past that returns errors
+    // that this loop's own try/catches (inside fetchTripAdvisorInfo) turn
+    // into an indistinguishable "no photo" rather than a retry. 4-at-a-time
+    // keeps peak concurrent external calls well under that ceiling.
+    const CONCURRENCY = 4;
+    const places = parsedBody.data.places;
+    const results: { name: string; photoUrl: string | null; source: string | null; attributionUrl: string | null }[] = [];
+    for (let i = 0; i < places.length; i += CONCURRENCY) {
+      const chunkResults = await Promise.all(
+        places.slice(i, i + CONCURRENCY).map(async (place) => {
+          const nameNormalized = normalizeName(place.name);
+          // Rounded to ~111m — the same POI queried from a slightly different
+          // exact coordinate (a fresh MKMapItem vs. an earlier geocode) still
+          // lands on the same cache row.
+          const latRounded = Math.round(place.lat * 1000) / 1000;
+          const lngRounded = Math.round(place.lng * 1000) / 1000;
+          const cacheId = `${nameNormalized}|${latRounded}|${lngRounded}`;
 
-        const [cached] = await db.select().from(poiPhotoCache).where(eq(poiPhotoCache.id, cacheId)).limit(1);
-        const cacheAgeDays = cached ? (Date.now() - new Date(cached.fetchedAt).getTime()) / (1000 * 60 * 60 * 24) : Infinity;
+          const [cached] = await db.select().from(poiPhotoCache).where(eq(poiPhotoCache.id, cacheId)).limit(1);
+          const cacheAgeDays = cached ? (Date.now() - new Date(cached.fetchedAt).getTime()) / (1000 * 60 * 60 * 24) : Infinity;
 
-        if (cached && cacheAgeDays < PHOTO_CACHE_TTL_DAYS) {
-          return { name: place.name, photoUrl: cached.photoUrl, source: cached.source, attributionUrl: cached.attributionUrl };
-        }
-
-        // Wikipedia first, matching /places/explain-poi's own priority — a
-        // real Wikimedia Commons photo over a Tripadvisor one when both exist.
-        const wiki = await fetchWikipediaPhoto(place.name, place.lat, place.lng);
-        let photoUrl: string | null = wiki?.url ?? null;
-        let source: 'wikipedia' | 'tripadvisor' | null = wiki ? 'wikipedia' : null;
-        let attributionUrl: string | null = wiki?.pageUrl ?? null;
-
-        if (!photoUrl) {
-          const info = await fetchTripAdvisorInfo(place.name, place.lat, place.lng);
-          if (info.photoUrls[0]) {
-            photoUrl = info.photoUrls[0];
-            source = 'tripadvisor';
+          if (cached && cacheAgeDays < PHOTO_CACHE_TTL_DAYS) {
+            return { name: place.name, photoUrl: cached.photoUrl, source: cached.source, attributionUrl: cached.attributionUrl };
           }
-        }
 
-        const fetchedAt = new Date().toISOString();
-        await db
-          .insert(poiPhotoCache)
-          .values({ id: cacheId, nameNormalized, latRounded, lngRounded, photoUrl, source, attributionUrl, fetchedAt })
-          .onConflictDoUpdate({
-            target: poiPhotoCache.id,
-            set: { photoUrl, source, attributionUrl, fetchedAt },
-          });
+          // Wikipedia first, matching /places/explain-poi's own priority — a
+          // real Wikimedia Commons photo over a Tripadvisor one when both exist.
+          const wiki = await fetchWikipediaPhoto(place.name, place.lat, place.lng, place.category ?? undefined);
+          let photoUrl: string | null = wiki?.url ?? null;
+          let source: 'wikipedia' | 'tripadvisor' | null = wiki ? 'wikipedia' : null;
+          let attributionUrl: string | null = wiki?.pageUrl ?? null;
 
-        return { name: place.name, photoUrl, source, attributionUrl };
-      })
-    );
+          if (!photoUrl) {
+            const info = await fetchTripAdvisorInfo(place.name, place.lat, place.lng);
+            if (info.photoUrls[0]) {
+              photoUrl = info.photoUrls[0];
+              source = 'tripadvisor';
+            }
+          }
+
+          const fetchedAt = new Date().toISOString();
+          await db
+            .insert(poiPhotoCache)
+            .values({ id: cacheId, nameNormalized, latRounded, lngRounded, photoUrl, source, attributionUrl, fetchedAt })
+            .onConflictDoUpdate({
+              target: poiPhotoCache.id,
+              set: { photoUrl, source, attributionUrl, fetchedAt },
+            });
+
+          return { name: place.name, photoUrl, source, attributionUrl };
+        })
+      );
+      results.push(...chunkResults);
+    }
 
     return reply.send({ results });
   });

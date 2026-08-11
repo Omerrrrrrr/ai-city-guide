@@ -186,7 +186,7 @@ struct ExploreScreen: View {
         let missing = items.filter { photoURLs[$0.name] == nil }.prefix(20)
         guard !missing.isEmpty else { return }
         let request = PhotoBulkRequest(places: missing.map {
-            PhotoBulkPlace(name: $0.name, lat: $0.coordinate.latitude, lng: $0.coordinate.longitude)
+            PhotoBulkPlace(name: $0.name, lat: $0.coordinate.latitude, lng: $0.coordinate.longitude, category: $0.categoryLabel.isEmpty ? nil : $0.categoryLabel)
         })
         Task {
             guard let response = try? await PlacesAPI.photosBulk(request) else { return }

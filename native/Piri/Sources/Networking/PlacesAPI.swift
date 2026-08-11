@@ -136,6 +136,11 @@ struct PhotoBulkPlace: Encodable {
     var name: String
     var lat: Double
     var lng: Double
+    /// `POIPlace.categoryLabel` — lets the backend's Wikipedia lookup only
+    /// trust a distance-only fallback match (no literal name overlap) for
+    /// categories where a Wikipedia article is actually plausible, instead
+    /// of ever attaching an unrelated nearby landmark's photo to a shop.
+    var category: String?
 }
 
 struct PhotoBulkRequest: Encodable {

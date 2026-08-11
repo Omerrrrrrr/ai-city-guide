@@ -142,9 +142,17 @@ export async function fetchTripAdvisorInfo(
     const url = new URL('https://terra.tripadvisor.com/api/locations/nearby');
     url.searchParams.set('lat', String(lat));
     url.searchParams.set('lon', String(lng));
-    url.searchParams.set('radius', '0.3');
+    // Widened from 300m: Apple's POI pin and Tripadvisor's own registered
+    // coordinate for the same real place can drift more than 300m apart.
+    // Safe to widen because the name-overlap check below is still required
+    // regardless of radius -- this only grows the candidate pool it's
+    // allowed to search through, never loosens the match itself. (Some
+    // places -- confirmed live with a real Oslo Hard Rock Cafe -- simply
+    // aren't in Tripadvisor's database at all near a given pin, even at
+    // 1.5km; no radius fixes that, it's a coverage gap, not a drift one.)
+    url.searchParams.set('radius', '0.6');
     url.searchParams.set('unit', 'KM');
-    url.searchParams.set('size', '10');
+    url.searchParams.set('size', '15');
 
     const res = await fetch(url, {
       headers: { 'X-API-Key': TRIPADVISOR_API_KEY },
