@@ -80,6 +80,7 @@
 		B76B20B3FEABC73E69373793 /* Trip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96FE584464E381510D16935C /* Trip.swift */; };
 		B86D99FE1C368872A95297E9 /* CameraController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A93188E4925629A97DF4B4F0 /* CameraController.swift */; };
 		B8F002588A7356E943EE2281 /* OnboardingScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3652D871ED8EF7E7997CC36 /* OnboardingScreen.swift */; };
+		BA982D8C8D53B5A086815E50 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 508A41E927502E9CB0B734D4 /* PrivacyInfo.xcprivacy */; };
 		C1B3BB1517E5EAD8D861C18C /* LookAroundCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26F2F82581B09C946DED399 /* LookAroundCard.swift */; };
 		C3DB184A2DD02A67D555B617 /* UserProfileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4C2666096F0297D66681891 /* UserProfileStore.swift */; };
 		C4571C5476BB6CECDD2B4F47 /* PushNotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB62061C800BEF24D07A2C43 /* PushNotificationManager.swift */; };
@@ -149,6 +150,7 @@
 		3EE61E58BF0F9281015C1F99 /* LanguageManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanguageManager.swift; sourceTree = "<group>"; };
 		40632CC354EF9E493BB92DED /* RecentlyViewedStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentlyViewedStore.swift; sourceTree = "<group>"; };
 		4EA57B06A6E01213B556B858 /* AdminAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminAPI.swift; sourceTree = "<group>"; };
+		508A41E927502E9CB0B734D4 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		57103CE5924DEF3637376683 /* PlaceHoursTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceHoursTests.swift; sourceTree = "<group>"; };
 		5A0D0AD80CD490F2E75F460F /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		5A0EB13F235AC7C694C7EFDD /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
@@ -443,6 +445,7 @@
 			isa = PBXGroup;
 			children = (
 				E712507F714C68342D7027E7 /* Localizable.xcstrings */,
+				508A41E927502E9CB0B734D4 /* PrivacyInfo.xcprivacy */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -568,6 +571,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A785BBB4AFF5DC51F15C29A3 /* Localizable.xcstrings in Resources */,
+				BA982D8C8D53B5A086815E50 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -737,6 +741,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				PIRI_APS_ENVIRONMENT = development;
 				PRODUCT_BUNDLE_IDENTIFIER = com.piriapp.piri;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -795,6 +800,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				PIRI_APS_ENVIRONMENT = production;
 				PRODUCT_BUNDLE_IDENTIFIER = com.piriapp.piri;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";

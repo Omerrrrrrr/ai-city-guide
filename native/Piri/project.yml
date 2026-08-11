@@ -31,21 +31,45 @@ targets:
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+        # Portrait-only (see above) with no full-screen opt-out otherwise
+        # trips Apple's own archive validator: "All interface orientations
+        # must be supported unless the app requires full screen" —
+        # confirmed via a real `xcodebuild archive` run. iPad (this app's
+        # TARGETED_DEVICE_FAMILY includes it) defaults to expecting
+        # multi-orientation/multitasking support unless this is set.
+        UIRequiresFullScreen: true
         NSLocationWhenInUseUsageDescription: "Piri uses your location to show nearby places and give you city-specific recommendations."
         NSCameraUsageDescription: "Piri uses your camera to identify places and give you personalized explanations."
         NSPhotoLibraryAddUsageDescription: "Piri can save trip photos to your library."
         CFBundleShortVersionString: "1.0.0"
         CFBundleVersion: "1"
+        # Standard HTTPS/TLS only, no proprietary/non-exempt encryption --
+        # declaring this here answers Apple's export-compliance question
+        # automatically at each submission instead of it being asked in
+        # App Store Connect every time.
+        ITSAppUsesNonExemptEncryption: false
     entitlements:
       path: Piri.entitlements
       properties:
-        aps-environment: development
+        # Literal build-setting reference, substituted by Xcode at
+        # codesign time -- not a plain value, since Debug and Release
+        # genuinely need different values here (see PIRI_APS_ENVIRONMENT
+        # below). A push notification sent against a Release/App-Store
+        # build with this hardcoded to "development" silently fails to
+        # deliver -- APNs' development and production environments are
+        # entirely separate services with separate device tokens.
+        aps-environment: $(PIRI_APS_ENVIRONMENT)
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.piriapp.piri
         TARGETED_DEVICE_FAMILY: "1,2"
         CODE_SIGN_STYLE: Automatic
         GENERATE_INFOPLIST_FILE: NO
+      configs:
+        Debug:
+          PIRI_APS_ENVIRONMENT: development
+        Release:
+          PIRI_APS_ENVIRONMENT: production
   PiriTests:
     type: bundle.unit-test
     platform: iOS
