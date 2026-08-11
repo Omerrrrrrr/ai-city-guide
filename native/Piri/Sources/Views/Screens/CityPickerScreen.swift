@@ -6,6 +6,13 @@ import SwiftUI
 /// ready/discovering/queued/failed status, no discovery push-token
 /// registration. `/cities/discover` stays intact server-side, just unused.
 struct CityPickerScreen: View {
+    /// When provided, picking a result calls this instead of setting the
+    /// app-wide active city — used where a screen needs a one-off search
+    /// anchor elsewhere (e.g. `CollectionDetailScreen` searching for a
+    /// place in a different city) without changing what the rest of the
+    /// app considers "the current city".
+    var onSelect: ((CityResult) -> Void)?
+
     @Environment(CityStore.self) private var cityStore
     @Environment(\.dismiss) private var dismiss
 
@@ -20,7 +27,7 @@ struct CityPickerScreen: View {
             header
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    if let cityName = cityStore.cityName {
+                    if onSelect == nil, let cityName = cityStore.cityName {
                         currentCitySection(cityName)
                     }
 
@@ -181,6 +188,11 @@ struct CityPickerScreen: View {
     }
 
     private func select(_ city: CityResult) {
+        if let onSelect {
+            onSelect(city)
+            dismiss()
+            return
+        }
         // No curated-DB "known city" concept left — every geocoded result is
         // immediately usable with Apple POI data. Fall back to a coordinate-
         // derived id when the backend didn't have one on file.

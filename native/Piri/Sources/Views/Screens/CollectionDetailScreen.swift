@@ -28,6 +28,15 @@ struct CollectionDetailScreen: View {
     @State private var searchResults: [POIPlace] = []
     @State private var isSearchingPlaces = false
     @State private var searchTask: Task<Void, Never>?
+    @State private var showingSearchCityPicker = false
+    /// Overrides `cityStore` as the search anchor for this screen only —
+    /// added because the search was silently limited to the globally
+    /// active city (found live: searching "Sulamaniye" while Oslo was
+    /// active only matched a mosque named after it *in* Oslo, not the
+    /// actual place the user meant elsewhere). Never touches the app-wide
+    /// active city.
+    @State private var searchAnchorCityName: String?
+    @State private var searchAnchorCoordinate: CLLocationCoordinate2D?
 
     private var collection: SavedCollection? {
         savedPlacesStore.collections.first { $0.id == collectionId }
@@ -150,24 +159,54 @@ struct CollectionDetailScreen: View {
     }
 
     private var searchField: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-            TextField(String(localized: "collection.searchPlaceholder"), text: $searchQuery)
-                .textFieldStyle(.plain)
-                .autocorrectionDisabled()
-            if !searchQuery.isEmpty {
-                Button {
-                    searchQuery = ""
-                    searchTask?.cancel()
-                    searchResults = []
-                } label: {
-                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField(String(localized: "collection.searchPlaceholder"), text: $searchQuery)
+                    .textFieldStyle(.plain)
+                    .autocorrectionDisabled()
+                if !searchQuery.isEmpty {
+                    Button {
+                        searchQuery = ""
+                        searchTask?.cancel()
+                        searchResults = []
+                    } label: {
+                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemBackground)))
+
+            // A place search anchored on the wrong city just returns
+            // nothing useful — surfaced directly (not buried in a
+            // separate settings screen) since it's exactly what explains
+            // an empty/unexpected result to the person searching.
+            Button {
+                showingSearchCityPicker = true
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "mappin.and.ellipse").font(.system(size: 12))
+                    Text(L("collection.searchLocation", searchAnchorCityName ?? cityStore.cityName ?? String(localized: "common.everywhere")))
+                        .font(.system(size: 12, weight: .medium))
+                    Text("common.change").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.gold)
+                }
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .sheet(isPresented: $showingSearchCityPicker) {
+            CityPickerScreen { city in
+                searchAnchorCityName = city.name
+                searchAnchorCoordinate = CLLocationCoordinate2D(latitude: city.centerLat, longitude: city.centerLng)
+                if !searchQuery.trimmingCharacters(in: .whitespaces).isEmpty {
+                    scheduleSearch(searchQuery)
                 }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemBackground)))
     }
 
     @ViewBuilder
@@ -231,8 +270,10 @@ struct CollectionDetailScreen: View {
             searchResults = []
             return
         }
-        guard let lat = cityStore.lat, let lng = cityStore.lng else { return }
-        let coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+        let activeCityCoordinate: CLLocationCoordinate2D? = cityStore.lat.flatMap { lat in
+            cityStore.lng.map { lng in CLLocationCoordinate2D(latitude: lat, longitude: lng) }
+        }
+        guard let coordinate = searchAnchorCoordinate ?? activeCityCoordinate else { return }
         isSearchingPlaces = true
         searchTask = Task {
             try? await Task.sleep(for: .milliseconds(300))

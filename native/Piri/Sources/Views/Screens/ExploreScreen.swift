@@ -17,9 +17,19 @@ struct ExploreScreen: View {
     @State private var selectedCategoryGroup: POICategoryGroup?
     @State private var results: [POIPlace] = []
     @State private var isLoading = false
+    @State private var isLoadingMore = false
     @State private var selectedPOI: POIPlace?
     @State private var locationManager = LocationManager()
     @State private var searchTask: Task<Void, Never>?
+    /// `MKLocalSearchRequest` has no result-count/page parameter at all —
+    /// confirmed against the actual header, not just docs — so ~25 results
+    /// per call is a hard, undocumented Apple cap, not anything tunable
+    /// here. Scrolling to the bottom re-searches at a wider radius and
+    /// merges in whatever's new, same pattern as `PlanBuilderScreen`, since
+    /// that's the only way to surface more than one call's worth at all.
+    @State private var searchRadius: CLLocationDistance = 4000
+    @State private var searchCoordinate: CLLocationCoordinate2D?
+    private static let maxSearchRadius: CLLocationDistance = 20000
 
     var body: some View {
         ScrollView {
@@ -123,9 +133,19 @@ struct ExploreScreen: View {
                         .clipShape(RoundedRectangle(cornerRadius: 18))
                     }
                     .buttonStyle(.plain)
+                    .onAppear { loadMoreIfNeeded(after: poi) }
                 }
             }
             .padding(.horizontal, 16)
+
+            if isLoadingMore {
+                HStack {
+                    Spacer()
+                    ProgressView().tint(Theme.gold)
+                    Spacer()
+                }
+                .padding(.top, 4)
+            }
         }
     }
 
@@ -150,11 +170,39 @@ struct ExploreScreen: View {
         isLoading = true
         defer { isLoading = false }
 
+        searchCoordinate = coordinate
+        searchRadius = 4000
+
         let trimmed = query.trimmingCharacters(in: .whitespaces)
         results = await POISearchService.search(
             near: coordinate,
             categories: selectedCategoryGroup?.categories,
-            naturalLanguageQuery: trimmed.isEmpty ? nil : trimmed
+            naturalLanguageQuery: trimmed.isEmpty ? nil : trimmed,
+            radiusMeters: searchRadius
         )
+    }
+
+    private func loadMoreIfNeeded(after poi: POIPlace) {
+        guard poi.id == results.last?.id else { return }
+        guard !isLoading, !isLoadingMore, searchRadius < Self.maxSearchRadius else { return }
+        guard let coordinate = searchCoordinate else { return }
+
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        searchRadius = min(searchRadius * 1.7, Self.maxSearchRadius)
+        isLoadingMore = true
+
+        Task {
+            defer { isLoadingMore = false }
+            let more = await POISearchService.search(
+                near: coordinate,
+                categories: selectedCategoryGroup?.categories,
+                naturalLanguageQuery: trimmed.isEmpty ? nil : trimmed,
+                radiusMeters: searchRadius
+            )
+            let existingIdentifiers = Set(results.map { $0.asReference.identifier })
+            let newOnes = more.filter { !existingIdentifiers.contains($0.asReference.identifier) }
+            guard !newOnes.isEmpty else { return }
+            results += newOnes
+        }
     }
 }

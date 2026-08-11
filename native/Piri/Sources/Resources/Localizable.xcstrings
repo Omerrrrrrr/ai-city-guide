@@ -3521,6 +3521,29 @@
         }
       }
     },
+    "collection.searchLocation": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Searching in %1$@"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Søker i %1$@"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@'de aranıyor"
+          }
+        }
+      }
+    },
     "collection.searchNoResults": {
       "extractionState": "manual",
       "localizations": {

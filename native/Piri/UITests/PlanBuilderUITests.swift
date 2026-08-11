@@ -96,13 +96,42 @@ final class PlanBuilderUITests: XCTestCase {
                 searchField.typeText("kafe")
                 Thread.sleep(forTimeInterval: 2)
                 attach(app, name: "08b-search-results")
+
+                // Search-location override: change the search anchor away
+                // from the active city (found live: searching for a place
+                // in a different city silently returned nothing useful,
+                // scoped to wherever the active city happened to be).
+                let changeSearchLocation = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "Değiştir")).firstMatch
+                if changeSearchLocation.waitForExistence(timeout: 3), changeSearchLocation.isHittable {
+                    changeSearchLocation.tap()
+                    attach(app, name: "08c-search-city-picker")
+                    let citySearchField = app.textFields.firstMatch
+                    if citySearchField.waitForExistence(timeout: 5) {
+                        citySearchField.tap()
+                        citySearchField.typeText("Istanbul")
+                        // Matching "tanbul" rather than "Istanbul" — Turkish
+                        // renders it "İstanbul" (dotted capital İ, U+0130,
+                        // not ASCII I), which even a case-insensitive
+                        // CONTAINS predicate won't match as a substring.
+                        let firstCityResult = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "tanbul")).firstMatch
+                        if firstCityResult.waitForExistence(timeout: 8) {
+                            firstCityResult.tap()
+                        }
+                    }
+                    Thread.sleep(forTimeInterval: 2)
+                    attach(app, name: "08d-search-location-changed")
+                }
+
                 // Clear back out (backspace rather than guessing the clear
                 // button's accessibility label) so the rest of the flow
                 // sees the normal (non-search) collection list again —
                 // CollectionDetailScreen swaps to the search-results list
                 // whenever the query isn't empty.
-                searchField.typeText(String(repeating: "\u{8}", count: 10))
-                Thread.sleep(forTimeInterval: 0.5)
+                if searchField.waitForExistence(timeout: 3) {
+                    searchField.tap()
+                    searchField.typeText(String(repeating: "\u{8}", count: 20))
+                    Thread.sleep(forTimeInterval: 0.5)
+                }
             }
 
             let pickDateRow = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "Tarih")).firstMatch
