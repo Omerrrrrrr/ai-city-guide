@@ -1572,6 +1572,13 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
           address: z.string().trim().max(300).optional(),
           locale: z.string().trim().min(2).max(8).optional(),
           userProfile: userProfileSchema.optional(),
+          // Capped generously just against abuse, not against a normal long
+          // chat -- a real conversation (confirmed live) can run well past
+          // 20 turns, and hard-rejecting the whole request past that point
+          // surfaced as a bare, unlocalized "Invalid request" with no way
+          // to recover except clearing the chat. Trimmed to the most
+          // recent turns below instead, same pattern already used for
+          // /places/recommend-poi's own history.
           history: z
             .array(
               z.object({
@@ -1579,7 +1586,7 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
                 content: z.string().trim().min(1).max(2000),
               })
             )
-            .max(20),
+            .max(200),
           message: z.string().trim().min(1).max(1000),
         })
         .safeParse(request.body);
@@ -1588,7 +1595,8 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
         return reply.code(400).send({ error: 'Invalid request' });
       }
 
-      const { name, category, address, locale, userProfile, history, message } = parsed.data;
+      const { name, category, address, locale, userProfile, message } = parsed.data;
+      const history = parsed.data.history.slice(-12);
       const aiProvider = getAiProviderConfig();
       if (!aiProvider) {
         return reply.code(503).send({ error: 'AI not configured' });
@@ -1608,7 +1616,9 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
               role: 'system',
               content: `You are Piri, a knowledgeable personal travel guide, continuing a conversation about one specific place the user is looking at right now:\n${placeContext}\n\nYou have no verified facts beyond what's given above — rely on general knowledge about places of this type and name, and say so plainly if you're not sure of something specific (an exact date, owner, etc.) rather than inventing it.
 
-NEARBY-PLACES RULE (found via testing: asked for a nearby restaurant, this chat invented a specific chain's name, then a "500 meters" distance it explicitly admitted not knowing, then fabricated turn-by-turn directions — all confidently, with zero real location or map data behind any of it): this chat has no coordinates, no nearby-search results, and no routing data at all — only the single place named above. Never name a specific other business as if it's a verified real place near here, never state a distance in meters/minutes, and never give directions ("turn right", "walk along X street") — all of that would be invented, not looked up. If asked something like this, say plainly that you don't have real nearby/map data in this chat, and point them to the map or a fresh search instead of guessing.
+NEARBY-PLACES RULE (found via testing: asked for a nearby restaurant, this chat invented a specific chain's name, then a "500 meters" distance it explicitly admitted not knowing, then fabricated turn-by-turn directions — all confidently, with zero real location or map data behind any of it): this chat has no coordinates, no nearby-search results, and no routing data at all — only the single place named above. Never name a specific other business as if it's a verified real place near here, never state a distance in meters/minutes, and never give directions ("turn right", "walk along X street") — all of that would be invented, not looked up. If asked something like this, say plainly that you don't have real nearby/map data in this chat, and point them to the map or a fresh search instead of guessing. This holds even if an earlier reply in this same conversation already named a specific place — an earlier mistake is not a fact to build on, treat it as unverified too rather than staying "consistent" with it.
+
+SCOPE RULE (found via testing: pushed hard enough, this chat kept inventing increasingly specific restaurants — "Gino's Pizza", "Bellini" — for a request about a completely different town, Grimstad, nowhere near the place this chat is about): if the user asks about a different place, neighborhood, or town that isn't this specific place or its immediate vicinity, don't attempt an answer from general knowledge at all. Say plainly that this chat is focused on ${name} and that Piri's main search (Ask Piri) is the right place to ask about somewhere else, since it can actually search real places there — this chat can't.
 
 Keep replies short and conversational (1-4 sentences) — this is a chat, not another blurb.${NO_HYPE_GUARD}${profileContext}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
             },
