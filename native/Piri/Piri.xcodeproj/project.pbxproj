@@ -64,6 +64,7 @@
 		9540AA2B53DA5CA6ABA74D33 /* PlaceDirections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02E923D5ACCD81DBBA0233C5 /* PlaceDirections.swift */; };
 		9558015CF2CE4C6AC4AEE174 /* ProfileScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE6342530F052E87F0BEA86F /* ProfileScreen.swift */; };
 		9A8D2E7A8F6B7CF500CED79E /* LanguageManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE61E58BF0F9281015C1F99 /* LanguageManager.swift */; };
+		9CEA2601DD279A5F0E8A8BB3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DD664E9C3165D45C042C8BD0 /* Assets.xcassets */; };
 		9DBB1505F2DC9C2E7A9B406F /* GeoDistance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 919CD348C1A4DAC8457484D8 /* GeoDistance.swift */; };
 		9DDC6A7D2595EB487B32DFA3 /* SavedCollection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C808B025C8E9ED7515733584 /* SavedCollection.swift */; };
 		A2D65D1C6851A7802697F3BE /* TripPhotoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D8F55E9E6F23F30F9323E2F /* TripPhotoStore.swift */; };
@@ -210,6 +211,7 @@
 		D81083A6ED959FC685F77BB0 /* SavedPOIReference.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedPOIReference.swift; sourceTree = "<group>"; };
 		DB354EEA308416A9AB05BE5B /* TripsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripsScreen.swift; sourceTree = "<group>"; };
 		DB62061C800BEF24D07A2C43 /* PushNotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotificationManager.swift; sourceTree = "<group>"; };
+		DD664E9C3165D45C042C8BD0 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		E14279B087BC9A6DFFCFE55E /* PlanBuilderScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanBuilderScreen.swift; sourceTree = "<group>"; };
 		E712507F714C68342D7027E7 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		E75B93DCE842287CB76F2A2F /* POIPhotoGallery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POIPhotoGallery.swift; sourceTree = "<group>"; };
@@ -444,6 +446,7 @@
 		EFCC4851EA1EA689B72DD308 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				DD664E9C3165D45C042C8BD0 /* Assets.xcassets */,
 				E712507F714C68342D7027E7 /* Localizable.xcstrings */,
 				508A41E927502E9CB0B734D4 /* PrivacyInfo.xcprivacy */,
 			);
@@ -570,6 +573,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9CEA2601DD279A5F0E8A8BB3 /* Assets.xcassets in Resources */,
 				A785BBB4AFF5DC51F15C29A3 /* Localizable.xcstrings in Resources */,
 				BA982D8C8D53B5A086815E50 /* PrivacyInfo.xcprivacy in Resources */,
 			);
