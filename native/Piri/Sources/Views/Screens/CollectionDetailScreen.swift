@@ -1,3 +1,4 @@
+import MapKit
 import SwiftUI
 
 /// A user-named group of saved places (`SavedCollection`) — rename, remove
@@ -12,6 +13,7 @@ struct CollectionDetailScreen: View {
 
     @Environment(SavedPlacesStore.self) private var savedPlacesStore
     @Environment(TabSelection.self) private var tabSelection
+    @Environment(CityStore.self) private var cityStore
     @Environment(\.dismiss) private var dismiss
 
     @State private var isEditingName = false
@@ -22,6 +24,10 @@ struct CollectionDetailScreen: View {
     @State private var pickerDate = Date()
     @State private var forecast: Weather?
     @State private var hoursResults: [String: HoursCheckResult] = [:]
+    @State private var searchQuery = ""
+    @State private var searchResults: [POIPlace] = []
+    @State private var isSearchingPlaces = false
+    @State private var searchTask: Task<Void, Never>?
 
     private var collection: SavedCollection? {
         savedPlacesStore.collections.first { $0.id == collectionId }
@@ -101,20 +107,26 @@ struct CollectionDetailScreen: View {
             header(collection)
             ScrollView {
                 VStack(spacing: 12) {
-                    if collection.kind == .plan {
-                        dateSection(collection)
-                        weatherBanner
-                        if collection.places.count >= 2 {
-                            optimizeButton(collection)
-                            createRouteButton(collection)
-                        }
-                    }
+                    searchField
 
-                    if collection.places.isEmpty {
-                        emptyState
+                    if !searchQuery.trimmingCharacters(in: .whitespaces).isEmpty {
+                        searchResultsSection(collection)
                     } else {
-                        ForEach(Array(collection.places.enumerated()), id: \.element.id) { index, reference in
-                            referenceRow(reference, isFirst: index == 0, isLast: index == collection.places.count - 1)
+                        if collection.kind == .plan {
+                            dateSection(collection)
+                            weatherBanner
+                            if collection.places.count >= 2 {
+                                optimizeButton(collection)
+                                createRouteButton(collection)
+                            }
+                        }
+
+                        if collection.places.isEmpty {
+                            emptyState
+                        } else {
+                            ForEach(Array(collection.places.enumerated()), id: \.element.id) { index, reference in
+                                referenceRow(reference, isFirst: index == 0, isLast: index == collection.places.count - 1)
+                            }
                         }
                     }
                 }
@@ -133,6 +145,102 @@ struct CollectionDetailScreen: View {
             async let weatherTask: Void = loadForecastIfNeeded(for: collection, date: date)
             async let hoursTask: Void = loadHoursIfNeeded(for: collection, date: date)
             _ = await (weatherTask, hoursTask)
+        }
+        .onChange(of: searchQuery) { _, newValue in scheduleSearch(newValue) }
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+            TextField(String(localized: "collection.searchPlaceholder"), text: $searchQuery)
+                .textFieldStyle(.plain)
+                .autocorrectionDisabled()
+            if !searchQuery.isEmpty {
+                Button {
+                    searchQuery = ""
+                    searchTask?.cancel()
+                    searchResults = []
+                } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemBackground)))
+    }
+
+    @ViewBuilder
+    private func searchResultsSection(_ collection: SavedCollection) -> some View {
+        if isSearchingPlaces && searchResults.isEmpty {
+            VStack(spacing: 8) {
+                SkeletonBox().frame(height: 60)
+                SkeletonBox().frame(height: 60)
+            }
+        } else if searchResults.isEmpty {
+            Text("collection.searchNoResults").font(.system(size: 14)).foregroundStyle(.secondary).padding(.top, 8)
+        } else {
+            ForEach(searchResults) { poi in
+                searchResultRow(poi, collection: collection)
+            }
+        }
+    }
+
+    private func searchResultRow(_ poi: POIPlace, collection: SavedCollection) -> some View {
+        let added = collection.places.contains { $0.identifier == poi.asReference.identifier }
+        return HStack(spacing: 12) {
+            Button {
+                selectedPOI = poi
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: POICategoryGroups.icon(for: poi.category))
+                        .font(.system(size: 18))
+                        .foregroundStyle(Theme.gold)
+                        .frame(width: 36, height: 36)
+                        .background(Circle().fill(Theme.gold.opacity(0.12)))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(poi.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(.primary).lineLimit(1)
+                        if !poi.categoryLabel.isEmpty {
+                            Text(poi.categoryLabel).font(.system(size: 13)).foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                Haptics.light()
+                savedPlacesStore.toggle(poi, inCollection: collection.id)
+            } label: {
+                Image(systemName: added ? "checkmark.circle.fill" : "plus.circle")
+                    .font(.system(size: 22))
+                    .foregroundStyle(added ? Theme.gold : .secondary)
+            }
+            .buttonStyle(.borderless)
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 12).fill(added ? Theme.gold.opacity(0.08) : Color(.secondarySystemBackground)))
+    }
+
+    private func scheduleSearch(_ query: String) {
+        searchTask?.cancel()
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else {
+            searchResults = []
+            return
+        }
+        guard let lat = cityStore.lat, let lng = cityStore.lng else { return }
+        let coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+        isSearchingPlaces = true
+        searchTask = Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            let results = await POISearchService.search(near: coordinate, categories: nil, naturalLanguageQuery: trimmed)
+            guard !Task.isCancelled else { return }
+            searchResults = results
+            isSearchingPlaces = false
         }
     }
 

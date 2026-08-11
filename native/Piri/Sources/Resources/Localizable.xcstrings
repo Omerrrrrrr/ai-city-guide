@@ -3521,6 +3521,52 @@
         }
       }
     },
+    "collection.searchNoResults": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No places found for this search."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fant ingen steder for dette søket."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu arama için yer bulunamadı."
+          }
+        }
+      }
+    },
+    "collection.searchPlaceholder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search a place to add…"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Søk etter et sted å legge til…"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eklemek için yer ara…"
+          }
+        }
+      }
+    },
     "collection.willBeOpen": {
       "extractionState": "manual",
       "localizations": {
@@ -9686,19 +9732,19 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Add places to it from any place's detail page."
+            "value": "Search above to add a place, or add one from any place's detail page."
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Legg til steder fra et steds detaljside."
+            "value": "Søk over for å legge til et sted, eller legg til fra et steds detaljside."
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Herhangi bir yerin detay sayfasından bu listeye yer ekleyebilirsin."
+            "value": "Yukarıdan arayarak yer ekleyebilir, ya da herhangi bir yerin detay sayfasından ekleyebilirsin."
           }
         }
       }

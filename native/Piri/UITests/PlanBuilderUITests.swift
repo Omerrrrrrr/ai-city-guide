@@ -87,6 +87,24 @@ final class PlanBuilderUITests: XCTestCase {
             firstPlanRow.tap()
             attach(app, name: "08-collection-detail")
 
+            // Search-to-add: new field at the top of CollectionDetailScreen
+            // so a place can be added directly instead of only via another
+            // screen's detail page.
+            let searchField = app.textFields.firstMatch
+            if searchField.waitForExistence(timeout: 5) {
+                searchField.tap()
+                searchField.typeText("kafe")
+                Thread.sleep(forTimeInterval: 2)
+                attach(app, name: "08b-search-results")
+                // Clear back out (backspace rather than guessing the clear
+                // button's accessibility label) so the rest of the flow
+                // sees the normal (non-search) collection list again —
+                // CollectionDetailScreen swaps to the search-results list
+                // whenever the query isn't empty.
+                searchField.typeText(String(repeating: "\u{8}", count: 10))
+                Thread.sleep(forTimeInterval: 0.5)
+            }
+
             let pickDateRow = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "Tarih")).firstMatch
             if pickDateRow.waitForExistence(timeout: 5) {
                 pickDateRow.tap()
