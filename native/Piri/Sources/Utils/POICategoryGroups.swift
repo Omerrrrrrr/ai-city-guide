@@ -36,7 +36,15 @@ enum POICategoryGroups {
         // cathedral (`.religiousSite`) had no chip that could ever surface
         // it, on top of Apple's plain nearby-browse already burying it below
         // the ~25-result cap (see `AIScreen.coreSightCategories`).
-        POICategoryGroup(labelKey: "mapPoiCategories.landmarks", categories: [.landmark, .nationalMonument, .castle, .fortress, .religiousSite, .library], icon: "star.circle.fill"),
+        POICategoryGroup(labelKey: "mapPoiCategories.landmarks", categories: [.landmark, .nationalMonument, .castle, .fortress, .library], icon: "star.circle.fill"),
+        // Split out from the landmarks group -- lumped in with castles and
+        // monuments, a mosque/church/synagogue/temple had no chip of its
+        // own even though it's a distinct, common thing someone wants to
+        // find (see the 2026-08 conversation on faith-relevant features).
+        // Apple's single `.religiousSite` category doesn't distinguish which
+        // religion a given place belongs to, so this can't be split further
+        // than "places of worship" as one group.
+        POICategoryGroup(labelKey: "mapPoiCategories.worship", categories: [.religiousSite], icon: "building.2.fill"),
         POICategoryGroup(labelKey: "mapPoiCategories.nature", categories: [.park, .nationalPark, .campground, .hiking, .zoo], icon: "leaf.fill"),
         POICategoryGroup(labelKey: "mapPoiCategories.culture", categories: [.theater, .movieTheater, .musicVenue, .planetarium, .aquarium], icon: "theatermasks.fill"),
         POICategoryGroup(labelKey: "mapPoiCategories.beaches", categories: [.beach, .marina, .surfing, .kayaking], icon: "beach.umbrella.fill"),
@@ -73,8 +81,10 @@ enum POICategoryGroups {
     static func gradient(for category: MKPointOfInterestCategory?) -> LinearGradient {
         let colors: [Color]
         switch category {
-        case .museum, .landmark, .nationalMonument, .castle, .fortress, .library, .religiousSite:
+        case .museum, .landmark, .nationalMonument, .castle, .fortress, .library:
             colors = [Color(red: 0.55, green: 0.42, blue: 0.20), Color(red: 0.82, green: 0.68, blue: 0.38)]
+        case .religiousSite:
+            colors = [Color(red: 0.32, green: 0.28, blue: 0.48), Color(red: 0.58, green: 0.52, blue: 0.76)]
         case .park, .nationalPark, .campground, .hiking, .zoo:
             colors = [Color(red: 0.14, green: 0.36, blue: 0.24), Color(red: 0.38, green: 0.58, blue: 0.36)]
         case .theater, .movieTheater, .musicVenue, .planetarium, .aquarium:

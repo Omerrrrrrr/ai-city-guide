@@ -6230,6 +6230,28 @@
         }
       }
     },
+    "mapPoiCategories.worship": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Worship"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gudstjenestested"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "İbadet Yerleri"
+          }
+        }
+      }
+    },
     "onboarding.begin": {
       "localizations": {
         "en": {
