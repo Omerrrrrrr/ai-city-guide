@@ -22,6 +22,14 @@ struct HomeScreen: View {
     @State private var selectedCategoryGroup: POICategoryGroup?
     @State private var poiResults: [POIPlace] = []
     @State private var poiLoading = false
+    /// Halal/Kosher/Vegetarian/Vegan — orthogonal to `selectedCategoryGroup`
+    /// (Apple's own POI taxonomy has no dietary tags at all), sourced from
+    /// OpenStreetMap via the same `/places/dietary` endpoint the map screen
+    /// uses. Kept as a separate result list, not merged into `poiResults`,
+    /// since these are lightweight OSM pins with no `MKMapItem` behind them.
+    @State private var dietaryFilter: DietTag?
+    @State private var dietaryResults: [DietaryPin] = []
+    @State private var dietaryLoading = false
     /// See `ExploreScreen`'s identical field for why an empty string (not
     /// a missing key) means "checked, no photo found".
     @State private var poiPhotoURLs: [String: String] = [:]
@@ -56,6 +64,12 @@ struct HomeScreen: View {
             VStack(alignment: .leading, spacing: 16) {
                 header
                 categoryChipsRow
+                if !Self.useCuratedHomeData {
+                    dietaryChipsRow
+                    if dietaryFilter != nil {
+                        dietaryResultsSection
+                    }
+                }
 
                 if let error = placesQuery.errorMessage, !placesQuery.isLoading, Self.useCuratedHomeData {
                     errorBanner(error)
@@ -133,6 +147,13 @@ struct HomeScreen: View {
         .onChange(of: selectedCategoryGroup?.id) { _, _ in
             guard !Self.useCuratedHomeData else { return }
             Task { await loadPOIs() }
+        }
+        .onChange(of: dietaryFilter) { _, filter in
+            guard let filter else {
+                dietaryResults = []
+                return
+            }
+            Task { await loadDietaryResults(filter) }
         }
         .sheet(isPresented: $showingCityPicker) { CityPickerScreen() }
         .sheet(item: $selectedPOI) { poi in POIExplainSheet(poi: poi) }
@@ -212,6 +233,110 @@ struct HomeScreen: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
         }
+    }
+
+    /// Orthogonal to `categoryChipsRow` — a dietary need, not an Apple POI
+    /// category, so it's its own row rather than folded into the same one.
+    /// Same single-select-with-toggle-off interaction as the category chips.
+    private var dietaryChipsRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ForEach(DietTag.allCases) { tag in
+                    let active = dietaryFilter == tag
+                    // See `MapScreen.dietaryChips`: `String.LocalizationValue`
+                    // treats a directly-interpolated literal as a format
+                    // string with the interpolated part as an *argument*,
+                    // not part of the lookup key — building the key as a
+                    // plain `String` first avoids that.
+                    let key: String = "diet.\(tag.rawValue)"
+                    Button(String(localized: String.LocalizationValue(key))) {
+                        dietaryFilter = active ? nil : tag
+                    }
+                    .font(.system(size: 14, weight: .medium))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Capsule().fill(active ? Theme.gold : Theme.navy.opacity(0.08)))
+                    .foregroundStyle(active ? .white : .primary)
+                }
+            }
+            .padding(.horizontal, 20)
+        }
+    }
+
+    /// Shown only while a dietary filter is active — the primary thing the
+    /// user is looking for at that point, so it sits ahead of the plain POI
+    /// list. Lightweight rows only (name + which diet tags matched), no tap
+    /// action — these are OSM pins with no `MKMapItem` behind them, so there's
+    /// nothing to open a full `POIExplainSheet` on, matching the map
+    /// screen's `dietaryPinCard`.
+    private var dietaryResultsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("dietaryResults.title").font(.system(size: 21, weight: .heavy))
+                .padding(.horizontal, 20)
+            if dietaryLoading {
+                VStack(spacing: 10) {
+                    ForEach(0..<3, id: \.self) { _ in SkeletonBox().frame(height: 52) }
+                }
+                .padding(.horizontal, 20)
+            } else if dietaryResults.isEmpty {
+                Text("dietaryResults.empty")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 20)
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(dietaryResults) { pin in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(pin.name).font(.system(size: 15, weight: .semibold))
+                            HStack(spacing: 6) {
+                                ForEach(pin.dietTags, id: \.self) { tag in
+                                    let key: String = "diet.\(tag)"
+                                    Text(String(localized: String.LocalizationValue(key)))
+                                        .font(.caption.weight(.medium))
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Color(.systemGreen).opacity(0.18), in: Capsule())
+                                        .foregroundStyle(Color(.systemGreen))
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemBackground)))
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+        }
+    }
+
+    /// Same meters-to-degrees approximation used everywhere else a center +
+    /// radius needs to become a bbox for `/places/dietary` — good enough at
+    /// city scale, doesn't need to be geodesically exact.
+    private func dietaryBoundingBox(center: CLLocationCoordinate2D, radiusMeters: CLLocationDistance) -> (minLat: Double, maxLat: Double, minLng: Double, maxLng: Double) {
+        let latDelta = radiusMeters / 111_000
+        let lngDelta = radiusMeters / (111_000 * cos(center.latitude * .pi / 180))
+        return (center.latitude - latDelta, center.latitude + latDelta, center.longitude - lngDelta, center.longitude + lngDelta)
+    }
+
+    private func loadDietaryResults(_ tag: DietTag) async {
+        let coordinate: CLLocationCoordinate2D?
+        if let lat = cityStore.lat, let lng = cityStore.lng {
+            coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+        } else {
+            coordinate = await locationManager.currentLocationOnce()
+        }
+        guard let coordinate else { return }
+        // A newer tap may have already changed `dietaryFilter` by the time
+        // this `await` resolves — don't clobber its result with a stale one.
+        guard dietaryFilter == tag else { return }
+
+        dietaryLoading = true
+        defer { dietaryLoading = false }
+        let box = dietaryBoundingBox(center: coordinate, radiusMeters: 4000)
+        let fetched = (try? await DietaryPlacesAPI.fetchNearby(minLat: box.minLat, maxLat: box.maxLat, minLng: box.minLng, maxLng: box.maxLng, diet: tag)) ?? []
+        guard dietaryFilter == tag else { return }
+        dietaryResults = fetched
     }
 
     private var poiSection: some View {

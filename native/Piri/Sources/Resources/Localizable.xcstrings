@@ -5911,6 +5911,50 @@
         }
       }
     },
+    "dietaryResults.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dietary matches"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diettfunn"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diyet Uygun Yerler"
+          }
+        }
+      }
+    },
+    "dietaryResults.empty": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No matches found nearby"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ingen treff i nærheten"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yakında uygun yer bulunamadı"
+          }
+        }
+      }
+    },
     "diet.halal": {
       "localizations": {
         "en": {
