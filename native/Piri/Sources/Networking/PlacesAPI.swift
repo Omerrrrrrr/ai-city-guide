@@ -65,6 +65,19 @@ enum LivePlacesAPI {
     }
 }
 
+enum DietaryPlacesAPI {
+    static func fetchNearby(minLat: Double, maxLat: Double, minLng: Double, maxLng: Double, diet: DietTag) async throws -> [DietaryPin] {
+        let response: DietaryPinsResponse = try await APIClient.shared.get("/places/dietary", query: [
+            "minLat": String(minLat),
+            "maxLat": String(maxLat),
+            "minLng": String(minLng),
+            "maxLng": String(maxLng),
+            "diet": diet.rawValue,
+        ])
+        return response.dietaryPins
+    }
+}
+
 enum RoutesAPI {
     static func directions(coordinates: [PlaceCoordinate], profile: RouteProfile = .footWalking) async throws -> DirectionsResult {
         try await APIClient.shared.post("/routes/directions", body: DirectionsRequest(coordinates: coordinates, profile: profile))

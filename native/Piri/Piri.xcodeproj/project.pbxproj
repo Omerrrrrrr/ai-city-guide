@@ -29,6 +29,7 @@
 		25B756C97A73DF9878AC1832 /* POIPlace.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFE56DF7DF9101D7624A7945 /* POIPlace.swift */; };
 		2AB24C0177982CE14D50DE58 /* ExploreScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D0AAD7772B7FF41780137D3 /* ExploreScreen.swift */; };
 		2DE8A2EAC38DD7CAFFA6C4FD /* LivePin.swift in Sources */ = {isa = PBXBuildFile; fileRef = F887777DB4455F61F087FC46 /* LivePin.swift */; };
+		79CCE8F74D3249A6A21AFB52 /* DietaryPin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D771CE6D48C49D78017ED2E /* DietaryPin.swift */; };
 		2E9750DCA179C8A76BA71091 /* CameraPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B05066D4D6C47F50C5385DE8 /* CameraPreviewView.swift */; };
 		3186DFA472AAB935E785B459 /* AdminHoursScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5BF8793AD992C8BC1764725 /* AdminHoursScreen.swift */; };
 		32DF154767055D8CB0E248F8 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = 0E7861782F4D7F2210CCACEA /* Sentry */; };
@@ -235,6 +236,7 @@
 		F3E89F063A982438E9A06B7D /* AdminImagesScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminImagesScreen.swift; sourceTree = "<group>"; };
 		F4CCFDBC5424BE2952A53037 /* SentryConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentryConfig.swift; sourceTree = "<group>"; };
 		F887777DB4455F61F087FC46 /* LivePin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePin.swift; sourceTree = "<group>"; };
+		6D771CE6D48C49D78017ED2E /* DietaryPin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DietaryPin.swift; sourceTree = "<group>"; };
 		F88D9297E5E64646338B6975 /* PlaceMiniMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceMiniMap.swift; sourceTree = "<group>"; };
 		FFE56DF7DF9101D7624A7945 /* POIPlace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POIPlace.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -338,6 +340,7 @@
 				8DDB1F8B09EEB0E1E5A7C23D /* City.swift */,
 				05E08798A1304146E73129B0 /* Directions.swift */,
 				F887777DB4455F61F087FC46 /* LivePin.swift */,
+				6D771CE6D48C49D78017ED2E /* DietaryPin.swift */,
 				D51DBC290790323812C65938 /* Place.swift */,
 				FFE56DF7DF9101D7624A7945 /* POIPlace.swift */,
 				C808B025C8E9ED7515733584 /* SavedCollection.swift */,
@@ -664,6 +667,7 @@
 				9A8D2E7A8F6B7CF500CED79E /* LanguageManager.swift in Sources */,
 				DC9FD5DC597F5F2014C89C5A /* LanguageStore.swift in Sources */,
 				2DE8A2EAC38DD7CAFFA6C4FD /* LivePin.swift in Sources */,
+				79CCE8F74D3249A6A21AFB52 /* DietaryPin.swift in Sources */,
 				1E086E37354ECEE0BD0A696D /* Localization.swift in Sources */,
 				AA0513F0B8654D68605A9DCE /* LocationManager.swift in Sources */,
 				C1B3BB1517E5EAD8D861C18C /* LookAroundCard.swift in Sources */,

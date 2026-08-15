@@ -11,11 +11,15 @@ import SwiftUI
 struct PiriMapView: UIViewRepresentable {
     var places: [Place]
     var livePins: [LivePin]
+    /// Halal/kosher/vegetarian/vegan matches for the currently-selected
+    /// `DietTag`, if any — empty when no dietary filter is active.
+    var dietaryPins: [DietaryPin] = []
     var routeCoordinates: [CLLocationCoordinate2D]
     var showsUserLocation: Bool
     var onRegionChange: (MKCoordinateRegion) -> Void
     var onSelectPlace: (Place) -> Void
     var onSelectLivePin: (LivePin) -> Void
+    var onSelectDietaryPin: (DietaryPin) -> Void = { _ in }
     /// Apple's own base-map points of interest (restaurants, shops,
     /// landmarks baked into the map tiles themselves) — not our data at
     /// all, but the user still expects every pin on the map to respond to a
@@ -53,6 +57,7 @@ struct PiriMapView: UIViewRepresentable {
         mapView.selectableMapFeatures = .pointsOfInterest
         mapView.register(MKMarkerAnnotationView.self, forAnnotationViewWithReuseIdentifier: MapAnnotationReuseID.place)
         mapView.register(MKMarkerAnnotationView.self, forAnnotationViewWithReuseIdentifier: MapAnnotationReuseID.livePin)
+        mapView.register(MKMarkerAnnotationView.self, forAnnotationViewWithReuseIdentifier: MapAnnotationReuseID.dietaryPin)
         mapView.register(MKMarkerAnnotationView.self, forAnnotationViewWithReuseIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier)
         if let centerOnce {
             mapView.setRegion(centerOnce, animated: false)
@@ -99,18 +104,23 @@ struct PiriMapView: UIViewRepresentable {
     private func reconcileAnnotations(on mapView: MKMapView) {
         let existingPlace = mapView.annotations.compactMap { $0 as? PlaceAnnotation }
         let existingLivePin = mapView.annotations.compactMap { $0 as? LivePinAnnotation }
+        let existingDietaryPin = mapView.annotations.compactMap { $0 as? DietaryPinAnnotation }
 
         let currentPlaceIds = Set(existingPlace.map(\.place.id))
         let targetPlaceIds = Set(places.map(\.id))
         let currentLiveIds = Set(existingLivePin.map(\.livePin.id))
         let targetLiveIds = Set(livePins.map(\.id))
+        let currentDietaryIds = Set(existingDietaryPin.map(\.dietaryPin.id))
+        let targetDietaryIds = Set(dietaryPins.map(\.id))
 
-        guard currentPlaceIds != targetPlaceIds || currentLiveIds != targetLiveIds else { return }
+        guard currentPlaceIds != targetPlaceIds || currentLiveIds != targetLiveIds || currentDietaryIds != targetDietaryIds else { return }
 
         let toRemovePlace = existingPlace.filter { !targetPlaceIds.contains($0.place.id) }
         let toRemoveLive = existingLivePin.filter { !targetLiveIds.contains($0.livePin.id) }
+        let toRemoveDietary = existingDietaryPin.filter { !targetDietaryIds.contains($0.dietaryPin.id) }
         mapView.removeAnnotations(toRemovePlace)
         mapView.removeAnnotations(toRemoveLive)
+        mapView.removeAnnotations(toRemoveDietary)
 
         let toAddPlace = places
             .filter { $0.location != nil && !currentPlaceIds.contains($0.id) }
@@ -118,8 +128,12 @@ struct PiriMapView: UIViewRepresentable {
         let toAddLive = livePins
             .filter { !currentLiveIds.contains($0.id) }
             .map(LivePinAnnotation.init)
+        let toAddDietary = dietaryPins
+            .filter { !currentDietaryIds.contains($0.id) }
+            .map(DietaryPinAnnotation.init)
         mapView.addAnnotations(toAddPlace)
         mapView.addAnnotations(toAddLive)
+        mapView.addAnnotations(toAddDietary)
     }
 
     /// Tints already-placed place pins gold/blue in place, without touching
@@ -181,6 +195,14 @@ struct PiriMapView: UIViewRepresentable {
                 return view
             }
 
+            if let dietaryAnnotation = annotation as? DietaryPinAnnotation {
+                let view = mapView.dequeueReusableAnnotationView(withIdentifier: MapAnnotationReuseID.dietaryPin, for: dietaryAnnotation) as? MKMarkerAnnotationView
+                view?.clusteringIdentifier = MapAnnotationReuseID.dietaryPin
+                view?.markerTintColor = .systemGreen
+                view?.canShowCallout = true
+                return view
+            }
+
             return nil
         }
 
@@ -189,6 +211,8 @@ struct PiriMapView: UIViewRepresentable {
                 parent.onSelectPlace(placeAnnotation.place)
             } else if let liveAnnotation = annotation as? LivePinAnnotation {
                 parent.onSelectLivePin(liveAnnotation.livePin)
+            } else if let dietaryAnnotation = annotation as? DietaryPinAnnotation {
+                parent.onSelectDietaryPin(dietaryAnnotation.dietaryPin)
             } else if let cluster = annotation as? MKClusterAnnotation {
                 // Tapping a cluster badge did nothing before this — MapKit
                 // doesn't auto-expand clusters on tap, so every clustered pin

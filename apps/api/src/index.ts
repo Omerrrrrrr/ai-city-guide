@@ -71,6 +71,7 @@ import { haversineKm } from './geo';
 import { fetchTripAdvisorInfo, fetchTripAdvisorPhotos, fetchTripAdvisorReviews, normalizeName, type TripAdvisorInfo } from './tripadvisor';
 import { fetchWikipediaPhoto, WIKIPEDIA_PLAUSIBLE_CATEGORIES } from './wiki-photo';
 import { fetchWikidataFacts } from './wikidata';
+import { fetchDietaryPlaces } from './dietary';
 import { fetchUnsplashPhoto } from './unsplash';
 import { places, cities, liveGridCellStatus, livePlaceCache, poiPhotoCache } from './schema';
 
@@ -664,6 +665,49 @@ async function buildServer() {
       request.log.error(error);
       return reply.code(502).send({ error: error?.message ?? 'Failed to load nearby live places' });
     }
+  });
+
+  // ── /places/dietary — halal/kosher/vegetarian/vegan pins for a map viewport ───
+  // A filter for anyone with a dietary need, not one faith — Halal/Kosher/
+  // Vegetarian/Vegan sit side by side as equal options. Sourced live from
+  // OpenStreetMap's Overpass API (see dietary.ts): free, keyless, and the
+  // only one of the app's data sources that actually carries this tag at
+  // all (Tripadvisor's `attributes`/`categories` fields came back empty on
+  // every real restaurant tested on our current plan; Overture's own places
+  // schema has no dietary/cuisine columns). No caching layer, unlike
+  // /places/nearby-live's per-grid-cell Postgres cache — Overpass responds
+  // in a few seconds for a viewport-sized query and this is a fresh, ad-hoc
+  // filtered query per (bbox, diet) pair, not worth building cache infra for.
+  const MAX_DIETARY_BBOX_SPAN_DEG = 0.08; // ~9km
+
+  app.get<{
+    Querystring: { minLat: string; maxLat: string; minLng: string; maxLng: string; diet: string };
+  }>('/places/dietary', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const coord = () => z.string().regex(/^-?\d+(?:\.\d+)?$/).transform(Number);
+    const parsedQuery = z
+      .object({
+        minLat: coord(),
+        maxLat: coord(),
+        minLng: coord(),
+        maxLng: coord(),
+        diet: z.enum(['halal', 'kosher', 'vegetarian', 'vegan']),
+      })
+      .safeParse(request.query);
+
+    if (!parsedQuery.success) {
+      return reply.code(400).send({ error: 'minLat, maxLat, minLng, maxLng, and a valid diet are required.' });
+    }
+
+    const { minLat, maxLat, minLng, maxLng, diet } = parsedQuery.data;
+    if (maxLat <= minLat || maxLng <= minLng) {
+      return reply.code(400).send({ error: 'max values must be greater than min values.' });
+    }
+    if (maxLat - minLat > MAX_DIETARY_BBOX_SPAN_DEG || maxLng - minLng > MAX_DIETARY_BBOX_SPAN_DEG) {
+      return reply.code(400).send({ error: 'Requested area is too large — zoom in further.' });
+    }
+
+    const dietaryPins = await fetchDietaryPlaces(minLat, maxLat, minLng, maxLng, diet);
+    return { dietaryPins };
   });
 
   // ── /places/enrich-live — promote a tapped raw pin into a curated place ───────

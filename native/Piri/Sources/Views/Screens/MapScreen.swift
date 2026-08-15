@@ -32,6 +32,20 @@ struct MapScreen: View {
     @State private var livePins: [LivePin] = []
     @State private var selectedCategoryGroup: POICategoryGroup?
     @State private var mapType: MKMapType = .standard
+    /// A filter for anyone with a dietary need, not one faith — see
+    /// `DietTag`. Orthogonal to `selectedCategoryGroup`: this drives a
+    /// separate live pin layer (`dietaryPins`, sourced from OpenStreetMap),
+    /// not Apple's own `pointOfInterestFilter`, since Apple's POI data
+    /// carries no dietary tags at all.
+    @State private var dietaryFilter: DietTag?
+    @State private var dietaryPins: [DietaryPin] = []
+    @State private var dietaryFetchTask: Task<Void, Never>?
+    @State private var selectedDietaryPin: DietaryPin?
+    /// Updated on every `handleRegionChange` call (unlike `initialRegion`,
+    /// which is set once and deliberately not kept in sync with panning) so
+    /// toggling `dietaryFilter` can immediately fetch against wherever the
+    /// map currently is, without waiting for the next pan/zoom.
+    @State private var currentRegion: MKCoordinateRegion?
     @State private var selectedPlace: Place?
     @State private var selectedLivePin: LivePin?
     @State private var selectedMapFeature: MKMapFeatureAnnotation?
@@ -119,6 +133,7 @@ struct MapScreen: View {
                     PiriMapView(
                         places: filteredPlaces,
                         livePins: Self.useCuratedMapData ? livePins : [],
+                        dietaryPins: routeMode ? [] : dietaryPins,
                         // In route mode, a fetched-but-not-yet-started route
                         // (`previewRoute()`) draws here as a preview line —
                         // this is still the plain picking map, not
@@ -129,6 +144,7 @@ struct MapScreen: View {
                         onRegionChange: handleRegionChange,
                         onSelectPlace: { selectPlace($0) },
                         onSelectLivePin: { selectLivePin($0) },
+                        onSelectDietaryPin: { selectDietaryPin($0) },
                         onSelectMapFeature: { feature in
                             if routeMode {
                                 Task { await toggleStop(fromFeature: feature) }
@@ -152,6 +168,7 @@ struct MapScreen: View {
                 if !routeMode {
                     searchBar
                     categoryChips
+                    dietaryChips
                 }
                 if let errorMessage {
                     Text(errorMessage)
@@ -166,6 +183,8 @@ struct MapScreen: View {
                     placeCard(for: selectedPlace)
                 } else if let selectedLivePin {
                     livePinCard(for: selectedLivePin)
+                } else if let selectedDietaryPin {
+                    dietaryPinCard(for: selectedDietaryPin)
                 } else if let selectedMapFeature {
                     mapFeatureCard(for: selectedMapFeature)
                 }
@@ -214,6 +233,16 @@ struct MapScreen: View {
         .onChange(of: locationManager.breadcrumb) { _, points in
             guard let activeTripId = tripsStore.activeTripId, let last = points.last else { return }
             tripsStore.addBreadcrumb(activeTripId, point: last)
+        }
+        // Refetch immediately on filter change, not just on the next pan/
+        // zoom -- `currentRegion` is kept in sync by `handleRegionChange` on
+        // every region change, unlike `initialRegion`.
+        .onChange(of: dietaryFilter) { _, _ in
+            if let currentRegion {
+                fetchDietaryPinsIfNeeded(for: currentRegion)
+            } else {
+                dietaryPins = []
+            }
         }
         .sheet(isPresented: $showTripPhotoCapture) {
             TripPhotoCaptureSheet { data in
@@ -323,16 +352,57 @@ struct MapScreen: View {
         }
     }
 
+    /// Orthogonal to `categoryChips` — a dietary need, not an Apple POI
+    /// category, so it's its own row rather than folded into the same one.
+    private var dietaryChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(DietTag.allCases) { tag in
+                    let active = dietaryFilter == tag
+                    // `String.LocalizationValue` conforms to
+                    // `ExpressibleByStringInterpolation` for its
+                    // parameterized-string-argument feature -- passing an
+                    // interpolated literal directly (`"diet.\(x)"`) makes
+                    // Swift treat `x` as a *format argument*, not part of
+                    // the lookup key, so it silently fails to resolve and
+                    // falls back to echoing the raw interpolated text.
+                    // Building the key as a plain `String` first (as
+                    // `categoryChips` already does with `group.labelKey`)
+                    // avoids that entirely.
+                    let key: String = "diet.\(tag.rawValue)"
+                    Button(String(localized: String.LocalizationValue(key))) {
+                        dietaryFilter = active ? nil : tag
+                    }
+                    .font(.footnote.weight(.medium))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(active ? Color(.systemGreen) : Color(.secondarySystemBackground), in: Capsule())
+                    .foregroundStyle(active ? .white : .primary)
+                }
+            }
+        }
+    }
+
     private func selectPlace(_ place: Place) {
         selectedPlace = place
         selectedLivePin = nil
         selectedMapFeature = nil
+        selectedDietaryPin = nil
         poiExplainTask?.cancel()
     }
 
     private func selectLivePin(_ pin: LivePin) {
         selectedLivePin = pin
         selectedPlace = nil
+        selectedMapFeature = nil
+        selectedDietaryPin = nil
+        poiExplainTask?.cancel()
+    }
+
+    private func selectDietaryPin(_ pin: DietaryPin) {
+        selectedDietaryPin = pin
+        selectedPlace = nil
+        selectedLivePin = nil
         selectedMapFeature = nil
         poiExplainTask?.cancel()
     }
@@ -341,6 +411,7 @@ struct MapScreen: View {
         selectedMapFeature = feature
         selectedPlace = nil
         selectedLivePin = nil
+        selectedDietaryPin = nil
         poiExplainResult = nil
         poiExplainError = nil
         lookAroundScene = nil
@@ -390,6 +461,36 @@ struct MapScreen: View {
                 Task { await enrichLivePin(pin) }
             }
             .buttonStyle(.borderedProminent)
+        }
+        .padding()
+        .piriGlassCard(cornerRadius: 16)
+    }
+
+    /// No AI enrichment path, unlike `livePinCard`'s "show all" → full curated
+    /// place — this pin type is purely a dietary-match indicator, so the
+    /// card is just the name and which tags matched.
+    private func dietaryPinCard(for pin: DietaryPin) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(pin.name).font(.headline)
+                Spacer()
+                Button {
+                    selectedDietaryPin = nil
+                } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                }
+            }
+            HStack(spacing: 6) {
+                ForEach(pin.dietTags, id: \.self) { tag in
+                    let key: String = "diet.\(tag)"
+                    Text(String(localized: String.LocalizationValue(key)))
+                        .font(.caption.weight(.medium))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color(.systemGreen).opacity(0.18), in: Capsule())
+                        .foregroundStyle(Color(.systemGreen))
+                }
+            }
         }
         .padding()
         .piriGlassCard(cornerRadius: 16)
@@ -605,6 +706,9 @@ struct MapScreen: View {
     }
 
     private func handleRegionChange(_ region: MKCoordinateRegion) {
+        currentRegion = region
+        fetchDietaryPinsIfNeeded(for: region)
+
         guard Self.useCuratedMapData else { return }
         liveFetchTask?.cancel()
         guard region.span.latitudeDelta <= maxLiveFetchLatitudeDelta else {
@@ -630,6 +734,38 @@ struct MapScreen: View {
                 guard !Task.isCancelled else { return }
                 errorMessage = error.localizedDescription
             }
+        }
+    }
+
+    /// Independent of `Self.useCuratedMapData` — this is a fresh, unrelated
+    /// feature (see the 2026-08 conversation on dietary filtering), not part
+    /// of the old curated-pins pivot decision. Not `async` since it only
+    /// kicks off a debounced background `Task`, matching `handleRegionChange`'s
+    /// own live-pin fetch, which this mirrors.
+    private func fetchDietaryPinsIfNeeded(for region: MKCoordinateRegion) {
+        dietaryFetchTask?.cancel()
+        guard let dietaryFilter, region.span.latitudeDelta <= maxLiveFetchLatitudeDelta else {
+            dietaryPins = []
+            return
+        }
+
+        dietaryFetchTask = Task {
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return }
+
+            let minLat = region.center.latitude - region.span.latitudeDelta / 2
+            let maxLat = region.center.latitude + region.span.latitudeDelta / 2
+            let minLng = region.center.longitude - region.span.longitudeDelta / 2
+            let maxLng = region.center.longitude + region.span.longitudeDelta / 2
+
+            // No `errorMessage` on failure, unlike the live-pin fetch this
+            // mirrors -- Overpass is a best-effort free service and an empty
+            // result (no matches nearby, or a transient Overpass hiccup) is
+            // an expected, unremarkable outcome here, not something to
+            // surface as an app error banner.
+            let pins = (try? await DietaryPlacesAPI.fetchNearby(minLat: minLat, maxLat: maxLat, minLng: minLng, maxLng: maxLng, diet: dietaryFilter)) ?? []
+            guard !Task.isCancelled else { return }
+            dietaryPins = pins
         }
     }
 

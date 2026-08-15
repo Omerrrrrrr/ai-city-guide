@@ -38,8 +38,28 @@ final class LivePinAnnotation: NSObject, MKAnnotation {
     }
 }
 
+/// A dietary-filter match (halal/kosher/vegetarian/vegan) from
+/// `/places/dietary`. No enrichment path, unlike `LivePinAnnotation` — this
+/// is purely a "matches your filter" indicator, tapping it just shows the
+/// name and which diet tags matched.
+final class DietaryPinAnnotation: NSObject, MKAnnotation {
+    let dietaryPin: DietaryPin
+
+    var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: dietaryPin.lat, longitude: dietaryPin.lng)
+    }
+
+    var title: String? { dietaryPin.name }
+    var subtitle: String? { dietaryPin.dietTags.joined(separator: ", ") }
+
+    init(dietaryPin: DietaryPin) {
+        self.dietaryPin = dietaryPin
+    }
+}
+
 enum MapAnnotationReuseID {
     static let place = "PlaceAnnotation"
     static let livePin = "LivePinAnnotation"
+    static let dietaryPin = "DietaryPinAnnotation"
     static let cluster = "ClusterAnnotation"
 }
