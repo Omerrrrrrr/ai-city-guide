@@ -158,6 +158,35 @@ export async function fetchTripAdvisorReviews(locationId: number, size: number =
   }
 }
 
+/**
+ * Whole-word overlap with a minimum overlap ratio, not a raw substring check.
+ * Confirmed live: Oslo's "MUNCH" museum has no Tripadvisor listing at all
+ * (a real coverage gap, not a drift/radius issue \u2014 same class as the Hard
+ * Rock Cafe case noted below), but Bj\u00f8rvika around it is full of eateries
+ * branded off its name ("LETT - Munch Brygge", "Koie Ramen Munch"). A plain
+ * substring/whole-word-contains check matches the POI "Munch" onto one of
+ * those instead of correctly returning no match, because "munch" appears as
+ * a whole word in each. Requiring the shorter name's words to make up at
+ * least half of the longer name's words rejects those (1 of 3 words) while
+ * still accepting normal cases like a short Apple POI name plus one official
+ * descriptor word ("Vigeland" vs "Vigeland Park", 1 of 2).
+ */
+export function namesMatch(target: string, candidate: string): boolean {
+  if (!target || !candidate) return false;
+  if (target === candidate) return true;
+
+  const targetWords = target.split(' ').filter(Boolean);
+  const candidateWords = candidate.split(' ').filter(Boolean);
+  if (!targetWords.length || !candidateWords.length) return false;
+
+  const [shorterWords, longerWords] =
+    targetWords.length <= candidateWords.length ? [targetWords, candidateWords] : [candidateWords, targetWords];
+  const longerWordSet = new Set(longerWords);
+
+  const allShorterWordsPresent = shorterWords.every((word) => longerWordSet.has(word));
+  return allShorterWordsPresent && shorterWords.length / longerWords.length >= 0.5;
+}
+
 export function normalizeName(name: string): string {
   return name
     .toLowerCase()
@@ -248,7 +277,7 @@ export async function fetchTripAdvisorInfo(
     const target = normalizeName(name);
     const match = (data.data ?? []).find((item) => {
       const candidateName = normalizeName(item.location?.names?.[0]?.value ?? '');
-      return candidateName.length > 0 && (candidateName.includes(target) || target.includes(candidateName));
+      return candidateName.length > 0 && namesMatch(target, candidateName);
     });
 
     const description = match?.location?.descriptions?.[0]?.value ?? null;
