@@ -20,6 +20,7 @@
     "eval": "promptfoo eval -c evals/promptfooconfig.yaml"
   },
   "dependencies": {
+    "@ai-sdk/google": "3.0.110",
     "@ai-sdk/openai": "^3.0.41",
     "@duckdb/node-api": "^1.5.4-r.1",
     "@fastify/cors": "^10.0.1",

@@ -6,6 +6,7 @@ import rateLimit from '@fastify/rate-limit';
 import { and, eq, gte, ilike, inArray, lte } from 'drizzle-orm';
 import { generateObject, generateText } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { z } from 'zod';
 
 import { closeDb, connectDb, db } from './db';
@@ -80,6 +81,13 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY?.trim();
 const OPENAI_MODEL = process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY?.trim();
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL ?? 'anthropic/claude-sonnet-4.5';
+// Google AI Studio, not Cloud Vision/Places -- a genuinely free tier with no
+// billing account required (see .env.example). Picked specifically for its
+// stronger landmark/place vision accuracy vs gpt-4o-mini, confirmed live:
+// gpt-4o-mini identified two visually distinct Icelandic waterfall photos as
+// the same (wrong, for at least one of them) famous landmark.
+const GOOGLE_API_KEY = process.env.GOOGLE_GENERATIVE_AI_API_KEY?.trim();
+const GOOGLE_MODEL = process.env.GOOGLE_MODEL ?? 'gemini-2.5-flash';
 const APP_URL = process.env.APP_URL ?? 'http://localhost:4000';
 const OPENWEATHER_API_KEY = process.env.OPENWEATHER_API_KEY?.trim();
 const OPENROUTESERVICE_API_KEY = process.env.OPENROUTESERVICE_API_KEY?.trim();
@@ -153,6 +161,9 @@ const openrouter = createOpenAI({
     'HTTP-Referer': APP_URL,
     'X-OpenRouter-Title': 'AI City Guide',
   },
+});
+const google = createGoogleGenerativeAI({
+  apiKey: GOOGLE_API_KEY,
 });
 
 const chatMessageSchema = z.object({
@@ -264,13 +275,21 @@ async function geocodeCityName(query: string) {
     }));
 }
 
-type AiProviderName = 'openai' | 'openrouter';
+type AiProviderName = 'openai' | 'openrouter' | 'google';
 
 function getAiProviderConfig():
   | {
       provider: AiProviderName;
       model: string;
-      client: ReturnType<typeof createOpenAI>;
+      // Every branch's `.client` only ever gets called as `.chat(model)`
+      // (see every `aiProvider.client.chat(aiProvider.model)` call site) --
+      // `createOpenAI`'s and `createGoogleGenerativeAI`'s return types are
+      // distinct concrete types, but both satisfy this shape against the
+      // same `ai`-package-major's `LanguageModelV3`, so a minimal structural
+      // type here (rather than a full union of both SDKs' provider types)
+      // is what every caller actually needs and keeps this signature stable
+      // if a fourth provider is ever added.
+      client: { chat: (modelId: string) => Parameters<typeof generateObject>[0]['model'] };
     }
   | null {
   const openaiConfig =
@@ -291,10 +310,21 @@ function getAiProviderConfig():
         }
       : null;
 
+  const googleConfig =
+    GOOGLE_API_KEY
+      ? {
+          provider: 'google' as const,
+          model: GOOGLE_MODEL,
+          client: google,
+        }
+      : null;
+
   if (AI_PROVIDER === 'openai' && openaiConfig) return openaiConfig;
   if (AI_PROVIDER === 'openrouter' && openrouterConfig) return openrouterConfig;
+  if (AI_PROVIDER === 'google' && googleConfig) return googleConfig;
   if (openaiConfig) return openaiConfig;
   if (openrouterConfig) return openrouterConfig;
+  if (googleConfig) return googleConfig;
 
   return null;
 }
