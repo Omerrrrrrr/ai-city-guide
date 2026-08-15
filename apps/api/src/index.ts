@@ -70,6 +70,7 @@ import {
 import { haversineKm } from './geo';
 import { fetchTripAdvisorInfo, fetchTripAdvisorPhotos, fetchTripAdvisorReviews, normalizeName, type TripAdvisorInfo } from './tripadvisor';
 import { fetchWikipediaPhoto, WIKIPEDIA_PLAUSIBLE_CATEGORIES } from './wiki-photo';
+import { fetchWikidataFacts } from './wikidata';
 import { fetchUnsplashPhoto } from './unsplash';
 import { places, cities, liveGridCellStatus, livePlaceCache, poiPhotoCache } from './schema';
 
@@ -1387,25 +1388,63 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
             })()
           : Promise.resolve(null);
 
-      const [tripAdvisorInfo, curatedPlace] = await Promise.all([
+      // Wikipedia is fetched here (not just for its photo below) because the
+      // user's stated priority is telling a rich, multi-angle story about
+      // iconic landmarks (history/architecture/significance) — Tripadvisor's
+      // description is usually just a business's own dining-focused blurb
+      // (confirmed live: Oslo's MUNCH museum matched a nearby cafe's listing
+      // before the name-matching fix, and even correctly matched would still
+      // just be marketing copy), the wrong primary source for that. Passing
+      // `null` as the AI provider skips wiki-enrichment's own internal
+      // AI-summarization call and just returns the raw extract — the
+      // generateObject call below does the actual synthesis, same pattern
+      // already used for the Tripadvisor description.
+      const wikiPromise =
+        lat !== undefined && lng !== undefined
+          ? enrichPlaceWithWikipedia({ name, category: category ?? 'place', lat, lng }, null)
+          : Promise.resolve({ status: 'not-found', rawMetadata: {} } as const);
+
+      const [tripAdvisorInfo, curatedPlace, wikiEnrichment] = await Promise.all([
         lat !== undefined && lng !== undefined
           ? fetchTripAdvisorInfo(name, lat, lng, undefined, false)
           : Promise.resolve({ rating: null, description: null, photoUrls: [], locationId: null } as TripAdvisorInfo),
         curatedMatchPromise,
+        wikiPromise,
       ]);
+
+      // Wikidata facts depend on the QID Wikipedia just resolved, so this is
+      // an unavoidable second hop after the Promise.all above rather than a
+      // member of it — but it only fires on the landmark-matched path (where
+      // the added latency, bounded by wikidata.ts's own 4s timeout, actually
+      // buys real value), not on every POI tap.
+      const wikidataFacts =
+        wikiEnrichment.status === 'matched' && wikiEnrichment.wikidataId
+          ? await fetchWikidataFacts(wikiEnrichment.wikidataId)
+          : null;
+
+      const wikidataFactsLine = wikidataFacts
+        ? [
+            wikidataFacts.foundedYear ? `Opened ${wikidataFacts.foundedYear}` : null,
+            wikidataFacts.architect ? `designed by ${wikidataFacts.architect}` : null,
+            wikidataFacts.architecturalStyle ? `style: ${wikidataFacts.architecturalStyle}` : null,
+          ]
+            .filter(Boolean)
+            .join(', ')
+        : '';
 
       // Piri's own curated place record for this same physical POI, when one
       // exists — its AI-generated enrichment (vibe/best-for/rainy-day-fit/
       // price level) is richer than anything Apple MapKit or Tripadvisor
       // gives, so it's folded in as extra grounding alongside (not instead
-      // of) the Tripadvisor description above. This does NOT re-enable
-      // curated data as a map pin source (see `MapScreen.useCuratedMapData`)
-      // — it only enriches the explain response for an Apple POI the user
-      // already tapped.
+      // of) the sources above. This does NOT re-enable curated data as a map
+      // pin source (see `MapScreen.useCuratedMapData`) — it only enriches
+      // the explain response for an Apple POI the user already tapped.
       const placeContext = [
         `Name: ${name}`,
         category ? `Category: ${category}` : null,
         address ? `Address: ${address}` : null,
+        wikiEnrichment.status === 'matched' ? `Wikipedia summary: ${wikiEnrichment.summary}` : null,
+        wikidataFactsLine ? `Wikidata: ${wikidataFactsLine}` : null,
         tripAdvisorInfo.description ? `Tripadvisor description: ${tripAdvisorInfo.description}` : null,
         curatedPlace?.shortStory ? `Story: ${curatedPlace.shortStory}` : null,
         curatedPlace?.localVibeMood ? `Vibe: ${curatedPlace.localVibeMood}` : null,
@@ -1427,9 +1466,12 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
             }
           : null;
 
-      const factualGuard = tripAdvisorInfo.description
-        ? `A real Tripadvisor description of this place is included below — ground your response in it and don't contradict it, but still don't invent additional unverifiable specifics (exact founding dates, named owners, awards) beyond what's given.`
-        : `Only the place's name, category, and address are given below — you have no verified facts beyond that, so rely on general knowledge about places of this type and this name; don't invent specific unverifiable claims (exact founding dates, named owners, awards) about it.`;
+      const factualGuard =
+        wikiEnrichment.status === 'matched'
+          ? `A real Wikipedia summary of this place is included below${wikidataFactsLine ? ', along with a few structured Wikidata facts' : ''} — ground the historical, architectural, and significance angle in them and don't contradict them; they're the source of truth for this place's history and identity.${tripAdvisorInfo.description ? ` A Tripadvisor description is also included below — you can draw on it for practical, current-visit specifics (food, atmosphere, offerings), but Wikipedia stays the primary source for what this place actually is.` : ''} Still don't invent additional unverifiable specifics (exact founding dates, named owners, awards) beyond what's given anywhere below.`
+          : tripAdvisorInfo.description
+            ? `A real Tripadvisor description of this place is included below — ground your response in it and don't contradict it, but still don't invent additional unverifiable specifics (exact founding dates, named owners, awards) beyond what's given.`
+            : `Only the place's name, category, and address are given below — you have no verified facts beyond that, so rely on general knowledge about places of this type and this name; don't invent specific unverifiable claims (exact founding dates, named owners, awards) about it.`;
 
       const faithMismatchGuard =
         userProfile?.faith && userProfile.faith !== 'secular' && userProfile.faith !== 'prefer_not_to_say'
