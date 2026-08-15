@@ -38,11 +38,14 @@ struct PiriMapView: UIViewRepresentable {
     /// with the same or a new region would otherwise never re-fire once the
     /// initial center-on-load has already happened.
     var recenterTrigger: UUID? = nil
+    /// Standard / satellite / hybrid base map imagery.
+    var mapType: MKMapType = .standard
 
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
         mapView.delegate = context.coordinator
         mapView.showsUserLocation = showsUserLocation
+        mapView.mapType = mapType
         // Makes Apple's own base-map POI icons (grocery stores, restaurants,
         // landmarks — anything rendered by the map tiles rather than one of
         // our own annotations) individually selectable, delivered to the
@@ -59,6 +62,9 @@ struct PiriMapView: UIViewRepresentable {
 
     func updateUIView(_ mapView: MKMapView, context: Context) {
         context.coordinator.parent = self
+        if mapView.mapType != mapType {
+            mapView.mapType = mapType
+        }
         reconcileAnnotations(on: mapView)
         reconcileRoute(on: mapView, coordinator: context.coordinator)
         reconcileSelection(on: mapView, coordinator: context.coordinator)

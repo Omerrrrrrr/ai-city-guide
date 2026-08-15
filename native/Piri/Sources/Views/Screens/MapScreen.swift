@@ -31,6 +31,7 @@ struct MapScreen: View {
     @State private var places: [Place] = []
     @State private var livePins: [LivePin] = []
     @State private var selectedCategoryGroup: POICategoryGroup?
+    @State private var mapType: MKMapType = .standard
     @State private var selectedPlace: Place?
     @State private var selectedLivePin: LivePin?
     @State private var selectedMapFeature: MKMapFeatureAnnotation?
@@ -137,7 +138,8 @@ struct MapScreen: View {
                         },
                         pointOfInterestCategories: selectedCategoryGroup?.categories,
                         centerOnce: initialRegion,
-                        recenterTrigger: recenterTrigger
+                        recenterTrigger: recenterTrigger,
+                        mapType: mapType
                     )
                     .ignoresSafeArea()
                 }
@@ -171,7 +173,11 @@ struct MapScreen: View {
             .padding()
         }
         .overlay(alignment: .bottomTrailing) {
-            routeModeToggleButton.padding(20)
+            VStack(spacing: 12) {
+                mapTypeButton
+                routeModeToggleButton
+            }
+            .padding(20)
         }
         // Not `.navigationTitle` — the system nav bar/large-title reserved a
         // big, unstyled blank band above the map (inconsistent with every
@@ -213,6 +219,41 @@ struct MapScreen: View {
             TripPhotoCaptureSheet { data in
                 Task { await attachTripPhoto(data) }
             }
+        }
+    }
+
+    private var mapTypeButton: some View {
+        Menu {
+            Button {
+                mapType = .standard
+            } label: {
+                Label(String(localized: "map.style.standard"), systemImage: "map")
+            }
+            Button {
+                mapType = .hybrid
+            } label: {
+                Label(String(localized: "map.style.hybrid"), systemImage: "square.stack.3d.up")
+            }
+            Button {
+                mapType = .satellite
+            } label: {
+                Label(String(localized: "map.style.satellite"), systemImage: "globe.americas.fill")
+            }
+        } label: {
+            Image(systemName: mapTypeIconName)
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(.primary)
+                .frame(width: 48, height: 48)
+                .background(Circle().fill(.thinMaterial))
+                .shadow(radius: 3)
+        }
+    }
+
+    private var mapTypeIconName: String {
+        switch mapType {
+        case .satellite, .satelliteFlyover: return "globe.americas.fill"
+        case .hybrid, .hybridFlyover: return "square.stack.3d.up.fill"
+        default: return "map"
         }
     }
 
