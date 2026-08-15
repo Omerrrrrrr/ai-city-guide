@@ -87,7 +87,12 @@ const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL ?? 'anthropic/claude-sonne
 // gpt-4o-mini identified two visually distinct Icelandic waterfall photos as
 // the same (wrong, for at least one of them) famous landmark.
 const GOOGLE_API_KEY = process.env.GOOGLE_GENERATIVE_AI_API_KEY?.trim();
-const GOOGLE_MODEL = process.env.GOOGLE_MODEL ?? 'gemini-2.5-flash';
+// 'gemini-flash-latest', not a pinned version like 'gemini-2.5-flash' --
+// confirmed live: that pinned id already errors with "no longer available
+// to new users" as of this writing, Google having moved to a 3.x model
+// generation. The '-latest' alias is Google's own always-current pointer,
+// avoiding the same problem recurring every time they retire a version.
+const GOOGLE_MODEL = process.env.GOOGLE_MODEL ?? 'gemini-flash-latest';
 const APP_URL = process.env.APP_URL ?? 'http://localhost:4000';
 const OPENWEATHER_API_KEY = process.env.OPENWEATHER_API_KEY?.trim();
 const OPENROUTESERVICE_API_KEY = process.env.OPENROUTESERVICE_API_KEY?.trim();
