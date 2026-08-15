@@ -141,13 +141,31 @@ struct ExplainResult: Codable {
     /// AI-generated) — Wikipedia's photo, when there is one, sorts first
     /// per the user's explicit priority. Each carries its own `source` for
     /// per-photo attribution rather than one blanket label, since a single
-    /// place can have photos from both providers at once.
+    /// place can have photos from both providers at once. An Unsplash photo
+    /// only ever appears here as a last resort, when neither real source had
+    /// one.
     var photos: [POIPhoto] = []
+    /// Present only when this Apple POI matches one of Piri's own curated
+    /// `places` rows (by name+proximity) — its AI-generated enrichment
+    /// (vibe, best-for, price level, duration, rainy-day fit) is richer than
+    /// anything Apple MapKit or Tripadvisor gives. `nil` when no curated
+    /// match exists.
+    var curatedInfo: CuratedPlaceInfo?
 }
 
 enum POIPhotoSource: String, Codable {
     case wikipedia
     case tripadvisor
+    case unsplash
+}
+
+struct CuratedPlaceInfo: Codable {
+    var priceLevel: String?
+    var vibe: String?
+    var bestFor: String?
+    var familyFriendly: Bool?
+    var durationMinutes: Int?
+    var rainyDayFit: Bool?
 }
 
 struct POIPhoto: Codable, Identifiable, Hashable {

@@ -4295,6 +4295,50 @@
         }
       }
     },
+    "curatedInfo.familyFriendly": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Family-friendly"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Familievennlig"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aile dostu"
+          }
+        }
+      }
+    },
+    "curatedInfo.rainyDayFit": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Good for rainy days"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bra på regnværsdager"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yağmurlu günler için uygun"
+          }
+        }
+      }
+    },
     "explore.emptyText": {
       "localizations": {
         "en": {

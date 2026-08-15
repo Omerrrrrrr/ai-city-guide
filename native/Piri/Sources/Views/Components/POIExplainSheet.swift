@@ -28,6 +28,7 @@ struct POIExplainSheet: View {
     /// "The request timed out." into the AI's own context.
     @State private var chatError: String?
     @State private var lookAroundScene: MKLookAroundScene?
+    @State private var weatherQuery = WeatherQuery()
     /// Drives Apple's own full Place Card via `mapItemDetailSheet` — the
     /// only place hours show up. `MKMapItem` has no `hours`/`openingHours`
     /// property at all (confirmed against the SDK header directly, not just
@@ -109,6 +110,12 @@ struct POIExplainSheet: View {
                                         Label(L("poiReviews.seeAll", rating.reviewCount), systemImage: "text.bubble")
                                             .font(.footnote.weight(.semibold))
                                     }
+                                }
+                                if let curatedInfo = result.curatedInfo {
+                                    CuratedInfoRow(info: curatedInfo)
+                                }
+                                if let weather = weatherQuery.weather {
+                                    weatherBadge(weather)
                                 }
                                 POIPhotoGallery(photos: result.photos)
                                 Text(result.body).font(.footnote)
@@ -212,6 +219,18 @@ struct POIExplainSheet: View {
         .sheet(isPresented: $showingReviews) { TripAdvisorReviewsSheet(poi: poi) }
         .task { await explain() }
         .task { await loadLookAroundScene() }
+        .task { await weatherQuery.load(lat: poi.coordinate.latitude, lng: poi.coordinate.longitude) }
+    }
+
+    /// Compact, not a card element — current conditions at this POI, one
+    /// line, next to the rating row rather than a section of its own.
+    private func weatherBadge(_ weather: Weather) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: weather.condition.icon)
+            Text("\(Int(weather.temp))°, \(weather.description.capitalized)")
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
     }
 
     @ViewBuilder

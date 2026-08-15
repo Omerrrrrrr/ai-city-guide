@@ -41,6 +41,10 @@ struct MapScreen: View {
     /// its own retry button, instead of a disconnected top-of-screen banner
     /// that could also linger after the card that caused it is dismissed.
     @State private var poiExplainError: String?
+    /// Fetched alongside (not blocking) the AI explain call — independent of
+    /// `poiExplainCache`, since a cache hit on the AI text shouldn't also
+    /// serve stale weather. `WeatherQuery` has its own 30-minute cache.
+    @State private var mapFeatureWeatherQuery = WeatherQuery()
     /// Resolved alongside the AI explain call so `mapFeatureCard` can show
     /// its plain phone/website fields and offer the full Place Card sheet.
     @State private var resolvedMapFeatureItem: MKMapItem?
@@ -423,6 +427,12 @@ struct MapScreen: View {
                 if let rating = poiExplainResult.rating {
                     TripAdvisorRatingRow(rating: rating)
                 }
+                if let curatedInfo = poiExplainResult.curatedInfo {
+                    CuratedInfoRow(info: curatedInfo)
+                }
+                if let weather = mapFeatureWeatherQuery.weather {
+                    weatherBadge(weather)
+                }
                 POIPhotoGallery(photos: poiExplainResult.photos)
                 Text(poiExplainResult.body).font(.footnote)
                 ForEach(poiExplainResult.highlights, id: \.self) { highlight in
@@ -488,6 +498,17 @@ struct MapScreen: View {
         .sheet(item: $addToCollectionKind) { kind in
             if let poi { AddToCollectionSheet(poi: poi, kind: kind) }
         }
+    }
+
+    /// Compact, not a card element — current conditions at this POI, one
+    /// line, next to the rating row rather than a section of its own.
+    private func weatherBadge(_ weather: Weather) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: weather.condition.icon)
+            Text("\(Int(weather.temp))°, \(weather.description.capitalized)")
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
     }
 
     private func setInitialRegionIfNeeded() async {
@@ -613,6 +634,10 @@ struct MapScreen: View {
         }
 
         guard !Task.isCancelled else { return }
+
+        // Fire-and-forget — weather has no dependency on the AI explain
+        // call or its cache, so it's not awaited here.
+        Task { await mapFeatureWeatherQuery.load(lat: feature.coordinate.latitude, lng: feature.coordinate.longitude) }
 
         let profile = userProfileStore.profile
         let cacheKey = poiCacheKey(feature, profile: profile)

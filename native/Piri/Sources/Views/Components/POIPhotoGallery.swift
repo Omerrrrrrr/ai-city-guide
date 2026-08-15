@@ -44,7 +44,13 @@ struct POIPhotoGallery: View {
 }
 
 private func sourceLabel(_ source: POIPhotoSource) -> some View {
-    Text(source == .wikipedia ? "Wikipedia" : "Tripadvisor")
+    let label: String
+    switch source {
+    case .wikipedia: label = "Wikipedia"
+    case .tripadvisor: label = "Tripadvisor"
+    case .unsplash: label = "Unsplash"
+    }
+    return Text(label)
         .font(.system(size: 9, weight: .semibold))
         .foregroundStyle(.white)
         .padding(.horizontal, 6)

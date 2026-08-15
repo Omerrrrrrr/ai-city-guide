@@ -70,6 +70,7 @@ import {
 import { haversineKm } from './geo';
 import { fetchTripAdvisorInfo, fetchTripAdvisorPhotos, fetchTripAdvisorReviews, normalizeName, type TripAdvisorInfo } from './tripadvisor';
 import { fetchWikipediaPhoto, WIKIPEDIA_PLAUSIBLE_CATEGORIES } from './wiki-photo';
+import { fetchUnsplashPhoto } from './unsplash';
 import { places, cities, liveGridCellStatus, livePlaceCache, poiPhotoCache } from './schema';
 
 const PORT = Number(process.env.PORT ?? 4000);
@@ -1365,20 +1366,66 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
       // the fact. Photos aren't needed for the prompt, so that second
       // network call is skipped here (`includePhotos: false`) and fetched
       // below in parallel with the AI call instead, rather than adding to
-      // this sequential wait.
-      const tripAdvisorInfo =
+      // this sequential wait. The curated-place lookup below has no such
+      // grounding dependency, so it runs alongside this wait instead of
+      // adding to it.
+      const curatedMatchPromise =
         lat !== undefined && lng !== undefined
-          ? await fetchTripAdvisorInfo(name, lat, lng, undefined, false)
-          : { rating: null, description: null, photoUrls: [], locationId: null };
+          ? (async () => {
+              // Tight box (~500m) since this is a same-place match against
+              // our own DB, not discovery — findLikelyDuplicate's own
+              // distance+name-similarity check does the real matching, this
+              // just shrinks the candidate set it has to scan.
+              const delta = 0.005;
+              const nearby = await db
+                .select()
+                .from(places)
+                .where(
+                  and(gte(places.lat, lat - delta), lte(places.lat, lat + delta), gte(places.lng, lng - delta), lte(places.lng, lng + delta))
+                );
+              return findLikelyDuplicate({ name, lat, lng }, nearby) ?? null;
+            })()
+          : Promise.resolve(null);
 
+      const [tripAdvisorInfo, curatedPlace] = await Promise.all([
+        lat !== undefined && lng !== undefined
+          ? fetchTripAdvisorInfo(name, lat, lng, undefined, false)
+          : Promise.resolve({ rating: null, description: null, photoUrls: [], locationId: null } as TripAdvisorInfo),
+        curatedMatchPromise,
+      ]);
+
+      // Piri's own curated place record for this same physical POI, when one
+      // exists — its AI-generated enrichment (vibe/best-for/rainy-day-fit/
+      // price level) is richer than anything Apple MapKit or Tripadvisor
+      // gives, so it's folded in as extra grounding alongside (not instead
+      // of) the Tripadvisor description above. This does NOT re-enable
+      // curated data as a map pin source (see `MapScreen.useCuratedMapData`)
+      // — it only enriches the explain response for an Apple POI the user
+      // already tapped.
       const placeContext = [
         `Name: ${name}`,
         category ? `Category: ${category}` : null,
         address ? `Address: ${address}` : null,
         tripAdvisorInfo.description ? `Tripadvisor description: ${tripAdvisorInfo.description}` : null,
+        curatedPlace?.shortStory ? `Story: ${curatedPlace.shortStory}` : null,
+        curatedPlace?.localVibeMood ? `Vibe: ${curatedPlace.localVibeMood}` : null,
+        curatedPlace?.localVibeBestFor ? `Best for: ${curatedPlace.localVibeBestFor}` : null,
+        curatedPlace?.rainyDayFit != null ? `Rainy day fit: ${curatedPlace.rainyDayFit}` : null,
       ]
         .filter(Boolean)
         .join('\n');
+
+      const curatedInfo =
+        curatedPlace
+          ? {
+              priceLevel: curatedPlace.priceLevel && curatedPlace.priceLevel !== 'Unknown' ? curatedPlace.priceLevel : null,
+              vibe: curatedPlace.localVibeMood,
+              bestFor: curatedPlace.localVibeBestFor,
+              familyFriendly: curatedPlace.isFamilyFriendly,
+              durationMinutes: curatedPlace.durationMinutes,
+              rainyDayFit: curatedPlace.rainyDayFit,
+            }
+          : null;
 
       const factualGuard = tripAdvisorInfo.description
         ? `A real Tripadvisor description of this place is included below — ground your response in it and don't contradict it, but still don't invent additional unverifiable specifics (exact founding dates, named owners, awards) beyond what's given.`
@@ -1432,13 +1479,24 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
         // Wikipedia first — the user's explicit priority — then Tripadvisor.
         // Each photo carries its own source so the client can attribute it
         // correctly rather than a single blanket label.
-        const photos: { url: string; source: 'wikipedia' | 'tripadvisor'; attributionUrl?: string }[] = [];
+        const photos: { url: string; source: 'wikipedia' | 'tripadvisor' | 'unsplash'; attributionUrl?: string }[] = [];
         if (wikiPhoto) {
           photos.push({ url: wikiPhoto.url, source: 'wikipedia', attributionUrl: wikiPhoto.pageUrl });
         }
         photos.push(...tripAdvisorPhotoUrls.map((url) => ({ url, source: 'tripadvisor' as const })));
 
-        return reply.send({ ...(object as Record<string, unknown>), rating: tripAdvisorInfo.rating, photos });
+        // Last-resort visual only when neither real-place photo source had
+        // anything — deliberately sequential (not folded into the Promise.all
+        // above), since whether it's needed at all depends on that call's
+        // own results. Only adds latency on the (uncommon) empty-photo path.
+        if (photos.length === 0) {
+          const unsplashPhoto = await fetchUnsplashPhoto(category ? `${name} ${category}` : name);
+          if (unsplashPhoto) {
+            photos.push({ url: unsplashPhoto.url, source: 'unsplash', attributionUrl: unsplashPhoto.attributionUrl });
+          }
+        }
+
+        return reply.send({ ...(object as Record<string, unknown>), rating: tripAdvisorInfo.rating, photos, curatedInfo });
       } catch (e: any) {
         return sendServerError(request, reply, e, 'Failed to explain place');
       }
