@@ -25,7 +25,14 @@ jobs:
       - run: npm run test
 
   ios:
-    runs-on: macos-14
+    # macos-14's newest available Xcode (16.2) predates the iOS 26 SDK, and
+    # Theme.swift uses the iOS 26 Liquid Glass `glassEffect` API (guarded by
+    # `#available` at runtime, but the symbol still has to exist in the SDK
+    # at compile time regardless) -- macos-15 is needed for an Xcode new
+    # enough to have it. Confirmed via the actual failed run's log
+    # (`gh run view --log-failed`): "value of type 'Self' has no member
+    # 'glassEffect'" against Xcode 16.2, not a signing/destination issue.
+    runs-on: macos-15
     defaults:
       run:
         working-directory: native/Piri
