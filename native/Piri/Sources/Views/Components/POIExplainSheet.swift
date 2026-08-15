@@ -20,6 +20,13 @@ struct POIExplainSheet: View {
     @State private var chatHistory: [POIChatTurn] = []
     @State private var chatInput = ""
     @State private var chatSending = false
+    /// Kept separate from `chatHistory` (not appended as a fake `.assistant`
+    /// turn) for two reasons: it needs visibly distinct styling so a network
+    /// error can't be mistaken for something Piri actually said, and
+    /// `chatHistory` is sent back to the backend as conversation context on
+    /// the next message — an error turn baked into that history would leak
+    /// "The request timed out." into the AI's own context.
+    @State private var chatError: String?
     @State private var lookAroundScene: MKLookAroundScene?
     /// Drives Apple's own full Place Card via `mapItemDetailSheet` — the
     /// only place hours show up. `MKMapItem` has no `hours`/`openingHours`
@@ -112,7 +119,13 @@ struct POIExplainSheet: View {
                                     }
                                 }
                             } else if let errorMessage {
-                                Text(errorMessage).font(.footnote).foregroundStyle(Theme.closedRed)
+                                HStack(spacing: 8) {
+                                    Text(errorMessage).font(.footnote).foregroundStyle(Theme.closedRed)
+                                    Spacer()
+                                    Button("common.retry") { Task { await explain() } }
+                                        .buttonStyle(.bordered)
+                                        .controlSize(.small)
+                                }
                             }
 
                             // Phone/website/address — real plain values,
@@ -160,12 +173,28 @@ struct POIExplainSheet: View {
                                 }
                                 .id("chat-sending")
                             }
+
+                            if let chatError {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                    Text(chatError)
+                                }
+                                .font(.footnote)
+                                .foregroundStyle(Theme.closedRed)
+                                .padding(10)
+                                .background(Theme.closedRed.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+                                .id("chat-error")
+                            }
                         }
                         .padding()
                     }
                     .onChange(of: chatHistory.count) { _, _ in
                         guard let last = chatHistory.last else { return }
                         withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
+                    }
+                    .onChange(of: chatError) { _, newValue in
+                        guard newValue != nil else { return }
+                        withAnimation { proxy.scrollTo("chat-error", anchor: .bottom) }
                     }
                 }
 
@@ -258,6 +287,7 @@ struct POIExplainSheet: View {
 
     private func explain() async {
         loading = true
+        errorMessage = nil
         defer { loading = false }
 
         let request = ExplainPOIRequest(
@@ -286,6 +316,7 @@ struct POIExplainSheet: View {
         let historyForRequest = chatHistory
         chatHistory.append(POIChatTurn(role: .user, content: message))
         chatSending = true
+        chatError = nil
         defer { chatSending = false }
 
         let request = POIChatRequest(
@@ -302,7 +333,7 @@ struct POIExplainSheet: View {
             let response = try await PlacesAPI.chatAboutPOI(request)
             chatHistory.append(POIChatTurn(role: .assistant, content: response.reply))
         } catch {
-            chatHistory.append(POIChatTurn(role: .assistant, content: error.localizedDescription))
+            chatError = error.localizedDescription
         }
     }
 }

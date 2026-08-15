@@ -12369,6 +12369,29 @@
         }
       }
     },
+    "mapPoiCategories.activities": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activities"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktiviteter"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktiviteler"
+          }
+        }
+      }
+    },
     "tripadvisor.everyDay": {
       "extractionState": "manual",
       "localizations": {

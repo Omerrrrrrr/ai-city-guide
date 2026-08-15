@@ -68,7 +68,7 @@ import {
   type UserProfileInput,
 } from './user-context';
 import { haversineKm } from './geo';
-import { fetchTripAdvisorInfo, fetchTripAdvisorReviews, normalizeName, type TripAdvisorInfo } from './tripadvisor';
+import { fetchTripAdvisorInfo, fetchTripAdvisorPhotos, fetchTripAdvisorReviews, normalizeName, type TripAdvisorInfo } from './tripadvisor';
 import { fetchWikipediaPhoto, WIKIPEDIA_PLAUSIBLE_CATEGORIES } from './wiki-photo';
 import { places, cities, liveGridCellStatus, livePlaceCache, poiPhotoCache } from './schema';
 
@@ -1359,13 +1359,17 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
       const recentlyViewedSummaries = await resolveRecentlyViewedSummaries(recentlyViewedPlaceIds);
       const { text: profileContext, hasProfile } = buildUserContext(userProfile, recentlyViewedSummaries);
 
-      // Fetched ahead of the AI call (not run in parallel with it) so a real
-      // Tripadvisor description, when there is one, can ground the prompt
-      // instead of only reaching the client after the fact.
+      // Rating + description are fetched ahead of the AI call (not run in
+      // parallel with it) so a real Tripadvisor description, when there is
+      // one, can ground the prompt instead of only reaching the client after
+      // the fact. Photos aren't needed for the prompt, so that second
+      // network call is skipped here (`includePhotos: false`) and fetched
+      // below in parallel with the AI call instead, rather than adding to
+      // this sequential wait.
       const tripAdvisorInfo =
         lat !== undefined && lng !== undefined
-          ? await fetchTripAdvisorInfo(name, lat, lng)
-          : { rating: null, description: null, photoUrls: [] };
+          ? await fetchTripAdvisorInfo(name, lat, lng, undefined, false)
+          : { rating: null, description: null, photoUrls: [], locationId: null };
 
       const placeContext = [
         `Name: ${name}`,
@@ -1395,10 +1399,11 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         : '';
 
       try {
-        // Wikipedia has no dependency on the AI prompt (unlike the
-        // Tripadvisor description above), so it runs concurrently with the
-        // generateObject call instead of adding to the sequential wait.
-        const [{ object }, wikiPhoto] = await Promise.all([
+        // Neither Wikipedia's photo nor Tripadvisor's photos depend on the AI
+        // prompt (unlike the Tripadvisor description above), so both run
+        // concurrently with the generateObject call instead of adding to the
+        // sequential wait.
+        const [{ object }, wikiPhoto, tripAdvisorPhotoUrls] = await Promise.all([
           generateObject({
             model: aiProvider.client.chat(aiProvider.model),
             maxOutputTokens: 300,
@@ -1421,6 +1426,7 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
             prompt: `Explain this place:\n\n${placeContext}`,
           } as any),
           lat !== undefined && lng !== undefined ? fetchWikipediaPhoto(name, lat, lng, category) : Promise.resolve(null),
+          tripAdvisorInfo.locationId ? fetchTripAdvisorPhotos(tripAdvisorInfo.locationId) : Promise.resolve([]),
         ]);
 
         // Wikipedia first — the user's explicit priority — then Tripadvisor.
@@ -1430,7 +1436,7 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
         if (wikiPhoto) {
           photos.push({ url: wikiPhoto.url, source: 'wikipedia', attributionUrl: wikiPhoto.pageUrl });
         }
-        photos.push(...tripAdvisorInfo.photoUrls.map((url) => ({ url, source: 'tripadvisor' as const })));
+        photos.push(...tripAdvisorPhotoUrls.map((url) => ({ url, source: 'tripadvisor' as const })));
 
         return reply.send({ ...(object as Record<string, unknown>), rating: tripAdvisorInfo.rating, photos });
       } catch (e: any) {

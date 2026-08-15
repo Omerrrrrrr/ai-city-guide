@@ -36,6 +36,11 @@ struct MapScreen: View {
     @State private var selectedMapFeature: MKMapFeatureAnnotation?
     @State private var poiExplainResult: ExplainResult?
     @State private var poiExplainLoading = false
+    /// Separate from the shared `errorMessage` banner (search/directions/live
+    /// pins) so a POI-explain failure shows inline in `mapFeatureCard` with
+    /// its own retry button, instead of a disconnected top-of-screen banner
+    /// that could also linger after the card that caused it is dismissed.
+    @State private var poiExplainError: String?
     /// Resolved alongside the AI explain call so `mapFeatureCard` can show
     /// its plain phone/website fields and offer the full Place Card sheet.
     @State private var resolvedMapFeatureItem: MKMapItem?
@@ -292,6 +297,7 @@ struct MapScreen: View {
         selectedPlace = nil
         selectedLivePin = nil
         poiExplainResult = nil
+        poiExplainError = nil
         lookAroundScene = nil
         resolvedMapFeatureItem = nil
         showingMapItemDetail = false
@@ -304,6 +310,7 @@ struct MapScreen: View {
     private func dismissMapFeature() {
         selectedMapFeature = nil
         poiExplainResult = nil
+        poiExplainError = nil
         lookAroundScene = nil
         showingMapItemDetail = false
         addToCollectionKind = nil
@@ -423,6 +430,17 @@ struct MapScreen: View {
                         Circle().fill(Theme.gold).frame(width: 5, height: 5).padding(.top, 6)
                         Text(highlight).font(.caption)
                     }
+                }
+            } else if let poiExplainError {
+                HStack(spacing: 8) {
+                    Text(poiExplainError).font(.footnote).foregroundStyle(.secondary).lineLimit(2)
+                    Spacer()
+                    Button("common.retry") {
+                        poiExplainTask?.cancel()
+                        poiExplainTask = Task { await explainMapFeature(feature) }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
                 }
             }
 
@@ -561,8 +579,21 @@ struct MapScreen: View {
         }
     }
 
-    private func poiCacheKey(_ feature: MKMapFeatureAnnotation) -> String {
-        "\(feature.title ?? "")|\(String(format: "%.5f", feature.coordinate.latitude))|\(String(format: "%.5f", feature.coordinate.longitude))"
+    /// Includes a fingerprint of the personalization fields actually sent to
+    /// `/places/explain-poi` (below), so editing profile/interests/budget/pace
+    /// mid-session makes previously-cached blurbs simply stop matching
+    /// instead of resurfacing stale, pre-edit personalization.
+    private func poiCacheKey(_ feature: MKMapFeatureAnnotation, profile: UserProfile) -> String {
+        let fingerprint = [
+            profile.name,
+            profile.professionText ?? "",
+            profile.interestsText.joined(separator: ","),
+            profile.faith?.rawValue ?? "",
+            profile.budget?.rawValue ?? "",
+            profile.groupType?.rawValue ?? "",
+            profile.pace?.rawValue ?? "",
+        ].joined(separator: ",")
+        return "\(feature.title ?? "")|\(String(format: "%.5f", feature.coordinate.latitude))|\(String(format: "%.5f", feature.coordinate.longitude))|\(fingerprint)"
     }
 
     private func explainMapFeature(_ feature: MKMapFeatureAnnotation) async {
@@ -583,16 +614,18 @@ struct MapScreen: View {
 
         guard !Task.isCancelled else { return }
 
-        let cacheKey = poiCacheKey(feature)
+        let profile = userProfileStore.profile
+        let cacheKey = poiCacheKey(feature, profile: profile)
         if let cached = Self.poiExplainCache[cacheKey] {
             poiExplainResult = cached
+            poiExplainError = nil
             return
         }
 
         poiExplainLoading = true
+        poiExplainError = nil
         defer { poiExplainLoading = false }
 
-        let profile = userProfileStore.profile
         let request = ExplainPOIRequest(
             name: feature.title ?? "",
             category: category,
@@ -619,7 +652,7 @@ struct MapScreen: View {
             Self.poiExplainCache[cacheKey] = result
         } catch {
             guard !Task.isCancelled else { return }
-            errorMessage = error.localizedDescription
+            poiExplainError = error.localizedDescription
         }
     }
 }

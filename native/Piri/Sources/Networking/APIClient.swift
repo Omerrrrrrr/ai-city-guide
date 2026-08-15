@@ -62,8 +62,16 @@ final class APIClient {
 
     private struct EmptyBody: Encodable {}
 
+    /// Explicit allowlist of POST paths that are safe to retry even though
+    /// POST is normally excluded below -- both are pure read-and-generate
+    /// with nothing persisted server-side (no DB write, no side effect to
+    /// double), unlike bookmarks/plans/sync POSTs which must stay
+    /// single-shot. Matched by path, not a blanket "retry all POST" flag.
+    private static let retryableWriteMethodPaths: Set<String> = ["/places/explain-poi", "/places/explain-poi/chat"]
+
     /// One retry, only for transient transport failures (dropped
-    /// connection, timeout) on idempotent methods -- never retries POST/PUT,
+    /// connection, timeout) on idempotent methods, plus the specific
+    /// side-effect-free POST paths above -- never retries other POST/PUT,
     /// since replaying a write after an ambiguous failure could double it.
     private func performWithSingleRetry(_ request: URLRequest) async throws -> (Data, URLResponse) {
         do {
@@ -71,7 +79,8 @@ final class APIClient {
         } catch let error as URLError {
             let retryableCodes: Set<URLError.Code> = [.timedOut, .networkConnectionLost, .notConnectedToInternet]
             let isIdempotent = request.httpMethod == "GET" || request.httpMethod == nil
-            guard isIdempotent, retryableCodes.contains(error.code) else { throw error }
+            let isRetryableWrite = request.httpMethod == "POST" && Self.retryableWriteMethodPaths.contains(request.url?.path ?? "")
+            guard isIdempotent || isRetryableWrite, retryableCodes.contains(error.code) else { throw error }
             return try await session.data(for: request)
         }
     }

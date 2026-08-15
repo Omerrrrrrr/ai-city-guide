@@ -36,16 +36,22 @@ enum POICategoryGroups {
         // cathedral (`.religiousSite`) had no chip that could ever surface
         // it, on top of Apple's plain nearby-browse already burying it below
         // the ~25-result cap (see `AIScreen.coreSightCategories`).
-        POICategoryGroup(labelKey: "mapPoiCategories.landmarks", categories: [.landmark, .nationalMonument, .castle, .fortress, .religiousSite], icon: "star.circle.fill"),
-        POICategoryGroup(labelKey: "mapPoiCategories.nature", categories: [.park, .nationalPark, .campground], icon: "leaf.fill"),
-        POICategoryGroup(labelKey: "mapPoiCategories.culture", categories: [.theater, .movieTheater], icon: "theatermasks.fill"),
-        POICategoryGroup(labelKey: "mapPoiCategories.beaches", categories: [.beach, .marina], icon: "beach.umbrella.fill"),
+        POICategoryGroup(labelKey: "mapPoiCategories.landmarks", categories: [.landmark, .nationalMonument, .castle, .fortress, .religiousSite, .library], icon: "star.circle.fill"),
+        POICategoryGroup(labelKey: "mapPoiCategories.nature", categories: [.park, .nationalPark, .campground, .hiking, .zoo], icon: "leaf.fill"),
+        POICategoryGroup(labelKey: "mapPoiCategories.culture", categories: [.theater, .movieTheater, .musicVenue, .planetarium, .aquarium], icon: "theatermasks.fill"),
+        POICategoryGroup(labelKey: "mapPoiCategories.beaches", categories: [.beach, .marina, .surfing, .kayaking], icon: "beach.umbrella.fill"),
         POICategoryGroup(labelKey: "mapPoiCategories.cafes", categories: [.cafe, .bakery], icon: "cup.and.saucer.fill"),
-        POICategoryGroup(labelKey: "mapPoiCategories.food", categories: [.restaurant, .brewery, .winery, .foodMarket], icon: "fork.knife"),
+        POICategoryGroup(labelKey: "mapPoiCategories.food", categories: [.restaurant, .brewery, .winery, .foodMarket, .distillery], icon: "fork.knife"),
         POICategoryGroup(labelKey: "mapPoiCategories.shopping", categories: [.store], icon: "bag.fill"),
         POICategoryGroup(labelKey: "mapPoiCategories.nightlife", categories: [.nightlife], icon: "wineglass.fill"),
-        POICategoryGroup(labelKey: "mapPoiCategories.sports", categories: [.stadium, .fitnessCenter], icon: "sportscourt.fill"),
+        POICategoryGroup(labelKey: "mapPoiCategories.sports", categories: [.stadium, .fitnessCenter, .golf, .tennis, .soccer, .swimming], icon: "sportscourt.fill"),
         POICategoryGroup(labelKey: "mapPoiCategories.lodging", categories: [.hotel], icon: "bed.double.fill"),
+        // The remaining categories referenced by `queryKeywordCategories`
+        // below (amusement parks, adventure sports, etc.) previously had no
+        // chip at all -- confirmed no visible way to filter the map down to
+        // them even though an Ask Piri query like "eğlence" already knew to
+        // search for them.
+        POICategoryGroup(labelKey: "mapPoiCategories.activities", categories: [.amusementPark, .bowling, .miniGolf, .goKart, .skatePark, .rockClimbing, .skiing], icon: "gamecontroller.fill"),
     ]
 
     /// Falls back to the generic pin icon for any Apple category not covered
@@ -87,6 +93,8 @@ enum POICategoryGroups {
             colors = [Color(red: 0.10, green: 0.40, blue: 0.34), Color(red: 0.28, green: 0.62, blue: 0.50)]
         case .hotel:
             colors = [Color(red: 0.17, green: 0.20, blue: 0.36), Color(red: 0.32, green: 0.36, blue: 0.56)]
+        case .amusementPark, .bowling, .miniGolf, .goKart, .skatePark, .rockClimbing, .skiing:
+            colors = [Color(red: 0.55, green: 0.12, blue: 0.32), Color(red: 0.85, green: 0.32, blue: 0.52)]
         default:
             colors = [Color(red: 0.30, green: 0.30, blue: 0.34), Color(red: 0.52, green: 0.52, blue: 0.56)]
         }
