@@ -462,7 +462,21 @@ const enrichmentSchema = z.object({
   factType: z.string().describe('A short category label, e.g. "Historic wooden house district".'),
   isIndoor: z.boolean(),
   isFamilyFriendly: z.boolean(),
-  durationMinutes: z.number().int().min(10).max(480),
+  // Nullable, matching `priceLevel`'s 'Unknown' escape valve below — this
+  // used to be a mandatory field with no way to say "I don't know," so a
+  // generic Overture candidate with no Wikipedia match and nothing in its
+  // name/category implying a visit length still had to get a specific
+  // invented number (e.g. "45"), stored and shown to users as a plain fact
+  // with no "estimated" framing. Every downstream consumer (DB column,
+  // place-dto.ts, the Swift models, CuratedInfoRow) already treats this as
+  // optional, so this was the only forced-non-null link in the chain.
+  durationMinutes: z
+    .number()
+    .int()
+    .min(10)
+    .max(480)
+    .nullable()
+    .describe('Typical visit length in minutes, only when genuinely implied by the input (category, Wikipedia summary). Null if you have no real basis for a specific number — don\'t guess one just to fill the field.'),
   rainyDayFit: z.boolean(),
   // A free-text description here drifted in practice (seen live: "Low to
   // medium", "Ticketed admission", "Paid activity", "Medium to high", ~19

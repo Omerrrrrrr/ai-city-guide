@@ -1179,6 +1179,16 @@ async function buildServer() {
       const profileContext = identifyHasProfile
         ? `${userContext}\n\nTailor every sentence to this specific person. An architect should hear about structure and engineering. A Muslim should hear about religious significance. A historian should hear about historical layers. A photographer should hear about light, composition, and visual opportunities. Be specific, not generic.${identifyFaithMismatchGuard}`
         : '';
+      // Unlike /places/explain-poi (which has its own factualGuard, backed
+      // by real Wikipedia/Wikidata/Tripadvisor grounding data), this
+      // endpoint has zero fetched facts about the identified place at all —
+      // just the photo and general model knowledge — yet asks for a
+      // multi-sentence "rich explanation." Without an explicit guard here,
+      // correctly identifying e.g. "Hagia Sophia" gives the model every
+      // incentive to also add a specific founding date or architect name
+      // from parametric memory, right or wrong, presented with the same
+      // confidence as the identification itself.
+      const identifyFactualGuard = ` You have no verified facts fetched for this place beyond what the image and location hint show — no confirmed founding date, architect, or award. If you're genuinely confident of a specific, well-known fact about the place you've identified, you may state it, but never state a specific date/name/number you're not actually sure of just to sound authoritative — describe it in general terms instead (e.g. "built in the Ottoman era" rather than a guessed exact year) or leave it out.`;
 
       const nearbyHint =
         nearbyPlaces.length > 0
@@ -1223,7 +1233,7 @@ async function buildServer() {
               ],
             },
           ],
-          system: `You are Piri, a deeply knowledgeable personal travel guide. You identify places from photos and explain them in a way that speaks directly to who the user is.${profileContext}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
+          system: `You are Piri, a deeply knowledgeable personal travel guide. You identify places from photos and explain them in a way that speaks directly to who the user is.${identifyFactualGuard}${profileContext}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         } as any)) as { object: z.infer<typeof identifySchema> };
 
         // Fuzzy-match the identified title against DB places. Nearby places are
@@ -1325,6 +1335,12 @@ async function buildServer() {
       const personalization = hasProfile
         ? `Let this person's profession, interests, and worldview subtly color your angle and word choice, but don't name-check them (avoid phrases like "as an architect" or "from an engineer's perspective") and don't force a themed detail into every sentence. At most one specific detail should reflect who they are — the rest should just be a genuinely interesting, natural description of the place.${faithMismatchGuard}`
         : `Give a warm, engaging overview that a curious traveler would enjoy.`;
+      // Mirrors /places/explain-poi's factualGuard — this endpoint's
+      // grounding (`placeContext` above) is real curated-DB content, which
+      // narrows the risk, but nothing previously stopped the model from
+      // adding a specific fact (a founding date, an architect's name) that
+      // isn't actually present in that context.
+      const factualGuard = ` Ground your response in the facts given below and don't contradict them, but don't invent additional unverifiable specifics (exact founding dates, named owners, awards) beyond what's given — if the description/story below doesn't mention it, rely on general knowledge about places of this type instead of guessing a specific detail.`;
 
       try {
         const { object } = await generateObject({
@@ -1343,7 +1359,7 @@ async function buildServer() {
               .max(3)
               .describe('2-3 specific things this particular person would find most interesting here.'),
           }),
-          system: `You are Piri, a deeply knowledgeable personal travel guide. Your job is to explain a place in a way that speaks directly to who the user is — their profession, interests, and worldview.${NO_HYPE_GUARD}${profileContext}
+          system: `You are Piri, a deeply knowledgeable personal travel guide. Your job is to explain a place in a way that speaks directly to who the user is — their profession, interests, and worldview.${factualGuard}${NO_HYPE_GUARD}${profileContext}
 
 ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
           prompt: `Explain this place:\n\n${placeContext}`,
@@ -2046,7 +2062,11 @@ ${placeContext.length > 0
 
 GROUNDING RULE: never name a specific venue in your answer text that is not in the shortlist below — not a real place you happen to know from general knowledge, not a plausible-sounding invented name, none of that. Every specific place name in your answer must come from the shortlist, and every one you name MUST also appear in "recommendations" — never mention a place by name without also returning it as a card. If nothing in the shortlist fits well, don't invent or recall one from memory — speak generically instead ("a cozy cafe nearby", "a scenic walking spot") or say you don't have a great match for that yet.
 
-PRIORITY RULE: the user's current message always overrides their general profile — the profile is just a fallback for when they haven't said what they want right now. If the message explicitly asks for something that differs from a stated profile preference (e.g. they say "something cheap" even though their profile says budget: luxury, or "quick stop" even though their profile says pace: relaxed), you MUST follow what they just asked for and treat the conflicting profile field as irrelevant for this turn — do not mention the mismatch, do not ask a clarifying question, do not offer to look for something else instead. Silently pick your best matches from the shortlist for the immediate request and answer as if the profile said exactly what the message asked for. A shortlist almost always has *something* that plausibly fits a simple, common request like "cheap food" or "somewhere quick" — recommend from it rather than declining.`
+PRIORITY RULE: the user's current message always overrides their general profile — the profile is just a fallback for when they haven't said what they want right now. If the message explicitly asks for something that differs from a stated profile preference (e.g. they say "something cheap" even though their profile says budget: luxury, or "quick stop" even though their profile says pace: relaxed), you MUST follow what they just asked for and treat the conflicting profile field as irrelevant for this turn — do not mention the mismatch, do not ask a clarifying question, do not offer to look for something else instead. Silently pick your best matches from the shortlist for the immediate request and answer as if the profile said exactly what the message asked for. A shortlist almost always has *something* that plausibly fits a simple, common request like "cheap food" or "somewhere quick" — recommend from it rather than declining.
+
+NO-INVENTED-FACTS RULE (same failure this codebase's /places/recommend-poi caught and closed — a model, after being told not to invent a rating *number*, switched to vaguer but equally false claims like "highly rated" or "popular" for the same place): the shortlist above carries no rating/review data at all, so you know NOTHING about how any of these places are rated — not a number, and not a vague qualitative stand-in either ("highly rated", "popular", "well-reviewed", "iyi puanlı", "çok yorumlu", and so on are all just as invented as a fake number). Describe a place by its real fields only (category, tags, story, vibe) — never its rating or popularity.
+
+DIRECTIONS RULE (same failure class as the rating one, for a different fact type): the shortlist's distance figures are real, so stating how far something is is fine, but you have no real street-level routing data here — never write literal turn-by-turn directions ("turn right onto X street", "head north for 200m"). If asked for directions, just recommend the place (per the rules above) and don't narrate a route — tapping the result gives the user real navigation.`
   : `You have NO places in your database for ${cityLabel} yet. Answer from your own knowledge — give a helpful, accurate response about the place or question. Tell the user you don't have ${cityLabel} mapped yet and suggest they use city search to trigger discovery. Return an empty recommendations array.`
 }
 
