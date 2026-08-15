@@ -384,34 +384,50 @@ struct MapScreen: View {
                 // Same bookmark/flag pair as POIExplainSheet — this card
                 // floats over the map itself so there was nowhere to save
                 // or plan a tapped POI from without leaving the map.
+                // Tap targets are widened past the glyph via `.frame` +
+                // `.contentShape` (default icon-only buttons here were only
+                // as big as the SF Symbol itself, easy to mis-tap on a
+                // floating card), and the close button gets extra leading
+                // space so it isn't sitting flush against the plan button.
                 if let poi {
                     let identifier = poi.asReference.identifier
-                    Button {
-                        Haptics.light()
-                        addToCollectionKind = .saved
-                    } label: {
-                        Image(systemName: savedPlacesStore.isSaved(identifier) ? "bookmark.fill" : "bookmark")
-                            .foregroundStyle(savedPlacesStore.isSaved(identifier) ? Theme.gold : .secondary)
+                    HStack(spacing: 12) {
+                        Button {
+                            Haptics.light()
+                            addToCollectionKind = .saved
+                        } label: {
+                            Image(systemName: savedPlacesStore.isSaved(identifier) ? "bookmark.fill" : "bookmark")
+                                .foregroundStyle(savedPlacesStore.isSaved(identifier) ? Theme.gold : .secondary)
+                                .frame(width: 36, height: 36)
+                                .contentShape(Rectangle())
+                        }
+                        Button {
+                            Haptics.light()
+                            addToCollectionKind = .plan
+                        } label: {
+                            // Not "flag" — that's already `routeModeToggleButton`'s
+                            // icon on this same screen, and reusing it here for
+                            // "add to Plan" made the two concepts (start Route
+                            // Mode vs. save this POI into a Plan list) look like
+                            // the same action.
+                            Image(systemName: savedPlacesStore.isPlanned(identifier) ? "suitcase.fill" : "suitcase")
+                                .foregroundStyle(savedPlacesStore.isPlanned(identifier) ? Theme.gold : .secondary)
+                                .frame(width: 36, height: 36)
+                                .contentShape(Rectangle())
+                        }
                     }
-                    Button {
-                        Haptics.light()
-                        addToCollectionKind = .plan
-                    } label: {
-                        // Not "flag" — that's already `routeModeToggleButton`'s
-                        // icon on this same screen, and reusing it here for
-                        // "add to Plan" made the two concepts (start Route
-                        // Mode vs. save this POI into a Plan list) look like
-                        // the same action.
-                        Image(systemName: savedPlacesStore.isPlanned(identifier) ? "suitcase.fill" : "suitcase")
-                            .foregroundStyle(savedPlacesStore.isPlanned(identifier) ? Theme.gold : .secondary)
-                    }
+                    .font(.title3)
+                    .padding(.trailing, 10)
                 }
                 Button {
                     dismissMapFeature()
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
+                        .frame(width: 36, height: 36)
+                        .contentShape(Rectangle())
                 }
+                .font(.title3)
             }
 
             // AI explanation first — the reason this card is showing at
