@@ -1224,6 +1224,16 @@ async function buildServer() {
       // from parametric memory, right or wrong, presented with the same
       // confidence as the identification itself.
       const identifyFactualGuard = ` You have no verified facts fetched for this place beyond what the image and location hint show — no confirmed founding date, architect, or award. If you're genuinely confident of a specific, well-known fact about the place you've identified, you may state it, but never state a specific date/name/number you're not actually sure of just to sound authoritative — describe it in general terms instead (e.g. "built in the Ottoman era" rather than a guessed exact year) or leave it out.`;
+      // Confirmed live: two visually distinct Icelandic waterfalls (real,
+      // identifiable-with-distinguishing-features photos, no location
+      // given) both got confidently named "Seljalandsfoss" — its own
+      // fame, not anything actually visible in either specific photo, was
+      // doing the work. `locationHint`'s no-location branch below already
+      // hedges the "several similar-looking places" case, but this failure
+      // happened independent of whether a location was given at all, so
+      // it needs its own always-on rule rather than living inside that
+      // branch.
+      const identifyConfidenceGuard = ` CONFIDENCE RULE: don't default to the single most famous example of a category just because it's the name most likely to come to mind — base the specific identification on distinguishing visual details actually in THIS photo (the particular rock formation, the water's exact path, the specific surrounding terrain or architecture), not on "this looks like the kind of place that's usually called X." If you can't point to something in the image that actually sets this apart from other similar-looking places in the same category, say so honestly (e.g. "a waterfall in Iceland's highlands, though I can't pin down which specific one from this angle") rather than naming the most iconic example as a guess.`;
 
       const nearbyHint =
         nearbyPlaces.length > 0
@@ -1268,7 +1278,7 @@ async function buildServer() {
               ],
             },
           ],
-          system: `You are Piri, a deeply knowledgeable personal travel guide. You identify places from photos and explain them in a way that speaks directly to who the user is.${identifyFactualGuard}${profileContext}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
+          system: `You are Piri, a deeply knowledgeable personal travel guide. You identify places from photos and explain them in a way that speaks directly to who the user is.${identifyFactualGuard}${identifyConfidenceGuard}${profileContext}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         } as any)) as { object: z.infer<typeof identifySchema> };
 
         // Fuzzy-match the identified title against DB places. Nearby places are
