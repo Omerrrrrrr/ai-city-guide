@@ -56,7 +56,14 @@ struct AddToCollectionSheet: View {
             .navigationTitle(String(localized: kind == .plan ? "saved.plan.addToPlan" : "saved.collections.addToList"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
+                // Every toggle here already saves immediately
+                // (`savedPlacesStore.toggle`), so this button has nothing
+                // to "confirm" and nothing to "cancel" — it just closes the
+                // sheet. It was previously in the leading Cancel slot but
+                // labeled "Done", the opposite of every other Cancel/Done
+                // pair in the app. "Done" in the trailing slot (matching
+                // e.g. Reminders' list pickers) is the closer fit.
+                ToolbarItem(placement: .confirmationAction) {
                     Button("common.done") { dismiss() }
                 }
             }

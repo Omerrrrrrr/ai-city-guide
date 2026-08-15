@@ -86,6 +86,9 @@ struct MapScreen: View {
     @State var isFetchingRoute = false
     @State var routeError: String?
     @State var showTripPhotoCapture = false
+    /// Confirms before `routeModeToggleButton` discards a non-empty,
+    /// not-yet-started `plannedStops` — see the 2026-08 usability audit.
+    @State var showDiscardStopsConfirm = false
     /// Guards against re-running rehydration/re-starting breadcrumb recording
     /// every time this view re-evaluates its body while a trip is active.
     @State var hydratedTripId: String?

@@ -18,6 +18,7 @@ struct CollectionDetailScreen: View {
 
     @State private var isEditingName = false
     @State private var nameInput = ""
+    @State private var showDeleteConfirm = false
     @State private var selectedPOI: POIPlace?
     @State private var resolvingIdentifier: String?
     @State private var showingDatePicker = false
@@ -422,6 +423,13 @@ struct CollectionDetailScreen: View {
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.white)
                     .onSubmit { commitRename(collection) }
+                    // Swiping the sheet away instead of pressing Return
+                    // used to lose the typed name with no warning — commit
+                    // it on disappear too.
+                    .onDisappear {
+                        guard isEditingName else { return }
+                        commitRename(collection)
+                    }
             } else {
                 Button {
                     nameInput = collection.name
@@ -437,8 +445,7 @@ struct CollectionDetailScreen: View {
             Spacer()
 
             Button {
-                savedPlacesStore.deleteCollection(collection.id)
-                dismiss()
+                showDeleteConfirm = true
             } label: {
                 Image(systemName: "trash").foregroundStyle(.white.opacity(0.7))
             }
@@ -447,6 +454,15 @@ struct CollectionDetailScreen: View {
         .padding(.top, 12)
         .padding(.bottom, 16)
         .piriGlassSurface()
+        .alert(String(localized: "collection.delete.title"), isPresented: $showDeleteConfirm) {
+            Button(String(localized: "common.delete"), role: .destructive) {
+                savedPlacesStore.deleteCollection(collection.id)
+                dismiss()
+            }
+            Button(String(localized: "common.cancel"), role: .cancel) {}
+        } message: {
+            Text("collection.delete.message")
+        }
     }
 
     private func commitRename(_ collection: SavedCollection) {

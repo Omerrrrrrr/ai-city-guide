@@ -14,6 +14,7 @@ struct TripDetailScreen: View {
     @State private var playbackTask: Task<Void, Never>?
     @State private var isEditingName = false
     @State private var nameInput = ""
+    @State private var showDeleteConfirm = false
     @State private var viewerIndex: Int?
     @State private var selectedPOI: POIPlace?
     @State private var resolvingStopIdentifier: String?
@@ -284,6 +285,14 @@ struct TripDetailScreen: View {
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.white)
                     .onSubmit { tripsStore.renameTrip(trip.id, name: nameInput.trimmingCharacters(in: .whitespaces)); isEditingName = false }
+                    // A swipe-down dismiss (rather than the Return key)
+                    // used to lose whatever was typed with no warning —
+                    // commit it on disappear too, same as any other
+                    // "close the sheet" path.
+                    .onDisappear {
+                        guard isEditingName else { return }
+                        tripsStore.renameTrip(trip.id, name: nameInput.trimmingCharacters(in: .whitespaces))
+                    }
             } else {
                 Button {
                     nameInput = trip.name ?? ""
@@ -303,8 +312,7 @@ struct TripDetailScreen: View {
                     Image(systemName: "square.and.arrow.up").foregroundStyle(.white.opacity(0.7))
                 }
                 Button("common.clear") {
-                    tripsStore.deleteTrip(trip.id)
-                    dismiss()
+                    showDeleteConfirm = true
                 }
                 .font(.system(size: 15))
                 .foregroundStyle(.white.opacity(0.6))
@@ -314,6 +322,15 @@ struct TripDetailScreen: View {
         .padding(.top, 12)
         .padding(.bottom, 16)
         .piriGlassSurface()
+        .alert(String(localized: "trip.delete.title"), isPresented: $showDeleteConfirm) {
+            Button(String(localized: "common.clear"), role: .destructive) {
+                tripsStore.deleteTrip(trip.id)
+                dismiss()
+            }
+            Button(String(localized: "common.cancel"), role: .cancel) {}
+        } message: {
+            Text("trip.delete.message")
+        }
     }
 
     private func tripDateLabel(_ trip: Trip) -> String {

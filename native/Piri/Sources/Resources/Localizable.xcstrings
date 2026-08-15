@@ -3682,6 +3682,116 @@
         }
       }
     },
+    "common.delete": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slett"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sil"
+          }
+        }
+      }
+    },
+    "trip.delete.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete this trip?"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slette denne turen?"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu seyahat silinsin mi?"
+          }
+        }
+      }
+    },
+    "trip.delete.message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This permanently deletes the trip, its route, and any photos you added."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette sletter turen, ruten og eventuelle bilder permanent."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu, seyahati, rotasını ve eklediğin fotoğrafları kalıcı olarak siler."
+          }
+        }
+      }
+    },
+    "collection.delete.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete this list?"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slette denne listen?"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu liste silinsin mi?"
+          }
+        }
+      }
+    },
+    "collection.delete.message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This permanently deletes the list and every place saved in it."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dette sletter listen og alle stedene lagret i den permanent."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu, listeyi ve içindeki tüm kayıtlı yerleri kalıcı olarak siler."
+          }
+        }
+      }
+    },
     "common.continue": {
       "extractionState": "stale",
       "localizations": {
@@ -5885,6 +5995,94 @@
           "stringUnit": {
             "state": "translated",
             "value": "Rota takip ediliyor · %1$lld nokta kaydedildi"
+          }
+        }
+      }
+    },
+    "map.route.activeTripConflict": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You already have a trip in progress — end it before starting a new plan."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du har allerede en pågående tur — avslutt den før du starter en ny plan."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zaten devam eden bir seyahatin var — yeni bir plan başlatmadan önce onu bitir."
+          }
+        }
+      }
+    },
+    "map.route.updateNeedsTwoStops": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add at least 2 stops to update the route."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legg til minst 2 stopp for å oppdatere ruten."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rotayı güncellemek için en az 2 durak ekle."
+          }
+        }
+      }
+    },
+    "routeMode.discardStops.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discard picked stops?"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forkaste valgte stopp?"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seçilen duraklar silinsin mi?"
+          }
+        }
+      }
+    },
+    "routeMode.discardStops.message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You'll lose the stops you've picked for this route."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du mister stoppene du har valgt for denne ruten."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bu rota için seçtiğin duraklar kaybolacak."
           }
         }
       }

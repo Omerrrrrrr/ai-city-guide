@@ -71,7 +71,15 @@ struct SavedScreen: View {
         .navigationBarHidden(true)
         .sheet(item: $selectedPOI) { poi in POIExplainSheet(poi: poi) }
         .sheet(item: $selectedCollection) { collection in CollectionDetailScreen(collectionId: collection.id) }
-        .sheet(isPresented: $showingPlanBuilder) { PlanBuilderScreen() }
+        .sheet(isPresented: $showingPlanBuilder) {
+            PlanBuilderScreen()
+                // A swipe-down used to silently discard whatever themes/
+                // pace/candidates had been picked so far. The screen
+                // already has its own explicit "common.cancel" button for
+                // deliberately backing out — require that instead of an
+                // easy-to-trigger-by-accident gesture.
+                .interactiveDismissDisabled()
+        }
     }
 
     private func collectionsSection(kind: SavedCollectionKind) -> some View {

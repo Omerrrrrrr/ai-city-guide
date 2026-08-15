@@ -62,14 +62,16 @@ extension MapScreen {
                 routeMode = true
                 return
             }
-            routeMode.toggle()
-            if !routeMode {
-                plannedStops = []
-                routeGeometry = nil
-                routeDistanceMeters = nil
-                routeDurationSeconds = nil
-                routeError = nil
+            // Leaving route mode with picked-but-not-yet-started stops used
+            // to discard them on this single tap with no way back — confirm
+            // first instead, matching the same "started" invariant used
+            // everywhere else here (a *started* trip is only ever left via
+            // the explicit "Bitir" button, never this toggle).
+            if routeMode && !plannedStops.isEmpty {
+                showDiscardStopsConfirm = true
+                return
             }
+            routeMode.toggle()
         } label: {
             Image(systemName: "flag.fill")
                 .font(.system(size: 18, weight: .bold))
@@ -77,6 +79,19 @@ extension MapScreen {
                 .frame(width: 48, height: 48)
                 .background(Circle().fill(routeMode ? AnyShapeStyle(Theme.gold) : AnyShapeStyle(.thinMaterial)))
                 .shadow(radius: 3)
+        }
+        .alert(String(localized: "routeMode.discardStops.title"), isPresented: $showDiscardStopsConfirm) {
+            Button(String(localized: "common.clear"), role: .destructive) {
+                routeMode = false
+                plannedStops = []
+                routeGeometry = nil
+                routeDistanceMeters = nil
+                routeDurationSeconds = nil
+                routeError = nil
+            }
+            Button(String(localized: "common.cancel"), role: .cancel) {}
+        } message: {
+            Text("routeMode.discardStops.message")
         }
     }
 
@@ -139,8 +154,11 @@ extension MapScreen {
         guard tripsStore.activeTripId == nil else {
             // Already mid-trip — don't silently overwrite it. Same
             // invariant `routeModeToggleButton` already enforces: only ever
-            // show the existing active trip until it's ended.
+            // show the existing active trip until it's ended. Surface *why*
+            // the hand-off's stops didn't take effect instead of just
+            // dropping them with no explanation.
             routeMode = true
+            routeError = String(localized: "map.route.activeTripConflict")
             return
         }
         plannedStops = stops
@@ -329,17 +347,35 @@ extension MapScreen {
             .opacity(plannedStops.count < 2 ? 0.5 : 1)
         } else {
             HStack(spacing: 10) {
-                if stopsChangedFromActiveTrip, plannedStops.count >= 2 {
-                    Button {
-                        Task { await updateRoute() }
-                    } label: {
-                        Text("map.route.update")
-                            .font(.footnote.weight(.bold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 14).padding(.vertical, 12)
-                            .background(RoundedRectangle(cornerRadius: 10).fill(Theme.navy))
+                // Shown whenever stops differ from the active trip's saved
+                // ones, not just when there happen to be ≥2 left — removing
+                // stops down to 0-1 used to hide this button entirely, so
+                // the removal was reflected in the UI but never actually
+                // persisted to the trip. Keeping it visible (disabled +
+                // dimmed, same convention `startRoute`'s button already
+                // uses below `count >= 2`) makes that state visible and
+                // gives the user something to act on instead of a removal
+                // that silently didn't take.
+                if stopsChangedFromActiveTrip {
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Button {
+                            Task { await updateRoute() }
+                        } label: {
+                            Text("map.route.update")
+                                .font(.footnote.weight(.bold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 14).padding(.vertical, 12)
+                                .background(RoundedRectangle(cornerRadius: 10).fill(Theme.navy))
+                        }
+                        .disabled(isFetchingRoute || plannedStops.count < 2)
+                        .opacity(plannedStops.count < 2 ? 0.5 : 1)
+
+                        if plannedStops.count < 2 {
+                            Text("map.route.updateNeedsTwoStops")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
                     }
-                    .disabled(isFetchingRoute)
                 }
                 Button {
                     endRoute()
