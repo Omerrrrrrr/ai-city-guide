@@ -106,6 +106,12 @@ final class SavedPlacesStore {
         persist()
     }
 
+    /// Overwrites local state with a pulled server copy (account sync only).
+    func replaceCollections(_ newCollections: [SavedCollection]) {
+        collections = newCollections
+        persist()
+    }
+
     private func persist() {
         persistence.save(SavedPlacesState(collections: collections))
     }

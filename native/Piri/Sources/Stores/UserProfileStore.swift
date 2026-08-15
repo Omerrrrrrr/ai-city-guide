@@ -33,6 +33,13 @@ final class UserProfileStore {
         persistence.save(profile)
     }
 
+    /// Overwrites local state with a pulled server copy (account sync only —
+    /// never called from local editing flows, which go through `update`).
+    func replaceProfile(_ newProfile: UserProfile) {
+        profile = newProfile
+        persistence.save(profile)
+    }
+
     var profileContext: String {
         buildProfileContext(profile)
     }

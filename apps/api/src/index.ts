@@ -1,6 +1,6 @@
 import 'dotenv/config';
 
-import Fastify from 'fastify';
+import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import { and, eq, gte, ilike, inArray, lte } from 'drizzle-orm';
@@ -13,9 +13,26 @@ import { ensureSchema } from './ensure-schema';
 import { initSentry, Sentry } from './sentry';
 import {
   buildFallbackReason,
+  groundAnswerAgainstShortlist,
   rankPlacesForQuery,
   selectDiverseShortlist,
 } from './ai-recommendations';
+import {
+  authenticateUser,
+  findOrCreateAppleUser,
+  getSyncBlobs,
+  getUserById,
+  putSyncBlobs,
+  registerUser,
+  toPublicUser,
+} from './accounts';
+import {
+  AuthError,
+  requireUserId,
+  signSessionToken,
+  timingSafeStringEqual,
+  verifyAppleIdentityToken,
+} from './auth';
 import {
   applyApprovedImageCandidates,
   approveImageCandidate,
@@ -76,6 +93,8 @@ const MAX_AI_RECOMMENDATIONS = 5;
 const NEARBY_LOCATION_RADIUS_KM = 25;
 const AI_PROVIDER = process.env.AI_PROVIDER?.trim().toLowerCase();
 const ADMIN_API_TOKEN = process.env.ADMIN_API_TOKEN?.trim() || undefined;
+const AUTH_JWT_SECRET = process.env.AUTH_JWT_SECRET?.trim() || undefined;
+const APPLE_BUNDLE_ID = process.env.APPLE_BUNDLE_ID?.trim() || 'com.piriapp.piri';
 const CORS_ORIGINS = (process.env.CORS_ORIGINS ?? '')
   .split(',')
   .map((origin) => origin.trim())
@@ -99,11 +118,25 @@ function validateEnv() {
       'ADMIN_API_TOKEN is not set. All /admin/* routes will respond 503 until it is configured.'
     );
   }
+
+  if (!AUTH_JWT_SECRET) {
+    console.warn(
+      'AUTH_JWT_SECRET is not set. All /auth/* and /me* routes will respond 503 until it is configured.'
+    );
+  }
 }
 
 function isAdminPath(url: string) {
   const path = url.split('?')[0];
   return path === '/admin' || path.startsWith('/admin/');
+}
+
+// `POST /places` writes directly to the live places table and has no auth
+// concept of its own -- gate it behind the same admin token as `/admin/*`
+// rather than inventing a second mechanism for one route.
+function isAdminGatedWrite(request: { method: string; url: string }) {
+  const path = request.url.split('?')[0];
+  return isAdminPath(request.url) || (request.method === 'POST' && path === '/places');
 }
 const openai = createOpenAI({
   name: 'openai',
@@ -323,7 +356,7 @@ async function buildServer() {
   await app.register(rateLimit, { max: 120, timeWindow: '1 minute' });
 
   app.addHook('onRequest', async (request, reply) => {
-    if (!isAdminPath(request.url)) return;
+    if (!isAdminGatedWrite(request)) return;
 
     if (!ADMIN_API_TOKEN) {
       return reply.code(503).send({
@@ -332,7 +365,7 @@ async function buildServer() {
     }
 
     const [scheme, token] = (request.headers.authorization ?? '').split(' ');
-    if (scheme !== 'Bearer' || token !== ADMIN_API_TOKEN) {
+    if (scheme !== 'Bearer' || !token || !timingSafeStringEqual(token, ADMIN_API_TOKEN)) {
       return reply.code(401).send({ error: 'Unauthorized' });
     }
   });
@@ -340,6 +373,14 @@ async function buildServer() {
   app.addHook('onClose', async () => {
     await closeDb();
   });
+
+  // Logs the real error server-side (captured by the logger hook above,
+  // which forwards to Sentry when configured) without leaking internal
+  // error messages/stack details to the client.
+  function sendServerError(request: FastifyRequest, reply: FastifyReply, error: unknown, fallback: string) {
+    request.log.error(error);
+    return reply.code(500).send({ error: fallback });
+  }
 
   app.get('/health', async () => ({ status: 'ok' }));
   app.get('/app-status', async () => {
@@ -683,8 +724,7 @@ async function buildServer() {
       await db.update(livePlaceCache).set({ promotedPlaceId: created.id }).where(eq(livePlaceCache.id, overtureId));
       return toPlaceDto(created);
     } catch (error: any) {
-      request.log.error(error);
-      return reply.code(500).send({ error: error?.message ?? 'Failed to enrich place' });
+      return sendServerError(request, reply, error, 'Failed to enrich place');
     }
   });
 
@@ -1172,8 +1212,7 @@ async function buildServer() {
 
         return reply.send({ ...object, matchedPlaceId });
       } catch (e: any) {
-        app.log.error(e);
-        return reply.code(500).send({ error: e.message || 'Failed to identify place' });
+        return sendServerError(request, reply, e, 'Failed to identify place');
       }
     }
   );
@@ -1266,8 +1305,7 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
 
         return reply.send(object);
       } catch (e: any) {
-        app.log.error(e);
-        return reply.code(500).send({ error: e.message || 'Failed to explain place' });
+        return sendServerError(request, reply, e, 'Failed to explain place');
       }
     }
   );
@@ -1396,8 +1434,7 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
 
         return reply.send({ ...(object as Record<string, unknown>), rating: tripAdvisorInfo.rating, photos });
       } catch (e: any) {
-        app.log.error(e);
-        return reply.code(500).send({ error: e.message || 'Failed to explain place' });
+        return sendServerError(request, reply, e, 'Failed to explain place');
       }
     }
   );
@@ -1664,8 +1701,7 @@ Keep replies short and conversational (1-4 sentences) — this is a chat, not an
 
         return reply.send({ reply: text });
       } catch (e: any) {
-        app.log.error(e);
-        return reply.code(500).send({ error: e.message || 'Failed to reply' });
+        return sendServerError(request, reply, e, 'Failed to reply');
       }
     }
   );
@@ -1958,13 +1994,27 @@ ${placeContext.length > 0 ? `Available shortlist:\n${JSON.stringify(placeContext
         }
       );
 
+      const groundingFallback =
+        locale === 'tr'
+          ? 'Bunun için elimde net bir eşleşme yok şu an — başka bir şey sorabilirim.'
+          : locale === 'nb'
+            ? 'Jeg har ikke et sikkert treff for det akkurat nå — spør gjerne om noe annet.'
+            : "I don't have a confirmed match for that right now — feel free to ask something else.";
+      const { answer: groundedAnswer, flaggedPhrase } = groundAnswerAgainstShortlist(
+        (object as any).answer ?? '',
+        shortlistedEntries.map((entry) => entry.row.name),
+        groundingFallback
+      );
+      if (flaggedPhrase) {
+        request.log.warn({ flaggedPhrase, query }, 'Ungrounded place mention stripped from AI answer');
+      }
+
       return {
-        answer: (object as any).answer,
+        answer: groundedAnswer,
         recommendations: dedupedRecommendations,
       };
     } catch (e: any) {
-      app.log.error(e);
-      return reply.code(500).send({ error: e.message || 'Failed to generate recommendations' });
+      return sendServerError(request, reply, e, 'Failed to generate recommendations');
     }
   });
 
@@ -2269,16 +2319,166 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
         return true;
       });
 
+      const groundingFallback =
+        locale === 'tr'
+          ? 'Bunun için elimde net bir eşleşme yok şu an — başka bir şey sorabilirim.'
+          : locale === 'nb'
+            ? 'Jeg har ikke et sikkert treff for det akkurat nå — spør gjerne om noe annet.'
+            : "I don't have a confirmed match for that right now — feel free to ask something else.";
+      const { answer: groundedAnswer, flaggedPhrase } = groundAnswerAgainstShortlist(
+        answerText,
+        poiCandidates.map((candidate) => candidate.name),
+        groundingFallback
+      );
+      if (flaggedPhrase) {
+        request.log.warn({ flaggedPhrase, query }, 'Ungrounded place mention stripped from AI answer');
+      }
+
       return {
-        answer: answerText,
+        answer: groundedAnswer,
         isItinerary: (object as any).isItinerary === true,
         recommendations: deduped.slice(0, MAX_AI_RECOMMENDATIONS),
       };
     } catch (e: any) {
-      app.log.error(e);
-      return reply.code(500).send({ error: e.message || 'Failed to generate recommendations' });
+      return sendServerError(request, reply, e, 'Failed to generate recommendations');
     }
   });
+
+  // ── /auth/*, /me* — Optional accounts + whole-blob sync ──────────────────────
+  // Sign-in is opt-in, not a gate: the app works fully signed-out today (local
+  // Keychain/UserDefaults only) and keeps working that way after sign-out too.
+  // `profile`/`savedPlaces`/`trips` are synced 1:1 as whatever JSON blob the
+  // client already produces locally -- see accounts.ts.
+
+  app.post<{ Body: { identityToken?: string; email?: string; fullName?: string } }>(
+    '/auth/apple',
+    { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const parsed = z
+        .object({
+          identityToken: z.string().trim().min(1),
+          email: z.string().trim().email().optional(),
+          fullName: z.string().trim().optional(),
+        })
+        .safeParse(request.body ?? {});
+
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'Invalid request' });
+      }
+
+      if (!AUTH_JWT_SECRET) {
+        return reply.code(503).send({ error: 'Accounts are disabled. Set AUTH_JWT_SECRET in the backend environment to enable them.' });
+      }
+
+      try {
+        const { appleUserId, email } = await verifyAppleIdentityToken(parsed.data.identityToken, APPLE_BUNDLE_ID);
+        const user = await findOrCreateAppleUser(appleUserId, email ?? parsed.data.email);
+        const token = await signSessionToken(user.id, AUTH_JWT_SECRET);
+        return reply.send({ token, user: toPublicUser(user) });
+      } catch (e) {
+        if (e instanceof AuthError) return reply.code(e.status).send({ error: e.message });
+        return sendServerError(request, reply, e, 'Sign in with Apple failed');
+      }
+    }
+  );
+
+  app.post<{ Body: { email?: string; password?: string; displayName?: string } }>(
+    '/auth/register',
+    { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const parsed = z
+        .object({
+          email: z.string().trim().email(),
+          password: z.string().min(8).max(256),
+          displayName: z.string().trim().max(256).optional(),
+        })
+        .safeParse(request.body ?? {});
+
+      if (!parsed.success) {
+        return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Invalid request' });
+      }
+
+      if (!AUTH_JWT_SECRET) {
+        return reply.code(503).send({ error: 'Accounts are disabled. Set AUTH_JWT_SECRET in the backend environment to enable them.' });
+      }
+
+      try {
+        const user = await registerUser(parsed.data.email, parsed.data.password, parsed.data.displayName);
+        const token = await signSessionToken(user.id, AUTH_JWT_SECRET);
+        return reply.code(201).send({ token, user: toPublicUser(user) });
+      } catch (e) {
+        if (e instanceof AuthError) return reply.code(e.status).send({ error: e.message });
+        return sendServerError(request, reply, e, 'Registration failed');
+      }
+    }
+  );
+
+  app.post<{ Body: { email?: string; password?: string } }>(
+    '/auth/login',
+    { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const parsed = z
+        .object({ email: z.string().trim().email(), password: z.string().min(1) })
+        .safeParse(request.body ?? {});
+
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'Invalid request' });
+      }
+
+      if (!AUTH_JWT_SECRET) {
+        return reply.code(503).send({ error: 'Accounts are disabled. Set AUTH_JWT_SECRET in the backend environment to enable them.' });
+      }
+
+      try {
+        const user = await authenticateUser(parsed.data.email, parsed.data.password);
+        const token = await signSessionToken(user.id, AUTH_JWT_SECRET);
+        return reply.send({ token, user: toPublicUser(user) });
+      } catch (e) {
+        if (e instanceof AuthError) return reply.code(e.status).send({ error: e.message });
+        return sendServerError(request, reply, e, 'Sign in failed');
+      }
+    }
+  );
+
+  app.get('/me', async (request, reply) => {
+    const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
+    if (!userId) return;
+
+    const user = await getUserById(userId);
+    if (!user) return reply.code(401).send({ error: 'Unauthorized' });
+    return reply.send(toPublicUser(user));
+  });
+
+  app.get('/me/sync', async (request, reply) => {
+    const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
+    if (!userId) return;
+
+    try {
+      return reply.send(await getSyncBlobs(userId));
+    } catch (e) {
+      return sendServerError(request, reply, e, 'Failed to load sync data');
+    }
+  });
+
+  app.put<{ Body: Partial<Record<'profile' | 'savedPlaces' | 'trips', unknown>> }>(
+    '/me/sync',
+    async (request, reply) => {
+      const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
+      if (!userId) return;
+
+      const body = request.body;
+      if (!body || typeof body !== 'object' || Array.isArray(body)) {
+        return reply.code(400).send({ error: 'Invalid request' });
+      }
+
+      try {
+        const updatedAt = await putSyncBlobs(userId, body);
+        return reply.send({ updatedAt });
+      } catch (e) {
+        return sendServerError(request, reply, e, 'Failed to save sync data');
+      }
+    }
+  );
 
   // ── /weather — Proxy OpenWeatherMap current conditions ───────────────────────
   app.get<{ Querystring: { lat: string; lng: string } }>(

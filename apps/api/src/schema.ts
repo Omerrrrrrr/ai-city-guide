@@ -159,6 +159,36 @@ export const poiPhotoCache = pgTable('poi_photo_cache', {
   index('idx_poi_photo_cache_name').on(table.nameNormalized),
 ]);
 
+// Accounts. Sign in with Apple and email/password both land here --
+// `appleUserId` and `passwordHash` are each nullable since an account only
+// ever has whichever one(s) it was actually created/linked with.
+export const users = pgTable('users', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  email: varchar('email', { length: 320 }).notNull(),
+  passwordHash: text('password_hash'),
+  appleUserId: varchar('apple_user_id', { length: 128 }),
+  displayName: varchar('display_name', { length: 256 }),
+  createdAt: varchar('created_at', { length: 64 }).notNull(),
+}, (table) => [
+  uniqueIndex('idx_users_email').on(table.email),
+  uniqueIndex('idx_users_apple_user_id').on(table.appleUserId),
+]);
+
+// Whole-blob sync storage: each of the app's local Codable stores
+// (profile/savedPlaces/trips) already serializes itself to one JSON value
+// for on-device persistence (see UserDefaultsStore/KeychainStore on the
+// client) -- this mirrors that exact shape 1:1 instead of a bespoke
+// relational schema per store, so the client can push/pull with the same
+// JSON it already produces locally.
+export const userSyncBlobs = pgTable('user_sync_blobs', {
+  userId: varchar('user_id', { length: 64 }).notNull(),
+  key: varchar('key', { length: 32 }).notNull(), // 'profile' | 'savedPlaces' | 'trips'
+  value: text('value').notNull(),
+  updatedAt: varchar('updated_at', { length: 64 }).notNull(),
+}, (table) => [
+  uniqueIndex('idx_user_sync_blobs_user_key').on(table.userId, table.key),
+]);
+
 export type PlaceRow = typeof places.$inferSelect;
 export type PoiPhotoCacheRow = typeof poiPhotoCache.$inferSelect;
 export type PlaceImageCandidateRow = typeof placeImageCandidates.$inferSelect;
@@ -166,3 +196,5 @@ export type CityRow = typeof cities.$inferSelect;
 export type PushSubscriptionRow = typeof pushSubscriptions.$inferSelect;
 export type LivePlaceCacheRow = typeof livePlaceCache.$inferSelect;
 export type LiveGridCellStatusRow = typeof liveGridCellStatus.$inferSelect;
+export type UserRow = typeof users.$inferSelect;
+export type UserSyncBlobRow = typeof userSyncBlobs.$inferSelect;

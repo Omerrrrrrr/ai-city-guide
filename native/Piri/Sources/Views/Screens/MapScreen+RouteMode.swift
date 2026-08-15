@@ -35,20 +35,18 @@ extension MapScreen {
         let breadcrumbCoords = trip.breadcrumb.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng) }
         let stopCoords = trip.stops.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng) }
         let all = routeCoords + breadcrumbCoords + stopCoords
-        guard !all.isEmpty else { return initialRegion }
-
         let lats = all.map(\.latitude)
         let lngs = all.map(\.longitude)
-        let center = CLLocationCoordinate2D(
-            latitude: (lats.min()! + lats.max()!) / 2,
-            longitude: (lngs.min()! + lngs.max()!) / 2
-        )
+        guard let minLat = lats.min(), let maxLat = lats.max(),
+              let minLng = lngs.min(), let maxLng = lngs.max() else { return initialRegion }
+
+        let center = CLLocationCoordinate2D(latitude: (minLat + maxLat) / 2, longitude: (minLng + maxLng) / 2)
         // Pad the bounding box so stops near the edge aren't clipped against
         // the map view's frame, with a floor so a single-stop or
         // very-close-together trip doesn't zoom in to street level.
         let span = MKCoordinateSpan(
-            latitudeDelta: max((lats.max()! - lats.min()!) * 1.6, 0.02),
-            longitudeDelta: max((lngs.max()! - lngs.min()!) * 1.6, 0.02)
+            latitudeDelta: max((maxLat - minLat) * 1.6, 0.02),
+            longitudeDelta: max((maxLng - minLng) * 1.6, 0.02)
         )
         return MKCoordinateRegion(center: center, span: span)
     }

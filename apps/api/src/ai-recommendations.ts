@@ -466,3 +466,38 @@ function capitalize(input: string) {
   if (!input) return input;
   return `${input[0].toUpperCase()}${input.slice(1)}`;
 }
+
+// Matches runs of 2-4 capitalized words (a lightweight proper-noun heuristic
+// covering Turkish/Nordic letters) -- a single capitalized word is left
+// unflagged since sentence-initial capitals make that far too noisy on its
+// own, so this only catches multi-word name-shaped phrases.
+const CAP_WORD = "[A-ZÇĞİÖŞÜÆØÅ][\\wçğıöşüÇĞİÖŞÜæøåÆØÅ'’-]*";
+const PROPER_NOUN_PHRASE = new RegExp(`\\b${CAP_WORD}(?:\\s+${CAP_WORD}){1,3}\\b`, 'g');
+
+// Safety net for the flip side of the existing "mentioned but not returned"
+// backfill above: the prompt's GROUNDING RULE tells the model never to name a
+// venue outside its shortlist, but that's enforced by instruction only, not
+// checked. This scans the model's free-text answer for a name-shaped phrase
+// that doesn't match (or partially overlap) any real shortlisted/candidate
+// name, and swaps in a safe generic fallback rather than serving an
+// unverified claim if one is found.
+export function groundAnswerAgainstShortlist(
+  answer: string,
+  knownNames: string[],
+  fallback: string
+): { answer: string; flaggedPhrase: string | null } {
+  if (!answer) return { answer, flaggedPhrase: null };
+
+  const known = knownNames.map((name) => name.trim().toLowerCase()).filter(Boolean);
+  const candidates = answer.match(PROPER_NOUN_PHRASE) ?? [];
+
+  for (const raw of candidates) {
+    const lower = raw.trim().toLowerCase();
+    const isKnown = known.some((name) => name.includes(lower) || lower.includes(name));
+    if (!isKnown) {
+      return { answer: fallback, flaggedPhrase: raw.trim() };
+    }
+  }
+
+  return { answer, flaggedPhrase: null };
+}

@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildFallbackReason, rankPlacesForQuery, selectDiverseShortlist } from './ai-recommendations';
+import {
+  buildFallbackReason,
+  groundAnswerAgainstShortlist,
+  rankPlacesForQuery,
+  selectDiverseShortlist,
+} from './ai-recommendations';
 import type { PlaceRow } from './schema';
 
 function createPlace(overrides: Partial<PlaceRow>): PlaceRow {
@@ -197,4 +202,48 @@ test('rankPlacesForQuery does not fragment tokens on Turkish dotless "ı" or Nor
   const ranked = rankPlacesForQuery([walkingArea, other], 'gezinti yapmak istiyorum, yürüyüş şart', '');
 
   assert.equal(ranked[0]?.row.id, 'walk-1');
+});
+
+test('groundAnswerAgainstShortlist leaves an answer alone when every named place is in the shortlist', () => {
+  const { answer, flaggedPhrase } = groundAnswerAgainstShortlist(
+    'You could try Torvet Bistro for something cozy.',
+    ['Torvet Bistro', 'Posebyen'],
+    'fallback'
+  );
+
+  assert.equal(answer, 'You could try Torvet Bistro for something cozy.');
+  assert.equal(flaggedPhrase, null);
+});
+
+test('groundAnswerAgainstShortlist swaps in the fallback when a name-shaped phrase is not in the shortlist', () => {
+  const { answer, flaggedPhrase } = groundAnswerAgainstShortlist(
+    'You could try Gino\'s Pizza for something cozy.',
+    ['Torvet Bistro', 'Posebyen'],
+    'fallback'
+  );
+
+  assert.equal(answer, 'fallback');
+  assert.equal(flaggedPhrase, "Gino's Pizza");
+});
+
+test('groundAnswerAgainstShortlist does not flag a partial mention of a real shortlist name', () => {
+  const { answer, flaggedPhrase } = groundAnswerAgainstShortlist(
+    'Kristiansand Cathedral is worth a look.',
+    ['Kristiansand Cathedral'],
+    'fallback'
+  );
+
+  assert.equal(answer, 'Kristiansand Cathedral is worth a look.');
+  assert.equal(flaggedPhrase, null);
+});
+
+test('groundAnswerAgainstShortlist ignores a lone capitalized word (sentence-initial capitals are too noisy to flag alone)', () => {
+  const { answer, flaggedPhrase } = groundAnswerAgainstShortlist(
+    'Sure, happy to help with that!',
+    ['Torvet Bistro'],
+    'fallback'
+  );
+
+  assert.equal(answer, 'Sure, happy to help with that!');
+  assert.equal(flaggedPhrase, null);
 });

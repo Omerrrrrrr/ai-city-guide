@@ -33,6 +33,7 @@ struct ProfileScreen: View {
     @Environment(RecentlyViewedStore.self) private var recentlyViewedStore
     @Environment(TripsStore.self) private var tripsStore
     @Environment(PlacesQuery.self) private var placesQuery
+    @Environment(AuthStore.self) private var authStore
 
     @State private var isEditingName = false
     @State private var nameInput = ""
@@ -41,6 +42,7 @@ struct ProfileScreen: View {
     @State private var showingRestartHint = false
     @State private var profileTab: ProfileTab = .language
     @State private var newInterestText = ""
+    @State private var showingSignIn = false
 
     private var profile: UserProfile { userProfileStore.profile }
     private var displayName: String {
@@ -54,6 +56,7 @@ struct ProfileScreen: View {
                 header
                 profileTabsSegment
                 profileTabContent
+                accountCard
                 cityCard
                 savedDataCard
                 tripsCard
@@ -92,6 +95,7 @@ struct ProfileScreen: View {
         }
         .sheet(isPresented: $showingCityPicker) { CityPickerScreen() }
         .sheet(item: $showingSaved) { tab in SavedScreen(initialTab: tab) }
+        .sheet(isPresented: $showingSignIn) { SignInScreen() }
         .navigationBarHidden(true)
     }
 
@@ -375,6 +379,45 @@ struct ProfileScreen: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+        }
+    }
+
+    private var accountCard: some View {
+        card(titleKey: "settings.account") {
+            if let user = authStore.user {
+                VStack(alignment: .leading, spacing: 10) {
+                    let name = user.displayName?.trimmingCharacters(in: .whitespaces)
+                    Text((name?.isEmpty == false ? name : nil) ?? user.email)
+                        .font(.system(size: 15, weight: .semibold))
+                    Button(role: .destructive) {
+                        authStore.signOut()
+                    } label: {
+                        Text(String(localized: String.LocalizationValue("settings.account.signOut")))
+                            .font(.system(size: 14, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(.secondary.opacity(0.24)))
+                    }
+                    .buttonStyle(.plain)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(String(localized: String.LocalizationValue("settings.account.signedOutNote")))
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                    Button {
+                        showingSignIn = true
+                    } label: {
+                        Text(String(localized: String.LocalizationValue("settings.account.signIn")))
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(RoundedRectangle(cornerRadius: 14).fill(Theme.navy))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
         }
     }
 

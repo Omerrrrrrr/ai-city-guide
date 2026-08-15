@@ -90,6 +90,15 @@ final class TripsStore {
         persist()
     }
 
+    /// Overwrites local state with a pulled server copy (account sync only).
+    /// `activeTripId` deliberately isn't part of this -- an in-progress trip
+    /// is a single-device, in-the-moment session concept, not something
+    /// meaningful to carry across devices.
+    func replaceTrips(_ newTrips: [Trip]) {
+        trips = newTrips
+        persist()
+    }
+
     private func persist() {
         persistence.save(TripsState(trips: trips, activeTripId: activeTripId))
     }

@@ -342,16 +342,15 @@ struct TripDetailScreen: View {
     /// ground than that (same bug already fixed for `MapScreen`'s live route
     /// tracking; this screen's post-trip summary map had the identical gap).
     private func averageRegion(_ coordinates: [CLLocationCoordinate2D]) -> MKCoordinateRegion? {
-        guard !coordinates.isEmpty else { return nil }
         let lats = coordinates.map(\.latitude)
         let lngs = coordinates.map(\.longitude)
-        let center = CLLocationCoordinate2D(
-            latitude: (lats.min()! + lats.max()!) / 2,
-            longitude: (lngs.min()! + lngs.max()!) / 2
-        )
+        guard let minLat = lats.min(), let maxLat = lats.max(),
+              let minLng = lngs.min(), let maxLng = lngs.max() else { return nil }
+
+        let center = CLLocationCoordinate2D(latitude: (minLat + maxLat) / 2, longitude: (minLng + maxLng) / 2)
         let span = MKCoordinateSpan(
-            latitudeDelta: max((lats.max()! - lats.min()!) * 1.6, 0.02),
-            longitudeDelta: max((lngs.max()! - lngs.min()!) * 1.6, 0.02)
+            latitudeDelta: max((maxLat - minLat) * 1.6, 0.02),
+            longitudeDelta: max((maxLng - minLng) * 1.6, 0.02)
         )
         return MKCoordinateRegion(center: center, span: span)
     }

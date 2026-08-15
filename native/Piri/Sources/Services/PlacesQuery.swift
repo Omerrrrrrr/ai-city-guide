@@ -62,8 +62,14 @@ final class PlacesQuery {
     func nearby(to place: Place, limit: Int = 3) -> [PlaceWithDistance] {
         guard let location = place.location else { return [] }
         return places
-            .filter { $0.id != place.id && $0.location != nil }
-            .map { PlaceWithDistance(place: $0, distanceKm: geoDistanceKm(location.lat, location.lng, $0.location!.lat, $0.location!.lng)) }
+            .filter { $0.id != place.id }
+            .compactMap { other -> PlaceWithDistance? in
+                guard let otherLocation = other.location else { return nil }
+                return PlaceWithDistance(
+                    place: other,
+                    distanceKm: geoDistanceKm(location.lat, location.lng, otherLocation.lat, otherLocation.lng)
+                )
+            }
             .sorted { $0.distanceKm < $1.distanceKm }
             .prefix(limit)
             .map { $0 }
@@ -71,8 +77,10 @@ final class PlacesQuery {
 
     func nearbyUser(lat: Double, lng: Double, limit: Int = 6) -> [PlaceWithDistance] {
         places
-            .filter { $0.location != nil }
-            .map { PlaceWithDistance(place: $0, distanceKm: geoDistanceKm(lat, lng, $0.location!.lat, $0.location!.lng)) }
+            .compactMap { place -> PlaceWithDistance? in
+                guard let location = place.location else { return nil }
+                return PlaceWithDistance(place: place, distanceKm: geoDistanceKm(lat, lng, location.lat, location.lng))
+            }
             .sorted { $0.distanceKm < $1.distanceKm }
             .prefix(limit)
             .map { $0 }

@@ -59,6 +59,8 @@ targets:
         # deliver -- APNs' development and production environments are
         # entirely separate services with separate device tokens.
         aps-environment: $(PIRI_APS_ENVIRONMENT)
+        com.apple.developer.applesignin:
+          - Default
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.piriapp.piri

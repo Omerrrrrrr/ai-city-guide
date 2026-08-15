@@ -1,0 +1,96 @@
+import Foundation
+import Observation
+
+private struct AuthState: Codable {
+    var token: String?
+    var user: AuthUser?
+}
+
+/// Optional account layer on top of the app's existing local-only stores.
+/// Sign-in is opt-in, not a gate -- the app works fully signed-out exactly
+/// as it did before this store existed, and local data is never cleared on
+/// sign-out (it just keeps working as offline/guest data). No `sessions`
+/// table on the backend: the token here is a long-lived, self-issued JWT,
+/// so signing out is just discarding it locally.
+@Observable
+final class AuthStore {
+    private(set) var token: String?
+    private(set) var user: AuthUser?
+
+    var isSignedIn: Bool { token != nil }
+
+    private let persistence = KeychainStore<AuthState>(key: "ai-city-guide.auth")
+
+    init() {
+        let saved = persistence.load()
+        token = saved?.token
+        user = saved?.user
+    }
+
+    func signOut() {
+        token = nil
+        user = nil
+        persistence.clear()
+    }
+
+    func signInWithApple(identityToken: String, email: String?, fullName: String?) async throws {
+        let response = try await AuthAPI.signInWithApple(identityToken: identityToken, email: email, fullName: fullName)
+        setSession(response)
+    }
+
+    func register(email: String, password: String, displayName: String?) async throws {
+        let response = try await AuthAPI.register(email: email, password: password, displayName: displayName)
+        setSession(response)
+    }
+
+    func logIn(email: String, password: String) async throws {
+        let response = try await AuthAPI.logIn(email: email, password: password)
+        setSession(response)
+    }
+
+    /// Runs once right after sign-in succeeds. For each of the 3 synced
+    /// keys: the server's value wins if it has one, otherwise whatever's on
+    /// this device gets pushed up to seed the account. Whole-blob,
+    /// last-write-wins -- not a field-level merge.
+    func performInitialSync(
+        userProfileStore: UserProfileStore,
+        savedPlacesStore: SavedPlacesStore,
+        tripsStore: TripsStore
+    ) async {
+        guard let token, let pulled = try? await AuthAPI.fetchSync(token: token) else { return }
+
+        if let profile = pulled.profile?.value {
+            userProfileStore.replaceProfile(profile)
+        } else if userProfileStore.profile != UserProfile() {
+            pushSync(SyncPushRequest(profile: userProfileStore.profile))
+        }
+
+        if let savedPlaces = pulled.savedPlaces?.value {
+            savedPlacesStore.replaceCollections(savedPlaces)
+        } else if !savedPlacesStore.collections.isEmpty {
+            pushSync(SyncPushRequest(savedPlaces: savedPlacesStore.collections))
+        }
+
+        if let trips = pulled.trips?.value {
+            tripsStore.replaceTrips(trips)
+        } else if !tripsStore.trips.isEmpty {
+            pushSync(SyncPushRequest(trips: tripsStore.trips))
+        }
+    }
+
+    /// Fire-and-forget background push, a no-op when signed out -- matches
+    /// the app's existing `try?`-swallow style for non-critical network
+    /// calls elsewhere (e.g. PlacesQuery's best-effort fetches).
+    func pushSync(_ request: SyncPushRequest) {
+        guard let token else { return }
+        Task {
+            try? await AuthAPI.pushSync(request, token: token)
+        }
+    }
+
+    private func setSession(_ response: AuthTokenResponse) {
+        token = response.token
+        user = response.user
+        persistence.save(AuthState(token: response.token, user: response.user))
+    }
+}

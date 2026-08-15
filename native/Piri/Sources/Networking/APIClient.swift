@@ -27,8 +27,19 @@ final class APIClient {
     private let decoder: JSONDecoder
     private let encoder: JSONEncoder
 
-    init(session: URLSession = .shared) {
-        self.session = session
+    init(session: URLSession? = nil) {
+        if let session {
+            self.session = session
+        } else {
+            // Explicit timeouts instead of URLSession.shared's defaults (60s
+            // request / 7 day resource) -- a stalled request used to hang
+            // every dependent screen (Scan, Ask Piri, Map) with no visible
+            // failure for a full minute before anything could retry.
+            let config = URLSessionConfiguration.default
+            config.timeoutIntervalForRequest = 15
+            config.timeoutIntervalForResource = 30
+            self.session = URLSession(configuration: config)
+        }
         self.decoder = JSONDecoder()
         self.encoder = JSONEncoder()
     }
@@ -50,6 +61,20 @@ final class APIClient {
     }
 
     private struct EmptyBody: Encodable {}
+
+    /// One retry, only for transient transport failures (dropped
+    /// connection, timeout) on idempotent methods -- never retries POST/PUT,
+    /// since replaying a write after an ambiguous failure could double it.
+    private func performWithSingleRetry(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        do {
+            return try await session.data(for: request)
+        } catch let error as URLError {
+            let retryableCodes: Set<URLError.Code> = [.timedOut, .networkConnectionLost, .notConnectedToInternet]
+            let isIdempotent = request.httpMethod == "GET" || request.httpMethod == nil
+            guard isIdempotent, retryableCodes.contains(error.code) else { throw error }
+            return try await session.data(for: request)
+        }
+    }
 
     private func send<Body: Encodable, Response: Decodable>(
         path: String,
@@ -77,7 +102,7 @@ final class APIClient {
 
         let (data, response): (Data, URLResponse)
         do {
-            (data, response) = try await session.data(for: request)
+            (data, response) = try await performWithSingleRetry(request)
         } catch {
             throw APIError.transport(error)
         }
