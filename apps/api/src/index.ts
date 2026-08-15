@@ -282,7 +282,16 @@ async function geocodeCityName(query: string) {
 
 type AiProviderName = 'openai' | 'openrouter' | 'google';
 
-function getAiProviderConfig():
+// `preferred`: an override for one specific call site that wants a
+// different provider than the app-wide `AI_PROVIDER` default, without
+// making every other endpoint's model choice depend on it -- currently
+// only `/places/identify` uses this (Gemini's vision/landmark accuracy is
+// meaningfully better than gpt-4o-mini's, confirmed live, but that has no
+// bearing on which model the text-only endpoints should use). Falls back
+// to the normal global-default chain when the preferred provider has no
+// key configured, same graceful-degrade contract as every other optional
+// integration in this file -- never a hard failure.
+function getAiProviderConfig(preferred?: AiProviderName):
   | {
       provider: AiProviderName;
       model: string;
@@ -323,6 +332,10 @@ function getAiProviderConfig():
           client: google,
         }
       : null;
+
+  if (preferred === 'google' && googleConfig) return googleConfig;
+  if (preferred === 'openai' && openaiConfig) return openaiConfig;
+  if (preferred === 'openrouter' && openrouterConfig) return openrouterConfig;
 
   if (AI_PROVIDER === 'openai' && openaiConfig) return openaiConfig;
   if (AI_PROVIDER === 'openrouter' && openrouterConfig) return openrouterConfig;
@@ -1179,7 +1192,10 @@ async function buildServer() {
       }
 
       const { imageBase64, mimeType, lat, lng, locale, userProfile } = parsedBody.data;
-      const aiProvider = getAiProviderConfig();
+      // 'google' preferred here specifically -- see getAiProviderConfig's
+      // own comment. Falls back to the app-wide default when no Google key
+      // is configured, so this endpoint still works either way.
+      const aiProvider = getAiProviderConfig('google');
 
       if (!aiProvider) {
         return reply.code(500).send({ error: 'AI is not configured in the backend' });
