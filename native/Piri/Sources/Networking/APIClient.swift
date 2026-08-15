@@ -121,7 +121,14 @@ final class APIClient {
         }
 
         guard (200..<300).contains(http.statusCode) else {
-            let message = (try? decoder.decode(ServerErrorBody.self, from: data))?.error
+            let body = try? decoder.decode(ServerErrorBody.self, from: data)
+            // Prefer `message` over `error` when both are present — this
+            // app's own handlers only ever send `{ error }`, but
+            // `@fastify/rate-limit`'s default 429 body sends both, and its
+            // `error` is just the generic, unlocalized HTTP reason phrase
+            // ("Too Many Requests") while `message` actually states the
+            // retry window ("Rate limit exceeded, retry in 1 minute").
+            let message = body?.message ?? body?.error
             throw APIError.server(status: http.statusCode, message: message)
         }
 
@@ -139,6 +146,7 @@ final class APIClient {
 
 private struct ServerErrorBody: Decodable {
     var error: String?
+    var message: String?
 }
 
 struct EmptyResponse: Decodable {}

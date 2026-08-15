@@ -25,13 +25,16 @@ private enum ConversationTurn: Identifiable {
     // string as content) so it doesn't get sent back to the backend as fake
     // prior assistant history, and so `turnView` can skip the "no matches"
     // subtext that only makes sense for a real, empty AI answer.
-    case error(id: String, message: String)
+    // `retryQuery`/`retryImage` are what actually failed, so a retry button
+    // can resubmit the exact same thing instead of making the user retype
+    // (and, for a photo question, re-pick the image from scratch).
+    case error(id: String, message: String, retryQuery: String, retryImage: UIImage?)
 
     var id: String {
         switch self {
         case .user(let id, _, _): return id
         case .assistant(let id, _, _, _): return id
-        case .error(let id, _): return id
+        case .error(let id, _, _, _): return id
         }
     }
 }
@@ -59,6 +62,11 @@ struct AIScreen: View {
     /// so the "Plan olarak kaydet" button can flip to a done state and stay
     /// there instead of creating a duplicate collection on a second tap.
     @State private var savedPlanTurnIds: Set<String> = []
+    /// Tracked so "Temizle" can actually cancel an in-flight request instead
+    /// of just wiping the visible conversation out from under it — without
+    /// this, a still-running request's answer/error used to land in what
+    /// looked like a brand-new empty chat with no explanation.
+    @State private var searchTask: Task<Void, Never>?
 
     private let initialQuery: String?
 
@@ -155,8 +163,15 @@ struct AIScreen: View {
         }
         .onChange(of: attachedItem) { _, newItem in
             Task {
-                guard let newItem, let data = try? await newItem.loadTransferable(type: Data.self) else { return }
-                attachedImage = UIImage(data: data)
+                guard let newItem else { return }
+                guard let data = try? await newItem.loadTransferable(type: Data.self), let image = UIImage(data: data) else {
+                    // Was a silent no-op on failure — the picker's
+                    // selection binding stayed set to the failed item with
+                    // no preview ever appearing and no explanation why.
+                    attachedItem = nil
+                    return
+                }
+                attachedImage = image
             }
         }
         // `.task(id:)`, not `.onChange` — see the identical comment on
@@ -205,6 +220,8 @@ struct AIScreen: View {
             Spacer()
             if !conversation.isEmpty {
                 Button("common.clear") {
+                    searchTask?.cancel()
+                    loading = false
                     conversation = []
                 }
                 .foregroundStyle(.white.opacity(0.55))
@@ -226,7 +243,7 @@ struct AIScreen: View {
             FlowLayout(spacing: 10) {
                 ForEach(suggestions, id: \.self) { suggestion in
                     Button {
-                        Task { await search(overrideQuery: suggestion) }
+                        searchTask = Task { await search(overrideQuery: suggestion) }
                     } label: {
                         Text(suggestion)
                             .font(.system(size: 14, weight: .medium))
@@ -286,10 +303,20 @@ struct AIScreen: View {
                 }
             }
 
-        case .error(_, let message):
-            HStack(alignment: .top, spacing: 8) {
-                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.closedRed)
-                Text(message).foregroundStyle(Theme.closedRed)
+        case .error(_, let message, let retryQuery, let retryImage):
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.closedRed)
+                    Text(message).foregroundStyle(Theme.closedRed)
+                }
+                Button("common.retry") {
+                    query = retryQuery
+                    attachedImage = retryImage
+                    searchTask = Task { await search() }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(loading)
             }
             .padding(.horizontal, 14).padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -406,10 +433,10 @@ struct AIScreen: View {
                     .frame(height: 48)
                     .background(RoundedRectangle(cornerRadius: 24).fill(Color(.secondarySystemBackground)))
                     .disabled(loading)
-                    .onSubmit { Task { await search() } }
+                    .onSubmit { searchTask = Task { await search() } }
 
                 Button {
-                    Task { await search() }
+                    searchTask = Task { await search() }
                 } label: {
                     Text("ai.ask")
                         .font(.system(size: 16, weight: .semibold))
@@ -506,6 +533,11 @@ struct AIScreen: View {
     }
 
     private func search(overrideQuery: String? = nil) async {
+        // The UI already disables Ask/submit while `loading`, but that's a
+        // rendering-timing guard, not a real one — two taps (or Return +
+        // Ask) landing in the same render tick could both reach here before
+        // SwiftUI applies `.disabled`, firing two LLM requests for one input.
+        guard !loading else { return }
         let nextQuery = (overrideQuery ?? query).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !nextQuery.isEmpty else { return }
 
@@ -540,7 +572,15 @@ struct AIScreen: View {
 
         let request = RecommendPOIRequest(
             query: nextQuery,
-            messages: history,
+            // `/places/recommend-poi` rejects any request over 8 messages
+            // (`chatMessageSchema` array cap, server-side) — sending the
+            // full, unbounded `history` meant every conversation broke
+            // outright on its 6th exchange (validation failure, opaque
+            // message, only recoverable by tapping Clear and losing
+            // everything). Trim to the same cap; the full conversation
+            // still stays visible in the UI, only what's sent as context
+            // to the model is bounded.
+            messages: Array(history.suffix(8)),
             userProfile: PersonalizationProfile(
                 name: profile.name,
                 profession: profile.professionText,
@@ -584,11 +624,22 @@ struct AIScreen: View {
                 } ?? 0
                 return POIRecommendation(poi: poi, aiReason: rec.aiReason, confidence: rec.confidence, distanceKm: distanceKm)
             }
+            // "Temizle" cancels `searchTask` but a request already in
+            // flight keeps running to completion regardless — without this
+            // check, its answer could land in a conversation the user
+            // already cleared, looking like a stray message out of nowhere.
+            guard !Task.isCancelled else { return }
             conversation.append(.assistant(id: "\(Date().timeIntervalSince1970)-assistant", content: response.answer, recommendations: resolved, isItinerary: response.isItinerary))
         } catch {
+            guard !Task.isCancelled else { return }
             query = nextQuery
-            conversation.append(.error(id: "\(Date().timeIntervalSince1970)-error", message: error.localizedDescription))
+            // Restore the photo too, not just the text — previously only
+            // the query was put back, so retrying a failed photo question
+            // meant re-picking the same image from scratch.
+            attachedImage = imageForRequest
+            conversation.append(.error(id: "\(Date().timeIntervalSince1970)-error", message: error.localizedDescription, retryQuery: nextQuery, retryImage: imageForRequest))
         }
+        guard !Task.isCancelled else { return }
         loading = false
     }
 }
