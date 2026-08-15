@@ -31,6 +31,18 @@ jobs:
         working-directory: native/Piri
     steps:
       - uses: actions/checkout@v4
+      - name: Select latest available Xcode
+        # deploymentTarget is iOS 18.0 (project.yml), which needs an iOS 18
+        # SDK -- macos-14 runner images ship several Xcode versions side by
+        # side under /Applications, and /Applications/Xcode.app's default
+        # symlink isn't guaranteed to point at one new enough. Pick whichever
+        # installed Xcode is newest instead of assuming the default.
+        run: |
+          LATEST_XCODE=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$LATEST_XCODE" ]; then
+            sudo xcode-select -s "$LATEST_XCODE"
+          fi
+          xcodebuild -version
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Generate Xcode project
@@ -40,5 +52,5 @@ jobs:
           xcodebuild build \
             -project Piri.xcodeproj \
             -scheme Piri \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO
