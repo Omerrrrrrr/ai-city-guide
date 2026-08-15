@@ -106,6 +106,18 @@ final class SavedPlacesStore {
         persist()
     }
 
+    /// Native `List`/`.onMove` drag-reorder variant (used by
+    /// `CollectionDetailScreen`'s reference list, matching
+    /// `MapScreen+RouteMode.swift`'s `moveStops`/`plannedStops.move`) — same
+    /// underlying persistence as `moveInCollection(_:identifier:offset:)`
+    /// above, just driven by `IndexSet`/destination instead of a single
+    /// adjacent swap.
+    func moveInCollection(_ id: String, fromOffsets offsets: IndexSet, toOffset destination: Int) {
+        guard let collectionIndex = collections.firstIndex(where: { $0.id == id }) else { return }
+        collections[collectionIndex].places.move(fromOffsets: offsets, toOffset: destination)
+        persist()
+    }
+
     /// Overwrites local state with a pulled server copy (account sync only).
     func replaceCollections(_ newCollections: [SavedCollection]) {
         collections = newCollections

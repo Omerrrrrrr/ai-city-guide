@@ -3452,6 +3452,72 @@
         }
       }
     },
+    "collection.forecastFailed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't load the forecast."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kunne ikke laste værmeldingen."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hava durumu yüklenemedi."
+          }
+        }
+      }
+    },
+    "collection.hoursFailed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't check opening hours."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kunne ikke sjekke åpningstider."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Çalışma saatleri kontrol edilemedi."
+          }
+        }
+      }
+    },
+    "collection.searchFailed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search failed — check your connection."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Søket mislyktes — sjekk tilkoblingen din."
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arama başarısız — bağlantını kontrol et."
+          }
+        }
+      }
+    },
     "collection.mayBeClosed": {
       "extractionState": "manual",
       "localizations": {

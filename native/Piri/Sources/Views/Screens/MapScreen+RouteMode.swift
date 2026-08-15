@@ -430,6 +430,25 @@ struct TripPhotoCaptureSheet: View {
                 CameraPreviewView(session: camera.session).ignoresSafeArea()
             } else {
                 Color.black.ignoresSafeArea()
+                // Was just a black screen with a permanently-disabled
+                // shutter and no explanation — same permission-denied
+                // overlay `ScanScreen` already uses for this identical
+                // `CameraController`/`isAuthorized` API.
+                VStack(spacing: 16) {
+                    Text("scan.permission.title").font(.system(size: 24, weight: .bold)).foregroundStyle(.white).multilineTextAlignment(.center)
+                    Text("scan.permission.body").foregroundStyle(.white.opacity(0.7)).multilineTextAlignment(.center)
+                    Button {
+                        Task { await camera.requestAuthorizationAndStart() }
+                    } label: {
+                        Text("scan.permission.allow")
+                            .font(.system(size: 17, weight: .bold))
+                            .foregroundStyle(Theme.navy)
+                            .padding(.horizontal, 32)
+                            .padding(.vertical, 16)
+                            .background(Capsule().fill(Theme.gold))
+                    }
+                }
+                .padding(32)
             }
 
             VStack {

@@ -8,6 +8,19 @@ import SwiftUI
 ///
 /// Only `.plan`-kind collections with 2+ places get the AI-optimize/
 /// create-route buttons — `.saved`-kind lists are just for keeping places.
+/// `.task(id:)` key for the weather/hours fetch — changes on either the
+/// target date or the place list (identifiers + count, so both a reorder-
+/// free add/remove and any other membership change trigger a refetch).
+private struct WeatherHoursFetchKey: Hashable {
+    let targetDate: Double?
+    let placeIdentifiers: [String]
+
+    init(collection: SavedCollection) {
+        targetDate = collection.targetDate
+        placeIdentifiers = collection.places.map(\.identifier)
+    }
+}
+
 struct CollectionDetailScreen: View {
     let collectionId: String
 
@@ -24,10 +37,13 @@ struct CollectionDetailScreen: View {
     @State private var showingDatePicker = false
     @State private var pickerDate = Date()
     @State private var forecast: Weather?
+    @State private var forecastFailed = false
     @State private var hoursResults: [String: HoursCheckResult] = [:]
+    @State private var hoursFailed = false
     @State private var searchQuery = ""
     @State private var searchResults: [POIPlace] = []
     @State private var isSearchingPlaces = false
+    @State private var searchFailed = false
     @State private var searchTask: Task<Void, Never>?
     @State private var showingSearchCityPicker = false
     /// Overrides `cityStore` as the search anchor for this screen only —
@@ -74,16 +90,28 @@ struct CollectionDetailScreen: View {
     private func loadForecastIfNeeded(for collection: SavedCollection, date: Date) async {
         guard isWithinForecastWindow(date), let coordinate = centroid(for: collection) else {
             forecast = nil
+            forecastFailed = false
             return
         }
-        forecast = try? await WeatherAPI.forecast(lat: coordinate.lat, lng: coordinate.lng, date: date)
+        forecastFailed = false
+        do {
+            forecast = try await WeatherAPI.forecast(lat: coordinate.lat, lng: coordinate.lng, date: date)
+        } catch {
+            // Previously `try?` — a network failure was visually identical
+            // to "no forecast for this date," with no way to tell the
+            // difference or retry.
+            forecast = nil
+            forecastFailed = true
+        }
     }
 
     private func loadHoursIfNeeded(for collection: SavedCollection, date: Date) async {
         guard !collection.places.isEmpty else {
             hoursResults = [:]
+            hoursFailed = false
             return
         }
+        hoursFailed = false
         // Matches /places/hours-check's own server-side cap.
         let places = collection.places.prefix(15).map { HoursCheckPlace(name: $0.name, lat: $0.lat, lng: $0.lng) }
         do {
@@ -93,6 +121,7 @@ struct CollectionDetailScreen: View {
             hoursResults = Dictionary(uniqueKeysWithValues: response.results.map { ($0.name, $0) })
         } catch {
             hoursResults = [:]
+            hoursFailed = true
         }
     }
 
@@ -124,7 +153,8 @@ struct CollectionDetailScreen: View {
                     } else {
                         if collection.kind == .plan {
                             dateSection(collection)
-                            weatherBanner
+                            weatherBanner(collection)
+                            hoursFailedBanner(collection)
                             if collection.places.count >= 2 {
                                 optimizeButton(collection)
                                 createRouteButton(collection)
@@ -134,9 +164,7 @@ struct CollectionDetailScreen: View {
                         if collection.places.isEmpty {
                             emptyState
                         } else {
-                            ForEach(Array(collection.places.enumerated()), id: \.element.id) { index, reference in
-                                referenceRow(reference, isFirst: index == 0, isLast: index == collection.places.count - 1)
-                            }
+                            referencesList(collection)
                         }
                     }
                 }
@@ -146,10 +174,18 @@ struct CollectionDetailScreen: View {
         .sheet(item: $selectedPOI) { poi in POIExplainSheet(poi: poi) }
         .sheet(isPresented: $showingDatePicker) { datePickerSheet(collection) }
         .onAppear { nameInput = collection.name }
-        .task(id: collection.targetDate) {
+        // Was keyed on `targetDate` alone -- adding/removing places via the
+        // inline search didn't change the id, so the weather centroid and
+        // hours-check silently went stale after an edit until the date was
+        // re-picked. Folding the place list into the id (SwiftUI only
+        // restarts a `.task(id:)` when the id actually changes) makes an
+        // edit refetch too.
+        .task(id: WeatherHoursFetchKey(collection: collection)) {
             guard let date = targetDate(for: collection) else {
                 forecast = nil
+                forecastFailed = false
                 hoursResults = [:]
+                hoursFailed = false
                 return
             }
             async let weatherTask: Void = loadForecastIfNeeded(for: collection, date: date)
@@ -217,6 +253,18 @@ struct CollectionDetailScreen: View {
                 SkeletonBox().frame(height: 60)
                 SkeletonBox().frame(height: 60)
             }
+        } else if searchFailed {
+            // Previously indistinguishable from "no results for this query"
+            // — both fell into the same empty-results text — since
+            // `POISearchService.search` swallowed every error into `[]`.
+            HStack(spacing: 8) {
+                Text("collection.searchFailed").font(.system(size: 14)).foregroundStyle(.secondary)
+                Spacer()
+                Button("common.retry") { scheduleSearch(searchQuery) }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+            }
+            .padding(.top, 8)
         } else if searchResults.isEmpty {
             Text("collection.searchNoResults").font(.system(size: 14)).foregroundStyle(.secondary).padding(.top, 8)
         } else {
@@ -269,6 +317,7 @@ struct CollectionDetailScreen: View {
         let trimmed = query.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else {
             searchResults = []
+            searchFailed = false
             return
         }
         let activeCityCoordinate: CLLocationCoordinate2D? = cityStore.lat.flatMap { lat in
@@ -276,12 +325,21 @@ struct CollectionDetailScreen: View {
         }
         guard let coordinate = searchAnchorCoordinate ?? activeCityCoordinate else { return }
         isSearchingPlaces = true
+        searchFailed = false
         searchTask = Task {
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
-            let results = await POISearchService.search(near: coordinate, categories: nil, naturalLanguageQuery: trimmed)
+            // `searchThrowing`, not the silent-degrade `search(...)` every
+            // other caller uses — this screen specifically wants to tell
+            // "the network failed" apart from "genuinely no results."
+            do {
+                searchResults = try await POISearchService.searchThrowing(near: coordinate, categories: nil, naturalLanguageQuery: trimmed)
+            } catch {
+                guard !Task.isCancelled else { return }
+                searchResults = []
+                searchFailed = true
+            }
             guard !Task.isCancelled else { return }
-            searchResults = results
             isSearchingPlaces = false
         }
     }
@@ -311,7 +369,7 @@ struct CollectionDetailScreen: View {
     }
 
     @ViewBuilder
-    private var weatherBanner: some View {
+    private func weatherBanner(_ collection: SavedCollection) -> some View {
         if let forecast {
             HStack(spacing: 10) {
                 Image(systemName: forecast.condition.icon).font(.system(size: 20)).foregroundStyle(Theme.gold)
@@ -322,6 +380,38 @@ struct CollectionDetailScreen: View {
             .padding(14)
             .background(RoundedRectangle(cornerRadius: 14).fill(Theme.gold.opacity(0.1)))
             .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.gold.opacity(0.25)))
+        } else if forecastFailed, let date = targetDate(for: collection) {
+            // Was previously indistinguishable from "no forecast available
+            // for this date" (both rendered nothing at all) — a real
+            // network failure now says so and offers a retry.
+            HStack(spacing: 8) {
+                Text("collection.forecastFailed").font(.footnote).foregroundStyle(.secondary)
+                Spacer()
+                Button("common.retry") {
+                    Task { await loadForecastIfNeeded(for: collection, date: date) }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+            .padding(14)
+            .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemBackground)))
+        }
+    }
+
+    @ViewBuilder
+    private func hoursFailedBanner(_ collection: SavedCollection) -> some View {
+        if hoursFailed, let date = targetDate(for: collection) {
+            HStack(spacing: 8) {
+                Text("collection.hoursFailed").font(.footnote).foregroundStyle(.secondary)
+                Spacer()
+                Button("common.retry") {
+                    Task { await loadHoursIfNeeded(for: collection, date: date) }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+            .padding(14)
+            .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemBackground)))
         }
     }
 
@@ -473,7 +563,38 @@ struct CollectionDetailScreen: View {
         isEditingName = false
     }
 
-    private func referenceRow(_ reference: SavedPOIReference, isFirst: Bool, isLast: Bool) -> some View {
+    /// Native `List` + `.onMove` drag-handle reordering — was two tiny
+    /// adjacent up/down chevrons plus a separate remove button, all crowded
+    /// together with no explicit tap-target sizing (easy to mis-tap between
+    /// "reorder" and "irreversibly remove"), and inconsistent with
+    /// `MapScreen+RouteMode.swift`'s `routeModeSheet`, which already uses
+    /// this same List/`.onMove` pattern for the same "reorder a list of
+    /// stops" concept. A `List` sizes itself independently rather than
+    /// flowing with its content, so it needs an explicit height to nest
+    /// inside the outer `ScrollView` without fighting it for the scroll
+    /// gesture — estimated generously per-row (icon + up to two lines of
+    /// text + an optional hours badge, taller than `routeModeSheet`'s
+    /// simpler row) and capped at 4 visible rows, same convention
+    /// `routeModeSheet` uses, with the List scrolling internally beyond that.
+    private func referencesList(_ collection: SavedCollection) -> some View {
+        List {
+            ForEach(collection.places) { reference in
+                referenceRow(reference)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+            }
+            .onMove { offsets, destination in
+                savedPlacesStore.moveInCollection(collectionId, fromOffsets: offsets, toOffset: destination)
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .environment(\.editMode, .constant(.active))
+        .frame(height: min(CGFloat(collection.places.count), 4) * 82)
+    }
+
+    private func referenceRow(_ reference: SavedPOIReference) -> some View {
         HStack(spacing: 12) {
             Button {
                 Task { await open(reference) }
@@ -508,41 +629,19 @@ struct CollectionDetailScreen: View {
             .disabled(resolvingIdentifier != nil)
 
             if resolvingIdentifier != reference.identifier {
-                // Plain up/down buttons, not drag-and-drop — this list is a
-                // `VStack` in a `ScrollView` (matches every other card list
-                // in the app), not a `List`, which is what SwiftUI's native
-                // `.onMove` drag reordering requires.
-                VStack(spacing: 2) {
-                    Button {
-                        Haptics.light()
-                        savedPlacesStore.moveInCollection(collectionId, identifier: reference.identifier, offset: -1)
-                    } label: {
-                        Image(systemName: "chevron.up").font(.system(size: 12, weight: .bold))
-                    }
-                    .disabled(isFirst)
-                    .opacity(isFirst ? 0.25 : 1)
-
-                    Button {
-                        Haptics.light()
-                        savedPlacesStore.moveInCollection(collectionId, identifier: reference.identifier, offset: 1)
-                    } label: {
-                        Image(systemName: "chevron.down").font(.system(size: 12, weight: .bold))
-                    }
-                    .disabled(isLast)
-                    .opacity(isLast ? 0.25 : 1)
-                }
-                .buttonStyle(.borderless)
-                .foregroundStyle(.secondary)
-
                 Button {
                     savedPlacesStore.removeFromCollection(collectionId, identifier: reference.identifier)
                 } label: {
-                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.borderless)
             }
         }
-        .padding(14)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemBackground)))
     }
 

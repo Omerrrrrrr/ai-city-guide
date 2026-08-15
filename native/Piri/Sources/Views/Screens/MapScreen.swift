@@ -173,7 +173,13 @@ struct MapScreen: View {
                     categoryChips
                     dietaryChips
                 }
-                if let errorMessage {
+                // Route mode has its own dedicated `routeError` line inside
+                // `routeModeSheet` -- this shared banner (search/directions/
+                // live pins) used to render on top of it regardless, so a
+                // stale unrelated error could linger over route mode, or a
+                // route error could look like it came from something else
+                // once the user left route mode. Scope it to non-route-mode.
+                if !routeMode, let errorMessage {
                     Text(errorMessage)
                         .font(.footnote)
                         .padding(8)
