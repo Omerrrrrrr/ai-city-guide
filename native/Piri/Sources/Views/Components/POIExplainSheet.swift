@@ -225,7 +225,7 @@ struct POIExplainSheet: View {
             }
         }
         .sheet(item: $addToCollectionKind) { kind in AddToCollectionSheet(poi: poi, kind: kind) }
-        .sheet(isPresented: $showingReviews) { TripAdvisorReviewsSheet(poi: poi) }
+        .sheet(isPresented: $showingReviews) { TripAdvisorReviewsSheet(poi: poi, totalReviewCount: result?.rating?.reviewCount) }
         .task { await explain() }
         .task { await loadLookAroundScene() }
         .task { await weatherQuery.load(lat: poi.coordinate.latitude, lng: poi.coordinate.longitude) }

@@ -6,6 +6,14 @@ import SwiftUI
 /// `/places/reviews`, never as part of the initial card load.
 struct TripAdvisorReviewsSheet: View {
     let poi: POIPlace
+    /// From the rating widget's own review count — compared against how
+    /// many `/places/reviews` actually returns so a real gap (Tripadvisor's
+    /// Content API only ever returns their 3 most recent reviews per
+    /// location, confirmed live against a place with 36 total, regardless
+    /// of the `size` requested — a paid-tier limitation on their end, not
+    /// a bug here) gets an honest note instead of silently looking like
+    /// "See all 36 reviews" under-delivered.
+    var totalReviewCount: Int?
 
     @Environment(\.dismiss) private var dismiss
     @State private var reviews: [TripAdvisorReview] = []
@@ -28,6 +36,11 @@ struct TripAdvisorReviewsSheet: View {
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 16) {
+                            if let totalReviewCount, totalReviewCount > reviews.count {
+                                Text(L("poiReviews.moreOnTripadvisor", reviews.count, totalReviewCount))
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            }
                             ForEach(reviews) { review in reviewRow(review) }
                         }
                         .padding()

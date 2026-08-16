@@ -168,8 +168,18 @@ enum POICategoryGroups {
     /// Apple's plain nearby-browse can bury a city's own cathedral below
     /// the ~25-result cap entirely). Explore/Home reuse the same set here
     /// for a lighter purpose — reordering, not searching.
+    ///
+    /// Widened beyond just museums/landmarks/monuments/castles to the rest
+    /// of what someone means by "müzeler ve bunun gibi yerler" (museums and
+    /// places like that) when they want a nearby-browse to lead with things
+    /// worth actually seeing — aquariums, zoos, theaters, and planetariums
+    /// are the same kind of "visit and look at something" venue, just not
+    /// literally a museum. Deliberately still excludes parks/beaches/nature
+    /// (their own "Doğa" category chip already covers those, and they're
+    /// more "spend time outdoors" than "come see this specific thing").
     static let coreSightCategories: Set<MKPointOfInterestCategory> = [
         .museum, .landmark, .nationalMonument, .castle, .fortress, .religiousSite,
+        .aquarium, .zoo, .theater, .planetarium,
     ]
 
     /// Moves sight-category places (museum, landmark, monument, ...) ahead
