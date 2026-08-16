@@ -46,6 +46,7 @@
 		47AB0C4FD2F7C0A3F1D3ED47 /* PlaceFiltersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A38B8B967050DA7D5EAE0DF7 /* PlaceFiltersTests.swift */; };
 		48790D92967906C9FC6A3E14 /* AdminModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A62E305A14B628DFA79318E3 /* AdminModels.swift */; };
 		50B18F789199EECB319D0C41 /* AccountUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70F5AFBFBB5E4BADED23CEA9 /* AccountUITests.swift */; };
+		9E493B03BD561B72165849F8 /* CollectionDetailUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6315B94A47E83E5C79FB740C /* CollectionDetailUITests.swift */; };
 		523FD7D67E6F2B9EAC7AE7BE /* TripsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A434588E21EEFBF99EDD0A1B /* TripsStoreTests.swift */; };
 		53511741B554A932B2C211B3 /* RecentlyViewedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40632CC354EF9E493BB92DED /* RecentlyViewedStore.swift */; };
 		56DA6B62203238017FC83366 /* CollectionDetailScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82D25734E2D392D33ACFF247 /* CollectionDetailScreen.swift */; };
@@ -187,6 +188,7 @@
 		6ADF11F38A3CEEA0D5E874A8 /* PiriMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PiriMapView.swift; sourceTree = "<group>"; };
 		70E1DF84B9EB0D5E98A9BA27 /* StatusBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBadge.swift; sourceTree = "<group>"; };
 		70F5AFBFBB5E4BADED23CEA9 /* AccountUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountUITests.swift; sourceTree = "<group>"; };
+		6315B94A47E83E5C79FB740C /* CollectionDetailUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionDetailUITests.swift; sourceTree = "<group>"; };
 		717A345206E0678E81ADF461 /* PlaceHours.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceHours.swift; sourceTree = "<group>"; };
 		7D94810B3041C6319D82ADC9 /* LanguageStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanguageStore.swift; sourceTree = "<group>"; };
 		7DBAC07C896E4A79299A7872 /* SavedPlacesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedPlacesStore.swift; sourceTree = "<group>"; };
@@ -493,6 +495,7 @@
 			children = (
 				70F5AFBFBB5E4BADED23CEA9 /* AccountUITests.swift */,
 				CB671448AA1226B18D624218 /* AppSmokeUITests.swift */,
+				6315B94A47E83E5C79FB740C /* CollectionDetailUITests.swift */,
 				86DB5417C3A05EBAEE7EB68E /* PlanBuilderUITests.swift */,
 			);
 			path = UITests;
@@ -637,6 +640,7 @@
 			files = (
 				50B18F789199EECB319D0C41 /* AccountUITests.swift in Sources */,
 				41036D1BB9344639267F7DAE /* AppSmokeUITests.swift in Sources */,
+				9E493B03BD561B72165849F8 /* CollectionDetailUITests.swift in Sources */,
 				E640521527F5AC8FD9D572B9 /* PlanBuilderUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
