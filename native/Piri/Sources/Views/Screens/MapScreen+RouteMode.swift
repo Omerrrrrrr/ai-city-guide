@@ -320,7 +320,7 @@ extension MapScreen {
                             ProgressView().controlSize(.mini)
                         }
                         Spacer()
-                        Image(systemName: stopsExpanded ? "chevron.up" : "chevron.down")
+                        Image(systemName: stopsExpanded ? "chevron.down" : "chevron.up")
                             .font(.footnote.weight(.semibold))
                             .foregroundStyle(.secondary)
                     }
