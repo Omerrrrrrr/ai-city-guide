@@ -4903,6 +4903,7 @@
       }
     },
     "dietaryTags.source" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -10016,6 +10017,7 @@
       }
     },
     "poiExplain.source.tripadvisor" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -10038,6 +10040,7 @@
       }
     },
     "poiExplain.source.wikipedia" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -13075,6 +13078,7 @@
       }
     },
     "settings.xp.level" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -13097,6 +13101,7 @@
       }
     },
     "settings.xp.remaining" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -13119,6 +13124,7 @@
       }
     },
     "settings.xp.title" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
