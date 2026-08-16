@@ -429,6 +429,15 @@ struct CollectionDetailScreen: View {
                 DatePicker("collection.dateLabel", selection: $pickerDate, in: Date()..., displayedComponents: [.date, .hourAndMinute])
                     .datePickerStyle(.graphical)
                     .padding(.horizontal)
+                // A single reference instant, not a start/end range — the
+                // whole list's hours are checked against just this one
+                // moment (see /places/hours-check), so this makes explicit
+                // what "one time for a multi-stop plan" actually means.
+                Text("collection.dateSubtitle")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
 
                 if collection.targetDate != nil {
                     Button(role: .destructive) {
