@@ -353,7 +353,7 @@ struct CollectionDetailScreen: View {
             HStack(spacing: 10) {
                 Image(systemName: "calendar").font(.system(size: 18)).foregroundStyle(Theme.gold)
                 if let date = targetDate(for: collection) {
-                    Text(date.formatted(date: .abbreviated, time: .omitted))
+                    Text(date.formatted(date: .abbreviated, time: .shortened))
                         .font(.system(size: 15, weight: .semibold)).foregroundStyle(.primary)
                 } else {
                     Text("collection.pickDate").font(.system(size: 15, weight: .semibold)).foregroundStyle(.secondary)
@@ -418,7 +418,15 @@ struct CollectionDetailScreen: View {
     private func datePickerSheet(_ collection: SavedCollection) -> some View {
         NavigationStack {
             VStack(spacing: 16) {
-                DatePicker("collection.dateLabel", selection: $pickerDate, in: Date()..., displayedComponents: .date)
+                // Time, not just date -- was displayedComponents: .date only,
+                // so the persisted targetDate silently carried whatever
+                // time-of-day pickerDate happened to default to (roughly
+                // "now," from whenever the sheet was first opened) instead
+                // of a deliberately chosen one. Confirmed live: the
+                // "Açık olacak" badge downstream is computed against that
+                // exact timestamp via /places/hours-check, so an accidental
+                // time made its open/closed prediction meaningless.
+                DatePicker("collection.dateLabel", selection: $pickerDate, in: Date()..., displayedComponents: [.date, .hourAndMinute])
                     .datePickerStyle(.graphical)
                     .padding(.horizontal)
 

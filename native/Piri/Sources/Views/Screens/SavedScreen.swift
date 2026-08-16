@@ -95,6 +95,14 @@ struct SavedScreen: View {
             guard newValue != nil else { return }
             dismiss()
         }
+        // Same nested-sheet gap as pendingAIQuery above, for
+        // CollectionDetailScreen's "Haritada Rota Oluştur" button — it
+        // switches tabSelection to Map and dismisses itself, but landed
+        // back on this screen instead of Map for the same reason.
+        .onChange(of: tabSelection.pendingRouteStops) { _, newValue in
+            guard newValue != nil else { return }
+            dismiss()
+        }
     }
 
     private func collectionsSection(kind: SavedCollectionKind) -> some View {
