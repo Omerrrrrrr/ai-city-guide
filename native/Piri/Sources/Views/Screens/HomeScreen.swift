@@ -76,13 +76,7 @@ struct HomeScreen: View {
                     errorBanner(error)
                 }
 
-                if !hasProfile, !poiLoading {
-                    profileNudge
-                }
-
-                if let weather = weatherQuery.weather {
-                    weatherBanner(weather)
-                }
+                suggestionCard
 
                 if Self.useCuratedHomeData {
                     if featured.isEmpty, !ranked.isEmpty {
@@ -117,8 +111,6 @@ struct HomeScreen: View {
                 } else {
                     poiSection
                 }
-
-                aiBanner
             }
             .padding(.bottom, 40)
         }
@@ -353,44 +345,49 @@ struct HomeScreen: View {
         dietaryResults = fetched
     }
 
+    // Photo-forward 2-column grid, mirroring ExploreScreen's `resultsGrid` —
+    // this used to be a plain list of 44×44-thumbnail rows, making the
+    // first screen a user sees the least visual one in the app despite
+    // already fetching the same `poiPhotoURLs` data ExploreScreen shows at
+    // full card size. See the 2026-08 visual-design research report,
+    // Phase 1: no new data, just the same photos shown bigger.
     private var poiSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("home.sections.nearYou").font(.system(size: 21, weight: .heavy))
                 .padding(.horizontal, 20)
             if poiLoading {
-                VStack(spacing: 10) {
-                    ForEach(0..<4, id: \.self) { _ in SkeletonBox().frame(height: 60) }
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                    ForEach(0..<4, id: \.self) { _ in SkeletonBox().frame(height: 140) }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 16)
             } else if poiResults.isEmpty {
                 Text("home.sections.nearYouEmpty")
                     .font(.system(size: 14))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 20)
             } else {
-                VStack(spacing: 10) {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                     ForEach(poiResults) { poi in
                         Button {
                             selectedPOI = poi
                         } label: {
-                            HStack(spacing: 12) {
-                                nearbyThumbnail(for: poi)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(poi.name).font(.system(size: 16, weight: .semibold)).foregroundStyle(.primary)
+                            VStack(alignment: .leading, spacing: 5) {
+                                nearbyTileImage(for: poi).frame(height: 100)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(poi.name).font(.system(size: 15, weight: .bold)).lineLimit(2)
                                     if !poi.categoryLabel.isEmpty {
-                                        Text(poi.categoryLabel).font(.system(size: 13)).foregroundStyle(.secondary)
+                                        Text(poi.categoryLabel).font(.system(size: 12)).foregroundStyle(.secondary)
                                     }
                                 }
-                                Spacer()
-                                Text("›").font(.system(size: 20)).foregroundStyle(.secondary)
+                                .padding(12)
                             }
-                            .padding(14)
-                            .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemBackground)))
+                            .background(RoundedRectangle(cornerRadius: 18).fill(Color(.secondarySystemGroupedBackground)))
+                            .clipShape(RoundedRectangle(cornerRadius: 18))
                         }
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 16)
             }
         }
     }
@@ -418,20 +415,17 @@ struct HomeScreen: View {
     }
 
     @ViewBuilder
-    private func nearbyThumbnail(for poi: POIPlace) -> some View {
+    private func nearbyTileImage(for poi: POIPlace) -> some View {
         let urlString = poiPhotoURLs[poi.name]
         if let urlString, !urlString.isEmpty, let url = URL(string: urlString) {
-            CachedAsyncImage(url: url, maxPixelSize: 120) { image in
+            CachedAsyncImage(url: url, maxPixelSize: 300) { image in
                 image.resizable().aspectRatio(contentMode: .fill)
             } placeholder: {
                 nearbyIconFallback(for: poi)
             }
-            .frame(width: 44, height: 44)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .clipped()
         } else {
             nearbyIconFallback(for: poi)
-                .frame(width: 44, height: 44)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
         }
     }
 
@@ -439,7 +433,7 @@ struct HomeScreen: View {
         ZStack {
             POICategoryGroups.gradient(for: poi.category)
             Image(systemName: POICategoryGroups.icon(for: poi.category))
-                .font(.system(size: 16))
+                .font(.system(size: 26))
                 .foregroundStyle(.white.opacity(0.92))
         }
     }
@@ -468,6 +462,25 @@ struct HomeScreen: View {
         .padding(14)
         .background(RoundedRectangle(cornerRadius: 14).fill(Theme.closedRed.opacity(0.1)))
         .padding(.horizontal, 20)
+    }
+
+    /// Single priority slot replacing three banners that used to stack on
+    /// top of each other (profile nudge, weather, "Ask Piri") whenever more
+    /// than one applied at once — up to three "please engage with me" cards
+    /// competing for attention on the very first screen. Picks the single
+    /// most relevant one instead: filling out a profile (unlocks
+    /// personalization) outranks a contextual weather tip, which outranks
+    /// the evergreen AI-chat fallback. See the 2026-08 visual-design
+    /// research report, Phase 1.
+    @ViewBuilder
+    private var suggestionCard: some View {
+        if !hasProfile, !poiLoading {
+            profileNudge
+        } else if let weather = weatherQuery.weather {
+            weatherBanner(weather)
+        } else {
+            aiBanner
+        }
     }
 
     private var profileNudge: some View {
@@ -567,6 +580,5 @@ struct HomeScreen: View {
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 20)
-        .padding(.top, 16)
     }
 }

@@ -96,6 +96,13 @@ struct POIExplainSheet: View {
                                 }
                             } else if let result {
                                 Text(result.headline).font(.subheadline.bold()).foregroundStyle(Theme.gold)
+                                // The real photo (Wikipedia/Tripadvisor, never
+                                // AI-generated) is the most visually engaging
+                                // thing this card has — it used to sit below
+                                // three rows of badges/text, effectively
+                                // buried. See the 2026-08 visual-design
+                                // research report, Phase 1.
+                                POIPhotoGallery(photos: result.photos)
                                 if let rating = result.rating {
                                     TripAdvisorRatingRow(rating: rating)
                                     // Only offered when we already know
@@ -120,7 +127,6 @@ struct POIExplainSheet: View {
                                 if let weather = weatherQuery.weather {
                                     weatherBadge(weather)
                                 }
-                                POIPhotoGallery(photos: result.photos)
                                 Text(result.body).font(.footnote)
                                 ForEach(result.highlights, id: \.self) { highlight in
                                     HStack(alignment: .top, spacing: 6) {

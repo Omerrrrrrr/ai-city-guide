@@ -54,6 +54,7 @@ struct ProfileScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 header
+                profileSummaryCard
                 profileTabsSegment
                 profileTabContent
                 accountCard
@@ -147,6 +148,60 @@ struct ProfileScreen: View {
         .piriGlassSurface()
         .padding(.horizontal, -20)
         .padding(.top, -20)
+    }
+
+    /// Reflects the profile fields already collected (profession, interests,
+    /// budget, group, pace) back in plain language, with editing one tap
+    /// away — the same fields already silently shape every AI blurb via
+    /// `buildProfileContext`, but until now the user never saw evidence of
+    /// that. Deliberately excludes `faith`: the research behind this card
+    /// (see the 2026-08 visual-design report) found users are fine with a
+    /// sensitive field driving something they themselves triggered (the
+    /// halal filter, already built that way) but not with it appearing as
+    /// a passive, always-visible label about them.
+    @ViewBuilder
+    private var profileSummaryCard: some View {
+        if !profileSummaryParts.isEmpty {
+            card(titleKey: "settings.profileSummary.title", trailing: {
+                Button(String(localized: "settings.profileSummary.edit")) { profileTab = .profession }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Theme.gold)
+            }) {
+                Text(profileSummaryParts.joined(separator: " · ")).font(.system(size: 15))
+            }
+        }
+    }
+
+    private var profileSummaryParts: [String] {
+        var parts: [String] = []
+
+        if let profession = profile.profession {
+            if profession == .other {
+                let custom = profile.professionOther.trimmingCharacters(in: .whitespaces)
+                if !custom.isEmpty { parts.append(custom) }
+            } else if let option = ProfileOptions.professions.first(where: { $0.value == profession }) {
+                parts.append(String(localized: String.LocalizationValue(option.labelKey)))
+            }
+        }
+
+        let interestLabels = profile.interests.compactMap { interest in
+            ProfileOptions.interests.first { $0.value == interest }.map { String(localized: String.LocalizationValue($0.labelKey)) }
+        } + profile.customInterests
+        if !interestLabels.isEmpty {
+            parts.append(interestLabels.joined(separator: ", "))
+        }
+
+        if let budget = profile.budget, let option = ProfileOptions.budgets.first(where: { $0.value == budget }) {
+            parts.append(String(localized: String.LocalizationValue(option.labelKey)))
+        }
+        if let groupType = profile.groupType, let option = ProfileOptions.groupTypes.first(where: { $0.value == groupType }) {
+            parts.append(String(localized: String.LocalizationValue(option.labelKey)))
+        }
+        if let pace = profile.pace, let option = ProfileOptions.paces.first(where: { $0.value == pace }) {
+            parts.append(String(localized: String.LocalizationValue(option.labelKey)))
+        }
+
+        return parts
     }
 
     private var profileTabsSegment: some View {
