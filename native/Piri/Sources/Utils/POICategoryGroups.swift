@@ -203,4 +203,97 @@ enum POICategoryGroups {
         let rest = items.filter { !sightIdentifiers.contains($0.id) }
         return sights + rest
     }
+
+    /// Why a POI got boosted for this specific user — the same value drives
+    /// both `sortedForProfile`'s ranking and the "Sana özel" badge that
+    /// names the reason in one word, instead of personalization staying an
+    /// invisible ranking effect the user has no way to notice or trust.
+    /// See the 2026-08 visual-design research report, Phase 2.
+    enum PersonalizationReason: String, CaseIterable {
+        case architecture, history, art, food, nature, nightlife, religion, music, sports
+
+        /// Reuses `ProfileOptions.interests`' own labels (same word, same
+        /// three languages already translated there) instead of a
+        /// duplicate set of strings — this enum's cases were deliberately
+        /// named to match `Interest`'s raw values one-for-one.
+        var labelKey: String { "profileOptions.interests.\(rawValue)" }
+    }
+
+    private static let reasonCategories: [PersonalizationReason: Set<MKPointOfInterestCategory>] = [
+        .architecture: [.landmark, .museum, .castle, .fortress, .nationalMonument],
+        .history: [.museum, .landmark, .nationalMonument, .castle, .fortress, .religiousSite],
+        .art: [.museum, .theater, .planetarium],
+        .food: [.restaurant, .cafe, .bakery, .foodMarket, .brewery, .winery, .distillery],
+        .nature: [.park, .nationalPark, .beach, .hiking, .campground, .zoo],
+        .nightlife: [.nightlife, .brewery, .winery, .distillery],
+        .religion: [.religiousSite],
+        .music: [.musicVenue],
+        .sports: [.stadium, .fitnessCenter, .golf, .tennis, .soccer, .swimming],
+    ]
+
+    /// Every reason this POI's category matches for this profile — checked
+    /// in a fixed, most-to-least-specific order (`PersonalizationReason`'s
+    /// declaration order) so a museum matching both "history" and
+    /// "architecture" always names the same one, rather than depending on
+    /// dictionary iteration order.
+    ///
+    /// Deliberately narrower than curated `Place`'s `profileBoost` (see
+    /// `PlaceFilters.swift`), which also weighs budget/pace/group-type
+    /// against curated tags Apple's POI data simply doesn't have (price
+    /// level, typical visit duration, "date night"/"family" labels) — this
+    /// only claims signals actually backed by real data: profession,
+    /// interests, and (as an opt-in-only signal, never surfaced as a
+    /// standalone label — see the report's caution on `faith`) worship
+    /// places for a non-secular faith.
+    static func personalizationReasons(for poi: POIPlace, profile: UserProfile) -> [PersonalizationReason] {
+        guard let category = poi.category else { return [] }
+        let interests = Set(profile.interests.map(\.rawValue))
+        func interested(_ interest: Interest) -> Bool { interests.contains(interest.rawValue) }
+
+        var matched: [PersonalizationReason] = []
+        for reason in PersonalizationReason.allCases {
+            guard let categories = reasonCategories[reason], categories.contains(category) else { continue }
+            let signalPresent: Bool
+            switch reason {
+            case .architecture: signalPresent = profile.profession == .architect || interested(.architecture)
+            case .history: signalPresent = profile.profession == .historian || interested(.history)
+            case .art: signalPresent = profile.profession == .artist || interested(.art)
+            case .food: signalPresent = profile.profession == .foodie || interested(.food)
+            case .nature: signalPresent = interested(.nature)
+            case .nightlife: signalPresent = interested(.nightlife)
+            case .religion:
+                signalPresent = interested(.religion) || (profile.faith != nil && profile.faith != .secular && profile.faith != .preferNotToSay)
+            case .music: signalPresent = interested(.music)
+            case .sports: signalPresent = interested(.sports)
+            }
+            if signalPresent { matched.append(reason) }
+        }
+        return matched
+    }
+
+    private static func historyBoost(for poi: POIPlace, viewed: [SavedPOIReference]) -> Int {
+        guard let category = poi.category else { return 0 }
+        let matches = viewed.filter { $0.category == category }.count
+        return min(matches * 2, 8)
+    }
+
+    /// Reorders live Apple POI results the same way `PlaceFilters.
+    /// sortedForProfile` already reorders curated ones — previously this
+    /// only ever ran on the `useCuratedHomeData` path, which has been
+    /// switched off since the Apple-POI pivot, so it never actually
+    /// affected what anyone saw.
+    ///
+    /// Takes an already-ordered list (callers pass `prioritizingSights`'s
+    /// output) and stably re-sorts by personalization score — Swift's
+    /// `sorted(by:)` is a stable sort, so anything scoring 0 (no matching
+    /// interest at all, or no profile) keeps its existing relative order
+    /// exactly. That means this never needs its own no-profile fallback:
+    /// with nothing to say, it's a no-op on top of whatever ordering was
+    /// already there, and only actually reshuffles when it has real signal.
+    static func sortedForProfile(_ items: [POIPlace], profile: UserProfile, viewed: [SavedPOIReference] = []) -> [POIPlace] {
+        func score(_ poi: POIPlace) -> Int {
+            personalizationReasons(for: poi, profile: profile).count * 6 + historyBoost(for: poi, viewed: viewed)
+        }
+        return items.sorted { score($0) > score($1) }
+    }
 }

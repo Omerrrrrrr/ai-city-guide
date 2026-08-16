@@ -62,4 +62,46 @@ enum ProfileOptions {
         .init(value: .balanced, labelKey: "profileOptions.paces.balanced", icon: "scalemass.fill"),
         .init(value: .packed, labelKey: "profileOptions.paces.packed", icon: "bolt.fill"),
     ]
+
+    /// Reflects the profile fields already collected back in plain
+    /// language — shared by `ProfileScreen`'s "Seni Böyle Görüyoruz" card
+    /// and `OnboardingScreen`'s end-of-wizard reward screen, rather than
+    /// keeping two copies of the same label-lookup logic. Deliberately
+    /// excludes `faith`: the 2026-08 visual-design research report found
+    /// users are fine with a sensitive field driving something they
+    /// themselves triggered (the halal filter, already built that way) but
+    /// not with it appearing as a passive, always-visible label about them.
+    static func summaryParts(for profile: UserProfile) -> [String] {
+        var parts: [String] = []
+
+        if let profession = profile.profession {
+            if profession == .other {
+                let custom = profile.professionOther.trimmingCharacters(in: .whitespaces)
+                if !custom.isEmpty { parts.append(custom) }
+            } else if let option = professions.first(where: { $0.value == profession }) {
+                parts.append(String(localized: String.LocalizationValue(option.labelKey)))
+            }
+        }
+
+        let presetInterestLabels: [String] = profile.interests.compactMap { interest -> String? in
+            guard let option = interests.first(where: { $0.value == interest }) else { return nil }
+            return String(localized: String.LocalizationValue(option.labelKey))
+        }
+        let interestLabels = presetInterestLabels + profile.customInterests
+        if !interestLabels.isEmpty {
+            parts.append(interestLabels.joined(separator: ", "))
+        }
+
+        if let budget = profile.budget, let option = budgets.first(where: { $0.value == budget }) {
+            parts.append(String(localized: String.LocalizationValue(option.labelKey)))
+        }
+        if let groupType = profile.groupType, let option = groupTypes.first(where: { $0.value == groupType }) {
+            parts.append(String(localized: String.LocalizationValue(option.labelKey)))
+        }
+        if let pace = profile.pace, let option = paces.first(where: { $0.value == pace }) {
+            parts.append(String(localized: String.LocalizationValue(option.labelKey)))
+        }
+
+        return parts
+    }
 }

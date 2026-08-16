@@ -4876,6 +4876,28 @@
         }
       }
     },
+    "dietaryTags.source" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source: OpenStreetMap"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kilde: OpenStreetMap"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kaynak: OpenStreetMap"
+          }
+        }
+      }
+    },
     "explore.emptyText" : {
       "localizations" : {
         "en" : {
@@ -5582,6 +5604,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Yağmurlu Gün"
+          }
+        }
+      }
+    },
+    "home.personalized" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "For you: %1$@"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "For deg: %1$@"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sana özel: %1$@"
           }
         }
       }
@@ -7264,6 +7308,72 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ne iş yapıyorsun?"
+          }
+        }
+      }
+    },
+    "onboarding.reward.cta" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Let's Go"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La oss starte"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Haydi Başlayalım"
+          }
+        }
+      }
+    },
+    "onboarding.reward.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Every recommendation from here on out is shaped by this."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle anbefalinger herfra er formet av dette."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bundan sonraki her öneri buna göre şekillenecek."
+          }
+        }
+      }
+    },
+    "onboarding.reward.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Piri gets it."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Piri skjønner det."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Piri seni tanıdı."
           }
         }
       }
@@ -9834,6 +9944,7 @@
       }
     },
     "poiReviews.moreOnTripadvisor" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

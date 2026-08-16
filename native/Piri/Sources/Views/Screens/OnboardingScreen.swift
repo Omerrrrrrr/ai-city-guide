@@ -7,6 +7,7 @@ struct OnboardingScreen: View {
     @Environment(UserProfileStore.self) private var userProfileStore
 
     @State private var step = 0
+    @State private var showingReward = false
     @State private var name = ""
     @State private var profession: Profession?
     @State private var professionOther = ""
@@ -21,6 +22,8 @@ struct OnboardingScreen: View {
     var body: some View {
         if step == 0 {
             welcomeStep
+        } else if showingReward {
+            rewardStep
         } else {
             wizard
         }
@@ -238,12 +241,22 @@ struct OnboardingScreen: View {
     private func advance() {
         if step < totalSteps {
             step += 1
+            return
+        }
+        saveProfile()
+        // Skip straight to finishing when there's nothing to reflect back —
+        // a reward screen for zero collected data would just be an empty
+        // pause, not a payoff. Someone who skipped every step already told
+        // us they don't want this moment.
+        if ProfileOptions.summaryParts(for: userProfileStore.profile).isEmpty {
+            userProfileStore.completeOnboarding()
         } else {
-            finish()
+            Haptics.medium()
+            showingReward = true
         }
     }
 
-    private func finish() {
+    private func saveProfile() {
         userProfileStore.update { profile in
             profile.name = name.trimmingCharacters(in: .whitespaces)
             profile.profession = profession
@@ -255,6 +268,52 @@ struct OnboardingScreen: View {
             profile.groupType = groupType
             profile.pace = pace
         }
-        userProfileStore.completeOnboarding()
+    }
+
+    /// One-screen "Piri seni tanıdı" payoff right after the profile wizard
+    /// — a Spotify-style instant-reward moment reflecting the just-entered
+    /// fields back in plain language, so filling out the form has a
+    /// visible result immediately instead of just disappearing into a
+    /// hidden AI-prompt fingerprint. See the 2026-08 visual-design
+    /// research report, Phase 2 ("anlık ödül").
+    private var rewardStep: some View {
+        VStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("✦").font(.system(size: 40)).foregroundStyle(Theme.gold)
+                    Text("onboarding.reward.title").font(.system(size: 34, weight: .heavy)).foregroundStyle(.white)
+                    Text("onboarding.reward.subtitle").font(.system(size: 16)).foregroundStyle(.white.opacity(0.7))
+
+                    FlowLayout(spacing: 8) {
+                        ForEach(ProfileOptions.summaryParts(for: userProfileStore.profile), id: \.self) { part in
+                            Text(part)
+                                .font(.system(size: 15, weight: .medium))
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 9)
+                                .background(Capsule().fill(Theme.gold.opacity(0.16)))
+                                .foregroundStyle(Theme.gold)
+                        }
+                    }
+                    .padding(.top, 8)
+                }
+                .padding(.vertical, 32)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            Button {
+                Haptics.medium()
+                userProfileStore.completeOnboarding()
+            } label: {
+                Text("onboarding.reward.cta")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(Theme.navy)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 18)
+                    .background(RoundedRectangle(cornerRadius: 16).fill(Theme.gold))
+            }
+        }
+        .padding(.horizontal, 32)
+        .padding(.bottom, 40)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.navy.ignoresSafeArea())
     }
 }

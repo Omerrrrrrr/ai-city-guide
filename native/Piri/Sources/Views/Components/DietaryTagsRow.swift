@@ -10,16 +10,25 @@ struct DietaryTagsRow: View {
 
     var body: some View {
         if !tags.isEmpty {
-            HStack(spacing: 6) {
-                ForEach(tags, id: \.self) { tag in
-                    let key: String = "diet.\(tag)"
-                    Text(String(localized: String.LocalizationValue(key)))
-                        .font(.caption.weight(.medium))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color(.systemGreen).opacity(0.18), in: Capsule())
-                        .foregroundStyle(Color(.systemGreen))
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    ForEach(tags, id: \.self) { tag in
+                        let key: String = "diet.\(tag)"
+                        Text(String(localized: String.LocalizationValue(key)))
+                            .font(.caption.weight(.medium))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color(.systemGreen).opacity(0.18), in: Capsule())
+                            .foregroundStyle(Color(.systemGreen))
+                    }
                 }
+                // Every other externally-sourced fact on this card
+                // (Tripadvisor's rating, each photo) already names its
+                // source inline — this was the one silent exception, just
+                // an unlabeled row of green pills. Small and secondary on
+                // purpose (a "trust marker," not a citation), matching the
+                // 2026-08 visual-design research report's Phase 2 finding.
+                Text("dietaryTags.source").font(.system(size: 10)).foregroundStyle(.secondary)
             }
         }
     }

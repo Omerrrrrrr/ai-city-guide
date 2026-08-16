@@ -386,6 +386,7 @@ struct HomeScreen: View {
                                         if !poi.categoryLabel.isEmpty {
                                             Text(poi.categoryLabel).font(.system(size: 12)).foregroundStyle(.secondary)
                                         }
+                                        personalizedBadge(for: poi)
                                     }
                                     .padding(12)
                                 }
@@ -421,7 +422,16 @@ struct HomeScreen: View {
         // Same principle as ExploreScreen: only reorder the unfiltered
         // "everything nearby" browse, not an already-homogeneous category
         // filter.
-        poiResults = selectedCategoryGroup == nil ? POICategoryGroups.prioritizingSights(fetched) : fetched
+        if selectedCategoryGroup == nil {
+            let sightsFirst = POICategoryGroups.prioritizingSights(fetched)
+            // sortedForProfile is a no-op stable re-sort when there's no
+            // profile match, so this is always safe to call — the
+            // sightsFirst order survives untouched until there's a real
+            // profession/interest signal to act on.
+            poiResults = POICategoryGroups.sortedForProfile(sightsFirst, profile: profile, viewed: recentlyViewedStore.viewed)
+        } else {
+            poiResults = fetched
+        }
         loadNearbyPhotosIfNeeded()
     }
 
@@ -446,6 +456,22 @@ struct HomeScreen: View {
             Image(systemName: POICategoryGroups.icon(for: poi.category))
                 .font(.system(size: 26))
                 .foregroundStyle(.white.opacity(0.92))
+        }
+    }
+
+    /// Names *why* this card was ranked up, not just that it was — a
+    /// personalized ranking with no visible trace of itself reads to the
+    /// user as no personalization at all (and can't be corrected if it's
+    /// ever wrong). Only the single strongest reason is shown, even if
+    /// several matched. See the 2026-08 visual-design research report,
+    /// Phase 2, and `POICategoryGroups.personalizationReasons`.
+    @ViewBuilder
+    private func personalizedBadge(for poi: POIPlace) -> some View {
+        if selectedCategoryGroup == nil, let reason = POICategoryGroups.personalizationReasons(for: poi, profile: profile).first {
+            Label(L("home.personalized", String(localized: String.LocalizationValue(reason.labelKey))), systemImage: "sparkles")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(Theme.gold)
+                .lineLimit(1)
         }
     }
 
