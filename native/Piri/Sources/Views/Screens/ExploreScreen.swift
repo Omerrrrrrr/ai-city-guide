@@ -238,7 +238,9 @@ struct ExploreScreen: View {
     private var resultsGrid: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(LPlural("explore.placesFound", count: results.count)).font(.system(size: 13)).foregroundStyle(.secondary).padding(.horizontal, 20)
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+            // `alignment: .top` -- see HomeScreen's `poiSection`, identical
+            // row-centering bug otherwise.
+            LazyVGrid(columns: [GridItem(.flexible(), alignment: .top), GridItem(.flexible(), alignment: .top)], spacing: 12) {
                 ForEach(results) { poi in
                     // Sibling overlay, not nested inside the Button's own
                     // label — see HomeScreen's identical pattern for why.

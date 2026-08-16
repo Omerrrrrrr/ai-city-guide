@@ -366,7 +366,15 @@ struct HomeScreen: View {
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 20)
             } else {
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                // `alignment: .top` on each column -- without it, a
+                // `GridItem` centers its cell within the row's height
+                // (the tallest cell in that row), so a card with a
+                // 1-line name would sit vertically centered next to a
+                // 2-line-name sibling instead of starting at the same Y
+                // -- confirmed live via the accessibility hierarchy: two
+                // cards in the same row had card-top Y-origins 39pt
+                // apart, tracking exactly with 1-line vs. 2-line names.
+                LazyVGrid(columns: [GridItem(.flexible(), alignment: .top), GridItem(.flexible(), alignment: .top)], spacing: 12) {
                     ForEach(poiResults) { poi in
                         // The Unsplash attribution badge is a sibling
                         // overlay, not nested inside the Button's own label
