@@ -15,6 +15,11 @@ struct TripDetailScreen: View {
     @State private var isEditingName = false
     @State private var nameInput = ""
     @State private var showDeleteConfirm = false
+    /// `TripSummarySheet` also auto-opens once, right when a trip ends
+    /// (`MapScreen.lastEndedTrip`) — this is the way back to it afterward,
+    /// for whoever dismissed that without sharing/screenshotting and wants
+    /// it again later. Same sheet, just a second entry point.
+    @State private var showingSummary = false
     @State private var viewerIndex: Int?
     @State private var selectedPOI: POIPlace?
     @State private var resolvingStopIdentifier: String?
@@ -123,6 +128,7 @@ struct TripDetailScreen: View {
             PhotoViewer(photos: trip.photos, index: wrapped.value)
         }
         .sheet(item: $selectedPOI) { poi in POIExplainSheet(poi: poi) }
+        .sheet(isPresented: $showingSummary) { TripSummarySheet(trip: trip) }
         .onAppear { nameInput = trip.name ?? "" }
     }
 
@@ -279,6 +285,11 @@ struct TripDetailScreen: View {
             Spacer()
 
             HStack(spacing: 14) {
+                Button {
+                    showingSummary = true
+                } label: {
+                    Image(systemName: "sparkles").foregroundStyle(.white.opacity(0.7))
+                }
                 ShareLink(item: shareText(trip)) {
                     Image(systemName: "square.and.arrow.up").foregroundStyle(.white.opacity(0.7))
                 }
