@@ -23,5 +23,14 @@ enum PlanThemes {
         PlanTheme(labelKey: "planThemes.shopping", icon: "bag.fill", categories: [.store]),
         PlanTheme(labelKey: "planThemes.family", icon: "figure.2.and.child.holdinghands", categories: [.zoo, .aquarium, .amusementPark, .park]),
         PlanTheme(labelKey: "planThemes.views", icon: "sun.horizon.fill", categories: [.landmark, .nationalMonument, .park]),
+        // Same 4 category groups the Map screen's own chips already cover
+        // (POICategoryGroups.all) that had no equivalent theme here yet —
+        // confirmed live: someone who wants a worship-site, beach, sports,
+        // or amusement-park-heavy day had no chip that matched. Reusing
+        // those chips' own labelKey/icon rather than duplicating new ones.
+        PlanTheme(labelKey: "mapPoiCategories.worship", icon: "building.2.fill", categories: [.religiousSite]),
+        PlanTheme(labelKey: "mapPoiCategories.beaches", icon: "beach.umbrella.fill", categories: [.beach, .marina, .surfing, .kayaking]),
+        PlanTheme(labelKey: "mapPoiCategories.sports", icon: "sportscourt.fill", categories: [.stadium, .fitnessCenter, .golf, .tennis, .soccer, .swimming]),
+        PlanTheme(labelKey: "mapPoiCategories.activities", icon: "gamecontroller.fill", categories: [.amusementPark, .bowling, .miniGolf, .goKart, .skatePark, .rockClimbing, .skiing]),
     ]
 }
