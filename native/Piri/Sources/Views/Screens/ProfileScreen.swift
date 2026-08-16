@@ -55,6 +55,7 @@ struct ProfileScreen: View {
             VStack(alignment: .leading, spacing: 14) {
                 header
                 profileSummaryCard
+                xpLevelCard
                 profileTabsSegment
                 profileTabContent
                 accountCard
@@ -169,6 +170,39 @@ struct ProfileScreen: View {
                     .foregroundStyle(Theme.gold)
             }) {
                 Text(parts.joined(separator: " · ")).font(.system(size: 15))
+            }
+        }
+    }
+
+    /// A score derived fresh from data already tracked elsewhere (profile
+    /// completeness, saved places, completed trips, recently-viewed count)
+    /// rather than a separately persisted counter -- see `Gamification`.
+    /// Personal-only: no leaderboard, no public profile, nothing shared.
+    private var xpLevelCard: some View {
+        let completedTrips = tripsStore.trips.filter { $0.endedAt != nil }.count
+        let savedPlaceCount = savedPlacesStore.collections.reduce(0) { $0 + $1.places.count }
+        let xp = Gamification.xp(
+            profile: profile,
+            savedPlaceCount: savedPlaceCount,
+            completedTripCount: completedTrips,
+            visitedCount: recentlyViewedStore.viewed.count
+        )
+        let level = Gamification.level(forXP: xp)
+
+        return card(titleKey: "settings.xp.title") {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle().fill(Theme.gold.opacity(0.15)).frame(width: 46, height: 46)
+                    Text("\(level)").font(.system(size: 19, weight: .bold)).foregroundStyle(Theme.gold)
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(L("settings.xp.level", level)).font(.system(size: 15, weight: .semibold))
+                    ProgressView(value: Gamification.progressIntoCurrentLevel(xp))
+                        .tint(Theme.gold)
+                    Text(L("settings.xp.remaining", Gamification.xpRemainingToNextLevel(xp)))
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }
