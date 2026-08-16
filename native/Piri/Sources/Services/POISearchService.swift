@@ -38,7 +38,17 @@ enum POISearchService {
         // A category-only browse (no `naturalLanguageQuery`) requires an
         // explicit `pointOfInterestFilter` — leaving it unset returns zero
         // results even with `resultTypes = .pointOfInterest` and a region.
-        request.pointOfInterestFilter = categories.map { MKPointOfInterestFilter(including: Array($0)) } ?? .includingAll
+        // The ambient "Tümü" browse (no category chip, no typed query)
+        // additionally excludes `nonTouristyCategories` — a real text
+        // search still gets `.includingAll` so typing "eczane" can still
+        // find a pharmacy even though the plain nearby-browse hides them.
+        if let categories {
+            request.pointOfInterestFilter = MKPointOfInterestFilter(including: Array(categories))
+        } else if naturalLanguageQuery == nil {
+            request.pointOfInterestFilter = MKPointOfInterestFilter(excluding: Array(POICategoryGroups.nonTouristyCategories))
+        } else {
+            request.pointOfInterestFilter = .includingAll
+        }
 
         let response = try await MKLocalSearch(request: request).start()
         // `request.region` is only a ranking hint, not a hard filter —

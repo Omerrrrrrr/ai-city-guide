@@ -145,6 +145,23 @@ enum POICategoryGroups {
         return matched.isEmpty ? nil : matched
     }
 
+    /// Excluded from the default, no-filter "Tümü" browse — real Apple POI
+    /// categories, just not what anyone opens a *travel guide* to find:
+    /// fuel/parking/EV charging, banks/ATMs, pharmacies, hospitals,
+    /// schools/universities, civic/emergency services, and plain grocery
+    /// stores. Confirmed live: Kristiansand's unfiltered "Yakınında" browse
+    /// surfaced a gas station, two supermarkets, and a school ahead of any
+    /// actual sight. Never applied to an explicit category chip (a
+    /// grocery-store chip, if one ever existed, should still show
+    /// groceries) or to a text search (typing "eczane" should still find a
+    /// pharmacy) — only to the ambient "show me what's around" browse.
+    static let nonTouristyCategories: Set<MKPointOfInterestCategory> = [
+        .animalService, .airport, .atm, .automotiveRepair, .bank, .carRental,
+        .evCharger, .fireStation, .foodMarket, .gasStation, .hospital,
+        .laundry, .mailbox, .parking, .pharmacy, .police, .postOffice,
+        .publicTransport, .restroom, .rvPark, .school, .university,
+    ]
+
     /// A city's headline sights — shared with `AIScreen`, which searches
     /// this set directly so a generic "plan my day" request always has a
     /// city's landmarks as candidates (see its own doc comment for why:

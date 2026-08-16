@@ -6294,6 +6294,7 @@
       }
     },
     "map.route.driving" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -6608,6 +6609,7 @@
       }
     },
     "map.route.walking" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -12428,6 +12430,7 @@
       }
     },
     "settings.profileSummary.edit" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -12450,6 +12453,7 @@
       }
     },
     "settings.profileSummary.title" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

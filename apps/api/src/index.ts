@@ -1614,7 +1614,7 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
           ? `A real Wikipedia summary of this place is included below${wikidataFactsLine ? ', along with a few structured Wikidata facts' : ''} — ground the historical, architectural, and significance angle in them and don't contradict them; they're the source of truth for this place's history and identity.${tripAdvisorInfo.description ? ` A Tripadvisor description is also included below — you can draw on it for practical, current-visit specifics (food, atmosphere, offerings), but Wikipedia stays the primary source for what this place actually is.` : ''} Still don't invent additional unverifiable specifics (exact founding dates, named owners, awards) beyond what's given anywhere below.`
           : tripAdvisorInfo.description
             ? `A real Tripadvisor description of this place is included below — ground your response in it and don't contradict it, but still don't invent additional unverifiable specifics (exact founding dates, named owners, awards) beyond what's given.`
-            : `Only the place's name, category, and address are given below — you have no verified facts beyond that, so rely on general knowledge about places of this type and this name; don't invent specific unverifiable claims (exact founding dates, named owners, awards) about it.`;
+            : `Only the place's name, category, and address are given below — you have no verified facts beyond that. Rely on the given category, not on assumptions from the name alone, for what this place actually offers: a name that echoes a well-known local landmark, area, or food term (e.g. a shop called "Fiskebrygga"/"Fish Wharf", after the historic fish-market building or district it sits in) does NOT mean the business itself sells or specializes in that thing — it may just be located there or use the name for branding. If the category is generic (e.g. "Store"), describe it in general terms plausible for that category rather than inventing a specific product line, cuisine, or specialty you can't verify. Don't invent specific unverifiable claims (exact founding dates, named owners, awards, specific products sold) about it.`;
 
       const faithMismatchGuard =
         userProfile?.faith && userProfile.faith !== 'secular' && userProfile.faith !== 'prefer_not_to_say'
@@ -1809,7 +1809,7 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
           // real Wikimedia Commons photo over a Tripadvisor one when both exist.
           const wiki = await fetchWikipediaPhoto(place.name, place.lat, place.lng, place.category ?? undefined);
           let photoUrl: string | null = wiki?.url ?? null;
-          let source: 'wikipedia' | 'tripadvisor' | null = wiki ? 'wikipedia' : null;
+          let source: 'wikipedia' | 'tripadvisor' | 'unsplash' | null = wiki ? 'wikipedia' : null;
           let attributionUrl: string | null = wiki?.pageUrl ?? null;
 
           if (!photoUrl) {
@@ -1817,6 +1817,23 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
             if (info.photoUrls[0]) {
               photoUrl = info.photoUrls[0];
               source = 'tripadvisor';
+            }
+          }
+
+          // Same last-resort /places/explain-poi already has — Home/
+          // Explore's grid was falling back to a plain category-icon tile
+          // for most small local businesses (no Wikipedia page, no
+          // Tripadvisor listing), which is exactly what a photo-forward
+          // grid shouldn't look like. Cached same as the two real sources
+          // above (30-day TTL, shared across every user), so this doesn't
+          // multiply Unsplash's 50-req/hour demo-tier quota by request
+          // volume -- only by genuinely new places.
+          if (!photoUrl) {
+            const unsplashPhoto = await fetchUnsplashPhoto(place.category ? `${place.name} ${place.category}` : place.name);
+            if (unsplashPhoto) {
+              photoUrl = unsplashPhoto.url;
+              source = 'unsplash';
+              attributionUrl = unsplashPhoto.attributionUrl;
             }
           }
 

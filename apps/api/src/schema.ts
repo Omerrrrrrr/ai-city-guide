@@ -152,7 +152,7 @@ export const poiPhotoCache = pgTable('poi_photo_cache', {
   latRounded: doublePrecision('lat_rounded').notNull(),
   lngRounded: doublePrecision('lng_rounded').notNull(),
   photoUrl: text('photo_url'),
-  source: varchar('source', { length: 32 }), // 'tripadvisor' | 'wikipedia' | null
+  source: varchar('source', { length: 32 }), // 'tripadvisor' | 'wikipedia' | 'unsplash' | null
   attributionUrl: text('attribution_url'),
   fetchedAt: varchar('fetched_at', { length: 64 }).notNull(),
 }, (table) => [

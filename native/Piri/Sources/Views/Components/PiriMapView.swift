@@ -84,7 +84,11 @@ struct PiriMapView: UIViewRepresentable {
             if let pointOfInterestCategories {
                 mapView.pointOfInterestFilter = MKPointOfInterestFilter(including: Array(pointOfInterestCategories))
             } else {
-                mapView.pointOfInterestFilter = .includingAll
+                // "Tümü" — same non-touristy exclusion as the plain-browse
+                // path in `POISearchService`, so the map's own base-tile
+                // POI layer doesn't litter the screen with gas stations,
+                // banks, and schools either.
+                mapView.pointOfInterestFilter = MKPointOfInterestFilter(excluding: Array(POICategoryGroups.nonTouristyCategories))
             }
             context.coordinator.lastPOICategories = pointOfInterestCategories
             context.coordinator.didApplyPOIFilter = true
