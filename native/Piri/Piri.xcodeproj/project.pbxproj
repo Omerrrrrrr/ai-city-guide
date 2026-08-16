@@ -80,6 +80,7 @@
 		E367A7465580AF7FD60BA8B9 /* CuratedInfoRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6DA9C9C2BD8E4941D309F03 /* CuratedInfoRow.swift */; };
 		1718ACCD9C16CFC2A4294551 /* DietaryTagsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAD9664F9AD7E3C21F9081FE /* DietaryTagsRow.swift */; };
 		F72F2C6DFF5326AB1FF65217 /* WeatherForecastSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FF915E4397E5E4DD1C61409 /* WeatherForecastSheet.swift */; };
+		B0D354DEBFA73660DAF7A7C7 /* TripSummarySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2710113A3EB845D696D1B39 /* TripSummarySheet.swift */; };
 		B0B5862CD4E82B308AFDE8CD /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 671A824ED89E058394F705D9 /* KeychainStore.swift */; };
 		B1CE3778A30DDE3281136DAE /* PlaceFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03AA8FC29DF1B7AFBACE82E /* PlaceFixtures.swift */; };
 		B32A7E5F97F0950A4DDC57EC /* SavedScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A6344FD16ACEE6A9600CDCC /* SavedScreen.swift */; };
@@ -177,6 +178,7 @@
 		D6DA9C9C2BD8E4941D309F03 /* CuratedInfoRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CuratedInfoRow.swift; sourceTree = "<group>"; };
 		FAD9664F9AD7E3C21F9081FE /* DietaryTagsRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DietaryTagsRow.swift; sourceTree = "<group>"; };
 		0FF915E4397E5E4DD1C61409 /* WeatherForecastSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherForecastSheet.swift; sourceTree = "<group>"; };
+		F2710113A3EB845D696D1B39 /* TripSummarySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripSummarySheet.swift; sourceTree = "<group>"; };
 		671A824ED89E058394F705D9 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		674770D930511AA70C53CCF8 /* POICategoryGroups.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POICategoryGroups.swift; sourceTree = "<group>"; };
 		6993AA4D03C823EF1D3DCFEE /* ProfileOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileOptions.swift; sourceTree = "<group>"; };
@@ -312,6 +314,7 @@
 				D6DA9C9C2BD8E4941D309F03 /* CuratedInfoRow.swift */,
 				FAD9664F9AD7E3C21F9081FE /* DietaryTagsRow.swift */,
 				0FF915E4397E5E4DD1C61409 /* WeatherForecastSheet.swift */,
+				F2710113A3EB845D696D1B39 /* TripSummarySheet.swift */,
 				B26F2F82581B09C946DED399 /* LookAroundCard.swift */,
 				135A602CC00ED4B1E83016AB /* MapAnnotations.swift */,
 				6ADF11F38A3CEEA0D5E874A8 /* PiriMapView.swift */,
@@ -663,6 +666,7 @@
 				E367A7465580AF7FD60BA8B9 /* CuratedInfoRow.swift in Sources */,
 				1718ACCD9C16CFC2A4294551 /* DietaryTagsRow.swift in Sources */,
 				F72F2C6DFF5326AB1FF65217 /* WeatherForecastSheet.swift in Sources */,
+				B0D354DEBFA73660DAF7A7C7 /* TripSummarySheet.swift in Sources */,
 				33AC9CF316C079973DFE5B23 /* CityPickerScreen.swift in Sources */,
 				7296C8E006BE3C8B454F1169 /* CityStore.swift in Sources */,
 				56DA6B62203238017FC83366 /* CollectionDetailScreen.swift in Sources */,

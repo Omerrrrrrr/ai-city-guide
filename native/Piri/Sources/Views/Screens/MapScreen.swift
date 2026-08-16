@@ -97,6 +97,11 @@ struct MapScreen: View {
     /// should be drawn instead of the trip's stale persisted one until
     /// "Güncelle" is tapped. Mirrors `stopsChangedFromActiveTrip`.
     @State var routeProfileDirty = false
+    /// Set by `endRoute()` right after ending a trip — presenting
+    /// `TripSummarySheet` as a `.sheet(item:)` this drives. `nil` the rest
+    /// of the time, so the summary only ever appears once, right when a
+    /// trip actually finishes, not on every future visit to this screen.
+    @State var lastEndedTrip: Trip?
     /// Collapsed by default — the full editable stop list used to always
     /// take up roughly half the screen over the map itself. Expanding is a
     /// deliberate tap, not automatic, so picking stops on the map still
@@ -307,6 +312,9 @@ struct MapScreen: View {
             TripPhotoCaptureSheet { data in
                 Task { await attachTripPhoto(data) }
             }
+        }
+        .sheet(item: $lastEndedTrip) { trip in
+            TripSummarySheet(trip: trip)
         }
     }
 

@@ -233,6 +233,11 @@ extension MapScreen {
     func endRoute() {
         if let activeTripId = tripsStore.activeTripId {
             tripsStore.endTrip(activeTripId)
+            // Snapshot after endTrip() so distanceMeters/durationSeconds and
+            // endedAt are already final -- endTrip() keeps the trip in
+            // tripsStore.trips (just clears activeTripId), it doesn't
+            // delete it, so this lookup is safe.
+            lastEndedTrip = tripsStore.trips.first { $0.id == activeTripId }
         }
         locationManager.stopBreadcrumbRecording()
         hydratedTripId = nil

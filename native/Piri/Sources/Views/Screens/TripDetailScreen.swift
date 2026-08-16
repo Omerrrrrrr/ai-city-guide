@@ -138,9 +138,9 @@ struct TripDetailScreen: View {
     /// nearly every trip-tracking app use for a journey's headline numbers.
     private func statsRow(_ trip: Trip) -> some View {
         HStack(spacing: 0) {
-            statItem(value: distanceText(trip), label: String(localized: "trips.stat.distance"))
+            statItem(value: trip.formattedDistance, label: String(localized: "trips.stat.distance"))
             Divider().frame(height: 30)
-            statItem(value: durationText(trip), label: String(localized: "trips.stat.duration"))
+            statItem(value: trip.formattedDuration, label: String(localized: "trips.stat.duration"))
             Divider().frame(height: 30)
             statItem(value: "\(trip.stops.count)", label: String(localized: "trips.stat.stops"))
         }
@@ -154,35 +154,6 @@ struct TripDetailScreen: View {
             Text(label).font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary).textCase(.uppercase)
         }
         .frame(maxWidth: .infinity)
-    }
-
-    private func distanceText(_ trip: Trip) -> String {
-        guard let meters = trip.distanceMeters, meters > 0 else { return "—" }
-        return String(format: "%.1f km", meters / 1000)
-    }
-
-    /// Falls back to `endedAt - startedAt` when `durationSeconds` wasn't
-    /// recorded (older/interrupted trips) rather than showing nothing.
-    /// Abbreviated unit letters (localized) instead of spelled-out "hours"/
-    /// "days" sidestep needing plural-form handling for a value that's
-    /// otherwise just a compact number pair.
-    private func durationText(_ trip: Trip) -> String {
-        let seconds = trip.durationSeconds ?? trip.endedAt.map { $0 - trip.startedAt }.map { $0 / 1000 }
-        guard let seconds, seconds > 0 else { return "—" }
-
-        let totalMinutes = Int(seconds / 60)
-        let hourUnit = String(localized: "trips.unit.hour")
-        let minuteUnit = String(localized: "trips.unit.minute")
-        let dayUnit = String(localized: "trips.unit.day")
-
-        if totalMinutes < 60 {
-            return "\(totalMinutes)\(minuteUnit)"
-        }
-        let totalHours = totalMinutes / 60
-        if totalHours < 24 {
-            return "\(totalHours)\(hourUnit) \(totalMinutes % 60)\(minuteUnit)"
-        }
-        return "\(totalHours / 24)\(dayUnit) \(totalHours % 24)\(hourUnit)"
     }
 
     /// A continuous vertical line behind the step badges, connecting each
@@ -281,7 +252,7 @@ struct TripDetailScreen: View {
             Spacer()
 
             if isEditingName {
-                TextField(tripDateLabel(trip), text: $nameInput)
+                TextField(trip.dateLabel, text: $nameInput)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.white)
                     .onSubmit { tripsStore.renameTrip(trip.id, name: nameInput.trimmingCharacters(in: .whitespaces)); isEditingName = false }
@@ -299,7 +270,7 @@ struct TripDetailScreen: View {
                     isEditingName = true
                 } label: {
                     HStack(spacing: 6) {
-                        Text(tripTitle(trip)).font(.system(size: 17, weight: .bold)).foregroundStyle(.white).lineLimit(1)
+                        Text(trip.displayTitle).font(.system(size: 17, weight: .bold)).foregroundStyle(.white).lineLimit(1)
                         Image(systemName: "pencil").font(.system(size: 12)).foregroundStyle(.white.opacity(0.5))
                     }
                 }
@@ -333,22 +304,13 @@ struct TripDetailScreen: View {
         }
     }
 
-    private func tripDateLabel(_ trip: Trip) -> String {
-        Date(timeIntervalSince1970: trip.startedAt / 1000).formatted(date: .abbreviated, time: .omitted)
-    }
-
-    private func tripTitle(_ trip: Trip) -> String {
-        let name = trip.name?.trimmingCharacters(in: .whitespaces) ?? ""
-        return name.isEmpty ? tripDateLabel(trip) : name
-    }
-
     private func shareText(_ trip: Trip) -> String {
         let stopNames = trip.stops.map(\.name).joined(separator: " → ")
         let distanceLine = trip.distanceMeters.map { L("trips.share.distance", String(format: "%.1f", $0 / 1000)) } ?? ""
         return L(
             "trips.share.message",
-            tripTitle(trip),
-            tripDateLabel(trip),
+            trip.displayTitle,
+            trip.dateLabel,
             stopNames.isEmpty ? String(localized: "trips.share.noStops") : stopNames,
             distanceLine
         )
