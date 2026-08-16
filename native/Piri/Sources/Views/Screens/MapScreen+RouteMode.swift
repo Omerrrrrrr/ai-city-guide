@@ -12,7 +12,7 @@ import SwiftUI
 /// `MapScreen.swift`) purely to keep that file from growing unmanageably.
 extension MapScreen {
     var stopsChangedFromActiveTrip: Bool {
-        guard let activeTrip = tripsStore.trips.first(where: { $0.id == tripsStore.activeTripId }) else { return false }
+        guard let activeTrip = tripsStore.activeTrip else { return false }
         return activeTrip.stops != plannedStops
     }
 
@@ -58,7 +58,7 @@ extension MapScreen {
 
     var routeModeToggleButton: some View {
         Button {
-            if tripsStore.activeTripId != nil {
+            if tripsStore.activeTrip != nil {
                 routeMode = true
                 return
             }
@@ -100,13 +100,18 @@ extension MapScreen {
     /// a trip that's already active (e.g. the user left the Map tab mid-trip
     /// and came back), and make sure breadcrumb recording is running.
     func rehydrateActiveTripIfNeeded() {
-        guard let activeTripId = tripsStore.activeTripId, hydratedTripId != activeTripId,
-              let activeTrip = tripsStore.trips.first(where: { $0.id == activeTripId }) else { return }
+        // `tripsStore.activeTrip` (not just `activeTripId`) is what guards
+        // against rehydrating a just-ended trip's stops back into
+        // `plannedStops` if `activeTripId` is ever stale when this runs
+        // (e.g. a sync pulling in an older TripsStore snapshot right after
+        // ending) -- confirmed live: "Rotayı Bitir" was seen leaving the
+        // sheet looking like the old, not-yet-ended plan.
+        guard let activeTrip = tripsStore.activeTrip, hydratedTripId != activeTrip.id else { return }
         plannedStops = activeTrip.stops
         routeGeometry = activeTrip.routeGeometry
         routeDistanceMeters = activeTrip.distanceMeters
         routeDurationSeconds = activeTrip.durationSeconds
-        hydratedTripId = activeTripId
+        hydratedTripId = activeTrip.id
         routeProfileDirty = false
         if !locationManager.isRecordingBreadcrumb {
             locationManager.startBreadcrumbRecording()
@@ -278,9 +283,32 @@ extension MapScreen {
 
     @ViewBuilder
     var routeModeSheet: some View {
-        let activeTrip = tripsStore.trips.first(where: { $0.id == tripsStore.activeTripId })
+        let activeTrip = tripsStore.activeTrip
 
         VStack(alignment: .leading, spacing: 12) {
+            // Explicit, unambiguous exit for the planning state — before
+            // this, the only way out was the overloaded flag button
+            // (toggle-and-confirm), with nothing in this card itself
+            // saying "you're done, close this." Not shown once a trip is
+            // actually active — ending a live-tracked trip stays the
+            // deliberate "Rotayı Bitir" action below, not a casual X tap.
+            if activeTrip == nil {
+                HStack {
+                    Spacer()
+                    Button {
+                        if plannedStops.isEmpty {
+                            routeMode = false
+                        } else {
+                            showDiscardStopsConfirm = true
+                        }
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
             if let routeError {
                 Text(routeError).font(.footnote).foregroundStyle(Theme.closedRed)
             }

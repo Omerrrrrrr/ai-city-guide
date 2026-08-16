@@ -12,6 +12,17 @@ final class TripsStore {
     private(set) var trips: [Trip] = []
     private(set) var activeTripId: String?
 
+    /// Single source of truth for "is there really a trip in progress right
+    /// now" — every call site used to re-derive this inline as
+    /// `trips.first(where: { $0.id == activeTripId })`, which trusts
+    /// `activeTripId` alone. Also requiring `endedAt == nil` here means a
+    /// trip that's already been ended can never be treated as active again
+    /// just because something left `activeTripId` pointing at it.
+    var activeTrip: Trip? {
+        guard let activeTripId else { return nil }
+        return trips.first { $0.id == activeTripId && $0.endedAt == nil }
+    }
+
     private let persistence: UserDefaultsStore<TripsState>
 
     init(defaults: UserDefaults = .standard) {

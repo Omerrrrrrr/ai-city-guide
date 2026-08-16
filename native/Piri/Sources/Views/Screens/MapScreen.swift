@@ -145,7 +145,7 @@ struct MapScreen: View {
     var body: some View {
         ZStack(alignment: .bottom) {
             if let initialRegion {
-                if routeMode, let activeTrip = tripsStore.trips.first(where: { $0.id == tripsStore.activeTripId }) {
+                if routeMode, let activeTrip = tripsStore.activeTrip {
                     // While the stop list has been edited past what the
                     // active trip last persisted, draw the freshly-previewed
                     // route (kept live by the `onChange(of: plannedStops)`
