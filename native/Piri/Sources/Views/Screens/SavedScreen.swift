@@ -15,6 +15,8 @@ enum SavedTab: Hashable, Identifiable {
 struct SavedScreen: View {
     @Environment(SavedPlacesStore.self) private var savedPlacesStore
     @Environment(RecentlyViewedStore.self) private var recentlyViewedStore
+    @Environment(TabSelection.self) private var tabSelection
+    @Environment(\.dismiss) private var dismiss
 
     @State private var tab: SavedTab
     @State private var selectedPOI: POIPlace?
@@ -79,6 +81,19 @@ struct SavedScreen: View {
                 // deliberately backing out — require that instead of an
                 // easy-to-trigger-by-accident gesture.
                 .interactiveDismissDisabled()
+        }
+        // "Piri ile günümü optimize et" (CollectionDetailScreen's optimize
+        // button) sets pendingAIQuery + switches tabSelection to Ask Piri,
+        // then dismisses itself -- but CollectionDetailScreen is a sheet
+        // presented *from this screen*, which is itself a sheet presented
+        // from ProfileScreen. That single dismiss only closed
+        // CollectionDetailScreen, landing back on this screen (still
+        // covering the tab bar) instead of actually reaching Ask Piri --
+        // confirmed live. Cascading the dismissal here closes this sheet
+        // too, so the tab switch underneath actually becomes visible.
+        .onChange(of: tabSelection.pendingAIQuery) { _, newValue in
+            guard newValue != nil else { return }
+            dismiss()
         }
     }
 
