@@ -83,6 +83,10 @@ struct MapScreen: View {
     @State var routeGeometry: [[Double]]?
     @State var routeDistanceMeters: Double?
     @State var routeDurationSeconds: Double?
+    /// Real turn-by-turn instructions for the current route, when
+    /// available — see `RouteStep`'s own doc comment for when this is empty.
+    @State var routeSteps: [RouteStep] = []
+    @State var showingRouteSteps = false
     @State var isFetchingRoute = false
     @State var routeError: String?
     /// Which profile the *next* `previewRoute()`/`startRoute()`/
@@ -295,6 +299,7 @@ struct MapScreen: View {
                 routeGeometry = nil
                 routeDistanceMeters = nil
                 routeDurationSeconds = nil
+                routeSteps = []
                 return
             }
             Task { await previewRoute() }

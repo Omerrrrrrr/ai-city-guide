@@ -3045,6 +3045,7 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
           route: coordinates.map((c) => [c.lat, c.lng]),
           distanceMeters,
           durationSeconds: distanceMeters / speedMetersPerSecond,
+          steps: [],
         });
       };
 
@@ -3072,11 +3073,22 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
           ([lng, lat]: [number, number]) => [lat, lng]
         );
         const summary = data.features?.[0]?.properties?.summary;
+        // One segment per leg between two consecutive coordinates (i.e. per
+        // stop-to-stop hop) -- flattened into a single ordered list so the
+        // client can show one continuous turn-by-turn list for the whole
+        // multi-stop route, not one per leg. `type: 10` ("Arrive") steps are
+        // ORS's own per-leg "you've arrived" markers; kept as-is, since a
+        // multi-stop walk arriving at each stop in turn is genuinely useful
+        // to see, not just at the very end.
+        const steps: { instruction: string; distanceMeters: number }[] = (data.features?.[0]?.properties?.segments ?? [])
+          .flatMap((segment: any) => segment.steps ?? [])
+          .map((step: any) => ({ instruction: step.instruction as string, distanceMeters: step.distance as number }));
 
         return reply.send({
           route: geometry,
           distanceMeters: summary?.distance ?? null,
           durationSeconds: summary?.duration ?? null,
+          steps,
         });
       } catch (e: any) {
         app.log.error(e, 'OpenRouteService request failed, falling back to a straight-line route');

@@ -87,6 +87,8 @@ extension MapScreen {
                 routeGeometry = nil
                 routeDistanceMeters = nil
                 routeDurationSeconds = nil
+                routeSteps = []
+                showingRouteSteps = false
                 routeError = nil
                 stopsExpanded = false
             }
@@ -144,8 +146,21 @@ extension MapScreen {
         plannedStops.removeAll { $0.identifier == identifier }
     }
 
+    /// Prepends the user's live position when available — without this, the
+    /// route always started at stop 1's own coordinate, as if the user were
+    /// already standing there, instead of actually beginning from wherever
+    /// they currently are. Falls back to just the stops (previous behavior)
+    /// when location isn't available yet (permission not granted, or no fix
+    /// yet on a cold GPS start).
     private func stopCoordinates() -> [PlaceCoordinate] {
-        plannedStops.map { PlaceCoordinate(lat: $0.lat, lng: $0.lng) }
+        let stops = plannedStops.map { PlaceCoordinate(lat: $0.lat, lng: $0.lng) }
+        guard let current = locationManager.currentLocation else { return stops }
+        let withCurrent = [PlaceCoordinate(lat: current.latitude, lng: current.longitude)] + stops
+        // /routes/directions caps at 10 coordinates server-side (matches
+        // createRouteButton's own `.prefix(10)`) -- trimming here instead of
+        // just appending unconditionally so a 10-stop plan doesn't suddenly
+        // start failing once a current-location point is added on top.
+        return Array(withCurrent.prefix(10))
     }
 
     /// Entry point for "Haritada Rota Oluştur" (SavedScreen's Plan tab) —
@@ -187,6 +202,7 @@ extension MapScreen {
             routeGeometry = result.route
             routeDistanceMeters = result.distanceMeters
             routeDurationSeconds = result.durationSeconds
+            routeSteps = result.steps
         } catch {
             routeError = String(localized: "map.route.failed")
         }
@@ -202,6 +218,7 @@ extension MapScreen {
             routeGeometry = result.route
             routeDistanceMeters = result.distanceMeters
             routeDurationSeconds = result.durationSeconds
+            routeSteps = result.steps
             let tripId = tripsStore.startTrip(
                 stops: plannedStops,
                 route: RouteInfo(routeGeometry: result.route, distanceMeters: result.distanceMeters, durationSeconds: result.durationSeconds)
@@ -224,6 +241,7 @@ extension MapScreen {
             routeGeometry = result.route
             routeDistanceMeters = result.distanceMeters
             routeDurationSeconds = result.durationSeconds
+            routeSteps = result.steps
             tripsStore.updateTripStops(
                 activeTripId,
                 stops: plannedStops,
@@ -261,6 +279,8 @@ extension MapScreen {
         routeGeometry = nil
         routeDistanceMeters = nil
         routeDurationSeconds = nil
+        routeSteps = []
+        showingRouteSteps = false
         routeMode = false
         stopsExpanded = false
         routeProfileDirty = false
@@ -387,6 +407,54 @@ extension MapScreen {
                     .scrollContentBackground(.hidden)
                     .environment(\.editMode, .constant(.active))
                     .frame(height: min(CGFloat(plannedStops.count), 4) * 52)
+                }
+            }
+
+            // Real turn-by-turn instructions (OpenRouteService), not just a
+            // line on the map — was previously fetched and immediately
+            // discarded server-side. Empty for the straight-line fallback
+            // (no real streets to give directions along), so this only
+            // shows up once a route has actually been calculated.
+            if !routeSteps.isEmpty {
+                Button {
+                    Haptics.light()
+                    withAnimation(.easeInOut(duration: 0.2)) { showingRouteSteps.toggle() }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "list.bullet").font(.footnote).foregroundStyle(.secondary)
+                        Text(LPlural("map.route.stepsCount", count: routeSteps.count))
+                            .font(.footnote.weight(.semibold))
+                        Spacer()
+                        Image(systemName: showingRouteSteps ? "chevron.down" : "chevron.up")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                if showingRouteSteps {
+                    List {
+                        ForEach(Array(routeSteps.enumerated()), id: \.offset) { _, step in
+                            HStack(alignment: .top, spacing: 10) {
+                                Image(systemName: "arrow.turn.up.right").font(.footnote).foregroundStyle(Theme.gold).padding(.top, 2)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(step.instruction).font(.footnote)
+                                    if step.distanceMeters > 0 {
+                                        Text(L("map.route.distanceKm", String(format: "%.2f", step.distanceMeters / 1000)))
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                        }
+                    }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .frame(height: min(CGFloat(routeSteps.count), 5) * 58)
                 }
             }
 
