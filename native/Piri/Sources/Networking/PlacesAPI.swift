@@ -171,6 +171,10 @@ struct PhotoBulkResult: Decodable {
     var photoUrl: String?
     var source: String?
     var attributionUrl: String?
+    /// Unsplash-only — their API Terms require naming the photographer, not
+    /// just linking through to Unsplash. `nil` for Wikipedia/Tripadvisor.
+    var photographerName: String?
+    var photographerUrl: String?
 }
 
 struct PhotoBulkResponse: Decodable {

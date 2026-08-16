@@ -154,6 +154,10 @@ export const poiPhotoCache = pgTable('poi_photo_cache', {
   photoUrl: text('photo_url'),
   source: varchar('source', { length: 32 }), // 'tripadvisor' | 'wikipedia' | 'unsplash' | null
   attributionUrl: text('attribution_url'),
+  // Unsplash-only -- their API Terms (§9) require naming the photographer,
+  // not just linking through to Unsplash. Null for Wikipedia/Tripadvisor rows.
+  photographerName: text('photographer_name'),
+  photographerUrl: text('photographer_url'),
   fetchedAt: varchar('fetched_at', { length: 64 }).notNull(),
 }, (table) => [
   index('idx_poi_photo_cache_name').on(table.nameNormalized),

@@ -33,7 +33,7 @@ struct HomeScreen: View {
     @State private var dietaryLoading = false
     /// See `ExploreScreen`'s identical field for why an empty string (not
     /// a missing key) means "checked, no photo found".
-    @State private var poiPhotoURLs: [String: String] = [:]
+    @State private var poiPhotos: [String: PhotoBulkResult] = [:]
     @State private var selectedPOI: POIPlace?
 
     private var profile: UserProfile { userProfileStore.profile }
@@ -348,7 +348,7 @@ struct HomeScreen: View {
     // Photo-forward 2-column grid, mirroring ExploreScreen's `resultsGrid` —
     // this used to be a plain list of 44×44-thumbnail rows, making the
     // first screen a user sees the least visual one in the app despite
-    // already fetching the same `poiPhotoURLs` data ExploreScreen shows at
+    // already fetching the same `poiPhotos` data ExploreScreen shows at
     // full card size. See the 2026-08 visual-design research report,
     // Phase 1: no new data, just the same photos shown bigger.
     private var poiSection: some View {
@@ -368,23 +368,34 @@ struct HomeScreen: View {
             } else {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                     ForEach(poiResults) { poi in
-                        Button {
-                            selectedPOI = poi
-                        } label: {
-                            VStack(alignment: .leading, spacing: 5) {
-                                nearbyTileImage(for: poi).frame(height: 100)
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(poi.name).font(.system(size: 15, weight: .bold)).lineLimit(2)
-                                    if !poi.categoryLabel.isEmpty {
-                                        Text(poi.categoryLabel).font(.system(size: 12)).foregroundStyle(.secondary)
+                        // The Unsplash attribution badge is a sibling
+                        // overlay, not nested inside the Button's own label
+                        // — two full-size overlapping tappable controls
+                        // (the card's Button, a Link for the photo credit)
+                        // don't compose reliably as parent/child in SwiftUI,
+                        // so this keeps them as independent hit-targets at
+                        // the same level instead.
+                        ZStack(alignment: .topTrailing) {
+                            Button {
+                                selectedPOI = poi
+                            } label: {
+                                VStack(alignment: .leading, spacing: 5) {
+                                    nearbyTileImage(for: poi).frame(height: 100)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(poi.name).font(.system(size: 15, weight: .bold)).lineLimit(2)
+                                        if !poi.categoryLabel.isEmpty {
+                                            Text(poi.categoryLabel).font(.system(size: 12)).foregroundStyle(.secondary)
+                                        }
                                     }
+                                    .padding(12)
                                 }
-                                .padding(12)
+                                .background(RoundedRectangle(cornerRadius: 18).fill(Color(.secondarySystemGroupedBackground)))
+                                .clipShape(RoundedRectangle(cornerRadius: 18))
                             }
-                            .background(RoundedRectangle(cornerRadius: 18).fill(Color(.secondarySystemGroupedBackground)))
-                            .clipShape(RoundedRectangle(cornerRadius: 18))
+                            .buttonStyle(.plain)
+
+                            unsplashBadge(for: poi)
                         }
-                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -416,7 +427,7 @@ struct HomeScreen: View {
 
     @ViewBuilder
     private func nearbyTileImage(for poi: POIPlace) -> some View {
-        let urlString = poiPhotoURLs[poi.name]
+        let urlString = poiPhotos[poi.name]?.photoUrl
         if let urlString, !urlString.isEmpty, let url = URL(string: urlString) {
             CachedAsyncImage(url: url, maxPixelSize: 300) { image in
                 image.resizable().aspectRatio(contentMode: .fill)
@@ -438,8 +449,31 @@ struct HomeScreen: View {
         }
     }
 
+    /// Unsplash's API Terms (§9) require attributing Unsplash and the
+    /// photographer, linked, every time a photo is displayed — the grid
+    /// card has no secondary detail view showing this same photo again, so
+    /// unlike `POIPhotoGallery`'s full-screen viewer, this can't defer full
+    /// attribution to "somewhere else in the flow." A sibling `Link` (not
+    /// nested inside the card's own `Button`, which two overlapping
+    /// controls don't handle reliably) opens the photographer's profile.
+    @ViewBuilder
+    private func unsplashBadge(for poi: POIPlace) -> some View {
+        if let photo = poiPhotos[poi.name], photo.source == "unsplash",
+           let photographerUrl = photo.photographerUrl, let url = URL(string: photographerUrl) {
+            Link(destination: url) {
+                Text("Unsplash")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(.black.opacity(0.55), in: Capsule())
+            }
+            .padding(6)
+        }
+    }
+
     private func loadNearbyPhotosIfNeeded() {
-        let missing = poiResults.filter { poiPhotoURLs[$0.name] == nil }.prefix(20)
+        let missing = poiResults.filter { poiPhotos[$0.name] == nil }.prefix(20)
         guard !missing.isEmpty else { return }
         let request = PhotoBulkRequest(places: missing.map {
             PhotoBulkPlace(name: $0.name, lat: $0.coordinate.latitude, lng: $0.coordinate.longitude, category: $0.categoryLabel.isEmpty ? nil : $0.categoryLabel)
@@ -447,7 +481,7 @@ struct HomeScreen: View {
         Task {
             guard let response = try? await PlacesAPI.photosBulk(request) else { return }
             for result in response.results {
-                poiPhotoURLs[result.name] = result.photoUrl ?? ""
+                poiPhotos[result.name] = result
             }
         }
     }

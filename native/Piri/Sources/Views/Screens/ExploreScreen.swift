@@ -38,13 +38,13 @@ struct ExploreScreen: View {
     @State private var searchRadius: CLLocationDistance = 4000
     @State private var searchCoordinate: CLLocationCoordinate2D?
     private static let maxSearchRadius: CLLocationDistance = 20000
-    /// Keyed by POI name. An empty string is a real, distinct value here —
-    /// "already checked, no photo found" — not just "haven't asked yet",
-    /// since `[String: String?]`'s subscript setter can't actually store
-    /// `Optional.none` as a value (assigning nil removes the key instead),
-    /// which would otherwise make every no-photo place get re-requested on
-    /// every scroll.
-    @State private var photoURLs: [String: String] = [:]
+    /// Keyed by POI name. The full result (not just the URL) is kept so
+    /// Unsplash-sourced photos can show their required photographer
+    /// attribution — a present dictionary entry with a `nil` `photoUrl` is
+    /// a real, distinct value here ("already checked, no photo found"), not
+    /// just "haven't asked yet", so a no-photo place doesn't get
+    /// re-requested on every scroll.
+    @State private var photos: [String: PhotoBulkResult] = [:]
 
     var body: some View {
         ScrollView {
@@ -240,25 +240,31 @@ struct ExploreScreen: View {
             Text(LPlural("explore.placesFound", count: results.count)).font(.system(size: 13)).foregroundStyle(.secondary).padding(.horizontal, 20)
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                 ForEach(results) { poi in
-                    Button {
-                        selectedPOI = poi
-                    } label: {
-                        VStack(alignment: .leading, spacing: 5) {
-                            tileImage(for: poi)
-                                .frame(height: 100)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(poi.name).font(.system(size: 15, weight: .bold)).lineLimit(2)
-                                if !poi.categoryLabel.isEmpty {
-                                    Text(poi.categoryLabel).font(.system(size: 12)).foregroundStyle(.secondary)
+                    // Sibling overlay, not nested inside the Button's own
+                    // label — see HomeScreen's identical pattern for why.
+                    ZStack(alignment: .topTrailing) {
+                        Button {
+                            selectedPOI = poi
+                        } label: {
+                            VStack(alignment: .leading, spacing: 5) {
+                                tileImage(for: poi)
+                                    .frame(height: 100)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(poi.name).font(.system(size: 15, weight: .bold)).lineLimit(2)
+                                    if !poi.categoryLabel.isEmpty {
+                                        Text(poi.categoryLabel).font(.system(size: 12)).foregroundStyle(.secondary)
+                                    }
                                 }
+                                .padding(12)
                             }
-                            .padding(12)
+                            .background(RoundedRectangle(cornerRadius: 18).fill(Color(.secondarySystemGroupedBackground)))
+                            .clipShape(RoundedRectangle(cornerRadius: 18))
                         }
-                        .background(RoundedRectangle(cornerRadius: 18).fill(Color(.secondarySystemGroupedBackground)))
-                        .clipShape(RoundedRectangle(cornerRadius: 18))
+                        .buttonStyle(.plain)
+                        .onAppear { loadMoreIfNeeded(after: poi) }
+
+                        unsplashBadge(for: poi)
                     }
-                    .buttonStyle(.plain)
-                    .onAppear { loadMoreIfNeeded(after: poi) }
                 }
             }
             .padding(.horizontal, 16)
@@ -279,7 +285,7 @@ struct ExploreScreen: View {
     /// same silent-degrade contract `POISearchService` already uses.
     @ViewBuilder
     private func tileImage(for poi: POIPlace) -> some View {
-        let urlString = photoURLs[poi.name]
+        let urlString = photos[poi.name]?.photoUrl
         if let urlString, !urlString.isEmpty, let url = URL(string: urlString) {
             CachedAsyncImage(url: url, maxPixelSize: 300) { image in
                 image.resizable().aspectRatio(contentMode: .fill)
@@ -301,12 +307,33 @@ struct ExploreScreen: View {
         }
     }
 
+    /// Unsplash's API Terms (§9) require attributing Unsplash and the
+    /// photographer, linked, every time a photo is displayed — see
+    /// HomeScreen's identical helper for the full rationale (no secondary
+    /// detail view here re-shows this same photo, so the grid card itself
+    /// has to carry it).
+    @ViewBuilder
+    private func unsplashBadge(for poi: POIPlace) -> some View {
+        if let photo = photos[poi.name], photo.source == "unsplash",
+           let photographerUrl = photo.photographerUrl, let url = URL(string: photographerUrl) {
+            Link(destination: url) {
+                Text("Unsplash")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(.black.opacity(0.55), in: Capsule())
+            }
+            .padding(6)
+        }
+    }
+
     /// Batches up to 20 places at once (matches `/places/photos-bulk`'s own
     /// cap) and skips anything already resolved — including a confirmed
     /// "no photo" — so scrolling through a long list doesn't re-request the
     /// same names over and over.
     private func loadPhotosIfNeeded(for items: [POIPlace]) {
-        let missing = items.filter { photoURLs[$0.name] == nil }.prefix(20)
+        let missing = items.filter { photos[$0.name] == nil }.prefix(20)
         guard !missing.isEmpty else { return }
         let request = PhotoBulkRequest(places: missing.map {
             PhotoBulkPlace(name: $0.name, lat: $0.coordinate.latitude, lng: $0.coordinate.longitude, category: $0.categoryLabel.isEmpty ? nil : $0.categoryLabel)
@@ -314,7 +341,7 @@ struct ExploreScreen: View {
         Task {
             guard let response = try? await PlacesAPI.photosBulk(request) else { return }
             for result in response.results {
-                photoURLs[result.name] = result.photoUrl ?? ""
+                photos[result.name] = result
             }
         }
     }

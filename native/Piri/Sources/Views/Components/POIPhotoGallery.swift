@@ -43,6 +43,38 @@ struct POIPhotoGallery: View {
     }
 }
 
+/// Unsplash's API Terms (§9) require attributing both Unsplash and the
+/// photographer by name, each linked — a generic "Unsplash" badge (what
+/// Wikipedia/Tripadvisor use, and what this used to show for every source)
+/// only satisfies "a link back," not "attribute ... the photographer."
+/// Falls back to the plain badge when the photographer fields are missing
+/// (shouldn't happen for a real Unsplash photo, but graceful regardless).
+@ViewBuilder
+private func attributionRow(for photo: POIPhoto) -> some View {
+    if photo.source == .unsplash, let photographerName = photo.photographerName {
+        HStack(spacing: 4) {
+            Text("Photo by").font(.system(size: 11)).foregroundStyle(.white.opacity(0.7))
+            if let photographerUrl = photo.photographerUrl, let url = URL(string: photographerUrl) {
+                Link(photographerName, destination: url)
+                    .font(.system(size: 11, weight: .semibold))
+            } else {
+                Text(photographerName).font(.system(size: 11, weight: .semibold)).foregroundStyle(.white)
+            }
+            Text("on").font(.system(size: 11)).foregroundStyle(.white.opacity(0.7))
+            if let attributionUrl = photo.attributionUrl, let url = URL(string: attributionUrl) {
+                Link("Unsplash", destination: url)
+                    .font(.system(size: 11, weight: .semibold))
+            } else {
+                Text("Unsplash").font(.system(size: 11, weight: .semibold)).foregroundStyle(.white)
+            }
+        }
+    } else if let attributionUrl = photo.attributionUrl, let url = URL(string: attributionUrl) {
+        Link(destination: url) { sourceLabel(photo.source) }
+    } else {
+        sourceLabel(photo.source)
+    }
+}
+
 private func sourceLabel(_ source: POIPhotoSource) -> some View {
     let label: String
     switch source {
@@ -87,14 +119,7 @@ private struct POIPhotoViewer: View {
                 Text("\(index + 1) / \(photos.count)").foregroundStyle(.white)
                 Spacer()
                 if photos.indices.contains(index) {
-                    let photo = photos[index]
-                    if let attributionUrl = photo.attributionUrl, let url = URL(string: attributionUrl) {
-                        Link(destination: url) {
-                            sourceLabel(photo.source)
-                        }
-                    } else {
-                        sourceLabel(photo.source)
-                    }
+                    attributionRow(for: photos[index])
                 }
                 Button {
                     dismiss()

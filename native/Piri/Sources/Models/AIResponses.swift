@@ -181,6 +181,11 @@ struct POIPhoto: Codable, Identifiable, Hashable {
     /// present for Wikipedia photos, `nil` for Tripadvisor ones (its photos
     /// endpoint doesn't return a per-photo page link).
     var attributionUrl: String?
+    /// Unsplash-only — their API Terms (§9) require attributing the
+    /// photographer by name, not just linking through to Unsplash
+    /// generically. `nil` for Wikipedia/Tripadvisor.
+    var photographerName: String?
+    var photographerUrl: String?
     var id: String { url }
 }
 

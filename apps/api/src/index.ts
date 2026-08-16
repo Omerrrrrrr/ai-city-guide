@@ -1664,7 +1664,13 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
         // Wikipedia first — the user's explicit priority — then Tripadvisor.
         // Each photo carries its own source so the client can attribute it
         // correctly rather than a single blanket label.
-        const photos: { url: string; source: 'wikipedia' | 'tripadvisor' | 'unsplash'; attributionUrl?: string }[] = [];
+        const photos: {
+          url: string;
+          source: 'wikipedia' | 'tripadvisor' | 'unsplash';
+          attributionUrl?: string;
+          photographerName?: string;
+          photographerUrl?: string;
+        }[] = [];
         if (wikiPhoto) {
           photos.push({ url: wikiPhoto.url, source: 'wikipedia', attributionUrl: wikiPhoto.pageUrl });
         }
@@ -1675,9 +1681,15 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
         // above), since whether it's needed at all depends on that call's
         // own results. Only adds latency on the (uncommon) empty-photo path.
         if (photos.length === 0) {
-          const unsplashPhoto = await fetchUnsplashPhoto(category ? `${name} ${category}` : name);
+          const unsplashPhoto = await fetchUnsplashPhoto(category ? `${name} ${category}` : name, category);
           if (unsplashPhoto) {
-            photos.push({ url: unsplashPhoto.url, source: 'unsplash', attributionUrl: unsplashPhoto.attributionUrl });
+            photos.push({
+              url: unsplashPhoto.url,
+              source: 'unsplash',
+              attributionUrl: unsplashPhoto.attributionUrl,
+              photographerName: unsplashPhoto.photographerName,
+              photographerUrl: unsplashPhoto.photographerUrl,
+            });
           }
         }
 
@@ -1786,7 +1798,14 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
     // keeps peak concurrent external calls well under that ceiling.
     const CONCURRENCY = 4;
     const places = parsedBody.data.places;
-    const results: { name: string; photoUrl: string | null; source: string | null; attributionUrl: string | null }[] = [];
+    const results: {
+      name: string;
+      photoUrl: string | null;
+      source: string | null;
+      attributionUrl: string | null;
+      photographerName: string | null;
+      photographerUrl: string | null;
+    }[] = [];
     for (let i = 0; i < places.length; i += CONCURRENCY) {
       const chunkResults = await Promise.all(
         places.slice(i, i + CONCURRENCY).map(async (place) => {
@@ -1802,7 +1821,14 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
           const cacheAgeDays = cached ? (Date.now() - new Date(cached.fetchedAt).getTime()) / (1000 * 60 * 60 * 24) : Infinity;
 
           if (cached && cacheAgeDays < PHOTO_CACHE_TTL_DAYS) {
-            return { name: place.name, photoUrl: cached.photoUrl, source: cached.source, attributionUrl: cached.attributionUrl };
+            return {
+              name: place.name,
+              photoUrl: cached.photoUrl,
+              source: cached.source,
+              attributionUrl: cached.attributionUrl,
+              photographerName: cached.photographerName,
+              photographerUrl: cached.photographerUrl,
+            };
           }
 
           // Wikipedia first, matching /places/explain-poi's own priority — a
@@ -1811,6 +1837,8 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
           let photoUrl: string | null = wiki?.url ?? null;
           let source: 'wikipedia' | 'tripadvisor' | 'unsplash' | null = wiki ? 'wikipedia' : null;
           let attributionUrl: string | null = wiki?.pageUrl ?? null;
+          let photographerName: string | null = null;
+          let photographerUrl: string | null = null;
 
           if (!photoUrl) {
             const info = await fetchTripAdvisorInfo(place.name, place.lat, place.lng);
@@ -1829,24 +1857,29 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
           // multiply Unsplash's 50-req/hour demo-tier quota by request
           // volume -- only by genuinely new places.
           if (!photoUrl) {
-            const unsplashPhoto = await fetchUnsplashPhoto(place.category ? `${place.name} ${place.category}` : place.name);
+            const unsplashPhoto = await fetchUnsplashPhoto(
+              place.category ? `${place.name} ${place.category}` : place.name,
+              place.category ?? undefined
+            );
             if (unsplashPhoto) {
               photoUrl = unsplashPhoto.url;
               source = 'unsplash';
               attributionUrl = unsplashPhoto.attributionUrl;
+              photographerName = unsplashPhoto.photographerName;
+              photographerUrl = unsplashPhoto.photographerUrl;
             }
           }
 
           const fetchedAt = new Date().toISOString();
           await db
             .insert(poiPhotoCache)
-            .values({ id: cacheId, nameNormalized, latRounded, lngRounded, photoUrl, source, attributionUrl, fetchedAt })
+            .values({ id: cacheId, nameNormalized, latRounded, lngRounded, photoUrl, source, attributionUrl, photographerName, photographerUrl, fetchedAt })
             .onConflictDoUpdate({
               target: poiPhotoCache.id,
-              set: { photoUrl, source, attributionUrl, fetchedAt },
+              set: { photoUrl, source, attributionUrl, photographerName, photographerUrl, fetchedAt },
             });
 
-          return { name: place.name, photoUrl, source, attributionUrl };
+          return { name: place.name, photoUrl, source, attributionUrl, photographerName, photographerUrl };
         })
       );
       results.push(...chunkResults);
