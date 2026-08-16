@@ -248,7 +248,6 @@ struct ExploreScreen: View {
                         } label: {
                             VStack(alignment: .leading, spacing: 5) {
                                 tileImage(for: poi)
-                                    .frame(height: 100)
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(poi.name).font(.system(size: 15, weight: .bold)).lineLimit(2)
                                     if !poi.categoryLabel.isEmpty {
@@ -283,19 +282,28 @@ struct ExploreScreen: View {
     /// Real photo when the cache/live lookup found one; the category icon
     /// tile (today's only option) otherwise — never a broken-image state,
     /// same silent-degrade contract `POISearchService` already uses.
+    ///
+    /// See `HomeScreen`'s `nearbyTileImage` (identical bug) for why this
+    /// reads the exact box size from a `GeometryReader` instead of relying
+    /// on `.frame(height:).clipped()`, which turned out unreliable for
+    /// portrait-source photos.
     @ViewBuilder
     private func tileImage(for poi: POIPlace) -> some View {
         let urlString = photos[poi.name]?.photoUrl
-        if let urlString, !urlString.isEmpty, let url = URL(string: urlString) {
-            CachedAsyncImage(url: url, maxPixelSize: 300) { image in
-                image.resizable().aspectRatio(contentMode: .fill)
-            } placeholder: {
+        GeometryReader { geo in
+            if let urlString, !urlString.isEmpty, let url = URL(string: urlString) {
+                CachedAsyncImage(url: url, maxPixelSize: 300) { image in
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    categoryTile(for: poi)
+                }
+                .frame(width: geo.size.width, height: geo.size.height)
+                .clipped()
+            } else {
                 categoryTile(for: poi)
             }
-            .clipped()
-        } else {
-            categoryTile(for: poi)
         }
+        .frame(height: 100)
     }
 
     private func categoryTile(for poi: POIPlace) -> some View {

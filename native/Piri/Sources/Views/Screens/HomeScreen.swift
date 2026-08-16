@@ -380,7 +380,7 @@ struct HomeScreen: View {
                                 selectedPOI = poi
                             } label: {
                                 VStack(alignment: .leading, spacing: 5) {
-                                    nearbyTileImage(for: poi).frame(height: 100)
+                                    nearbyTileImage(for: poi)
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(poi.name).font(.system(size: 15, weight: .bold)).lineLimit(2)
                                         if !poi.categoryLabel.isEmpty {
@@ -435,19 +435,34 @@ struct HomeScreen: View {
         loadNearbyPhotosIfNeeded()
     }
 
+    // A plain `.frame(height: 100).clipped()` on `aspectRatio(.fill)`
+    // content turned out unreliable here -- confirmed live via the
+    // accessibility hierarchy that a portrait-source photo (e.g. a tall
+    // aerial shot) still rendered at 181-271pt instead of 100pt regardless
+    // of whether `.frame` came before or after `.clipped()` in the
+    // modifier chain, which is what was bleeding down into the name/
+    // category text below for any non-landscape source photo. Reading the
+    // exact box size from a `GeometryReader` and applying it directly as
+    // the image's own `.frame(width:height:)` (rather than letting
+    // `aspectRatio(.fill)` infer a size from an ambient proposal) is the
+    // standard, unambiguous fix for this SwiftUI sizing gap.
     @ViewBuilder
     private func nearbyTileImage(for poi: POIPlace) -> some View {
         let urlString = poiPhotos[poi.name]?.photoUrl
-        if let urlString, !urlString.isEmpty, let url = URL(string: urlString) {
-            CachedAsyncImage(url: url, maxPixelSize: 300) { image in
-                image.resizable().aspectRatio(contentMode: .fill)
-            } placeholder: {
+        GeometryReader { geo in
+            if let urlString, !urlString.isEmpty, let url = URL(string: urlString) {
+                CachedAsyncImage(url: url, maxPixelSize: 300) { image in
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    nearbyIconFallback(for: poi)
+                }
+                .frame(width: geo.size.width, height: geo.size.height)
+                .clipped()
+            } else {
                 nearbyIconFallback(for: poi)
             }
-            .clipped()
-        } else {
-            nearbyIconFallback(for: poi)
         }
+        .frame(height: 100)
     }
 
     private func nearbyIconFallback(for poi: POIPlace) -> some View {

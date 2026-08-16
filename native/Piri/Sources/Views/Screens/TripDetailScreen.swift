@@ -186,7 +186,6 @@ struct TripDetailScreen: View {
             } label: {
                 HStack(spacing: 12) {
                     timelinePhoto(for: stop)
-                        .frame(width: 64, height: 64)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
 
                     VStack(alignment: .leading, spacing: 3) {
@@ -211,6 +210,12 @@ struct TripDetailScreen: View {
         }
     }
 
+    /// See `HomeScreen`'s `nearbyTileImage` (identical bug) for why this
+    /// doesn't just use `.frame(width:height:).clipped()` directly --
+    /// unreliable for portrait-source photos. Not user-visible here since
+    /// the caller's own `.clipShape` was already re-cropping correctly,
+    /// but fixing the same latent bug at its source rather than relying on
+    /// that.
     @ViewBuilder
     private func timelinePhoto(for stop: SavedPOIReference) -> some View {
         let urlString = photoURLs[stop.name]
@@ -220,9 +225,10 @@ struct TripDetailScreen: View {
             } placeholder: {
                 categoryFallback(stop)
             }
+            .frame(width: 64, height: 64)
             .clipped()
         } else {
-            categoryFallback(stop)
+            categoryFallback(stop).frame(width: 64, height: 64)
         }
     }
 
