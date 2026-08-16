@@ -1,6 +1,6 @@
 import 'dotenv/config';
 
-import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
+import Fastify, { type FastifyError, type FastifyReply, type FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import { and, eq, gte, ilike, inArray, lte } from 'drizzle-orm';
@@ -437,6 +437,25 @@ async function buildServer() {
 
   app.addHook('onClose', async () => {
     await closeDb();
+  });
+
+  // Safety net for errors that reach Fastify without going through a
+  // route's own try/catch (which already uses `sendServerError` below to
+  // avoid this) — Fastify's own default handler replies with the raw
+  // `error.message` for an uncaught exception. Confirmed live: a Wikipedia
+  // rate-limit (429) thrown inside enrichPlaceWithWikipedia, awaited
+  // outside any try/catch in /places/explain-poi, surfaced the literal
+  // "Wikipedia text search failed with 429" string in the app's error
+  // banner. Below 500, Fastify/plugin-generated errors (our own rate
+  // limiter, malformed-JSON body parsing) already carry a safe, intended
+  // message — only 500-class/unclassified errors (arbitrary thrown
+  // Errors) get the generic replacement.
+  app.setErrorHandler((error: FastifyError, request, reply) => {
+    request.log.error(error);
+    if (error.statusCode && error.statusCode < 500) {
+      return reply.code(error.statusCode).send({ error: error.message });
+    }
+    return reply.code(500).send({ error: 'Something went wrong. Please try again.' });
   });
 
   // Logs the real error server-side (captured by the logger hook above,
