@@ -34,8 +34,25 @@ struct TripsScreen: View {
 private struct TripRowView: View {
     let trip: Trip
 
+    /// Falls back from breadcrumb → planned route → stop coordinates, in
+    /// that order — a trip with real recorded GPS movement uses that (the
+    /// actual path walked), but a trip that was started and ended quickly,
+    /// or where breadcrumb recording never caught more than one point,
+    /// still has a route line or stop pins worth showing. Previously this
+    /// only ever used breadcrumb, so any trip without 2+ recorded points
+    /// fell back to a plain generic icon even when it clearly had a real
+    /// route or stops to draw.
     private var points: [CLLocationCoordinate2D] {
-        trip.breadcrumb.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng) }
+        let breadcrumbPoints = trip.breadcrumb.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng) }
+        if breadcrumbPoints.count > 1 { return breadcrumbPoints }
+
+        let routePoints = (trip.routeGeometry ?? []).compactMap { pair -> CLLocationCoordinate2D? in
+            guard pair.count == 2 else { return nil }
+            return CLLocationCoordinate2D(latitude: pair[0], longitude: pair[1])
+        }
+        if routePoints.count > 1 { return routePoints }
+
+        return trip.stops.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng) }
     }
 
     private var dateLabel: String {

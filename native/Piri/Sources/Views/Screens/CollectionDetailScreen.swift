@@ -283,9 +283,9 @@ struct CollectionDetailScreen: View {
                 HStack(spacing: 12) {
                     Image(systemName: POICategoryGroups.icon(for: poi.category))
                         .font(.system(size: 18))
-                        .foregroundStyle(Theme.gold)
+                        .foregroundStyle(.white.opacity(0.92))
                         .frame(width: 36, height: 36)
-                        .background(Circle().fill(Theme.gold.opacity(0.12)))
+                        .background(Circle().fill(POICategoryGroups.gradient(for: poi.category)))
                     VStack(alignment: .leading, spacing: 2) {
                         Text(poi.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(.primary).lineLimit(1)
                         if !poi.categoryLabel.isEmpty {
@@ -602,9 +602,9 @@ struct CollectionDetailScreen: View {
                 HStack(spacing: 12) {
                     Image(systemName: POICategoryGroups.icon(for: reference.category))
                         .font(.system(size: 18))
-                        .foregroundStyle(Theme.gold)
+                        .foregroundStyle(.white.opacity(0.92))
                         .frame(width: 36, height: 36)
-                        .background(Circle().fill(Theme.gold.opacity(0.12)))
+                        .background(Circle().fill(POICategoryGroups.gradient(for: reference.category)))
                     VStack(alignment: .leading, spacing: 2) {
                         Text(reference.name).font(.system(size: 16, weight: .semibold)).foregroundStyle(.primary)
                         if let category = reference.category?.rawValue {
