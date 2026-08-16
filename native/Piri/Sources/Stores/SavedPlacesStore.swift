@@ -28,10 +28,14 @@ final class SavedPlacesStore {
         }
     }
 
+    /// `places` defaults to empty for the common "create then add one at a
+    /// time" flow (`SavedScreen`) — `MapScreen`'s "Rotayı Kaydet" is the one
+    /// caller that already has an ordered stop list in hand and wants it
+    /// saved as-is in one shot, not built up place-by-place afterward.
     @discardableResult
-    func createCollection(name: String, kind: SavedCollectionKind) -> String {
+    func createCollection(name: String, kind: SavedCollectionKind, places: [SavedPOIReference] = []) -> String {
         let id = "collection-\(Int(Date().timeIntervalSince1970 * 1000))"
-        collections.append(SavedCollection(id: id, name: name, kind: kind, createdAt: Date().timeIntervalSince1970 * 1000, places: []))
+        collections.append(SavedCollection(id: id, name: name, kind: kind, createdAt: Date().timeIntervalSince1970 * 1000, places: places))
         persist()
         return id
     }

@@ -230,6 +230,17 @@ extension MapScreen {
         }
     }
 
+    /// Saves the currently-planned stops, in their current order, as a new
+    /// Plan collection — doesn't touch `plannedStops`/`routeMode`/live-trip
+    /// state at all, so this is purely additive: still free to also tap
+    /// "Rotayı Başlat" afterward, or keep editing the stop list.
+    func saveRouteAsPlan() {
+        let trimmed = saveRouteName.trimmingCharacters(in: .whitespaces)
+        let name = trimmed.isEmpty ? Date().formatted(date: .abbreviated, time: .omitted) : trimmed
+        savedPlacesStore.createCollection(name: name, kind: .plan, places: plannedStops)
+        Haptics.medium()
+    }
+
     func endRoute() {
         if let activeTripId = tripsStore.activeTripId {
             tripsStore.endTrip(activeTripId)
@@ -389,21 +400,42 @@ extension MapScreen {
     @ViewBuilder
     private func primaryRouteButton(activeTrip: Trip?) -> some View {
         if activeTrip == nil {
-            Button {
-                Task { await startRoute() }
-            } label: {
-                HStack {
-                    if isFetchingRoute { ProgressView().tint(.white) }
-                    Text("map.route.start")
+            HStack(spacing: 10) {
+                Button {
+                    saveRouteName = ""
+                    showingSaveRouteAlert = true
+                } label: {
+                    Text("map.route.save")
+                        .font(.footnote.weight(.bold))
+                        .foregroundStyle(Theme.navy)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.navy.opacity(0.35), lineWidth: 1.5))
                 }
-                .font(.footnote.weight(.bold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Theme.navy))
+                .disabled(plannedStops.count < 2)
+                .opacity(plannedStops.count < 2 ? 0.5 : 1)
+
+                Button {
+                    Task { await startRoute() }
+                } label: {
+                    HStack {
+                        if isFetchingRoute { ProgressView().tint(.white) }
+                        Text("map.route.start")
+                    }
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Theme.navy))
+                }
+                .disabled(plannedStops.count < 2 || isFetchingRoute)
+                .opacity(plannedStops.count < 2 ? 0.5 : 1)
             }
-            .disabled(plannedStops.count < 2 || isFetchingRoute)
-            .opacity(plannedStops.count < 2 ? 0.5 : 1)
+            .alert(String(localized: "map.route.save"), isPresented: $showingSaveRouteAlert) {
+                TextField(String(localized: "map.route.saveNamePlaceholder"), text: $saveRouteName)
+                Button(String(localized: "common.save")) { saveRouteAsPlan() }
+                Button(String(localized: "common.cancel"), role: .cancel) {}
+            }
         } else {
             HStack(spacing: 10) {
                 // Shown whenever stops differ from the active trip's saved

@@ -22,7 +22,7 @@ struct MapScreen: View {
     // Not `private` — `MapScreen+RouteMode.swift` (an extension, so it can't
     // declare its own stored/environment properties) needs access to these.
     @Environment(CityStore.self) var cityStore
-    @Environment(SavedPlacesStore.self) private var savedPlacesStore
+    @Environment(SavedPlacesStore.self) var savedPlacesStore
     @Environment(UserProfileStore.self) private var userProfileStore
     @Environment(TripsStore.self) var tripsStore
     @Environment(TabSelection.self) private var tabSelection
@@ -102,6 +102,12 @@ struct MapScreen: View {
     /// of the time, so the summary only ever appears once, right when a
     /// trip actually finishes, not on every future visit to this screen.
     @State var lastEndedTrip: Trip?
+    /// "Rotayı Kaydet" — saves the currently-planned stops (in their
+    /// current order) as a new Plan collection, without starting a live
+    /// trip. Previously the only way out of route mode was "Rotayı Başlat"
+    /// (commit to live tracking) or discard the whole plan.
+    @State var showingSaveRouteAlert = false
+    @State var saveRouteName = ""
     /// Collapsed by default — the full editable stop list used to always
     /// take up roughly half the screen over the map itself. Expanding is a
     /// deliberate tap, not automatic, so picking stops on the map still
