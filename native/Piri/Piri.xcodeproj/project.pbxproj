@@ -78,6 +78,7 @@
 		AA0513F0B8654D68605A9DCE /* LocationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E67959451EFC53E9B89AEE8 /* LocationManager.swift */; };
 		ABC4236A1C18ED878A9206C7 /* TripAdvisorRatingRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 642AE03D91D3B2C9EC654135 /* TripAdvisorRatingRow.swift */; };
 		E367A7465580AF7FD60BA8B9 /* CuratedInfoRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6DA9C9C2BD8E4941D309F03 /* CuratedInfoRow.swift */; };
+		1718ACCD9C16CFC2A4294551 /* DietaryTagsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAD9664F9AD7E3C21F9081FE /* DietaryTagsRow.swift */; };
 		B0B5862CD4E82B308AFDE8CD /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 671A824ED89E058394F705D9 /* KeychainStore.swift */; };
 		B1CE3778A30DDE3281136DAE /* PlaceFixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = C03AA8FC29DF1B7AFBACE82E /* PlaceFixtures.swift */; };
 		B32A7E5F97F0950A4DDC57EC /* SavedScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A6344FD16ACEE6A9600CDCC /* SavedScreen.swift */; };
@@ -151,7 +152,7 @@
 		2AD9D3415FA1CE99CB46112B /* TripMiniMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripMiniMap.swift; sourceTree = "<group>"; };
 		2D599D1F2D04446888B8C6DD /* PlaceFilters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceFilters.swift; sourceTree = "<group>"; };
 		31BFBA845700A3D94868AF4F /* UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
-		393739D613FFAA494380B5A7 /* Piri.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Piri.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		393739D613FFAA494380B5A7 /* Piri.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Piri.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		39DBEA8E24D31A30E61F6671 /* PlacesAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlacesAPI.swift; sourceTree = "<group>"; };
 		3A6344FD16ACEE6A9600CDCC /* SavedScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedScreen.swift; sourceTree = "<group>"; };
 		3B2507E5B02737F2619D4077 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
@@ -159,7 +160,7 @@
 		3EE61E58BF0F9281015C1F99 /* LanguageManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanguageManager.swift; sourceTree = "<group>"; };
 		40632CC354EF9E493BB92DED /* RecentlyViewedStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentlyViewedStore.swift; sourceTree = "<group>"; };
 		4EA57B06A6E01213B556B858 /* AdminAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminAPI.swift; sourceTree = "<group>"; };
-		508A41E927502E9CB0B734D4 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		508A41E927502E9CB0B734D4 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		57103CE5924DEF3637376683 /* PlaceHoursTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceHoursTests.swift; sourceTree = "<group>"; };
 		5A0D0AD80CD490F2E75F460F /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		5A0EB13F235AC7C694C7EFDD /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
@@ -173,6 +174,7 @@
 		627629055B808FB73F268A0F /* PlanThemes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanThemes.swift; sourceTree = "<group>"; };
 		642AE03D91D3B2C9EC654135 /* TripAdvisorRatingRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripAdvisorRatingRow.swift; sourceTree = "<group>"; };
 		D6DA9C9C2BD8E4941D309F03 /* CuratedInfoRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CuratedInfoRow.swift; sourceTree = "<group>"; };
+		FAD9664F9AD7E3C21F9081FE /* DietaryTagsRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DietaryTagsRow.swift; sourceTree = "<group>"; };
 		671A824ED89E058394F705D9 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		674770D930511AA70C53CCF8 /* POICategoryGroups.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POICategoryGroups.swift; sourceTree = "<group>"; };
 		6993AA4D03C823EF1D3DCFEE /* ProfileOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileOptions.swift; sourceTree = "<group>"; };
@@ -306,6 +308,7 @@
 				B05066D4D6C47F50C5385DE8 /* CameraPreviewView.swift */,
 				D207ADFEE3A017CC4579BF6E /* ChipGrid.swift */,
 				D6DA9C9C2BD8E4941D309F03 /* CuratedInfoRow.swift */,
+				FAD9664F9AD7E3C21F9081FE /* DietaryTagsRow.swift */,
 				B26F2F82581B09C946DED399 /* LookAroundCard.swift */,
 				135A602CC00ED4B1E83016AB /* MapAnnotations.swift */,
 				6ADF11F38A3CEEA0D5E874A8 /* PiriMapView.swift */,
@@ -655,6 +658,7 @@
 				94AB9FD4D6C37DFD9D08B4BC /* ChipGrid.swift in Sources */,
 				025D3E8C3D65AEFD244455F4 /* City.swift in Sources */,
 				E367A7465580AF7FD60BA8B9 /* CuratedInfoRow.swift in Sources */,
+				1718ACCD9C16CFC2A4294551 /* DietaryTagsRow.swift in Sources */,
 				33AC9CF316C079973DFE5B23 /* CityPickerScreen.swift in Sources */,
 				7296C8E006BE3C8B454F1169 /* CityStore.swift in Sources */,
 				56DA6B62203238017FC83366 /* CollectionDetailScreen.swift in Sources */,
@@ -770,6 +774,7 @@
 				CODE_SIGN_ENTITLEMENTS = Piri.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = W6U9VQR5RQ;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Generated/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -829,6 +834,7 @@
 				CODE_SIGN_ENTITLEMENTS = Piri.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = W6U9VQR5RQ;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Generated/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;

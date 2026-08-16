@@ -72,7 +72,7 @@ import { haversineKm } from './geo';
 import { fetchTripAdvisorInfo, fetchTripAdvisorPhotos, fetchTripAdvisorReviews, normalizeName, type TripAdvisorInfo } from './tripadvisor';
 import { fetchWikipediaPhoto, WIKIPEDIA_PLAUSIBLE_CATEGORIES } from './wiki-photo';
 import { fetchWikidataFacts } from './wikidata';
-import { fetchDietaryPlaces } from './dietary';
+import { fetchDietaryPlaces, fetchDietaryTagsForPlace } from './dietary';
 import { fetchUnsplashPhoto } from './unsplash';
 import { places, cities, liveGridCellStatus, livePlaceCache, poiPhotoCache } from './schema';
 
@@ -1525,12 +1525,20 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
           ? enrichPlaceWithWikipedia({ name, category: category ?? 'place', lat, lng }, null)
           : Promise.resolve({ status: 'not-found', rawMetadata: {} } as const);
 
-      const [tripAdvisorInfo, curatedPlace, wikiEnrichment] = await Promise.all([
+      // Folded into the main explain card (rather than kept as the map's
+      // separate, non-interactive dietary-pin card) so any restaurant tap
+      // shows halal/kosher/vegetarian/vegan awareness when OSM has it, not
+      // just ones already surfaced through the map's dietary filter.
+      const dietaryTagsPromise =
+        lat !== undefined && lng !== undefined ? fetchDietaryTagsForPlace(name, lat, lng) : Promise.resolve([] as string[]);
+
+      const [tripAdvisorInfo, curatedPlace, wikiEnrichment, dietaryTags] = await Promise.all([
         lat !== undefined && lng !== undefined
           ? fetchTripAdvisorInfo(name, lat, lng, undefined, false)
           : Promise.resolve({ rating: null, description: null, photoUrls: [], locationId: null } as TripAdvisorInfo),
         curatedMatchPromise,
         wikiPromise,
+        dietaryTagsPromise,
       ]);
 
       // Wikidata facts depend on the QID Wikipedia just resolved, so this is
@@ -1659,7 +1667,13 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
           }
         }
 
-        return reply.send({ ...(object as Record<string, unknown>), rating: tripAdvisorInfo.rating, photos, curatedInfo });
+        return reply.send({
+          ...(object as Record<string, unknown>),
+          rating: tripAdvisorInfo.rating,
+          photos,
+          curatedInfo,
+          dietaryTags: dietaryTags.length ? dietaryTags : null,
+        });
       } catch (e: any) {
         return sendServerError(request, reply, e, 'Failed to explain place');
       }

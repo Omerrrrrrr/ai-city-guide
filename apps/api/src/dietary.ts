@@ -5,6 +5,8 @@
 // `[]` on any failure (network, timeout, malformed response, Overpass
 // rate-limit/5xx) so a slow or unavailable Overpass instance never blocks
 // the map.
+import { namesMatch, normalizeName } from './tripadvisor';
+
 export type DietTag = 'halal' | 'kosher' | 'vegetarian' | 'vegan';
 
 export interface DietaryPlace {
@@ -65,6 +67,39 @@ export async function fetchDietaryPlaces(
         };
       })
       .slice(0, 40);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Single-place lookup for `/places/explain-poi` — same Overpass source as
+ * `fetchDietaryPlaces`, but scoped to a tight radius around one point and
+ * name-matched (via the same `namesMatch`/`normalizeName` pair used for
+ * Tripadvisor matching) instead of scanning a bbox for one diet type. Used
+ * to fold dietary-tag awareness into the main POI explain card for *any*
+ * restaurant, not just ones surfaced through the map's dietary filter.
+ */
+export async function fetchDietaryTagsForPlace(name: string, lat: number, lng: number): Promise<string[]> {
+  try {
+    const query = `[out:json][timeout:15];node["amenity"~"restaurant|cafe|fast_food|bar|pub"](around:75,${lat},${lng});out;`;
+
+    const res = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'PiriApp/1.0', Accept: '*/*' },
+      body: `data=${encodeURIComponent(query)}`,
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!res.ok) return [];
+
+    const data = (await res.json()) as { elements?: OverpassNode[] };
+    const nodes = data.elements ?? [];
+    const normalizedTarget = normalizeName(name);
+
+    const match = nodes.find((node) => node.tags?.name && namesMatch(normalizedTarget, normalizeName(node.tags.name)));
+    if (!match) return [];
+
+    return DIET_TAGS.filter((tag) => match.tags?.[`diet:${tag}`] === 'yes');
   } catch {
     return [];
   }

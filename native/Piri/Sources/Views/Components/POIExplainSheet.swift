@@ -114,6 +114,9 @@ struct POIExplainSheet: View {
                                 if let curatedInfo = result.curatedInfo {
                                     CuratedInfoRow(info: curatedInfo)
                                 }
+                                if let dietaryTags = result.dietaryTags {
+                                    DietaryTagsRow(tags: dietaryTags)
+                                }
                                 if let weather = weatherQuery.weather {
                                     weatherBadge(weather)
                                 }

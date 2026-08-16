@@ -151,6 +151,12 @@ struct ExplainResult: Codable {
     /// anything Apple MapKit or Tripadvisor gives. `nil` when no curated
     /// match exists.
     var curatedInfo: CuratedPlaceInfo?
+    /// Dietary tags (`halal`/`kosher`/`vegetarian`/`vegan`) matched against
+    /// this POI in OpenStreetMap, when any are present — folded into this
+    /// card so any restaurant tap shows dietary awareness, not just pins
+    /// surfaced through the map's dietary filter. `nil` when no OSM match
+    /// or no diet tags on the matched node.
+    var dietaryTags: [String]?
 }
 
 enum POIPhotoSource: String, Codable {

@@ -193,9 +193,12 @@ struct MapScreen: View {
                 } else if let selectedLivePin {
                     livePinCard(for: selectedLivePin)
                 } else if let selectedDietaryPin {
-                    dietaryPinCard(for: selectedDietaryPin)
+                    mapFeatureCard(for: MapFeatureIdentity(
+                        title: selectedDietaryPin.name,
+                        coordinate: CLLocationCoordinate2D(latitude: selectedDietaryPin.lat, longitude: selectedDietaryPin.lng)
+                    ))
                 } else if let selectedMapFeature {
-                    mapFeatureCard(for: selectedMapFeature)
+                    mapFeatureCard(for: MapFeatureIdentity(title: selectedMapFeature.title, coordinate: selectedMapFeature.coordinate))
                 }
             }
             .padding()
@@ -413,7 +416,16 @@ struct MapScreen: View {
         selectedPlace = nil
         selectedLivePin = nil
         selectedMapFeature = nil
+        poiExplainResult = nil
+        poiExplainError = nil
+        lookAroundScene = nil
+        resolvedMapFeatureItem = nil
+        showingMapItemDetail = false
+        addToCollectionKind = nil
         poiExplainTask?.cancel()
+        poiExplainTask = Task { await explainDietaryPin(pin) }
+        let coordinate = CLLocationCoordinate2D(latitude: pin.lat, longitude: pin.lng)
+        Task { lookAroundScene = try? await MKLookAroundSceneRequest(coordinate: coordinate).scene }
     }
 
     private func selectMapFeature(_ feature: MKMapFeatureAnnotation) {
@@ -434,6 +446,7 @@ struct MapScreen: View {
 
     private func dismissMapFeature() {
         selectedMapFeature = nil
+        selectedDietaryPin = nil
         poiExplainResult = nil
         poiExplainError = nil
         lookAroundScene = nil
@@ -475,35 +488,6 @@ struct MapScreen: View {
         .piriGlassCard(cornerRadius: 16)
     }
 
-    /// No AI enrichment path, unlike `livePinCard`'s "show all" → full curated
-    /// place — this pin type is purely a dietary-match indicator, so the
-    /// card is just the name and which tags matched.
-    private func dietaryPinCard(for pin: DietaryPin) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(pin.name).font(.headline)
-                Spacer()
-                Button {
-                    selectedDietaryPin = nil
-                } label: {
-                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
-                }
-            }
-            HStack(spacing: 6) {
-                ForEach(pin.dietTags, id: \.self) { tag in
-                    let key: String = "diet.\(tag)"
-                    Text(String(localized: String.LocalizationValue(key)))
-                        .font(.caption.weight(.medium))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color(.systemGreen).opacity(0.18), in: Capsule())
-                        .foregroundStyle(Color(.systemGreen))
-                }
-            }
-        }
-        .padding()
-        .piriGlassCard(cornerRadius: 16)
-    }
 
     /// Card for ANY tapped map POI — Piri's own pins have a stable DB record
     /// to explain, but most pins on the map are Apple's own base-tile POIs
@@ -514,23 +498,36 @@ struct MapScreen: View {
     /// `resolvedMapFeatureItem`, packaged as a `POIPlace` for the
     /// bookmark/flag buttons and `AddToCollectionSheet` — `nil` until
     /// `explainMapFeature` resolves it, same as those buttons' visibility.
-    private func resolvedMapFeaturePOI(for feature: MKMapFeatureAnnotation) -> POIPlace? {
+    /// Common identity for anything `mapFeatureCard` can render — Apple's own
+    /// `MKMapFeatureAnnotation` for base-tile POIs, or a tapped `DietaryPin`
+    /// (an OSM node, not an Apple feature annotation, so it has no
+    /// `MKMapFeatureAnnotation` of its own to reuse). Folding dietary-pin
+    /// taps into this same rich, interactive card — instead of the old
+    /// separate, non-tappable `dietaryPinCard` — was the user's explicit
+    /// request: one system instead of two, and dietary awareness on every
+    /// restaurant tap, not just pins already surfaced by the filter.
+    private struct MapFeatureIdentity {
+        let title: String?
+        let coordinate: CLLocationCoordinate2D
+    }
+
+    private func resolvedMapFeaturePOI(for identity: MapFeatureIdentity) -> POIPlace? {
         guard let resolvedMapFeatureItem else { return nil }
         return POIPlace(
-            name: resolvedMapFeatureItem.name ?? feature.title ?? "",
+            name: resolvedMapFeatureItem.name ?? identity.title ?? "",
             category: resolvedMapFeatureItem.pointOfInterestCategory,
-            coordinate: feature.coordinate,
+            coordinate: identity.coordinate,
             mapItem: resolvedMapFeatureItem
         )
     }
 
-    private func mapFeatureCard(for feature: MKMapFeatureAnnotation) -> some View {
-        let poi = resolvedMapFeaturePOI(for: feature)
+    private func mapFeatureCard(for identity: MapFeatureIdentity) -> some View {
+        let poi = resolvedMapFeaturePOI(for: identity)
 
         return VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("◈").foregroundStyle(Theme.gold)
-                Text(feature.title ?? "").font(.headline).lineLimit(1)
+                Text(identity.title ?? "").font(.headline).lineLimit(1)
                 Spacer()
                 // Same bookmark/flag pair as POIExplainSheet — this card
                 // floats over the map itself so there was nowhere to save
@@ -597,6 +594,9 @@ struct MapScreen: View {
                 if let curatedInfo = poiExplainResult.curatedInfo {
                     CuratedInfoRow(info: curatedInfo)
                 }
+                if let dietaryTags = poiExplainResult.dietaryTags {
+                    DietaryTagsRow(tags: dietaryTags)
+                }
                 if let weather = mapFeatureWeatherQuery.weather {
                     weatherBadge(weather)
                 }
@@ -614,7 +614,11 @@ struct MapScreen: View {
                     Spacer()
                     Button("common.retry") {
                         poiExplainTask?.cancel()
-                        poiExplainTask = Task { await explainMapFeature(feature) }
+                        if let selectedDietaryPin {
+                            poiExplainTask = Task { await explainDietaryPin(selectedDietaryPin) }
+                        } else if let selectedMapFeature {
+                            poiExplainTask = Task { await explainMapFeature(selectedMapFeature) }
+                        }
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
@@ -859,6 +863,77 @@ struct MapScreen: View {
             lat: feature.coordinate.latitude,
             lng: feature.coordinate.longitude,
             address: address,
+            locale: Locale.current.language.languageCode?.identifier,
+            userProfile: PersonalizationProfile(
+                name: profile.name,
+                profession: profile.professionText,
+                interests: profile.interestsText,
+                faith: profile.faith?.rawValue,
+                budget: profile.budget?.rawValue,
+                groupType: profile.groupType?.rawValue,
+                pace: profile.pace?.rawValue
+            ),
+            recentlyViewedPlaceIds: nil
+        )
+
+        do {
+            let result = try await PlacesAPI.explainPOI(request)
+            guard !Task.isCancelled else { return }
+            poiExplainResult = result
+            Self.poiExplainCache[cacheKey] = result
+        } catch {
+            guard !Task.isCancelled else { return }
+            poiExplainError = error.localizedDescription
+        }
+    }
+
+    private func dietaryPinCacheKey(_ pin: DietaryPin, profile: UserProfile) -> String {
+        let fingerprint = [
+            profile.name,
+            profile.professionText ?? "",
+            profile.interestsText.joined(separator: ","),
+            profile.faith?.rawValue ?? "",
+            profile.budget?.rawValue ?? "",
+            profile.groupType?.rawValue ?? "",
+            profile.pace?.rawValue ?? "",
+        ].joined(separator: ",")
+        return "\(pin.name)|\(String(format: "%.5f", pin.lat))|\(String(format: "%.5f", pin.lng))|\(fingerprint)"
+    }
+
+    /// Mirrors `explainMapFeature`, but a `DietaryPin` is an OSM node we
+    /// already have full name/coordinate data for — not an Apple feature
+    /// annotation — so there's no `MKMapItemRequest` resolution step. The
+    /// synthesized `MKMapItem` below exists only so `resolvedMapFeaturePOI`
+    /// can build a real `POIPlace` for the bookmark/plan buttons, matching
+    /// what a resolved Apple POI gets.
+    private func explainDietaryPin(_ pin: DietaryPin) async {
+        let coordinate = CLLocationCoordinate2D(latitude: pin.lat, longitude: pin.lng)
+        let mapItem = MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
+        mapItem.name = pin.name
+        resolvedMapFeatureItem = mapItem
+
+        guard !Task.isCancelled else { return }
+
+        Task { await mapFeatureWeatherQuery.load(lat: pin.lat, lng: pin.lng) }
+
+        let profile = userProfileStore.profile
+        let cacheKey = dietaryPinCacheKey(pin, profile: profile)
+        if let cached = Self.poiExplainCache[cacheKey] {
+            poiExplainResult = cached
+            poiExplainError = nil
+            return
+        }
+
+        poiExplainLoading = true
+        poiExplainError = nil
+        defer { poiExplainLoading = false }
+
+        let request = ExplainPOIRequest(
+            name: pin.name,
+            category: "Restaurant",
+            lat: pin.lat,
+            lng: pin.lng,
+            address: nil,
             locale: Locale.current.language.languageCode?.identifier,
             userProfile: PersonalizationProfile(
                 name: profile.name,
