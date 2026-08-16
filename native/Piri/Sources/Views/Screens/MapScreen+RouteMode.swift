@@ -107,6 +107,7 @@ extension MapScreen {
         routeDistanceMeters = activeTrip.distanceMeters
         routeDurationSeconds = activeTrip.durationSeconds
         hydratedTripId = activeTripId
+        routeProfileDirty = false
         if !locationManager.isRecordingBreadcrumb {
             locationManager.startBreadcrumbRecording()
         }
@@ -177,7 +178,7 @@ extension MapScreen {
         routeError = nil
         defer { isFetchingRoute = false }
         do {
-            let result = try await RoutesAPI.directions(coordinates: stopCoordinates())
+            let result = try await RoutesAPI.directions(coordinates: stopCoordinates(), profile: routeProfile)
             routeGeometry = result.route
             routeDistanceMeters = result.distanceMeters
             routeDurationSeconds = result.durationSeconds
@@ -192,7 +193,7 @@ extension MapScreen {
         routeError = nil
         defer { isFetchingRoute = false }
         do {
-            let result = try await RoutesAPI.directions(coordinates: stopCoordinates())
+            let result = try await RoutesAPI.directions(coordinates: stopCoordinates(), profile: routeProfile)
             routeGeometry = result.route
             routeDistanceMeters = result.distanceMeters
             routeDurationSeconds = result.durationSeconds
@@ -201,6 +202,7 @@ extension MapScreen {
                 route: RouteInfo(routeGeometry: result.route, distanceMeters: result.distanceMeters, durationSeconds: result.durationSeconds)
             )
             hydratedTripId = tripId
+            routeProfileDirty = false
             locationManager.startBreadcrumbRecording()
         } catch {
             routeError = String(localized: "map.route.failed")
@@ -213,7 +215,7 @@ extension MapScreen {
         routeError = nil
         defer { isFetchingRoute = false }
         do {
-            let result = try await RoutesAPI.directions(coordinates: stopCoordinates())
+            let result = try await RoutesAPI.directions(coordinates: stopCoordinates(), profile: routeProfile)
             routeGeometry = result.route
             routeDistanceMeters = result.distanceMeters
             routeDurationSeconds = result.durationSeconds
@@ -222,6 +224,7 @@ extension MapScreen {
                 stops: plannedStops,
                 route: RouteInfo(routeGeometry: result.route, distanceMeters: result.distanceMeters, durationSeconds: result.durationSeconds)
             )
+            routeProfileDirty = false
         } catch {
             routeError = String(localized: "map.route.failed")
         }
@@ -239,6 +242,8 @@ extension MapScreen {
         routeDurationSeconds = nil
         routeMode = false
         stopsExpanded = false
+        routeProfileDirty = false
+        routeProfile = .footWalking
     }
 
     /// Best-effort location tag, matching RN's `attachTripPhoto`: reads
@@ -271,6 +276,19 @@ extension MapScreen {
                 }
             }
 
+            if !plannedStops.isEmpty {
+                // Was always fetched walking-only with nothing in the UI
+                // saying so — indistinguishable from a driving route at a
+                // glance. Picking a mode here refetches immediately (see
+                // `onChange(of: routeProfile)`), so the map/summary reflect
+                // it right away instead of only after "Güncelle".
+                Picker("", selection: $routeProfile) {
+                    Label(String(localized: "map.route.walking"), systemImage: "figure.walk").tag(RouteProfile.footWalking)
+                    Label(String(localized: "map.route.driving"), systemImage: "car.fill").tag(RouteProfile.drivingCar)
+                }
+                .pickerStyle(.segmented)
+            }
+
             if plannedStops.isEmpty {
                 Text("map.route.hint").font(.footnote).foregroundStyle(.secondary)
             } else {
@@ -285,6 +303,9 @@ extension MapScreen {
                     withAnimation(.easeInOut(duration: 0.2)) { stopsExpanded.toggle() }
                 } label: {
                     HStack(spacing: 6) {
+                        Image(systemName: routeProfile == .drivingCar ? "car.fill" : "figure.walk")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                         Text(LPlural("map.route.stopsCount", count: plannedStops.count))
                             .font(.footnote.weight(.semibold))
                         if let summary = routeSummaryText(activeTrip: activeTrip) {

@@ -33,11 +33,20 @@ struct TripMapView: UIViewRepresentable {
     /// `MapScreen`'s live route-tracking mode turns this on so the user can
     /// see their own position alongside the growing breadcrumb.
     var showsUserLocation: Bool = false
+    /// Defaulted, not required — `TripDetailScreen`'s read-only playback use
+    /// doesn't have (or need) a map-style picker of its own. `MapScreen`'s
+    /// live route-tracking mode passes its own `mapType` through so the
+    /// Standard/Hybrid/Satellite picker still has an effect once a trip is
+    /// active and this view (not `PiriMapView`) is what's on screen — it
+    /// used to be silently ignored here, so switching styles mid-trip did
+    /// nothing.
+    var mapType: MKMapType = .standard
 
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
         mapView.delegate = context.coordinator
         mapView.showsUserLocation = showsUserLocation
+        mapView.mapType = mapType
         if let initialRegion {
             mapView.setRegion(initialRegion, animated: false)
         }
@@ -45,6 +54,9 @@ struct TripMapView: UIViewRepresentable {
     }
 
     func updateUIView(_ mapView: MKMapView, context: Context) {
+        if mapView.mapType != mapType {
+            mapView.mapType = mapType
+        }
         mapView.removeOverlays(mapView.overlays)
         if routeCoordinates.count > 1 {
             mapView.addOverlay(RoutePolyline(coordinates: routeCoordinates, count: routeCoordinates.count))

@@ -85,6 +85,18 @@ struct MapScreen: View {
     @State var routeDurationSeconds: Double?
     @State var isFetchingRoute = false
     @State var routeError: String?
+    /// Which profile the *next* `previewRoute()`/`startRoute()`/
+    /// `updateRoute()` call fetches — the route used to always be fetched
+    /// walking-only with no way to tell from the UI, and no way to ask for
+    /// a driving route at all.
+    @State var routeProfile: RouteProfile = .footWalking
+    /// True whenever `routeProfile` has been changed since the active
+    /// trip's route was last persisted — not stored on `Trip` itself (that
+    /// would need a schema/sync change for a purely local preview concern),
+    /// just enough state to know the freshly-refetched preview geometry
+    /// should be drawn instead of the trip's stale persisted one until
+    /// "Güncelle" is tapped. Mirrors `stopsChangedFromActiveTrip`.
+    @State var routeProfileDirty = false
     /// Collapsed by default — the full editable stop list used to always
     /// take up roughly half the screen over the map itself. Expanding is a
     /// deliberate tap, not automatic, so picking stops on the map still
@@ -130,13 +142,14 @@ struct MapScreen: View {
                     // one — otherwise the map didn't visibly react to
                     // adding/removing/reordering a stop until "Güncelle"
                     // was tapped.
-                    let liveGeometry = stopsChangedFromActiveTrip ? routeGeometry : nil
+                    let liveGeometry = (stopsChangedFromActiveTrip || routeProfileDirty) ? routeGeometry : nil
                     TripMapView(
                         routeCoordinates: (liveGeometry ?? activeTrip.routeGeometry ?? routeGeometry ?? []).compactMap(coordinate(fromPair:)),
                         breadcrumbCoordinates: activeTrip.breadcrumb.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng) },
                         stops: routeStopAnnotations,
                         initialRegion: activeTripDisplayRegion(for: activeTrip) ?? initialRegion,
-                        showsUserLocation: true
+                        showsUserLocation: true,
+                        mapType: mapType
                     )
                     .ignoresSafeArea()
                 } else {
@@ -273,6 +286,11 @@ struct MapScreen: View {
                 routeDurationSeconds = nil
                 return
             }
+            Task { await previewRoute() }
+        }
+        .onChange(of: routeProfile) { _, _ in
+            routeProfileDirty = true
+            guard plannedStops.count >= 2 else { return }
             Task { await previewRoute() }
         }
         // Refetch immediately on filter change, not just on the next pan/
