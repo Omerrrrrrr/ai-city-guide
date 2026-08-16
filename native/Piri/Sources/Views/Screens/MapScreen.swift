@@ -36,8 +36,15 @@ struct MapScreen: View {
     /// `DietTag`. Orthogonal to `selectedCategoryGroup`: this drives a
     /// separate live pin layer (`dietaryPins`, sourced from OpenStreetMap),
     /// not Apple's own `pointOfInterestFilter`, since Apple's POI data
-    /// carries no dietary tags at all.
-    @State private var dietaryFilter: DietTag?
+    /// carries no dietary tags at all. Backed by `@AppStorage`, same key
+    /// `HomeScreen` uses, so the choice is shared and remembered across
+    /// both screens instead of resetting every visit — see
+    /// `DietaryFilterButton`.
+    @AppStorage("dietaryFilterRawValue") private var dietaryFilterRawValue: String = ""
+    private var dietaryFilter: DietTag? {
+        get { DietTag(rawValue: dietaryFilterRawValue) }
+        nonmutating set { dietaryFilterRawValue = newValue?.rawValue ?? "" }
+    }
     @State private var dietaryPins: [DietaryPin] = []
     @State private var dietaryFetchTask: Task<Void, Never>?
     @State private var selectedDietaryPin: DietaryPin?
@@ -212,7 +219,6 @@ struct MapScreen: View {
                 if !routeMode {
                     searchBar
                     categoryChips
-                    dietaryChips
                 }
                 // Route mode has its own dedicated `routeError` line inside
                 // `routeModeSheet` -- this shared banner (search/directions/
@@ -413,51 +419,26 @@ struct MapScreen: View {
     }
 
     private var categoryChips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(POICategoryGroups.all) { group in
-                    let active = selectedCategoryGroup?.id == group.id
-                    Button(String(localized: String.LocalizationValue(group.labelKey))) {
-                        selectedCategoryGroup = active ? nil : group
+        HStack(spacing: 8) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(POICategoryGroups.all) { group in
+                        let active = selectedCategoryGroup?.id == group.id
+                        Button(String(localized: String.LocalizationValue(group.labelKey))) {
+                            selectedCategoryGroup = active ? nil : group
+                        }
+                        .font(.footnote.weight(.medium))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(active ? Color.accentColor : Color(.secondarySystemBackground), in: Capsule())
+                        .foregroundStyle(active ? .white : .primary)
                     }
-                    .font(.footnote.weight(.medium))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(active ? Color.accentColor : Color(.secondarySystemBackground), in: Capsule())
-                    .foregroundStyle(active ? .white : .primary)
                 }
             }
-        }
-    }
-
-    /// Orthogonal to `categoryChips` — a dietary need, not an Apple POI
-    /// category, so it's its own row rather than folded into the same one.
-    private var dietaryChips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(DietTag.allCases) { tag in
-                    let active = dietaryFilter == tag
-                    // `String.LocalizationValue` conforms to
-                    // `ExpressibleByStringInterpolation` for its
-                    // parameterized-string-argument feature -- passing an
-                    // interpolated literal directly (`"diet.\(x)"`) makes
-                    // Swift treat `x` as a *format argument*, not part of
-                    // the lookup key, so it silently fails to resolve and
-                    // falls back to echoing the raw interpolated text.
-                    // Building the key as a plain `String` first (as
-                    // `categoryChips` already does with `group.labelKey`)
-                    // avoids that entirely.
-                    let key: String = "diet.\(tag.rawValue)"
-                    Button(String(localized: String.LocalizationValue(key))) {
-                        dietaryFilter = active ? nil : tag
-                    }
-                    .font(.footnote.weight(.medium))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(active ? Color(.systemGreen) : Color(.secondarySystemBackground), in: Capsule())
-                    .foregroundStyle(active ? .white : .primary)
-                }
-            }
+            // Was its own always-visible chip row (`dietaryChips`) — see
+            // `HomeScreen.categoryChipsRow`'s identical change for why a
+            // single compact `DietaryFilterButton` replaced it.
+            DietaryFilterButton(selection: Binding(get: { dietaryFilter }, set: { dietaryFilter = $0 }))
         }
     }
 

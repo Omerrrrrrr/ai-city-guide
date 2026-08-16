@@ -28,7 +28,14 @@ struct HomeScreen: View {
     /// OpenStreetMap via the same `/places/dietary` endpoint the map screen
     /// uses. Kept as a separate result list, not merged into `poiResults`,
     /// since these are lightweight OSM pins with no `MKMapItem` behind them.
-    @State private var dietaryFilter: DietTag?
+    /// Backed by `@AppStorage`, and the same key `MapScreen` uses, so
+    /// picking a filter here also shows it pre-selected on Map (and vice
+    /// versa) instead of it resetting every time -- see `DietaryFilterButton`.
+    @AppStorage("dietaryFilterRawValue") private var dietaryFilterRawValue: String = ""
+    private var dietaryFilter: DietTag? {
+        get { DietTag(rawValue: dietaryFilterRawValue) }
+        nonmutating set { dietaryFilterRawValue = newValue?.rawValue ?? "" }
+    }
     @State private var dietaryResults: [DietaryPin] = []
     @State private var dietaryLoading = false
     /// See `ExploreScreen`'s identical field for why an empty string (not
@@ -65,11 +72,8 @@ struct HomeScreen: View {
             VStack(alignment: .leading, spacing: 16) {
                 header
                 categoryChipsRow
-                if !Self.useCuratedHomeData {
-                    dietaryChipsRow
-                    if dietaryFilter != nil {
-                        dietaryResultsSection
-                    }
+                if !Self.useCuratedHomeData, dietaryFilter != nil {
+                    dietaryResultsSection
                 }
 
                 if let error = placesQuery.errorMessage, !placesQuery.isLoading, Self.useCuratedHomeData {
@@ -222,51 +226,34 @@ struct HomeScreen: View {
     // chips) rather than Piri's own tag taxonomy, while curated data is
     // disabled — see `useCuratedHomeData`.
     private var categoryChipsRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                ForEach(POICategoryGroups.all) { group in
-                    let active = selectedCategoryGroup?.id == group.id
-                    Button(String(localized: String.LocalizationValue(group.labelKey))) {
-                        selectedCategoryGroup = active ? nil : group
+        HStack(spacing: 8) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(POICategoryGroups.all) { group in
+                        let active = selectedCategoryGroup?.id == group.id
+                        Button(String(localized: String.LocalizationValue(group.labelKey))) {
+                            selectedCategoryGroup = active ? nil : group
+                        }
+                        .font(.system(size: 14, weight: .medium))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(Capsule().fill(active ? Theme.gold : Theme.navy.opacity(0.08)))
+                        .foregroundStyle(active ? .white : .primary)
                     }
-                    .font(.system(size: 14, weight: .medium))
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(Capsule().fill(active ? Theme.gold : Theme.navy.opacity(0.08)))
-                    .foregroundStyle(active ? .white : .primary)
                 }
+                .padding(.leading, 20)
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 14)
-        }
-    }
-
-    /// Orthogonal to `categoryChipsRow` — a dietary need, not an Apple POI
-    /// category, so it's its own row rather than folded into the same one.
-    /// Same single-select-with-toggle-off interaction as the category chips.
-    private var dietaryChipsRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                ForEach(DietTag.allCases) { tag in
-                    let active = dietaryFilter == tag
-                    // See `MapScreen.dietaryChips`: `String.LocalizationValue`
-                    // treats a directly-interpolated literal as a format
-                    // string with the interpolated part as an *argument*,
-                    // not part of the lookup key — building the key as a
-                    // plain `String` first avoids that.
-                    let key: String = "diet.\(tag.rawValue)"
-                    Button(String(localized: String.LocalizationValue(key))) {
-                        dietaryFilter = active ? nil : tag
-                    }
-                    .font(.system(size: 14, weight: .medium))
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(Capsule().fill(active ? Theme.gold : Theme.navy.opacity(0.08)))
-                    .foregroundStyle(active ? .white : .primary)
-                }
+            // Not gated by `useCuratedHomeData` the way `dietaryResultsSection`
+            // still is below -- the button itself is harmless to show either
+            // way, and keeping it in this always-rendered row (rather than a
+            // separate conditional one) is what makes it a persistent,
+            // non-scrolling fixture next to the category chips.
+            if !Self.useCuratedHomeData {
+                DietaryFilterButton(selection: Binding(get: { dietaryFilter }, set: { dietaryFilter = $0 }))
             }
-            .padding(.horizontal, 20)
         }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
     }
 
     /// Shown only while a dietary filter is active — the primary thing the

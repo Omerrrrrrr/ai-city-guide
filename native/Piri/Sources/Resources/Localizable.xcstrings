@@ -4858,6 +4858,28 @@
         }
       }
     },
+    "dietaryFilter.button" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dietary filter"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diettfilter"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diyet filtresi"
+          }
+        }
+      }
+    },
     "dietaryResults.empty" : {
       "localizations" : {
         "en" : {
