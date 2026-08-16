@@ -157,6 +157,13 @@ struct ExplainResult: Codable {
     /// surfaced through the map's dietary filter. `nil` when no OSM match
     /// or no diet tags on the matched node.
     var dietaryTags: [String]?
+    /// Which real source (if any) the headline/body/highlights above were
+    /// actually grounded in server-side — "wikipedia", "tripadvisor", or
+    /// `nil` when neither matched and the AI fell back to general
+    /// knowledge about a place of this name/category. Surfaced via
+    /// `SourceCaption` so that distinction (fact-grounded vs. plausible
+    /// inference) isn't invisible to the person reading it.
+    var groundingSource: String?
 }
 
 enum POIPhotoSource: String, Codable {

@@ -1628,6 +1628,17 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
             }
           : null;
 
+      // Same branching the prompt guard below already keys the AI's
+      // grounding instructions on — surfaced to the client too so the
+      // explain card can show *which* real source (if any) actually backed
+      // this specific explanation, instead of "Wikipedia/Tripadvisor" being
+      // invisible trust signals only the prompt ever saw. See the 2026-08
+      // visual-design research report's "Trust Marker" finding, Phase 2 —
+      // this was previously only applied to dietary tags, not the one place
+      // (the AI body text) it matters most for.
+      const groundingSource: 'wikipedia' | 'tripadvisor' | null =
+        wikiEnrichment.status === 'matched' ? 'wikipedia' : tripAdvisorInfo.description ? 'tripadvisor' : null;
+
       const factualGuard =
         wikiEnrichment.status === 'matched'
           ? `A real Wikipedia summary of this place is included below${wikidataFactsLine ? ', along with a few structured Wikidata facts' : ''} — ground the historical, architectural, and significance angle in them and don't contradict them; they're the source of truth for this place's history and identity.${tripAdvisorInfo.description ? ` A Tripadvisor description is also included below — you can draw on it for practical, current-visit specifics (food, atmosphere, offerings), but Wikipedia stays the primary source for what this place actually is.` : ''} Still don't invent additional unverifiable specifics (exact founding dates, named owners, awards) beyond what's given anywhere below.`
@@ -1718,6 +1729,7 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
           photos,
           curatedInfo,
           dietaryTags: dietaryTags.length ? dietaryTags : null,
+          groundingSource,
         });
       } catch (e: any) {
         return sendServerError(request, reply, e, 'Failed to explain place');

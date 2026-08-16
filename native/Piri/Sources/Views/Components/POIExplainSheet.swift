@@ -128,6 +128,9 @@ struct POIExplainSheet: View {
                                     weatherBadge(weather)
                                 }
                                 Text(result.body).font(.footnote)
+                                if let source = result.groundingSource {
+                                    SourceCaption(text: String(localized: String.LocalizationValue("poiExplain.source.\(source)")))
+                                }
                                 ForEach(result.highlights, id: \.self) { highlight in
                                     HStack(alignment: .top, spacing: 6) {
                                         Circle().fill(Theme.gold).frame(width: 5, height: 5).padding(.top, 6)

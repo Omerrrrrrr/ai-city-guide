@@ -668,6 +668,9 @@ struct MapScreen: View {
                     weatherBadge(weather)
                 }
                 Text(poiExplainResult.body).font(.footnote)
+                if let source = poiExplainResult.groundingSource {
+                    SourceCaption(text: String(localized: String.LocalizationValue("poiExplain.source.\(source)")))
+                }
                 ForEach(poiExplainResult.highlights, id: \.self) { highlight in
                     HStack(alignment: .top, spacing: 6) {
                         Circle().fill(Theme.gold).frame(width: 5, height: 5).padding(.top, 6)

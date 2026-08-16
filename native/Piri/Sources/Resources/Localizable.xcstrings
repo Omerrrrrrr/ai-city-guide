@@ -6566,7 +6566,30 @@
         }
       }
     },
+    "map.route.start" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start Route"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start rute"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rotayı Başlat"
+          }
+        }
+      }
+    },
     "map.route.stepsCount.one" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -6589,6 +6612,7 @@
       }
     },
     "map.route.stepsCount.other" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -6606,28 +6630,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$lld adım"
-          }
-        }
-      }
-    },
-    "map.route.start" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Start Route"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Start rute"
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rotayı Başlat"
           }
         }
       }
@@ -10009,6 +10011,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Detaylı Bilgi"
+          }
+        }
+      }
+    },
+    "poiExplain.source.tripadvisor" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grounded in a real Tripadvisor description"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Basert på en ekte Tripadvisor-beskrivelse"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gerçek bir Tripadvisor açıklamasına dayanıyor"
+          }
+        }
+      }
+    },
+    "poiExplain.source.wikipedia" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grounded in Wikipedia"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Basert på Wikipedia"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wikipedia'ya dayanıyor"
           }
         }
       }

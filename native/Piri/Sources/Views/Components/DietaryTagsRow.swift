@@ -22,13 +22,7 @@ struct DietaryTagsRow: View {
                             .foregroundStyle(Color(.systemGreen))
                     }
                 }
-                // Every other externally-sourced fact on this card
-                // (Tripadvisor's rating, each photo) already names its
-                // source inline — this was the one silent exception, just
-                // an unlabeled row of green pills. Small and secondary on
-                // purpose (a "trust marker," not a citation), matching the
-                // 2026-08 visual-design research report's Phase 2 finding.
-                Text("dietaryTags.source").font(.system(size: 10)).foregroundStyle(.secondary)
+                SourceCaption(text: String(localized: "dietaryTags.source"))
             }
         }
     }
