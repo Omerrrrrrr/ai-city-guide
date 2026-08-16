@@ -19,6 +19,7 @@ struct HomeScreen: View {
     @State private var locationManager = LocationManager()
     @State private var nearbyUser: [PlaceWithDistance] = []
     @State private var showingCityPicker = false
+    @State private var showingWeatherForecast = false
     @State private var selectedCategoryGroup: POICategoryGroup?
     @State private var poiResults: [POIPlace] = []
     @State private var poiLoading = false
@@ -157,6 +158,13 @@ struct HomeScreen: View {
         }
         .sheet(isPresented: $showingCityPicker) { CityPickerScreen() }
         .sheet(item: $selectedPOI) { poi in POIExplainSheet(poi: poi) }
+        .sheet(isPresented: $showingWeatherForecast) {
+            if let weather = weatherQuery.weather,
+               let lat = cityStore.lat ?? locationManager.currentLocation?.latitude,
+               let lng = cityStore.lng ?? locationManager.currentLocation?.longitude {
+                WeatherForecastSheet(lat: lat, lng: lng, current: weather)
+            }
+        }
         .navigationBarHidden(true)
     }
 
@@ -179,14 +187,20 @@ struct HomeScreen: View {
                 }
                 Spacer()
                 if let weather = weatherQuery.weather {
-                    HStack(spacing: 4) {
-                        Image(systemName: weather.condition.icon).foregroundStyle(.white.opacity(0.9))
-                        Text("\(Int(weather.temp))°").font(.system(size: 15, weight: .bold)).foregroundStyle(.white.opacity(0.9))
-                        Text(weather.city).font(.system(size: 13)).foregroundStyle(.white.opacity(0.55))
+                    Button {
+                        Haptics.light()
+                        showingWeatherForecast = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: weather.condition.icon).foregroundStyle(.white.opacity(0.9))
+                            Text("\(Int(weather.temp))°").font(.system(size: 15, weight: .bold)).foregroundStyle(.white.opacity(0.9))
+                            Text(weather.city).font(.system(size: 13)).foregroundStyle(.white.opacity(0.55))
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Capsule().fill(.white.opacity(0.1)))
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Capsule().fill(.white.opacity(0.1)))
+                    .buttonStyle(.plain)
                 }
             }
             NavigationLink(destination: ExploreScreen()) {

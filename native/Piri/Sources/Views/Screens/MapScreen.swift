@@ -85,6 +85,11 @@ struct MapScreen: View {
     @State var routeDurationSeconds: Double?
     @State var isFetchingRoute = false
     @State var routeError: String?
+    /// Collapsed by default — the full editable stop list used to always
+    /// take up roughly half the screen over the map itself. Expanding is a
+    /// deliberate tap, not automatic, so picking stops on the map still
+    /// leaves most of the map visible.
+    @State var stopsExpanded = false
     @State var showTripPhotoCapture = false
     /// Confirms before `routeModeToggleButton` discards a non-empty,
     /// not-yet-started `plannedStops` — see the 2026-08 usability audit.
@@ -118,8 +123,16 @@ struct MapScreen: View {
         ZStack(alignment: .bottom) {
             if let initialRegion {
                 if routeMode, let activeTrip = tripsStore.trips.first(where: { $0.id == tripsStore.activeTripId }) {
+                    // While the stop list has been edited past what the
+                    // active trip last persisted, draw the freshly-previewed
+                    // route (kept live by the `onChange(of: plannedStops)`
+                    // preview fetch below) instead of the stale persisted
+                    // one — otherwise the map didn't visibly react to
+                    // adding/removing/reordering a stop until "Güncelle"
+                    // was tapped.
+                    let liveGeometry = stopsChangedFromActiveTrip ? routeGeometry : nil
                     TripMapView(
-                        routeCoordinates: (activeTrip.routeGeometry ?? routeGeometry ?? []).compactMap(coordinate(fromPair:)),
+                        routeCoordinates: (liveGeometry ?? activeTrip.routeGeometry ?? routeGeometry ?? []).compactMap(coordinate(fromPair:)),
                         breadcrumbCoordinates: activeTrip.breadcrumb.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng) },
                         stops: routeStopAnnotations,
                         initialRegion: activeTripDisplayRegion(for: activeTrip) ?? initialRegion,
@@ -245,6 +258,22 @@ struct MapScreen: View {
         .onChange(of: locationManager.breadcrumb) { _, points in
             guard let activeTripId = tripsStore.activeTripId, let last = points.last else { return }
             tripsStore.addBreadcrumb(activeTripId, point: last)
+        }
+        // Live preview as stops are picked/reordered/removed — previously
+        // the route line (and its distance) only appeared after explicitly
+        // starting or updating the trip, so picking stops showed nothing
+        // but straight guesses between pins the whole time.
+        .onChange(of: plannedStops) { oldStops, newStops in
+            if oldStops.isEmpty, !newStops.isEmpty {
+                stopsExpanded = true
+            }
+            guard newStops.count >= 2 else {
+                routeGeometry = nil
+                routeDistanceMeters = nil
+                routeDurationSeconds = nil
+                return
+            }
+            Task { await previewRoute() }
         }
         // Refetch immediately on filter change, not just on the next pan/
         // zoom -- `currentRegion` is kept in sync by `handleRegionChange` on

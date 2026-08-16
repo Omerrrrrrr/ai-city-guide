@@ -115,6 +115,12 @@ enum WeatherAPI {
             "date": ISO8601DateFormatter().string(from: date),
         ])
     }
+
+    /// Up to 5 days out (OpenWeatherMap's free-tier forecast horizon) — for
+    /// the Home screen's weather badge tap, not tied to any specific Plan date.
+    static func daily(lat: Double, lng: Double) async throws -> DailyForecastResponse {
+        try await APIClient.shared.get("/weather/daily", query: ["lat": String(lat), "lng": String(lng)])
+    }
 }
 
 struct HoursCheckPlace: Encodable {

@@ -20,6 +20,21 @@ struct Weather: Codable, Hashable {
     }
 }
 
+struct DailyForecast: Codable, Identifiable, Hashable {
+    var date: String
+    var tempMin: Double
+    var tempMax: Double
+    var condition: WeatherCondition
+    var description: String
+
+    var id: String { date }
+}
+
+struct DailyForecastResponse: Codable {
+    var city: String
+    var daily: [DailyForecast]
+}
+
 extension WeatherCondition {
     var icon: String {
         switch self {

@@ -96,6 +96,20 @@ const GOOGLE_MODEL = process.env.GOOGLE_MODEL ?? 'gemini-flash-latest';
 const APP_URL = process.env.APP_URL ?? 'http://localhost:4000';
 const OPENWEATHER_API_KEY = process.env.OPENWEATHER_API_KEY?.trim();
 const OPENROUTESERVICE_API_KEY = process.env.OPENROUTESERVICE_API_KEY?.trim();
+
+type OpenWeatherCondition = 'sunny' | 'cloudy' | 'rainy' | 'snowy' | 'stormy' | 'foggy';
+
+// Shared by /weather, /weather/forecast and /weather/daily -- OpenWeatherMap's
+// own condition-code ranges (https://openweathermap.org/weather-conditions),
+// collapsed onto the app's own six-value enum.
+function mapOpenWeatherCondition(weatherId: number): OpenWeatherCondition {
+  if (weatherId >= 200 && weatherId < 300) return 'stormy';
+  if (weatherId >= 300 && weatherId < 600) return 'rainy';
+  if (weatherId >= 600 && weatherId < 700) return 'snowy';
+  if (weatherId >= 700 && weatherId < 800) return 'foggy';
+  if (weatherId === 800) return 'sunny';
+  return 'cloudy';
+}
 const MAX_CONTEXT_PLACES = 14;
 const MIN_AI_RECOMMENDATIONS = 4;
 const MAX_AI_RECOMMENDATIONS = 5;
@@ -2750,14 +2764,7 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
         const data = await res.json() as any;
 
         const weatherId: number = data.weather?.[0]?.id ?? 800;
-        type WeatherCondition = 'sunny' | 'cloudy' | 'rainy' | 'snowy' | 'stormy' | 'foggy';
-        let condition: WeatherCondition;
-        if (weatherId >= 200 && weatherId < 300) condition = 'stormy';
-        else if (weatherId >= 300 && weatherId < 600) condition = 'rainy';
-        else if (weatherId >= 600 && weatherId < 700) condition = 'snowy';
-        else if (weatherId >= 700 && weatherId < 800) condition = 'foggy';
-        else if (weatherId === 800) condition = 'sunny';
-        else condition = 'cloudy';
+        const condition = mapOpenWeatherCondition(weatherId);
 
         return reply.send({
           city: data.name as string,
@@ -2820,14 +2827,7 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
         );
 
         const weatherId = closest.weather?.[0]?.id ?? 800;
-        type WeatherCondition = 'sunny' | 'cloudy' | 'rainy' | 'snowy' | 'stormy' | 'foggy';
-        let condition: WeatherCondition;
-        if (weatherId >= 200 && weatherId < 300) condition = 'stormy';
-        else if (weatherId >= 300 && weatherId < 600) condition = 'rainy';
-        else if (weatherId >= 600 && weatherId < 700) condition = 'snowy';
-        else if (weatherId >= 700 && weatherId < 800) condition = 'foggy';
-        else if (weatherId === 800) condition = 'sunny';
-        else condition = 'cloudy';
+        const condition = mapOpenWeatherCondition(weatherId);
 
         return reply.send({
           city: (data.city?.name ?? '') as string,
@@ -2839,6 +2839,77 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
           wind_speed: Math.round(closest.wind?.speed ?? 0),
           forecastTime: new Date(closest.dt * 1000).toISOString(),
         });
+      } catch (e: any) {
+        app.log.error(e);
+        return reply.code(500).send({ error: 'Failed to fetch weather forecast' });
+      }
+    }
+  );
+
+  // ── /weather/daily — Multi-day outlook for the Home screen's weather badge ───
+  // Same OpenWeatherMap 3-hour/5-day forecast list as /weather/forecast, but
+  // grouped into one row per calendar day instead of resolved against a
+  // single target date -- for "what's the week look like", not a Plan's one
+  // specific date.
+  app.get<{ Querystring: { lat: string; lng: string } }>(
+    '/weather/daily',
+    { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const parsedLat = parseFloat(request.query.lat ?? '');
+      const parsedLng = parseFloat(request.query.lng ?? '');
+
+      if (isNaN(parsedLat) || isNaN(parsedLng)) {
+        return reply.code(400).send({ error: 'lat and lng query params are required' });
+      }
+
+      if (!OPENWEATHER_API_KEY) {
+        return reply.code(503).send({ error: 'Weather not configured' });
+      }
+
+      try {
+        const owUrl = `https://api.openweathermap.org/data/2.5/forecast?lat=${parsedLat}&lon=${parsedLng}&units=metric&appid=${OPENWEATHER_API_KEY}`;
+        const res = await fetch(owUrl);
+        if (!res.ok) throw new Error(`OpenWeather ${res.status}`);
+        const data = (await res.json()) as any;
+
+        const slots: { dt: number; main: { temp_min: number; temp_max: number }; weather: { id: number; description: string }[] }[] =
+          data.list ?? [];
+        if (slots.length === 0) throw new Error('No forecast slots returned');
+
+        // Bucket by the slot's own calendar date (UTC -- OpenWeatherMap gives
+        // no per-city timezone here without another field lookup, and a
+        // multi-day outlook doesn't need minute-level precision), picking
+        // whichever weather code the day's midday-most slot reports so a
+        // brief early-morning shower doesn't paint an otherwise sunny day as
+        // rainy.
+        const byDay = new Map<string, typeof slots>();
+        for (const slot of slots) {
+          const day = new Date(slot.dt * 1000).toISOString().slice(0, 10);
+          const existing = byDay.get(day);
+          if (existing) existing.push(slot);
+          else byDay.set(day, [slot]);
+        }
+
+        const daily = Array.from(byDay.entries())
+          .slice(0, 5)
+          .map(([day, daySlots]) => {
+            const tempMin = Math.min(...daySlots.map((s) => s.main.temp_min));
+            const tempMax = Math.max(...daySlots.map((s) => s.main.temp_max));
+            const middaySlot = daySlots.reduce((best, slot) => {
+              const hour = new Date(slot.dt * 1000).getUTCHours();
+              const bestHour = new Date(best.dt * 1000).getUTCHours();
+              return Math.abs(hour - 13) < Math.abs(bestHour - 13) ? slot : best;
+            });
+            return {
+              date: day,
+              tempMin: Math.round(tempMin),
+              tempMax: Math.round(tempMax),
+              condition: mapOpenWeatherCondition(middaySlot.weather?.[0]?.id ?? 800),
+              description: middaySlot.weather?.[0]?.description ?? '',
+            };
+          });
+
+        return reply.send({ city: (data.city?.name ?? '') as string, daily });
       } catch (e: any) {
         app.log.error(e);
         return reply.code(500).send({ error: 'Failed to fetch weather forecast' });

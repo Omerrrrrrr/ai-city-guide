@@ -88,6 +88,7 @@ extension MapScreen {
                 routeDistanceMeters = nil
                 routeDurationSeconds = nil
                 routeError = nil
+                stopsExpanded = false
             }
             Button(String(localized: "common.cancel"), role: .cancel) {}
         } message: {
@@ -237,6 +238,7 @@ extension MapScreen {
         routeDistanceMeters = nil
         routeDurationSeconds = nil
         routeMode = false
+        stopsExpanded = false
     }
 
     /// Best-effort location tag, matching RN's `attachTripPhoto`: reads
@@ -272,24 +274,55 @@ extension MapScreen {
             if plannedStops.isEmpty {
                 Text("map.route.hint").font(.footnote).foregroundStyle(.secondary)
             } else {
-                // Stacked rows with a native drag handle (`.onMove`), not the
-                // old horizontal row of chips with up/down chevron buttons —
-                // full-width rows read each stop's name without truncation,
-                // and dragging a row to any position is a single gesture
-                // instead of repeated adjacent-swap taps.
-                List {
-                    ForEach(Array(plannedStops.enumerated()), id: \.element.identifier) { index, stop in
-                        stopRow(index: index, stop: stop)
-                            .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
+                // Collapsed by default to a single summary row (stop count +
+                // real distance/duration) — the full editable list used to
+                // always take up roughly half the screen over the map
+                // itself, with no way to shrink it back down to actually
+                // look at the route. Tapping the summary expands it back to
+                // the same draggable/removable rows as before.
+                Button {
+                    Haptics.light()
+                    withAnimation(.easeInOut(duration: 0.2)) { stopsExpanded.toggle() }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(LPlural("map.route.stopsCount", count: plannedStops.count))
+                            .font(.footnote.weight(.semibold))
+                        if let summary = routeSummaryText(activeTrip: activeTrip) {
+                            Text("·").foregroundStyle(.secondary)
+                            Text(summary).font(.footnote).foregroundStyle(.secondary)
+                        } else if isFetchingRoute {
+                            ProgressView().controlSize(.mini)
+                        }
+                        Spacer()
+                        Image(systemName: stopsExpanded ? "chevron.up" : "chevron.down")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.secondary)
                     }
-                    .onMove(perform: moveStops)
+                    .contentShape(Rectangle())
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .environment(\.editMode, .constant(.active))
-                .frame(height: min(CGFloat(plannedStops.count), 4) * 52)
+                .buttonStyle(.plain)
+
+                if stopsExpanded {
+                    // Stacked rows with a native drag handle (`.onMove`), not
+                    // the old horizontal row of chips with up/down chevron
+                    // buttons — full-width rows read each stop's name
+                    // without truncation, and dragging a row to any position
+                    // is a single gesture instead of repeated adjacent-swap
+                    // taps.
+                    List {
+                        ForEach(Array(plannedStops.enumerated()), id: \.element.identifier) { index, stop in
+                            stopRow(index: index, stop: stop)
+                                .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                        }
+                        .onMove(perform: moveStops)
+                    }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .environment(\.editMode, .constant(.active))
+                    .frame(height: min(CGFloat(plannedStops.count), 4) * 52)
+                }
             }
 
             if let activeTrip, !activeTrip.photos.isEmpty {
@@ -388,6 +421,18 @@ extension MapScreen {
                 }
             }
         }
+    }
+
+    /// Prefers the live-previewed values (kept fresh by
+    /// `onChange(of: plannedStops)`) over the active trip's last-persisted
+    /// ones, so an edited-but-not-yet-"Güncelle"d stop list still shows its
+    /// own real distance instead of a stale one.
+    private func routeSummaryText(activeTrip: Trip?) -> String? {
+        guard let distanceMeters = routeDistanceMeters ?? activeTrip?.distanceMeters,
+              let durationSeconds = routeDurationSeconds ?? activeTrip?.durationSeconds else { return nil }
+        let km = String(format: "%.1f", distanceMeters / 1000)
+        let minutes = String(Int((durationSeconds / 60).rounded()))
+        return "\(L("map.route.distanceKm", km)) · \(L("map.route.durationMinutes", minutes))"
     }
 
     private func stopRow(index: Int, stop: SavedPOIReference) -> some View {
