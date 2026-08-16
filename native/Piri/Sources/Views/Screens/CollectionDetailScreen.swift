@@ -113,7 +113,21 @@ struct CollectionDetailScreen: View {
         }
         hoursFailed = false
         // Matches /places/hours-check's own server-side cap.
-        let places = collection.places.prefix(15).map { HoursCheckPlace(name: $0.name, lat: $0.lat, lng: $0.lng) }
+        //
+        // The picked date/time is when the *plan* starts, not when every
+        // stop is visited -- checking all of them against that one instant
+        // means a place that's only reached hours later (after the ones
+        // ahead of it) could show "Açık olacak" even though it'll actually
+        // be closed by then. There's no real per-stop duration or
+        // between-stop travel time available here (Apple POIs carry
+        // neither), so this staggers each stop by a flat 60-minute
+        // assumption per position instead -- an approximation, but a much
+        // closer one than treating a 5-stop day as five simultaneous visits.
+        let assumedMinutesPerStop = 60.0
+        let places = collection.places.prefix(15).enumerated().map { index, reference in
+            let estimatedArrival = date.addingTimeInterval(Double(index) * assumedMinutesPerStop * 60)
+            return HoursCheckPlace(name: reference.name, lat: reference.lat, lng: reference.lng, date: ISO8601DateFormatter().string(from: estimatedArrival))
+        }
         do {
             let response = try await PlanSchedulingAPI.checkHours(
                 HoursCheckRequest(places: Array(places), date: ISO8601DateFormatter().string(from: date))

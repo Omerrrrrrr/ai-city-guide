@@ -127,6 +127,10 @@ struct HoursCheckPlace: Encodable {
     var name: String
     var lat: Double
     var lng: Double
+    /// Per-place override of `HoursCheckRequest.date` — see
+    /// `CollectionDetailScreen.loadHoursIfNeeded` for why every stop
+    /// shouldn't be checked against the exact same instant.
+    var date: String?
 }
 
 struct HoursCheckRequest: Encodable {

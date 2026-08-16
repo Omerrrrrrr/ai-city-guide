@@ -1732,7 +1732,7 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
   // run concurrently, no LLM call, no photos fetched.
   app.post<{
     Body: {
-      places: { name: string; lat: number; lng: number }[];
+      places: { name: string; lat: number; lng: number; date?: string }[];
       date: string;
     };
   }>('/places/hours-check', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (request, reply) => {
@@ -1744,6 +1744,12 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
               name: z.string().trim().min(1).max(200),
               lat: z.number(),
               lng: z.number(),
+              // Per-place override of the top-level `date` -- a Plan's
+              // stops are visited one after another, not all at the exact
+              // same instant, so the client staggers this by estimated
+              // arrival time per stop. Falls back to `date` when a place
+              // doesn't send its own (or sends an invalid one).
+              date: z.string().optional(),
             })
           )
           .min(1)
@@ -1763,7 +1769,9 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
 
     const results = await Promise.all(
       parsedBody.data.places.map(async (place) => {
-        const info = await fetchTripAdvisorInfo(place.name, place.lat, place.lng, targetDate, false);
+        const placeDate = place.date ? new Date(place.date) : null;
+        const referenceDate = placeDate && !isNaN(placeDate.getTime()) ? placeDate : targetDate;
+        const info = await fetchTripAdvisorInfo(place.name, place.lat, place.lng, referenceDate, false);
         return {
           name: place.name,
           willBeOpen: info.rating?.isOpenNow ?? null,
