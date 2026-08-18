@@ -39,7 +39,9 @@ import {
   findUserByUsername,
   getFollowState,
   getFriendProfile,
+  getLeaderboard,
   respondToFollowRequest,
+  searchUsers,
   sendFollowRequest,
   updateSharingPreferences,
   updateStats,
@@ -2943,31 +2945,38 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
     }
   });
 
-  app.patch<{ Body: Partial<{ shareXp: boolean; shareTripStats: boolean; shareTripHistory: boolean }> }>(
-    '/me/sharing-preferences',
-    async (request, reply) => {
-      const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
-      if (!userId) return;
+  app.patch<{
+    Body: Partial<{
+      shareXp: boolean;
+      shareTripStats: boolean;
+      shareTripHistory: boolean;
+      leaderboardVisible: boolean;
+      showRealName: boolean;
+    }>;
+  }>('/me/sharing-preferences', async (request, reply) => {
+    const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
+    if (!userId) return;
 
-      const parsed = z
-        .object({
-          shareXp: z.boolean().optional(),
-          shareTripStats: z.boolean().optional(),
-          shareTripHistory: z.boolean().optional(),
-        })
-        .safeParse(request.body ?? {});
-      if (!parsed.success) {
-        return reply.code(400).send({ error: 'Invalid request' });
-      }
-
-      try {
-        await updateSharingPreferences(userId, parsed.data);
-        return reply.send({ ok: true });
-      } catch (e) {
-        return sendServerError(request, reply, e, 'Failed to update sharing preferences');
-      }
+    const parsed = z
+      .object({
+        shareXp: z.boolean().optional(),
+        shareTripStats: z.boolean().optional(),
+        shareTripHistory: z.boolean().optional(),
+        leaderboardVisible: z.boolean().optional(),
+        showRealName: z.boolean().optional(),
+      })
+      .safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'Invalid request' });
     }
-  );
+
+    try {
+      await updateSharingPreferences(userId, parsed.data);
+      return reply.send({ ok: true });
+    } catch (e) {
+      return sendServerError(request, reply, e, 'Failed to update sharing preferences');
+    }
+  });
 
   app.patch<{
     Body: Partial<{ xp: number; completedTripCount: number; sharedTripHistory: { name: string; date: string }[] }>;
@@ -3005,6 +3014,46 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
       return sendServerError(request, reply, e, 'Failed to load friend profile');
     }
   });
+
+  // Faz 2: public leaderboard + search, gated purely by `leaderboardVisible`
+  // (independent of the Faz 1 `share*` flags -- see social.ts's top
+  // comment). Both still require a session, same as every other
+  // `/social/*` route -- not a fully anonymous public API.
+  app.get<{ Querystring: { limit?: string } }>('/social/leaderboard', async (request, reply) => {
+    const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
+    if (!userId) return;
+
+    const parsedLimit = z.coerce.number().int().min(1).max(100).default(50).safeParse(request.query.limit);
+    if (!parsedLimit.success) {
+      return reply.code(400).send({ error: 'Invalid request' });
+    }
+
+    try {
+      return reply.send(await getLeaderboard(parsedLimit.data));
+    } catch (e) {
+      return sendServerError(request, reply, e, 'Failed to load leaderboard');
+    }
+  });
+
+  app.get<{ Querystring: { q?: string } }>(
+    '/social/search',
+    { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
+      if (!userId) return;
+
+      const parsed = z.object({ q: z.string().trim().min(1).max(32) }).safeParse(request.query ?? {});
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'Invalid request' });
+      }
+
+      try {
+        return reply.send(await searchUsers(userId, parsed.data.q, 20));
+      } catch (e) {
+        return sendServerError(request, reply, e, 'Search failed');
+      }
+    }
+  );
 
   // ── /weather — Proxy OpenWeatherMap current conditions ───────────────────────
   app.get<{ Querystring: { lat: string; lng: string } }>(

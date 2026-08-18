@@ -191,6 +191,13 @@ export const users = pgTable('users', {
   xp: integer('xp').notNull().default(0),
   completedTripCount: integer('completed_trip_count').notNull().default(0),
   sharedTripHistory: text('shared_trip_history'), // JSON: [{name, date}] -- only meaningful while shareTripHistory=true
+  // Faz 2 (public leaderboard + search) columns. Unlike the `share*` flags
+  // above, `leaderboardVisible` defaults **true** -- the whole point of a
+  // leaderboard is that it has entries, and it's still user-controllable
+  // (can be turned off), just not opt-in-from-empty the way friend-sharing
+  // is. `showRealName` still defaults false (rumuz first).
+  leaderboardVisible: boolean('leaderboard_visible').notNull().default(true),
+  showRealName: boolean('show_real_name').notNull().default(false),
 }, (table) => [
   uniqueIndex('idx_users_email').on(table.email),
   uniqueIndex('idx_users_apple_user_id').on(table.appleUserId),

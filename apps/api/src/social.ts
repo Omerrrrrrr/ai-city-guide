@@ -1,15 +1,30 @@
-import { and, eq, inArray, or } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, isNotNull, ne, or } from 'drizzle-orm';
 
 import { AuthError } from './auth';
 import { db } from './db';
 import { follows, users, type UserRow } from './schema';
 
-// Mutual-follow-only social graph (Faz 1) -- no public search/leaderboard,
-// see the 2026-08 social-layer plan. A single `follows` row represents the
-// whole relationship through its lifecycle: inserted 'pending' when the
-// follower sends a request, flipped to 'accepted' by the followee, never
-// duplicated in the other direction -- "is X and Y friends" is just "does
-// an accepted row exist with X and Y in either position."
+// Social graph. Faz 1 (mutual-follow, opt-in-from-off sharing) + Faz 2
+// (public leaderboard/search, opt-in-from-on visibility, user-chosen
+// display name) -- see the 2026-08 social-layer plan. A single `follows`
+// row represents the whole relationship through its lifecycle: inserted
+// 'pending' when the follower sends a request, flipped to 'accepted' by the
+// followee, never duplicated in the other direction -- "is X and Y
+// friends" is just "does an accepted row exist with X and Y in either
+// position." Leaderboard/search are gated by `leaderboardVisible` alone
+// (independent of the Faz 1 `share*` flags, which only govern what
+// *friends* see on a full profile) -- joining the leaderboard inherently
+// means showing your rank/level/xp publicly, that's what a leaderboard is.
+
+/// What a user's `follows`/leaderboard/search entries actually display --
+/// their chosen username, or (if `showRealName` is on and they have one)
+/// their real `displayName`. Never the raw username when they've opted for
+/// their real name.
+export function publicDisplayName(user: Pick<UserRow, 'username' | 'displayName' | 'showRealName'>) {
+  const trimmedDisplayName = user.displayName?.trim();
+  if (user.showRealName && trimmedDisplayName) return trimmedDisplayName;
+  return user.username;
+}
 
 const USERNAME_PATTERN = /^[a-z0-9_]{3,20}$/;
 
@@ -89,10 +104,13 @@ export async function respondToFollowRequest(followeeId: string, followerId: str
   }
 }
 
-async function usernamesFor(userIds: string[]) {
+async function publicNamesFor(userIds: string[]) {
   if (userIds.length === 0) return new Map<string, string | null>();
-  const rows = await db.select({ id: users.id, username: users.username }).from(users).where(inArray(users.id, userIds));
-  return new Map(rows.map((row) => [row.id, row.username]));
+  const rows = await db
+    .select({ id: users.id, username: users.username, displayName: users.displayName, showRealName: users.showRealName })
+    .from(users)
+    .where(inArray(users.id, userIds));
+  return new Map(rows.map((row) => [row.id, publicDisplayName(row)]));
 }
 
 export async function getFollowState(userId: string) {
@@ -102,14 +120,54 @@ export async function getFollowState(userId: string) {
   const incomingIds = rows.filter((r) => r.status === 'pending' && r.followeeId === userId).map((r) => r.followerId);
   const outgoingIds = rows.filter((r) => r.status === 'pending' && r.followerId === userId).map((r) => r.followeeId);
 
-  const usernames = await usernamesFor([...friendIds, ...incomingIds, ...outgoingIds]);
-  const toEntry = (id: string) => ({ id, username: usernames.get(id) ?? null });
+  const names = await publicNamesFor([...friendIds, ...incomingIds, ...outgoingIds]);
+  const toEntry = (id: string) => ({ id, name: names.get(id) ?? null });
 
   return {
     friends: friendIds.map(toEntry),
     incomingRequests: incomingIds.map(toEntry),
     outgoingRequests: outgoingIds.map(toEntry),
   };
+}
+
+// Faz 2: public leaderboard, ranked by `xp` -- only accounts that opted in
+// (`leaderboardVisible`, default true) and actually have a claimed
+// username (nothing to rank/display otherwise) are included.
+export async function getLeaderboard(limit: number) {
+  const rows = await db
+    .select()
+    .from(users)
+    .where(and(eq(users.leaderboardVisible, true), isNotNull(users.username)))
+    .orderBy(desc(users.xp))
+    .limit(limit);
+
+  return rows.map((row) => ({
+    id: row.id,
+    name: publicDisplayName(row),
+    level: Math.floor(row.xp / 100) + 1,
+    xp: row.xp,
+  }));
+}
+
+// Faz 2: prefix search over the same leaderboard-visible population --
+// deliberately not a general user directory, just "find someone who
+// already chose to be discoverable."
+export async function searchUsers(viewerId: string, query: string, limit: number) {
+  const normalized = normalizeUsername(query);
+  if (!normalized) return [];
+
+  const rows = await db
+    .select()
+    .from(users)
+    .where(and(eq(users.leaderboardVisible, true), isNotNull(users.username), ilike(users.username, `${normalized}%`), ne(users.id, viewerId)))
+    .orderBy(desc(users.xp))
+    .limit(limit);
+
+  return rows.map((row) => ({
+    id: row.id,
+    name: publicDisplayName(row),
+    level: Math.floor(row.xp / 100) + 1,
+  }));
 }
 
 async function areFriends(userIdA: string, userIdB: string) {
@@ -131,7 +189,13 @@ async function areFriends(userIdA: string, userIdB: string) {
 
 export async function updateSharingPreferences(
   userId: string,
-  prefs: Partial<{ shareXp: boolean; shareTripStats: boolean; shareTripHistory: boolean }>
+  prefs: Partial<{
+    shareXp: boolean;
+    shareTripStats: boolean;
+    shareTripHistory: boolean;
+    leaderboardVisible: boolean;
+    showRealName: boolean;
+  }>
 ) {
   await db.update(users).set(prefs).where(eq(users.id, userId));
 }
@@ -150,13 +214,14 @@ export async function updateStats(
     .where(eq(users.id, userId));
 }
 
-// Only the fields the friend has opted into sharing -- `username` is always
-// included (it's how the viewer found them in the first place), everything
-// else is `null`/absent unless that specific `share*` flag is on.
+// Only the fields the friend has opted into sharing -- their chosen public
+// name (see `publicDisplayName`) is always included, since it's how the
+// viewer already knows who this is, everything else is `null`/absent
+// unless that specific `share*` flag is on.
 export function toSharedFriendProfile(friend: UserRow) {
   return {
     id: friend.id,
-    username: friend.username,
+    name: publicDisplayName(friend),
     xp: friend.shareXp ? friend.xp : null,
     level: friend.shareXp ? Math.floor(friend.xp / 100) + 1 : null,
     completedTripCount: friend.shareTripStats ? friend.completedTripCount : null,
