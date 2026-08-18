@@ -71,3 +71,23 @@ export async function checkAndIncrementUsage(userId: string, counterKey: string)
 
   return updated.length > 0;
 }
+
+/**
+ * Gives back a unit of quota previously spent by `checkAndIncrementUsage`
+ * for a call that turned out to fail or find nothing (e.g. Google Places
+ * erroring or returning no match) -- a user shouldn't lose quota for a
+ * lookup they got no value from. Best-effort: floors at 0, never throws.
+ */
+export async function refundUsage(userId: string, counterKey: string): Promise<void> {
+  const periodStart = currentPeriodStart();
+  await db
+    .update(usageCounters)
+    .set({ count: sql`GREATEST(${usageCounters.count} - 1, 0)` })
+    .where(
+      and(
+        eq(usageCounters.userId, userId),
+        eq(usageCounters.counterKey, counterKey),
+        eq(usageCounters.periodStart, periodStart)
+      )
+    );
+}

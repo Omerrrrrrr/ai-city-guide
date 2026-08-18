@@ -57,6 +57,8 @@ import {
   reassignImageCandidate,
 } from './image-candidate-service';
 import { previewGoogleHoursForPlace } from './google-places-hours';
+import { fetchPremiumPlaceDetails } from './google-places-poi';
+import { checkAndIncrementUsage, refundUsage } from './entitlements';
 import { openingHoursSchema } from './opening-hours';
 import { enrichPlaceWithWikipedia, type AiProviderConfig } from './wiki-enrichment';
 import { toPlaceDto } from './place-dto';
@@ -1998,6 +2000,62 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
 
       const reviews = await fetchTripAdvisorReviews(info.locationId, 10);
       return reply.send({ reviews, tripadvisorUrl: info.rating?.url ?? null });
+    }
+  );
+
+  // ── /places/premium-details — Google Places-backed rich POI data ───────────
+  // Premium-tier-only (see entitlements.ts): same name/lat/lng/address shape
+  // as /places/explain-poi (no stable placeId for an arbitrary MapKit POI),
+  // but returns Google's structured data (rating, price level, hours,
+  // photo) instead of an AI blurb. Free accounts get 403; paid accounts
+  // that have exhausted this month's quota get 429 -- both distinct from a
+  // 502 upstream failure, so the client can show "upgrade" vs "try later"
+  // vs "temporarily unavailable" correctly.
+  app.post<{
+    Body: { name: string; lat?: number; lng?: number; address?: string };
+  }>(
+    '/places/premium-details',
+    { config: { rateLimit: { max: 40, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
+      if (!userId) return;
+
+      const parsed = z
+        .object({
+          name: z.string().trim().min(1).max(200),
+          lat: z.number().optional(),
+          lng: z.number().optional(),
+          address: z.string().trim().max(300).optional(),
+        })
+        .safeParse(request.body);
+
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'Invalid request' });
+      }
+
+      const [user] = await db.select({ tier: users.tier }).from(users).where(eq(users.id, userId)).limit(1);
+      if (!user || user.tier === 'free') {
+        return reply.code(403).send({ error: 'Premium details require a paid plan.', code: 'upgrade_required' });
+      }
+
+      const allowed = await checkAndIncrementUsage(userId, 'google_places');
+      if (!allowed) {
+        return reply.code(429).send({ error: 'Monthly premium-details quota reached.', code: 'quota_exceeded' });
+      }
+
+      try {
+        const details = await fetchPremiumPlaceDetails(parsed.data);
+        if (!details) {
+          await refundUsage(userId, 'google_places');
+          return reply.code(404).send({ error: 'No Google Places match found.' });
+        }
+        return reply.send(details);
+      } catch (error: any) {
+        request.log.error(error);
+        await refundUsage(userId, 'google_places');
+        const message = error?.message ?? 'Google Places request failed';
+        return reply.code(502).send({ error: message });
+      }
     }
   );
 
