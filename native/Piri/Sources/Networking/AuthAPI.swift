@@ -21,6 +21,10 @@ enum AuthAPI {
         try await APIClient.shared.post("/auth/login", body: LoginRequest(email: email, password: password))
     }
 
+    static func fetchMe(token: String) async throws -> AuthUser {
+        try await APIClient.shared.get("/me", bearerToken: token)
+    }
+
     static func fetchSync(token: String) async throws -> SyncPullResponse {
         try await APIClient.shared.get("/me/sync", bearerToken: token)
     }

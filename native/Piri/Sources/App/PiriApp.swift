@@ -11,6 +11,7 @@ struct PiriApp: App {
     @State private var recentlyViewedStore = RecentlyViewedStore()
     @State private var adminAuthStore = AdminAuthStore()
     @State private var authStore = AuthStore()
+    @State private var friendsStore = FriendsStore()
     @State private var placesQuery = PlacesQuery()
     @State private var languageStore = LanguageStore()
 
@@ -28,6 +29,7 @@ struct PiriApp: App {
                 .environment(recentlyViewedStore)
                 .environment(adminAuthStore)
                 .environment(authStore)
+                .environment(friendsStore)
                 .environment(placesQuery)
                 .environment(languageStore)
                 .environment(PushNotificationManager.shared)

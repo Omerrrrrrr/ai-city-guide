@@ -7,8 +7,22 @@ import { users, userSyncBlobs, type UserRow } from './schema';
 export const SYNC_KEYS = ['profile', 'savedPlaces', 'trips'] as const;
 export type SyncKey = (typeof SYNC_KEYS)[number];
 
+// Includes the Faz 1 social-layer fields (username + share flags + the
+// stats the client pushes) since this is the one shape both `/me` and
+// every `/auth/*` response already send back -- reusing it here means the
+// client's own account state stays current without a separate endpoint.
 export function toPublicUser(user: UserRow) {
-  return { id: user.id, email: user.email, displayName: user.displayName };
+  return {
+    id: user.id,
+    email: user.email,
+    displayName: user.displayName,
+    username: user.username,
+    shareXp: user.shareXp,
+    shareTripStats: user.shareTripStats,
+    shareTripHistory: user.shareTripHistory,
+    xp: user.xp,
+    completedTripCount: user.completedTripCount,
+  };
 }
 
 export async function findOrCreateAppleUser(appleUserId: string, email: string | undefined) {

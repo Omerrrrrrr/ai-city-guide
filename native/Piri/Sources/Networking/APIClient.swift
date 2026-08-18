@@ -60,6 +60,10 @@ final class APIClient {
         try await send(path: path, method: "PUT", query: [:], body: body, bearerToken: bearerToken)
     }
 
+    func patch<Body: Encodable, Response: Decodable>(_ path: String, body: Body, bearerToken: String? = nil) async throws -> Response {
+        try await send(path: path, method: "PATCH", query: [:], body: body, bearerToken: bearerToken)
+    }
+
     private struct EmptyBody: Encodable {}
 
     /// Explicit allowlist of POST paths that are safe to retry even though

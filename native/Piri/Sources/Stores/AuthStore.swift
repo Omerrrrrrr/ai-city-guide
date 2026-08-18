@@ -78,6 +78,18 @@ final class AuthStore {
         }
     }
 
+    /// Re-pulls this account's own public fields (username, sharing
+    /// preferences, xp/completedTripCount) -- these can change without a
+    /// fresh sign-in (e.g. claiming a username on `FriendsScreen`), so a
+    /// stale `user` from whenever the session token was issued isn't
+    /// enough. Best-effort, same swallow-and-no-op-when-signed-out
+    /// contract as `pushSync`.
+    func refreshMe() async {
+        guard let token, let refreshed = try? await AuthAPI.fetchMe(token: token) else { return }
+        user = refreshed
+        persistence.save(AuthState(token: token, user: refreshed))
+    }
+
     /// Fire-and-forget background push, a no-op when signed out -- matches
     /// the app's existing `try?`-swallow style for non-critical network
     /// calls elsewhere (e.g. PlacesQuery's best-effort fetches).
@@ -85,6 +97,16 @@ final class AuthStore {
         guard let token else { return }
         Task {
             try? await AuthAPI.pushSync(request, token: token)
+        }
+    }
+
+    /// Same fire-and-forget contract as `pushSync`, for the Faz 1
+    /// social-layer stats (`xp`/`completedTripCount`/`sharedTripHistory`)
+    /// a friend's shared profile reads server-side.
+    func pushStats(_ request: StatsPushRequest) {
+        guard let token else { return }
+        Task {
+            try? await SocialAPI.pushStats(request, token: token)
         }
     }
 

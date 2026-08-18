@@ -4,6 +4,18 @@ struct AuthUser: Codable, Equatable {
     let id: String
     let email: String
     let displayName: String?
+    /// Social-layer (Faz 1) fields -- `toPublicUser` on the backend already
+    /// includes these on every `/auth/*` response and `/me`, so `AuthUser`
+    /// carries this account's own username/sharing-preference/stat state
+    /// alongside its existing identity fields rather than needing a
+    /// separate fetch. `nil`/`false`/`0` for any account that predates
+    /// this or hasn't touched it yet.
+    var username: String?
+    var shareXp: Bool = false
+    var shareTripStats: Bool = false
+    var shareTripHistory: Bool = false
+    var xp: Int = 0
+    var completedTripCount: Int = 0
 }
 
 struct AuthTokenResponse: Decodable {
