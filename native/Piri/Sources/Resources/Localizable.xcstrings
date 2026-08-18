@@ -5374,6 +5374,28 @@
         }
       }
     },
+    "friends.leaderboard.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leaderboard"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ledertavle"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Liderlik Tablosu"
+          }
+        }
+      }
+    },
     "friends.list.empty" : {
       "localizations" : {
         "en" : {
@@ -5480,6 +5502,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bekleyen İstekler"
+          }
+        }
+      }
+    },
+    "friends.sharing.leaderboardVisible" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show me on the leaderboard"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vis meg på ledertavlen"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Liderlik tablosunda görün"
+          }
+        }
+      }
+    },
+    "friends.sharing.showRealName" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show my real name"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vis det virkelige navnet mitt"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gerçek adımı göster"
           }
         }
       }

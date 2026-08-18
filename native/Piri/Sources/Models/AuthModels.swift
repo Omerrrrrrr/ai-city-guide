@@ -23,6 +23,62 @@ struct AuthUser: Codable, Equatable {
     /// sharing is. `showRealName` still defaults `false` (rumuz first).
     var leaderboardVisible: Bool = true
     var showRealName: Bool = false
+
+    enum CodingKeys: String, CodingKey {
+        case id, email, displayName, username, shareXp, shareTripStats, shareTripHistory
+        case xp, completedTripCount, leaderboardVisible, showRealName
+    }
+
+    // Custom decode: a non-optional property with a default value is NOT
+    // automatically treated as "decode if present, else default" by
+    // Swift's synthesized `Decodable` -- only `Optional` properties get
+    // that `decodeIfPresent` treatment. Without this, every one of the
+    // 7 fields above added after `AuthUser`'s original 3 would throw on
+    // any Keychain-persisted `AuthState` written before that field
+    // existed, and `KeychainStore.load()`'s `try?` would swallow that
+    // into a silent, total sign-out (confirmed live: a real account
+    // dropped out of `authStore.isSignedIn` this way after Faz 2 added
+    // `leaderboardVisible`/`showRealName`).
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        email = try container.decode(String.self, forKey: .email)
+        displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+        username = try container.decodeIfPresent(String.self, forKey: .username)
+        shareXp = try container.decodeIfPresent(Bool.self, forKey: .shareXp) ?? false
+        shareTripStats = try container.decodeIfPresent(Bool.self, forKey: .shareTripStats) ?? false
+        shareTripHistory = try container.decodeIfPresent(Bool.self, forKey: .shareTripHistory) ?? false
+        xp = try container.decodeIfPresent(Int.self, forKey: .xp) ?? 0
+        completedTripCount = try container.decodeIfPresent(Int.self, forKey: .completedTripCount) ?? 0
+        leaderboardVisible = try container.decodeIfPresent(Bool.self, forKey: .leaderboardVisible) ?? true
+        showRealName = try container.decodeIfPresent(Bool.self, forKey: .showRealName) ?? false
+    }
+
+    init(
+        id: String,
+        email: String,
+        displayName: String?,
+        username: String? = nil,
+        shareXp: Bool = false,
+        shareTripStats: Bool = false,
+        shareTripHistory: Bool = false,
+        xp: Int = 0,
+        completedTripCount: Int = 0,
+        leaderboardVisible: Bool = true,
+        showRealName: Bool = false
+    ) {
+        self.id = id
+        self.email = email
+        self.displayName = displayName
+        self.username = username
+        self.shareXp = shareXp
+        self.shareTripStats = shareTripStats
+        self.shareTripHistory = shareTripHistory
+        self.xp = xp
+        self.completedTripCount = completedTripCount
+        self.leaderboardVisible = leaderboardVisible
+        self.showRealName = showRealName
+    }
 }
 
 struct AuthTokenResponse: Decodable {

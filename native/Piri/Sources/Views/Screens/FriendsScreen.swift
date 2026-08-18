@@ -16,12 +16,15 @@ struct FriendsScreen: View {
     @State private var addFriendInput = ""
     @State private var addFriendError: String?
     @State private var isSendingRequest = false
+    @State private var searchResults: [LeaderboardEntry] = []
+    @State private var searchTask: Task<Void, Never>?
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 usernameSection
                 sharingSection
+                leaderboardLinkSection
                 addFriendSection
                 if !friendsStore.incomingRequests.isEmpty {
                     incomingRequestsSection
@@ -85,10 +88,40 @@ struct FriendsScreen: View {
                 get: { authStore.user?.shareTripHistory ?? false },
                 set: { authStore.updateSharingPreferences(shareTripHistory: $0) }
             ))
+            Divider().padding(.vertical, 4)
+            Toggle("friends.sharing.leaderboardVisible", isOn: Binding(
+                get: { authStore.user?.leaderboardVisible ?? true },
+                set: { authStore.updateSharingPreferences(leaderboardVisible: $0) }
+            ))
+            Toggle("friends.sharing.showRealName", isOn: Binding(
+                get: { authStore.user?.showRealName ?? false },
+                set: { authStore.updateSharingPreferences(showRealName: $0) }
+            ))
         }
         .tint(Theme.gold)
     }
 
+    private var leaderboardLinkSection: some View {
+        NavigationLink(destination: LeaderboardScreen()) {
+            HStack(spacing: 10) {
+                Image(systemName: "trophy.fill").foregroundStyle(Theme.gold)
+                Text("friends.leaderboard.title").font(.system(size: 15, weight: .semibold)).foregroundStyle(.primary)
+                Spacer()
+                Text("›").font(.system(size: 20)).foregroundStyle(.secondary.opacity(0.5))
+            }
+            .padding(12)
+            .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemGroupedBackground)))
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// The text field doubles as exact-username entry (existing "İstek
+    /// Gönder" button, Faz 1 behavior) *and* Faz 2 live search -- typing
+    /// triggers a debounced `/social/search` (only Faz-2-visible accounts
+    /// match), and tapping a result sends the request by id directly
+    /// (`sendFollowRequest(toUserId:)`) rather than needing to know their
+    /// exact username, since a result's displayed name might be their real
+    /// name instead.
     private var addFriendSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionHeader("friends.add.title")
@@ -97,6 +130,9 @@ struct FriendsScreen: View {
                     .textFieldStyle(.roundedBorder)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
+                    .onChange(of: addFriendInput) { _, newValue in
+                        scheduleSearch(newValue)
+                    }
                 Button {
                     Task { await sendRequest() }
                 } label: {
@@ -112,6 +148,25 @@ struct FriendsScreen: View {
             }
             if let addFriendError {
                 Text(addFriendError).font(.footnote).foregroundStyle(Theme.closedRed)
+            }
+            if !searchResults.isEmpty {
+                VStack(spacing: 6) {
+                    ForEach(searchResults) { result in
+                        Button {
+                            Task { await sendRequest(toUserId: result.id) }
+                        } label: {
+                            HStack(spacing: 10) {
+                                LevelBadge(level: result.level)
+                                Text(result.name ?? result.id).font(.system(size: 14, weight: .medium)).foregroundStyle(.primary)
+                                Spacer()
+                            }
+                            .padding(10)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(Color(.tertiarySystemGroupedBackground)))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isSendingRequest)
+                    }
+                }
             }
         }
     }
@@ -195,9 +250,49 @@ struct FriendsScreen: View {
         do {
             try await friendsStore.sendFollowRequest(username: addFriendInput, token: token)
             addFriendInput = ""
+            searchResults = []
         } catch {
             addFriendError = error.localizedDescription
         }
         isSendingRequest = false
+    }
+
+    /// Tapping a search result -- same flow as `sendRequest()` but by id,
+    /// since a result's displayed `name` might be a real name rather than
+    /// their actual username.
+    private func sendRequest(toUserId userId: String) async {
+        isSendingRequest = true
+        addFriendError = nil
+        guard let token = authStore.token else {
+            isSendingRequest = false
+            return
+        }
+        do {
+            try await friendsStore.sendFollowRequest(toUserId: userId, token: token)
+            addFriendInput = ""
+            searchResults = []
+        } catch {
+            addFriendError = error.localizedDescription
+        }
+        isSendingRequest = false
+    }
+
+    /// Debounced (~400ms) so search doesn't fire on every keystroke;
+    /// cancels the previous in-flight search rather than letting an older,
+    /// slower response race a newer one and overwrite fresher results.
+    private func scheduleSearch(_ query: String) {
+        searchTask?.cancel()
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, let token = authStore.token else {
+            searchResults = []
+            return
+        }
+        searchTask = Task {
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            guard !Task.isCancelled else { return }
+            let results = await friendsStore.search(query: trimmed, token: token)
+            guard !Task.isCancelled else { return }
+            searchResults = results
+        }
     }
 }

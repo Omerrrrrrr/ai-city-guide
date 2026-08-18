@@ -43,6 +43,7 @@ import {
   respondToFollowRequest,
   searchUsers,
   sendFollowRequest,
+  sendFollowRequestByUserId,
   updateSharingPreferences,
   updateStats,
 } from './social';
@@ -2886,20 +2887,32 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
     }
   });
 
-  app.post<{ Body: { username?: string } }>(
+  app.post<{ Body: { username?: string; userId?: string } }>(
     '/social/follow-requests',
     { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
     async (request, reply) => {
       const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
       if (!userId) return;
 
-      const parsed = z.object({ username: z.string().trim().min(1) }).safeParse(request.body ?? {});
+      // Either the exact username (manual "add friend" entry) or a userId
+      // (tapping a Faz 2 search/leaderboard row, which only ever carries
+      // that person's chosen public name -- see sendFollowRequestByUserId).
+      const parsed = z
+        .union([
+          z.object({ username: z.string().trim().min(1) }),
+          z.object({ userId: z.string().trim().min(1) }),
+        ])
+        .safeParse(request.body ?? {});
       if (!parsed.success) {
         return reply.code(400).send({ error: 'Invalid request' });
       }
 
       try {
-        await sendFollowRequest(userId, parsed.data.username);
+        if ('username' in parsed.data) {
+          await sendFollowRequest(userId, parsed.data.username);
+        } else {
+          await sendFollowRequestByUserId(userId, parsed.data.userId);
+        }
         return reply.code(201).send({ ok: true });
       } catch (e) {
         if (e instanceof AuthError) return reply.code(e.status).send({ error: e.message });

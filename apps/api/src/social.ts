@@ -53,12 +53,8 @@ export async function findUserByUsername(rawUsername: string) {
   return user ?? null;
 }
 
-export async function sendFollowRequest(followerId: string, followeeUsername: string) {
-  const followee = await findUserByUsername(followeeUsername);
-  if (!followee) {
-    throw new AuthError('No account with that username.', 404);
-  }
-  if (followee.id === followerId) {
+async function sendFollowRequestToId(followerId: string, followeeId: string) {
+  if (followeeId === followerId) {
     throw new AuthError("You can't follow yourself.", 400);
   }
 
@@ -67,8 +63,8 @@ export async function sendFollowRequest(followerId: string, followeeUsername: st
     .from(follows)
     .where(
       or(
-        and(eq(follows.followerId, followerId), eq(follows.followeeId, followee.id)),
-        and(eq(follows.followerId, followee.id), eq(follows.followeeId, followerId))
+        and(eq(follows.followerId, followerId), eq(follows.followeeId, followeeId)),
+        and(eq(follows.followerId, followeeId), eq(follows.followeeId, followerId))
       )
     )
     .limit(1);
@@ -81,10 +77,32 @@ export async function sendFollowRequest(followerId: string, followeeUsername: st
 
   await db.insert(follows).values({
     followerId,
-    followeeId: followee.id,
+    followeeId,
     status: 'pending',
     createdAt: new Date().toISOString(),
   });
+}
+
+export async function sendFollowRequest(followerId: string, followeeUsername: string) {
+  const followee = await findUserByUsername(followeeUsername);
+  if (!followee) {
+    throw new AuthError('No account with that username.', 404);
+  }
+  await sendFollowRequestToId(followerId, followee.id);
+}
+
+// Faz 2: search/leaderboard results only ever expose a person's *chosen*
+// public name (see `publicDisplayName`), never their raw username -- when
+// a user picked "show real name," leaking the username anyway through a
+// follow-request-by-username round-trip would quietly defeat that choice.
+// Sending by id (already known from the search/leaderboard row) avoids
+// that entirely.
+export async function sendFollowRequestByUserId(followerId: string, followeeId: string) {
+  const [followee] = await db.select({ id: users.id }).from(users).where(eq(users.id, followeeId)).limit(1);
+  if (!followee) {
+    throw new AuthError('User not found.', 404);
+  }
+  await sendFollowRequestToId(followerId, followee.id);
 }
 
 export async function respondToFollowRequest(followeeId: string, followerId: string, accept: boolean) {

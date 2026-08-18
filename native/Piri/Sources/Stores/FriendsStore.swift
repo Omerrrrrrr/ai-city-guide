@@ -30,6 +30,14 @@ final class FriendsStore {
         await fetchFollows(token: token)
     }
 
+    /// Same throwing contract as the username overload -- used when the
+    /// request comes from tapping a Faz 2 search/leaderboard row, where
+    /// only the id (and that person's chosen public name) is known.
+    func sendFollowRequest(toUserId userId: String, token: String) async throws {
+        try await SocialAPI.sendFollowRequest(toUserId: userId, token: token)
+        await fetchFollows(token: token)
+    }
+
     func accept(_ request: SocialUser, token: String) async {
         try? await SocialAPI.acceptFollowRequest(from: request.id, token: token)
         await fetchFollows(token: token)
@@ -42,5 +50,16 @@ final class FriendsStore {
 
     func fetchFriendProfile(id: String, token: String) async -> FriendProfile? {
         try? await SocialAPI.fetchFriendProfile(friendId: id, token: token)
+    }
+
+    /// Faz 2. Pure pass-through (no stored state) -- results are transient
+    /// UI state owned by whichever screen is searching, same reasoning
+    /// `fetchFriendProfile` already doesn't cache its result either.
+    func search(query: String, token: String) async -> [LeaderboardEntry] {
+        (try? await SocialAPI.searchUsers(query: query, token: token)) ?? []
+    }
+
+    func fetchLeaderboard(token: String) async -> [LeaderboardEntry] {
+        (try? await SocialAPI.fetchLeaderboard(token: token)) ?? []
     }
 }

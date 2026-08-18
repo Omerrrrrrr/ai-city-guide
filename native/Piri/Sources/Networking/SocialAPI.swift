@@ -20,6 +20,14 @@ enum SocialAPI {
         )
     }
 
+    static func sendFollowRequest(toUserId userId: String, token: String) async throws {
+        let _: OkResponse = try await APIClient.shared.post(
+            "/social/follow-requests",
+            body: FollowRequestBody(userId: userId),
+            bearerToken: token
+        )
+    }
+
     static func acceptFollowRequest(from followerId: String, token: String) async throws {
         let _: OkResponse = try await APIClient.shared.post("/social/follow-requests/\(followerId)/accept", bearerToken: token)
     }

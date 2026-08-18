@@ -32,8 +32,13 @@ struct UsernameLookupResponse: Decodable {
     let username: String?
 }
 
+/// Either an exact username (manual "add friend" entry) or a userId
+/// (tapping a Faz 2 search/leaderboard row, which only ever carries that
+/// person's chosen public name -- see `sendFollowRequestByUserId` in
+/// social.ts). Exactly one of the two is ever set.
 struct FollowRequestBody: Encodable {
-    let username: String
+    var username: String?
+    var userId: String?
 }
 
 /// All-optional/partial by design, same convention as `SyncPushRequest` --

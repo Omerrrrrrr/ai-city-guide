@@ -45,6 +45,7 @@
 		46BF181ED5C32670F9475103 /* PlaceHoursTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57103CE5924DEF3637376683 /* PlaceHoursTests.swift */; };
 		46C1DE0B4CACBC4421D3495A /* SignInScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E9E8644DC0121E0AFBE29F9 /* SignInScreen.swift */; };
 		F61A02A42F2946672EC9A531 /* FriendsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D992637383A66D3A850456 /* FriendsScreen.swift */; };
+		6B29F2E833DEABCA16810BE2 /* LeaderboardScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C685D05255A3D6AFE5CF3DE /* LeaderboardScreen.swift */; };
 		CA28C954200B0506F6457BE5 /* FriendProfileScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35F16D61059C48B4C1F92C35 /* FriendProfileScreen.swift */; };
 		475E18A765EBE2CB149976B6 /* PlanThemes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 627629055B808FB73F268A0F /* PlanThemes.swift */; };
 		47AB0C4FD2F7C0A3F1D3ED47 /* PlaceFiltersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A38B8B967050DA7D5EAE0DF7 /* PlaceFiltersTests.swift */; };
@@ -185,6 +186,7 @@
 		5DD8BEE6C2632619EE84A762 /* AdminAuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminAuthStore.swift; sourceTree = "<group>"; };
 		5E9E8644DC0121E0AFBE29F9 /* SignInScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInScreen.swift; sourceTree = "<group>"; };
 		C0D992637383A66D3A850456 /* FriendsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendsScreen.swift; sourceTree = "<group>"; };
+		2C685D05255A3D6AFE5CF3DE /* LeaderboardScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardScreen.swift; sourceTree = "<group>"; };
 		35F16D61059C48B4C1F92C35 /* FriendProfileScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendProfileScreen.swift; sourceTree = "<group>"; };
 		5EF08414F55178EA12A29A4A /* PluralsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluralsTests.swift; sourceTree = "<group>"; };
 		627629055B808FB73F268A0F /* PlanThemes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanThemes.swift; sourceTree = "<group>"; };
@@ -299,6 +301,7 @@
 				0484B04B4522F9407DDAAFC0 /* ScanScreen.swift */,
 				5E9E8644DC0121E0AFBE29F9 /* SignInScreen.swift */,
 				C0D992637383A66D3A850456 /* FriendsScreen.swift */,
+				2C685D05255A3D6AFE5CF3DE /* LeaderboardScreen.swift */,
 				35F16D61059C48B4C1F92C35 /* FriendProfileScreen.swift */,
 				288CCED2FFAC9B3264EE7AB5 /* TripDetailScreen.swift */,
 				DB354EEA308416A9AB05BE5B /* TripsScreen.swift */,
@@ -757,6 +760,7 @@
 				F3AE2BC1FF01643AA37BDAF4 /* SentryConfig.swift in Sources */,
 				46C1DE0B4CACBC4421D3495A /* SignInScreen.swift in Sources */,
 				F61A02A42F2946672EC9A531 /* FriendsScreen.swift in Sources */,
+				6B29F2E833DEABCA16810BE2 /* LeaderboardScreen.swift in Sources */,
 				CA28C954200B0506F6457BE5 /* FriendProfileScreen.swift in Sources */,
 				66C6A96AD3E9062ED1653B85 /* StatusBadge.swift in Sources */,
 				5AA6F51FFA86B9EA366E41E4 /* TabSelection.swift in Sources */,
