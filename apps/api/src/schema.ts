@@ -166,6 +166,17 @@ export const poiPhotoCache = pgTable('poi_photo_cache', {
 // Accounts. Sign in with Apple and email/password both land here --
 // `appleUserId` and `passwordHash` are each nullable since an account only
 // ever has whichever one(s) it was actually created/linked with.
+//
+// Social-layer (Faz 1, mutual-follow-only) columns: `username` is nullable
+// since existing accounts predate it and claiming one is a separate step,
+// not part of registration. The three `share*` flags are independent and
+// default false (opt-in) -- picking richer sharing is a deliberate per-
+// category choice, not a single privacy level, since e.g. sharing trip
+// history (place+date) is a very different risk than sharing just a level
+// number. `xp`/`completedTripCount`/`sharedTripHistory` are pushed by the
+// client (which already computes `Gamification.xp(...)` locally) rather
+// than recomputed here from the `userSyncBlobs` JSON, to avoid porting
+// that scoring logic into two languages.
 export const users = pgTable('users', {
   id: varchar('id', { length: 64 }).primaryKey(),
   email: varchar('email', { length: 320 }).notNull(),
@@ -173,9 +184,32 @@ export const users = pgTable('users', {
   appleUserId: varchar('apple_user_id', { length: 128 }),
   displayName: varchar('display_name', { length: 256 }),
   createdAt: varchar('created_at', { length: 64 }).notNull(),
+  username: varchar('username', { length: 32 }),
+  shareXp: boolean('share_xp').notNull().default(false),
+  shareTripStats: boolean('share_trip_stats').notNull().default(false),
+  shareTripHistory: boolean('share_trip_history').notNull().default(false),
+  xp: integer('xp').notNull().default(0),
+  completedTripCount: integer('completed_trip_count').notNull().default(0),
+  sharedTripHistory: text('shared_trip_history'), // JSON: [{name, date}] -- only meaningful while shareTripHistory=true
 }, (table) => [
   uniqueIndex('idx_users_email').on(table.email),
   uniqueIndex('idx_users_apple_user_id').on(table.appleUserId),
+  uniqueIndex('idx_users_username').on(table.username),
+]);
+
+// Mutual-follow social graph. No public discovery/search beyond looking up
+// one exact username (see `/users/lookup`) -- `status` starts 'pending' on
+// request and becomes 'accepted' only when the followee (not the follower)
+// approves it, matching `userSyncBlobs`' no-FK/uniqueIndex idiom rather
+// than a Drizzle `.references()` (none exist anywhere in this schema).
+export const follows = pgTable('follows', {
+  followerId: varchar('follower_id', { length: 64 }).notNull(),
+  followeeId: varchar('followee_id', { length: 64 }).notNull(),
+  status: varchar('status', { length: 16 }).notNull().default('pending'), // 'pending' | 'accepted'
+  createdAt: varchar('created_at', { length: 64 }).notNull(),
+}, (table) => [
+  uniqueIndex('idx_follows_pair').on(table.followerId, table.followeeId),
+  index('idx_follows_followee').on(table.followeeId),
 ]);
 
 // Whole-blob sync storage: each of the app's local Codable stores
@@ -202,3 +236,4 @@ export type LivePlaceCacheRow = typeof livePlaceCache.$inferSelect;
 export type LiveGridCellStatusRow = typeof liveGridCellStatus.$inferSelect;
 export type UserRow = typeof users.$inferSelect;
 export type UserSyncBlobRow = typeof userSyncBlobs.$inferSelect;
+export type FollowRow = typeof follows.$inferSelect;

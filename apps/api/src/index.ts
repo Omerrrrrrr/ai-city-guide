@@ -35,6 +35,16 @@ import {
   verifyAppleIdentityToken,
 } from './auth';
 import {
+  claimUsername,
+  findUserByUsername,
+  getFollowState,
+  getFriendProfile,
+  respondToFollowRequest,
+  sendFollowRequest,
+  updateSharingPreferences,
+  updateStats,
+} from './social';
+import {
   applyApprovedImageCandidates,
   approveImageCandidate,
   discoverImageCandidates,
@@ -2829,6 +2839,172 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
       }
     }
   );
+
+  // ── /social/*, /me/username, /me/sharing-preferences, /me/stats ──────────────
+  // Faz 1 social layer: mutual-follow-only, no public search/leaderboard/
+  // discovery -- `/users/lookup` only ever resolves one exact username at a
+  // time, never lists or searches. `xp`/`completedTripCount`/
+  // `sharedTripHistory` are pushed by the client (which already computes
+  // `Gamification.xp(...)` locally) rather than recomputed here from the
+  // `userSyncBlobs` JSON. See social.ts.
+
+  app.patch<{ Body: { username?: string } }>('/me/username', async (request, reply) => {
+    const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
+    if (!userId) return;
+
+    const parsed = z.object({ username: z.string().trim().min(1) }).safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'Invalid request' });
+    }
+
+    try {
+      const updated = await claimUsername(userId, parsed.data.username);
+      return reply.send({ username: updated.username });
+    } catch (e) {
+      if (e instanceof AuthError) return reply.code(e.status).send({ error: e.message });
+      return sendServerError(request, reply, e, 'Failed to set username');
+    }
+  });
+
+  app.get<{ Querystring: { username?: string } }>('/users/lookup', async (request, reply) => {
+    const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
+    if (!userId) return;
+
+    const parsed = z.object({ username: z.string().trim().min(1) }).safeParse(request.query ?? {});
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'Invalid request' });
+    }
+
+    try {
+      const found = await findUserByUsername(parsed.data.username);
+      if (!found) return reply.code(404).send({ error: 'No account with that username.' });
+      return reply.send({ id: found.id, username: found.username });
+    } catch (e) {
+      return sendServerError(request, reply, e, 'Lookup failed');
+    }
+  });
+
+  app.post<{ Body: { username?: string } }>(
+    '/social/follow-requests',
+    { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
+      if (!userId) return;
+
+      const parsed = z.object({ username: z.string().trim().min(1) }).safeParse(request.body ?? {});
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'Invalid request' });
+      }
+
+      try {
+        await sendFollowRequest(userId, parsed.data.username);
+        return reply.code(201).send({ ok: true });
+      } catch (e) {
+        if (e instanceof AuthError) return reply.code(e.status).send({ error: e.message });
+        return sendServerError(request, reply, e, 'Failed to send follow request');
+      }
+    }
+  );
+
+  app.post<{ Params: { followerId: string } }>('/social/follow-requests/:followerId/accept', async (request, reply) => {
+    const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
+    if (!userId) return;
+
+    try {
+      await respondToFollowRequest(userId, request.params.followerId, true);
+      return reply.send({ ok: true });
+    } catch (e) {
+      if (e instanceof AuthError) return reply.code(e.status).send({ error: e.message });
+      return sendServerError(request, reply, e, 'Failed to accept follow request');
+    }
+  });
+
+  app.post<{ Params: { followerId: string } }>('/social/follow-requests/:followerId/reject', async (request, reply) => {
+    const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
+    if (!userId) return;
+
+    try {
+      await respondToFollowRequest(userId, request.params.followerId, false);
+      return reply.send({ ok: true });
+    } catch (e) {
+      if (e instanceof AuthError) return reply.code(e.status).send({ error: e.message });
+      return sendServerError(request, reply, e, 'Failed to reject follow request');
+    }
+  });
+
+  app.get('/social/follows', async (request, reply) => {
+    const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
+    if (!userId) return;
+
+    try {
+      return reply.send(await getFollowState(userId));
+    } catch (e) {
+      return sendServerError(request, reply, e, 'Failed to load follows');
+    }
+  });
+
+  app.patch<{ Body: Partial<{ shareXp: boolean; shareTripStats: boolean; shareTripHistory: boolean }> }>(
+    '/me/sharing-preferences',
+    async (request, reply) => {
+      const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
+      if (!userId) return;
+
+      const parsed = z
+        .object({
+          shareXp: z.boolean().optional(),
+          shareTripStats: z.boolean().optional(),
+          shareTripHistory: z.boolean().optional(),
+        })
+        .safeParse(request.body ?? {});
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'Invalid request' });
+      }
+
+      try {
+        await updateSharingPreferences(userId, parsed.data);
+        return reply.send({ ok: true });
+      } catch (e) {
+        return sendServerError(request, reply, e, 'Failed to update sharing preferences');
+      }
+    }
+  );
+
+  app.patch<{
+    Body: Partial<{ xp: number; completedTripCount: number; sharedTripHistory: { name: string; date: string }[] }>;
+  }>('/me/stats', async (request, reply) => {
+    const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
+    if (!userId) return;
+
+    const parsed = z
+      .object({
+        xp: z.number().int().min(0).optional(),
+        completedTripCount: z.number().int().min(0).optional(),
+        sharedTripHistory: z.array(z.object({ name: z.string(), date: z.string() })).max(200).optional(),
+      })
+      .safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'Invalid request' });
+    }
+
+    try {
+      await updateStats(userId, parsed.data);
+      return reply.send({ ok: true });
+    } catch (e) {
+      return sendServerError(request, reply, e, 'Failed to update stats');
+    }
+  });
+
+  app.get<{ Params: { friendId: string } }>('/social/friends/:friendId/profile', async (request, reply) => {
+    const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
+    if (!userId) return;
+
+    try {
+      return reply.send(await getFriendProfile(userId, request.params.friendId));
+    } catch (e) {
+      if (e instanceof AuthError) return reply.code(e.status).send({ error: e.message });
+      return sendServerError(request, reply, e, 'Failed to load friend profile');
+    }
+  });
 
   // ── /weather — Proxy OpenWeatherMap current conditions ───────────────────────
   app.get<{ Querystring: { lat: string; lng: string } }>(
