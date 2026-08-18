@@ -198,6 +198,14 @@ export const users = pgTable('users', {
   // is. `showRealName` still defaults false (rumuz first).
   leaderboardVisible: boolean('leaderboard_visible').notNull().default(true),
   showRealName: boolean('show_real_name').notNull().default(false),
+  // Premium tier. 'free' | 'basic' | 'pro' -- both paid tiers unlock the
+  // same features (Google Places premium POI data, UGC uploads), differing
+  // only in monthly usage quota (see entitlements.ts's TIER_LIMITS), not
+  // feature access. `tierExpiresAt` is unused until the StoreKit purchase
+  // flow ships (Adım 4 of the premium-tier plan) -- until then `tier` is
+  // set manually via `PATCH /admin/users/:id/tier` for testing.
+  tier: varchar('tier', { length: 16 }).notNull().default('free'),
+  tierExpiresAt: varchar('tier_expires_at', { length: 64 }),
 }, (table) => [
   uniqueIndex('idx_users_email').on(table.email),
   uniqueIndex('idx_users_apple_user_id').on(table.appleUserId),
@@ -234,6 +242,20 @@ export const userSyncBlobs = pgTable('user_sync_blobs', {
   uniqueIndex('idx_user_sync_blobs_user_key').on(table.userId, table.key),
 ]);
 
+// Per-user, per-calendar-month usage counters for quota-gated premium
+// features (currently just 'google_places' -- see entitlements.ts). One
+// row per (user, feature, month) rather than a dedicated column per
+// feature on `users`, so a new quota-gated feature is a new `counterKey`
+// value, not a migration.
+export const usageCounters = pgTable('usage_counters', {
+  userId: varchar('user_id', { length: 64 }).notNull(),
+  counterKey: varchar('counter_key', { length: 32 }).notNull(),
+  periodStart: varchar('period_start', { length: 64 }).notNull(), // ISO date of the 1st of the month
+  count: integer('count').notNull().default(0),
+}, (table) => [
+  uniqueIndex('idx_usage_counters_user_key_period').on(table.userId, table.counterKey, table.periodStart),
+]);
+
 export type PlaceRow = typeof places.$inferSelect;
 export type PoiPhotoCacheRow = typeof poiPhotoCache.$inferSelect;
 export type PlaceImageCandidateRow = typeof placeImageCandidates.$inferSelect;
@@ -244,3 +266,4 @@ export type LiveGridCellStatusRow = typeof liveGridCellStatus.$inferSelect;
 export type UserRow = typeof users.$inferSelect;
 export type UserSyncBlobRow = typeof userSyncBlobs.$inferSelect;
 export type FollowRow = typeof follows.$inferSelect;
+export type UsageCounterRow = typeof usageCounters.$inferSelect;

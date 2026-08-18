@@ -57,6 +57,13 @@
       "when": 1787044453195,
       "tag": "0007_strange_cerise",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1787047799821,
+      "tag": "0008_absent_captain_midlands",
+      "breakpoints": true
     }
   ]
 }

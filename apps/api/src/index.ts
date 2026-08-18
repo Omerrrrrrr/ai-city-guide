@@ -87,7 +87,7 @@ import { fetchWikipediaPhoto, WIKIPEDIA_PLAUSIBLE_CATEGORIES } from './wiki-phot
 import { fetchWikidataFacts } from './wikidata';
 import { fetchDietaryPlaces, fetchDietaryTagsForPlace } from './dietary';
 import { fetchUnsplashPhoto } from './unsplash';
-import { places, cities, liveGridCellStatus, livePlaceCache, poiPhotoCache } from './schema';
+import { places, cities, liveGridCellStatus, livePlaceCache, poiPhotoCache, users } from './schema';
 
 const PORT = Number(process.env.PORT ?? 4000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY?.trim();
@@ -1148,6 +1148,32 @@ async function buildServer() {
       const statusCode = message.includes('GOOGLE_MAPS_API_KEY') ? 500 : 502;
       return reply.code(statusCode).send({ error: message });
     }
+  });
+
+  // Manual tier override for testing the premium-tier feature set
+  // end-to-end before the real StoreKit purchase flow exists -- once that
+  // ships, App Store Server Notifications will update `tier` automatically
+  // and this route stays only as an admin support tool.
+  app.patch<{
+    Params: { id: string };
+    Body: { tier?: string };
+  }>('/admin/users/:id/tier', async (request, reply) => {
+    const parsed = z.object({ tier: z.enum(['free', 'basic', 'pro']) }).safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'tier must be one of: free, basic, pro' });
+    }
+
+    const [updated] = await db
+      .update(users)
+      .set({ tier: parsed.data.tier })
+      .where(eq(users.id, request.params.id))
+      .returning();
+
+    if (!updated) {
+      return reply.code(404).send({ error: 'User not found' });
+    }
+
+    return { id: updated.id, tier: updated.tier };
   });
 
   app.get<{

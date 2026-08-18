@@ -25,6 +25,7 @@ export function toPublicUser(user: UserRow) {
     completedTripCount: user.completedTripCount,
     leaderboardVisible: user.leaderboardVisible,
     showRealName: user.showRealName,
+    tier: user.tier,
   };
 }
 
