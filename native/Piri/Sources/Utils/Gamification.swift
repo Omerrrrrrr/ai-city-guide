@@ -1,12 +1,14 @@
 import Foundation
 
-/// Personal-only XP/level score, deliberately just derived from data the app
-/// already tracks (profile completeness, saved places, completed trips,
-/// recently-viewed count) rather than a separately persisted XP counter or
-/// event log — there's nothing to keep in sync, migrate, or lose: the level
+/// XP/level score, deliberately just derived from data the app already
+/// tracks (profile completeness, saved places, completed trips, recently-
+/// viewed count) rather than a separately persisted XP counter or event
+/// log — there's nothing to keep in sync, migrate, or lose: the level
 /// shown always matches exactly what the current state says the user has
-/// done. No leaderboard, no public profile, nothing shared with anyone else
-/// — see the gamification/social idea memory this was scoped down from.
+/// done. Still no leaderboard and no public profile (see the
+/// gamification/social idea memory this was scoped down from), but as of
+/// Faz 1 this score IS shared with mutual-follow friends who opt in via
+/// `shareXp` — see `RootView`'s stats push and `FriendProfileScreen`.
 enum Gamification {
     static let xpPerLevel = 100
 

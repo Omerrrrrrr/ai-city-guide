@@ -110,6 +110,36 @@ final class AuthStore {
         }
     }
 
+    /// Throws (unlike the fire-and-forget pushes above) since this is a
+    /// direct response to a user tapping "save" -- they need to see why it
+    /// failed (already taken, invalid format), not have it silently no-op.
+    func setUsername(_ username: String) async throws {
+        guard let token else { return }
+        let response = try await SocialAPI.setUsername(username, token: token)
+        guard var updatedUser = user else { return }
+        updatedUser.username = response.username
+        setSession(AuthTokenResponse(token: token, user: updatedUser))
+    }
+
+    /// Optimistic local update (instant toggle feedback) + background push
+    /// -- a wrong guess here just gets silently corrected on the next
+    /// `refreshMe()`, same tolerance `pushSync`'s whole-blob overwrite
+    /// already has for a lost/failed push.
+    func updateSharingPreferences(shareXp: Bool? = nil, shareTripStats: Bool? = nil, shareTripHistory: Bool? = nil) {
+        guard let token, var updatedUser = user else { return }
+        if let shareXp { updatedUser.shareXp = shareXp }
+        if let shareTripStats { updatedUser.shareTripStats = shareTripStats }
+        if let shareTripHistory { updatedUser.shareTripHistory = shareTripHistory }
+        setSession(AuthTokenResponse(token: token, user: updatedUser))
+
+        Task {
+            try? await SocialAPI.updateSharingPreferences(
+                SharingPreferencesRequest(shareXp: shareXp, shareTripStats: shareTripStats, shareTripHistory: shareTripHistory),
+                token: token
+            )
+        }
+    }
+
     private func setSession(_ response: AuthTokenResponse) {
         token = response.token
         user = response.user

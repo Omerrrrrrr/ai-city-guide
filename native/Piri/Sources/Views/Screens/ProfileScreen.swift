@@ -34,6 +34,7 @@ struct ProfileScreen: View {
     @Environment(TripsStore.self) private var tripsStore
     @Environment(PlacesQuery.self) private var placesQuery
     @Environment(AuthStore.self) private var authStore
+    @Environment(FriendsStore.self) private var friendsStore
 
     @State private var isEditingName = false
     @State private var nameInput = ""
@@ -59,6 +60,9 @@ struct ProfileScreen: View {
                 profileTabsSegment
                 profileTabContent
                 accountCard
+                if authStore.isSignedIn {
+                    friendsCard
+                }
                 cityCard
                 savedDataCard
                 tripsCard
@@ -191,10 +195,7 @@ struct ProfileScreen: View {
 
         return card(titleKey: "settings.xp.title") {
             HStack(spacing: 14) {
-                ZStack {
-                    Circle().fill(Theme.gold.opacity(0.15)).frame(width: 46, height: 46)
-                    Text("\(level)").font(.system(size: 19, weight: .bold)).foregroundStyle(Theme.gold)
-                }
+                LevelBadge(level: level)
                 VStack(alignment: .leading, spacing: 6) {
                     Text(L("settings.xp.level", level)).font(.system(size: 15, weight: .semibold))
                     ProgressView(value: Gamification.progressIntoCurrentLevel(xp))
@@ -475,6 +476,36 @@ struct ProfileScreen: View {
                     }
                     .buttonStyle(.plain)
                 }
+            }
+        }
+    }
+
+    /// Only shown signed-in (Faz 1 social layer requires an account, same
+    /// reasoning `RootView`'s sync gating already uses). Loads its own
+    /// count on appear rather than depending on `FriendsScreen` having
+    /// been opened first, since this card renders whenever Profile does.
+    private var friendsCard: some View {
+        card(titleKey: "friends.title", trailing: {
+            NavigationLink(destination: FriendsScreen()) {
+                Text("settings.viewAll").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.gold)
+            }
+        }) {
+            HStack(spacing: 8) {
+                Text(LPlural("friends.count", count: friendsStore.friends.count))
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+                if !friendsStore.incomingRequests.isEmpty {
+                    Text("\(friendsStore.incomingRequests.count)")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 7).padding(.vertical, 3)
+                        .background(Capsule().fill(Theme.gold))
+                }
+            }
+        }
+        .task {
+            if let token = authStore.token {
+                await friendsStore.fetchFollows(token: token)
             }
         }
     }

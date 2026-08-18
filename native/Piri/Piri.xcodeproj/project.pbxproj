@@ -44,6 +44,8 @@
 		43BB82F44992911849EBCF73 /* Place.swift in Sources */ = {isa = PBXBuildFile; fileRef = D51DBC290790323812C65938 /* Place.swift */; };
 		46BF181ED5C32670F9475103 /* PlaceHoursTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57103CE5924DEF3637376683 /* PlaceHoursTests.swift */; };
 		46C1DE0B4CACBC4421D3495A /* SignInScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E9E8644DC0121E0AFBE29F9 /* SignInScreen.swift */; };
+		F61A02A42F2946672EC9A531 /* FriendsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D992637383A66D3A850456 /* FriendsScreen.swift */; };
+		CA28C954200B0506F6457BE5 /* FriendProfileScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35F16D61059C48B4C1F92C35 /* FriendProfileScreen.swift */; };
 		475E18A765EBE2CB149976B6 /* PlanThemes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 627629055B808FB73F268A0F /* PlanThemes.swift */; };
 		47AB0C4FD2F7C0A3F1D3ED47 /* PlaceFiltersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A38B8B967050DA7D5EAE0DF7 /* PlaceFiltersTests.swift */; };
 		48790D92967906C9FC6A3E14 /* AdminModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A62E305A14B628DFA79318E3 /* AdminModels.swift */; };
@@ -84,6 +86,7 @@
 		E367A7465580AF7FD60BA8B9 /* CuratedInfoRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6DA9C9C2BD8E4941D309F03 /* CuratedInfoRow.swift */; };
 		1718ACCD9C16CFC2A4294551 /* DietaryTagsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAD9664F9AD7E3C21F9081FE /* DietaryTagsRow.swift */; };
 		734B2CBF3833E50D8E474ED1 /* DietaryFilterButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50628975E26279556C1AEE17 /* DietaryFilterButton.swift */; };
+		B3953CC6D88783457A8096A9 /* LevelBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = D468C98199BBA5F394F1053C /* LevelBadge.swift */; };
 		DA3FDB3E4A49ABE1F0B19274 /* SourceCaption.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BFFA90C5E2820E32FC55394 /* SourceCaption.swift */; };
 		F72F2C6DFF5326AB1FF65217 /* WeatherForecastSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FF915E4397E5E4DD1C61409 /* WeatherForecastSheet.swift */; };
 		B0D354DEBFA73660DAF7A7C7 /* TripSummarySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2710113A3EB845D696D1B39 /* TripSummarySheet.swift */; };
@@ -181,12 +184,15 @@
 		5D0AAD7772B7FF41780137D3 /* ExploreScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreScreen.swift; sourceTree = "<group>"; };
 		5DD8BEE6C2632619EE84A762 /* AdminAuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminAuthStore.swift; sourceTree = "<group>"; };
 		5E9E8644DC0121E0AFBE29F9 /* SignInScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInScreen.swift; sourceTree = "<group>"; };
+		C0D992637383A66D3A850456 /* FriendsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendsScreen.swift; sourceTree = "<group>"; };
+		35F16D61059C48B4C1F92C35 /* FriendProfileScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendProfileScreen.swift; sourceTree = "<group>"; };
 		5EF08414F55178EA12A29A4A /* PluralsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluralsTests.swift; sourceTree = "<group>"; };
 		627629055B808FB73F268A0F /* PlanThemes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanThemes.swift; sourceTree = "<group>"; };
 		642AE03D91D3B2C9EC654135 /* TripAdvisorRatingRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripAdvisorRatingRow.swift; sourceTree = "<group>"; };
 		D6DA9C9C2BD8E4941D309F03 /* CuratedInfoRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CuratedInfoRow.swift; sourceTree = "<group>"; };
 		FAD9664F9AD7E3C21F9081FE /* DietaryTagsRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DietaryTagsRow.swift; sourceTree = "<group>"; };
 		50628975E26279556C1AEE17 /* DietaryFilterButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DietaryFilterButton.swift; sourceTree = "<group>"; };
+		D468C98199BBA5F394F1053C /* LevelBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LevelBadge.swift; sourceTree = "<group>"; };
 		8BFFA90C5E2820E32FC55394 /* SourceCaption.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceCaption.swift; sourceTree = "<group>"; };
 		0FF915E4397E5E4DD1C61409 /* WeatherForecastSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherForecastSheet.swift; sourceTree = "<group>"; };
 		F2710113A3EB845D696D1B39 /* TripSummarySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripSummarySheet.swift; sourceTree = "<group>"; };
@@ -292,6 +298,8 @@
 				3A6344FD16ACEE6A9600CDCC /* SavedScreen.swift */,
 				0484B04B4522F9407DDAAFC0 /* ScanScreen.swift */,
 				5E9E8644DC0121E0AFBE29F9 /* SignInScreen.swift */,
+				C0D992637383A66D3A850456 /* FriendsScreen.swift */,
+				35F16D61059C48B4C1F92C35 /* FriendProfileScreen.swift */,
 				288CCED2FFAC9B3264EE7AB5 /* TripDetailScreen.swift */,
 				DB354EEA308416A9AB05BE5B /* TripsScreen.swift */,
 			);
@@ -329,6 +337,7 @@
 				D6DA9C9C2BD8E4941D309F03 /* CuratedInfoRow.swift */,
 				FAD9664F9AD7E3C21F9081FE /* DietaryTagsRow.swift */,
 				50628975E26279556C1AEE17 /* DietaryFilterButton.swift */,
+				D468C98199BBA5F394F1053C /* LevelBadge.swift */,
 				8BFFA90C5E2820E32FC55394 /* SourceCaption.swift */,
 				0FF915E4397E5E4DD1C61409 /* WeatherForecastSheet.swift */,
 				F2710113A3EB845D696D1B39 /* TripSummarySheet.swift */,
@@ -691,6 +700,7 @@
 				E367A7465580AF7FD60BA8B9 /* CuratedInfoRow.swift in Sources */,
 				1718ACCD9C16CFC2A4294551 /* DietaryTagsRow.swift in Sources */,
 				734B2CBF3833E50D8E474ED1 /* DietaryFilterButton.swift in Sources */,
+				B3953CC6D88783457A8096A9 /* LevelBadge.swift in Sources */,
 				DA3FDB3E4A49ABE1F0B19274 /* SourceCaption.swift in Sources */,
 				F72F2C6DFF5326AB1FF65217 /* WeatherForecastSheet.swift in Sources */,
 				B0D354DEBFA73660DAF7A7C7 /* TripSummarySheet.swift in Sources */,
@@ -746,6 +756,8 @@
 				D33E22E7628EB1496DE2A8E7 /* ScanScreen.swift in Sources */,
 				F3AE2BC1FF01643AA37BDAF4 /* SentryConfig.swift in Sources */,
 				46C1DE0B4CACBC4421D3495A /* SignInScreen.swift in Sources */,
+				F61A02A42F2946672EC9A531 /* FriendsScreen.swift in Sources */,
+				CA28C954200B0506F6457BE5 /* FriendProfileScreen.swift in Sources */,
 				66C6A96AD3E9062ED1653B85 /* StatusBadge.swift in Sources */,
 				5AA6F51FFA86B9EA366E41E4 /* TabSelection.swift in Sources */,
 				100F6128B1DA42E96537D83B /* Theme.swift in Sources */,
