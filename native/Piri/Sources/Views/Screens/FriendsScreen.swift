@@ -121,7 +121,7 @@ struct FriendsScreen: View {
             sectionHeader("friends.requests.title")
             ForEach(friendsStore.incomingRequests) { request in
                 HStack(spacing: 10) {
-                    Text(request.username ?? request.id).font(.system(size: 15, weight: .medium))
+                    Text(request.name ?? request.id).font(.system(size: 15, weight: .medium))
                     Spacer()
                     Button("friends.requests.accept") {
                         Task { if let token = authStore.token { await friendsStore.accept(request, token: token) } }
@@ -146,15 +146,15 @@ struct FriendsScreen: View {
                 Text("friends.list.empty").font(.system(size: 14)).foregroundStyle(.secondary)
             } else {
                 ForEach(friendsStore.friends) { friend in
-                    NavigationLink(destination: FriendProfileScreen(friendId: friend.id, username: friend.username)) {
+                    NavigationLink(destination: FriendProfileScreen(friendId: friend.id, name: friend.name)) {
                         HStack(spacing: 10) {
                             Circle().fill(Theme.gold.opacity(0.15)).frame(width: 36, height: 36)
                                 .overlay(
-                                    Text(String((friend.username ?? "?").prefix(1)).uppercased())
+                                    Text(String((friend.name ?? "?").prefix(1)).uppercased())
                                         .font(.system(size: 15, weight: .bold))
                                         .foregroundStyle(Theme.gold)
                                 )
-                            Text(friend.username ?? friend.id).font(.system(size: 15, weight: .medium)).foregroundStyle(.primary)
+                            Text(friend.name ?? friend.id).font(.system(size: 15, weight: .medium)).foregroundStyle(.primary)
                             Spacer()
                             Text("›").font(.system(size: 20)).foregroundStyle(.secondary.opacity(0.5))
                         }

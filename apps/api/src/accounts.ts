@@ -7,10 +7,11 @@ import { users, userSyncBlobs, type UserRow } from './schema';
 export const SYNC_KEYS = ['profile', 'savedPlaces', 'trips'] as const;
 export type SyncKey = (typeof SYNC_KEYS)[number];
 
-// Includes the Faz 1 social-layer fields (username + share flags + the
-// stats the client pushes) since this is the one shape both `/me` and
-// every `/auth/*` response already send back -- reusing it here means the
-// client's own account state stays current without a separate endpoint.
+// Includes the Faz 1 + Faz 2 social-layer fields (username + share flags +
+// the stats the client pushes + leaderboard visibility/name choice) since
+// this is the one shape both `/me` and every `/auth/*` response already
+// send back -- reusing it here means the client's own account state stays
+// current without a separate endpoint.
 export function toPublicUser(user: UserRow) {
   return {
     id: user.id,
@@ -22,6 +23,8 @@ export function toPublicUser(user: UserRow) {
     shareTripHistory: user.shareTripHistory,
     xp: user.xp,
     completedTripCount: user.completedTripCount,
+    leaderboardVisible: user.leaderboardVisible,
+    showRealName: user.showRealName,
   };
 }
 

@@ -7,15 +7,16 @@ import SwiftUI
 /// shared renders an explicit "not shared" row rather than just omitting
 /// it silently, so it's clear this is their choice, not a loading gap.
 /// Id-based, matching `TripDetailScreen`/`CollectionDetailScreen`'s
-/// convention -- `username` is passed along from `FriendsScreen`'s
-/// already-known row data purely for an instant title before the fetch
-/// completes.
+/// convention -- `name` (that friend's chosen public display name, not
+/// necessarily their literal username) is passed along from
+/// `FriendsScreen`'s already-known row data purely for an instant title
+/// before the fetch completes.
 struct FriendProfileScreen: View {
     @Environment(AuthStore.self) private var authStore
     @Environment(FriendsStore.self) private var friendsStore
 
     let friendId: String
-    let username: String?
+    let name: String?
 
     @State private var profile: FriendProfile?
     @State private var isLoading = true
@@ -47,7 +48,7 @@ struct FriendProfileScreen: View {
             }
             .padding(16)
         }
-        .navigationTitle(profile?.username ?? username ?? String(localized: String.LocalizationValue("friends.title")))
+        .navigationTitle(profile?.name ?? name ?? String(localized: String.LocalizationValue("friends.title")))
         .navigationBarTitleDisplayMode(.inline)
         .task {
             if let token = authStore.token {

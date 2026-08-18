@@ -125,16 +125,30 @@ final class AuthStore {
     /// -- a wrong guess here just gets silently corrected on the next
     /// `refreshMe()`, same tolerance `pushSync`'s whole-blob overwrite
     /// already has for a lost/failed push.
-    func updateSharingPreferences(shareXp: Bool? = nil, shareTripStats: Bool? = nil, shareTripHistory: Bool? = nil) {
+    func updateSharingPreferences(
+        shareXp: Bool? = nil,
+        shareTripStats: Bool? = nil,
+        shareTripHistory: Bool? = nil,
+        leaderboardVisible: Bool? = nil,
+        showRealName: Bool? = nil
+    ) {
         guard let token, var updatedUser = user else { return }
         if let shareXp { updatedUser.shareXp = shareXp }
         if let shareTripStats { updatedUser.shareTripStats = shareTripStats }
         if let shareTripHistory { updatedUser.shareTripHistory = shareTripHistory }
+        if let leaderboardVisible { updatedUser.leaderboardVisible = leaderboardVisible }
+        if let showRealName { updatedUser.showRealName = showRealName }
         setSession(AuthTokenResponse(token: token, user: updatedUser))
 
         Task {
             try? await SocialAPI.updateSharingPreferences(
-                SharingPreferencesRequest(shareXp: shareXp, shareTripStats: shareTripStats, shareTripHistory: shareTripHistory),
+                SharingPreferencesRequest(
+                    shareXp: shareXp,
+                    shareTripStats: shareTripStats,
+                    shareTripHistory: shareTripHistory,
+                    leaderboardVisible: leaderboardVisible,
+                    showRealName: showRealName
+                ),
                 token: token
             )
         }

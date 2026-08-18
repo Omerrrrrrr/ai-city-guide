@@ -1,7 +1,8 @@
 import Foundation
 
-/// Faz 1 social layer: mutual-follow, username, opt-in stat sharing. Same
-/// `bearerToken` plumbing `AuthAPI`/`AdminAPI` already use.
+/// Faz 1 social layer (mutual-follow, username, opt-in stat sharing) + Faz
+/// 2 (public leaderboard/search). Same `bearerToken` plumbing
+/// `AuthAPI`/`AdminAPI` already use.
 enum SocialAPI {
     static func setUsername(_ username: String, token: String) async throws -> UsernameResponse {
         try await APIClient.shared.patch("/me/username", body: UsernameRequest(username: username), bearerToken: token)
@@ -41,5 +42,13 @@ enum SocialAPI {
 
     static func fetchFriendProfile(friendId: String, token: String) async throws -> FriendProfile {
         try await APIClient.shared.get("/social/friends/\(friendId)/profile", bearerToken: token)
+    }
+
+    static func fetchLeaderboard(limit: Int = 50, token: String) async throws -> [LeaderboardEntry] {
+        try await APIClient.shared.get("/social/leaderboard", query: ["limit": String(limit)], bearerToken: token)
+    }
+
+    static func searchUsers(query: String, token: String) async throws -> [LeaderboardEntry] {
+        try await APIClient.shared.get("/social/search", query: ["q": query], bearerToken: token)
     }
 }

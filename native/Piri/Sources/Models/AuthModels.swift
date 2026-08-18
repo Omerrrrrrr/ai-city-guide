@@ -16,6 +16,13 @@ struct AuthUser: Codable, Equatable {
     var shareTripHistory: Bool = false
     var xp: Int = 0
     var completedTripCount: Int = 0
+    /// Faz 2 (public leaderboard/search) -- `leaderboardVisible` defaults
+    /// `true` (unlike the Faz 1 `share*` flags above, which default off):
+    /// a leaderboard needs entries to be worth anything, and it's still
+    /// user-controllable, just not opt-in-from-empty the way friend-only
+    /// sharing is. `showRealName` still defaults `false` (rumuz first).
+    var leaderboardVisible: Bool = true
+    var showRealName: Bool = false
 }
 
 struct AuthTokenResponse: Decodable {
