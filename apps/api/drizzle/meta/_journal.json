@@ -64,6 +64,13 @@
       "when": 1787047799821,
       "tag": "0008_absent_captain_midlands",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1787048287918,
+      "tag": "0009_tough_starfox",
+      "breakpoints": true
     }
   ]
 }

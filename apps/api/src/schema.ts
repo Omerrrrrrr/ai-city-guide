@@ -256,6 +256,57 @@ export const usageCounters = pgTable('usage_counters', {
   uniqueIndex('idx_usage_counters_user_key_period').on(table.userId, table.counterKey, table.periodStart),
 ]);
 
+// UGC: user-submitted POI photos, reducing dependency on Wikipedia/
+// Tripadvisor/Unsplash/Google as the only photo sources. `poiKey` uses the
+// exact `${nameNormalized}|${latRounded}|${lngRounded}` scheme already
+// established by poi_photo_cache's `id` (see the /places/photos route),
+// so a submission lands on the same POI identity the rest of the photo
+// pipeline already uses. `photoUrl` holds a data: URI directly for now --
+// there's no object-storage credential configured in this environment
+// (no S3/R2/etc.), so this is the zero-new-infra interim choice, not a
+// production-scale design; swap for a real bucket + CDN URL before photo
+// volume/DB row size becomes a real concern.
+export const userSubmittedPhotos = pgTable('user_submitted_photos', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  poiKey: varchar('poi_key', { length: 300 }).notNull(),
+  poiName: varchar('poi_name', { length: 256 }).notNull(),
+  userId: varchar('user_id', { length: 64 }).notNull(),
+  photoUrl: text('photo_url').notNull(),
+  caption: varchar('caption', { length: 300 }),
+  status: varchar('status', { length: 16 }).notNull().default('pending'), // 'pending' | 'approved' | 'rejected'
+  moderationReason: text('moderation_reason'),
+  createdAt: varchar('created_at', { length: 64 }).notNull(),
+}, (table) => [
+  index('idx_user_submitted_photos_poi_key').on(table.poiKey),
+  index('idx_user_submitted_photos_user').on(table.userId),
+]);
+
+// Apple Guideline 1.2 (b): a report mechanism for UGC. Reports accumulate
+// against a photo; the route layer auto-rejects a photo once report count
+// crosses a fixed threshold (see index.ts) rather than needing a human
+// review queue at this scale.
+export const contentReports = pgTable('content_reports', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  photoId: varchar('photo_id', { length: 64 }).notNull(),
+  reporterId: varchar('reporter_id', { length: 64 }).notNull(),
+  reason: varchar('reason', { length: 300 }).notNull(),
+  createdAt: varchar('created_at', { length: 64 }).notNull(),
+}, (table) => [
+  uniqueIndex('idx_content_reports_photo_reporter').on(table.photoId, table.reporterId),
+]);
+
+// Apple Guideline 1.2 (c): ability to block an abusive user. Scoped to UGC
+// visibility only (a blocked user's photo submissions are hidden from the
+// blocker) -- there's no messaging/comment feature yet for this to also
+// gate.
+export const blocks = pgTable('blocks', {
+  blockerId: varchar('blocker_id', { length: 64 }).notNull(),
+  blockedId: varchar('blocked_id', { length: 64 }).notNull(),
+  createdAt: varchar('created_at', { length: 64 }).notNull(),
+}, (table) => [
+  uniqueIndex('idx_blocks_pair').on(table.blockerId, table.blockedId),
+]);
+
 export type PlaceRow = typeof places.$inferSelect;
 export type PoiPhotoCacheRow = typeof poiPhotoCache.$inferSelect;
 export type PlaceImageCandidateRow = typeof placeImageCandidates.$inferSelect;
@@ -267,3 +318,6 @@ export type UserRow = typeof users.$inferSelect;
 export type UserSyncBlobRow = typeof userSyncBlobs.$inferSelect;
 export type FollowRow = typeof follows.$inferSelect;
 export type UsageCounterRow = typeof usageCounters.$inferSelect;
+export type UserSubmittedPhotoRow = typeof userSubmittedPhotos.$inferSelect;
+export type ContentReportRow = typeof contentReports.$inferSelect;
+export type BlockRow = typeof blocks.$inferSelect;

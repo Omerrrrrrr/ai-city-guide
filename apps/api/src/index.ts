@@ -29,6 +29,7 @@ import {
 } from './accounts';
 import {
   AuthError,
+  newUserId,
   requireUserId,
   signSessionToken,
   timingSafeStringEqual,
@@ -59,6 +60,7 @@ import {
 import { previewGoogleHoursForPlace } from './google-places-hours';
 import { fetchPremiumPlaceDetails } from './google-places-poi';
 import { checkAndIncrementUsage, refundUsage } from './entitlements';
+import { moderatePhotoSubmission } from './moderation';
 import { openingHoursSchema } from './opening-hours';
 import { enrichPlaceWithWikipedia, type AiProviderConfig } from './wiki-enrichment';
 import { toPlaceDto } from './place-dto';
@@ -89,7 +91,7 @@ import { fetchWikipediaPhoto, WIKIPEDIA_PLAUSIBLE_CATEGORIES } from './wiki-phot
 import { fetchWikidataFacts } from './wikidata';
 import { fetchDietaryPlaces, fetchDietaryTagsForPlace } from './dietary';
 import { fetchUnsplashPhoto } from './unsplash';
-import { places, cities, liveGridCellStatus, livePlaceCache, poiPhotoCache, users } from './schema';
+import { places, cities, liveGridCellStatus, livePlaceCache, poiPhotoCache, users, userSubmittedPhotos, contentReports, blocks } from './schema';
 
 const PORT = Number(process.env.PORT ?? 4000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY?.trim();
@@ -2058,6 +2060,182 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
       }
     }
   );
+
+  // ── UGC: user-submitted POI photos ──────────────────────────────────────
+  // Reduces dependency on Wikipedia/Tripadvisor/Unsplash/Google as the only
+  // photo sources -- open to every account regardless of tier (the point is
+  // more contributed data, not a premium perk). `photoUrl` is a `data:` URI
+  // for now (see schema.ts's userSubmittedPhotos comment -- no object
+  // storage configured in this environment yet).
+  const REPORT_AUTO_REJECT_THRESHOLD = 3;
+
+  app.post<{
+    Body: { poiName: string; lat: number; lng: number; photoUrl: string; caption?: string };
+  }>(
+    '/poi/photos',
+    { config: { rateLimit: { max: 10, timeWindow: '1 day' } } },
+    async (request, reply) => {
+      const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
+      if (!userId) return;
+
+      const parsed = z
+        .object({
+          poiName: z.string().trim().min(1).max(200),
+          lat: z.number(),
+          lng: z.number(),
+          photoUrl: z.string().trim().min(1).max(8_000_000),
+          caption: z.string().trim().max(300).optional(),
+        })
+        .safeParse(request.body);
+
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'Invalid request' });
+      }
+
+      const { poiName, lat, lng, photoUrl, caption } = parsed.data;
+      const nameNormalized = normalizeName(poiName);
+      const latRounded = Math.round(lat * 1000) / 1000;
+      const lngRounded = Math.round(lng * 1000) / 1000;
+      const poiKey = `${nameNormalized}|${latRounded}|${lngRounded}`;
+
+      const moderation = await moderatePhotoSubmission(photoUrl, caption);
+
+      const [created] = await db
+        .insert(userSubmittedPhotos)
+        .values({
+          id: newUserId().replace('user_', 'photo_'),
+          poiKey,
+          poiName,
+          userId,
+          photoUrl,
+          caption: caption ?? null,
+          status: moderation.flagged ? 'rejected' : 'approved',
+          moderationReason: moderation.reason,
+          createdAt: new Date().toISOString(),
+        })
+        .returning();
+
+      return reply.code(201).send({
+        id: created.id,
+        status: created.status,
+        moderationReason: created.status === 'rejected' ? created.moderationReason : null,
+      });
+    }
+  );
+
+  app.get<{ Querystring: { name?: string; lat?: string; lng?: string } }>(
+    '/poi/photos',
+    async (request, reply) => {
+      const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
+      if (!userId) return;
+
+      const parsed = z
+        .object({
+          name: z.string().trim().min(1),
+          lat: z.coerce.number(),
+          lng: z.coerce.number(),
+        })
+        .safeParse(request.query ?? {});
+
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'Invalid request' });
+      }
+
+      const nameNormalized = normalizeName(parsed.data.name);
+      const latRounded = Math.round(parsed.data.lat * 1000) / 1000;
+      const lngRounded = Math.round(parsed.data.lng * 1000) / 1000;
+      const poiKey = `${nameNormalized}|${latRounded}|${lngRounded}`;
+
+      const blockedRows = await db.select({ blockedId: blocks.blockedId }).from(blocks).where(eq(blocks.blockerId, userId));
+      const blockedIds = new Set(blockedRows.map((row) => row.blockedId));
+
+      const rows = await db
+        .select()
+        .from(userSubmittedPhotos)
+        .where(and(eq(userSubmittedPhotos.poiKey, poiKey), eq(userSubmittedPhotos.status, 'approved')));
+
+      const visible = rows.filter((row) => !blockedIds.has(row.userId));
+
+      return reply.send({
+        photos: visible.map((row) => ({
+          id: row.id,
+          photoUrl: row.photoUrl,
+          caption: row.caption,
+          userId: row.userId,
+          createdAt: row.createdAt,
+        })),
+      });
+    }
+  );
+
+  // Apple Guideline 1.2 (b): a report mechanism for UGC. One report per
+  // (photo, reporter) pair; once a photo crosses REPORT_AUTO_REJECT_THRESHOLD
+  // distinct reporters it's automatically hidden (status -> 'rejected') --
+  // no human review queue at this scale, matching moderation.ts's approach.
+  app.post<{ Body: { photoId?: string; reason?: string } }>(
+    '/content-reports',
+    { config: { rateLimit: { max: 20, timeWindow: '1 hour' } } },
+    async (request, reply) => {
+      const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
+      if (!userId) return;
+
+      const parsed = z
+        .object({ photoId: z.string().trim().min(1), reason: z.string().trim().min(1).max(300) })
+        .safeParse(request.body ?? {});
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'Invalid request' });
+      }
+
+      const { photoId, reason } = parsed.data;
+      const photo = await db.query.userSubmittedPhotos.findFirst({ where: eq(userSubmittedPhotos.id, photoId) });
+      if (!photo) {
+        return reply.code(404).send({ error: 'Photo not found' });
+      }
+
+      await db
+        .insert(contentReports)
+        .values({ id: newUserId().replace('user_', 'report_'), photoId, reporterId: userId, reason, createdAt: new Date().toISOString() })
+        .onConflictDoNothing({ target: [contentReports.photoId, contentReports.reporterId] });
+
+      const reports = await db.select().from(contentReports).where(eq(contentReports.photoId, photoId));
+      if (reports.length >= REPORT_AUTO_REJECT_THRESHOLD && photo.status !== 'rejected') {
+        await db
+          .update(userSubmittedPhotos)
+          .set({ status: 'rejected', moderationReason: 'Auto-hidden after multiple reports' })
+          .where(eq(userSubmittedPhotos.id, photoId));
+      }
+
+      return reply.code(201).send({ ok: true });
+    }
+  );
+
+  // Apple Guideline 1.2 (c): ability to block an abusive user -- scoped to
+  // UGC visibility (see GET /poi/photos above), matching schema.ts's
+  // `blocks` table comment.
+  app.post<{ Params: { id: string } }>('/users/:id/block', async (request, reply) => {
+    const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
+    if (!userId) return;
+
+    const blockedId = request.params.id;
+    if (blockedId === userId) {
+      return reply.code(400).send({ error: 'Cannot block yourself' });
+    }
+
+    await db
+      .insert(blocks)
+      .values({ blockerId: userId, blockedId, createdAt: new Date().toISOString() })
+      .onConflictDoNothing({ target: [blocks.blockerId, blocks.blockedId] });
+
+    return reply.code(201).send({ ok: true });
+  });
+
+  app.post<{ Params: { id: string } }>('/users/:id/unblock', async (request, reply) => {
+    const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
+    if (!userId) return;
+
+    await db.delete(blocks).where(and(eq(blocks.blockerId, userId), eq(blocks.blockedId, request.params.id)));
+    return reply.send({ ok: true });
+  });
 
   // ── /places/explain-poi/chat — follow-up Q&A about a POI card ──────────────
   // Lets the user keep asking questions under the AI explanation shown for a
