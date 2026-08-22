@@ -61,6 +61,8 @@ import { previewGoogleHoursForPlace } from './google-places-hours';
 import { fetchPremiumPlaceDetails } from './google-places-poi';
 import { checkAndIncrementUsage, refundUsage } from './entitlements';
 import { moderatePhotoSubmission } from './moderation';
+import { uploadDataUriToR2 } from './r2';
+import { PRIVACY_POLICY_HTML } from './privacy-policy';
 import { openingHoursSchema } from './opening-hours';
 import { enrichPlaceWithWikipedia, type AiProviderConfig } from './wiki-enrichment';
 import { toPlaceDto } from './place-dto';
@@ -484,6 +486,11 @@ async function buildServer() {
   }
 
   app.get('/health', async () => ({ status: 'ok' }));
+  // App Store Connect requires a public privacy policy URL -- plain HTML,
+  // not JSON, so it bypasses the rest of this file's response conventions.
+  app.get('/privacy', async (_request, reply) => {
+    reply.type('text/html').send(PRIVACY_POLICY_HTML);
+  });
   app.get('/app-status', async () => {
     const aiProvider = getAiProviderConfig();
 
@@ -2099,15 +2106,24 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
       const poiKey = `${nameNormalized}|${latRounded}|${lngRounded}`;
 
       const moderation = await moderatePhotoSubmission(photoUrl, caption);
+      const photoId = newUserId().replace('user_', 'photo_');
+
+      // Only approved photos get uploaded to R2 -- a rejected submission is
+      // never served (GET /poi/photos filters to status='approved'), so
+      // there's no reason to put it in the bucket. uploadDataUriToR2 falls
+      // back to null (and the raw data: URI below) when R2 isn't configured.
+      const storedPhotoUrl = moderation.flagged
+        ? photoUrl
+        : (await uploadDataUriToR2(photoUrl, `poi-photos/${photoId}`)) ?? photoUrl;
 
       const [created] = await db
         .insert(userSubmittedPhotos)
         .values({
-          id: newUserId().replace('user_', 'photo_'),
+          id: photoId,
           poiKey,
           poiName,
           userId,
-          photoUrl,
+          photoUrl: storedPhotoUrl,
           caption: caption ?? null,
           status: moderation.flagged ? 'rejected' : 'approved',
           moderationReason: moderation.reason,
@@ -3506,14 +3522,14 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
     }
   );
 
-  // ── /routes/directions — Proxy OpenRouteService for real walking/driving routes ──
+  // ── /routes/directions — Proxy OpenRouteService for real walking/driving/cycling routes ──
   // Key stays server-side (never sent to the client) — same proxy pattern as
   // /weather. OPENROUTESERVICE_API_KEY is free to obtain (no credit card,
   // openrouteservice.org), 2000 req/day free tier. 503s until configured.
   app.post<{
     Body: {
       coordinates: { lat: number; lng: number }[];
-      profile?: 'foot-walking' | 'driving-car';
+      profile?: 'foot-walking' | 'driving-car' | 'cycling-regular';
     };
   }>(
     '/routes/directions',
@@ -3525,7 +3541,7 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
             .array(z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }))
             .min(2)
             .max(10),
-          profile: z.enum(['foot-walking', 'driving-car']).optional().default('foot-walking'),
+          profile: z.enum(['foot-walking', 'driving-car', 'cycling-regular']).optional().default('foot-walking'),
         })
         .safeParse(request.body);
 
@@ -3552,7 +3568,7 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
             coordinates[i + 1].lng
           ) * 1000;
         }
-        const speedMetersPerSecond = profile === 'driving-car' ? 11.1 : 1.4; // ~40 km/h vs ~5 km/h
+        const speedMetersPerSecond = profile === 'driving-car' ? 11.1 : profile === 'cycling-regular' ? 4.2 : 1.4; // ~40 km/h vs ~15 km/h vs ~5 km/h
         return reply.send({
           route: coordinates.map((c) => [c.lat, c.lng]),
           distanceMeters,

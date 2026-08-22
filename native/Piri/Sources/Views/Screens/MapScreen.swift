@@ -1,6 +1,20 @@
 import MapKit
 import SwiftUI
 
+/// XP is derived, not logged (see `Gamification.swift`), so a per-trip XP
+/// delta only exists if it's snapshotted right at the moment a trip ends --
+/// `endRoute()` in `MapScreen+RouteMode.swift` does exactly that and hands
+/// the result here as a one-shot sheet-presentation payload.
+struct PendingTripRecap: Identifiable {
+    let id = UUID()
+    let trip: Trip
+    let xpBefore: Int
+    let xpAfter: Int
+    let levelBefore: Int
+    let levelAfter: Int
+    let myLifetimeTripCount: Int
+}
+
 /// Port of `mobile/app/(tabs)/map.tsx`. The RN version had to gate live-pin
 /// fetching behind a manual "Discover this area" button and a hard
 /// server-side cap (`MAX_LIVE_PINS_RESPONSE = 25`) because bulk marker churn
@@ -23,9 +37,11 @@ struct MapScreen: View {
     // declare its own stored/environment properties) needs access to these.
     @Environment(CityStore.self) var cityStore
     @Environment(SavedPlacesStore.self) var savedPlacesStore
-    @Environment(UserProfileStore.self) private var userProfileStore
+    @Environment(UserProfileStore.self) var userProfileStore
     @Environment(TripsStore.self) var tripsStore
     @Environment(TabSelection.self) private var tabSelection
+    @Environment(AuthStore.self) private var authStore
+    @Environment(RecentlyViewedStore.self) var recentlyViewedStore
 
     @State var locationManager = LocationManager()
     @State private var places: [Place] = []
@@ -58,6 +74,11 @@ struct MapScreen: View {
     @State private var selectedMapFeature: MKMapFeatureAnnotation?
     @State private var poiExplainResult: ExplainResult?
     @State private var poiExplainLoading = false
+    /// Keyed to whichever POI `poiExplainResult` currently describes — reset
+    /// alongside it in every select/dismiss path below rather than left to
+    /// go stale, since a previous POI's photos briefly showing under a new
+    /// one's headline would misattribute them.
+    @State private var userPhotos: [UserSubmittedPhoto] = []
     /// Separate from the shared `errorMessage` banner (search/directions/live
     /// pins) so a POI-explain failure shows inline in `mapFeatureCard` with
     /// its own retry button, instead of a disconnected top-of-screen banner
@@ -71,6 +92,7 @@ struct MapScreen: View {
     /// its plain phone/website fields and offer the full Place Card sheet.
     @State private var resolvedMapFeatureItem: MKMapItem?
     @State private var showingMapItemDetail = false
+    @State private var showingDirections = false
     @State private var addToCollectionKind: SavedCollectionKind?
     @State private var lookAroundScene: MKLookAroundScene?
     @State private var routeCoordinates: [CLLocationCoordinate2D] = []
@@ -109,16 +131,20 @@ struct MapScreen: View {
     /// "Güncelle" is tapped. Mirrors `stopsChangedFromActiveTrip`.
     @State var routeProfileDirty = false
     /// Set by `endRoute()` right after ending a trip — presenting
-    /// `TripSummarySheet` as a `.sheet(item:)` this drives. `nil` the rest
-    /// of the time, so the summary only ever appears once, right when a
-    /// trip actually finishes, not on every future visit to this screen.
-    @State var lastEndedTrip: Trip?
+    /// `TripRecapView` as a `.sheet(item:)` this drives. `nil` the rest
+    /// of the time, so the animated recap only ever plays once, right when
+    /// a trip actually finishes, not on every future visit to this screen
+    /// (revisiting an old trip later shows the static `TripSummarySheet`
+    /// instead, from `TripDetailScreen`).
+    @State var pendingTripRecap: PendingTripRecap?
     /// "Rotayı Kaydet" — saves the currently-planned stops (in their
     /// current order) as a new Plan collection, without starting a live
     /// trip. Previously the only way out of route mode was "Rotayı Başlat"
     /// (commit to live tracking) or discard the whole plan.
     @State var showingSaveRouteAlert = false
     @State var saveRouteName = ""
+    @State var showingSaveConfirmation = false
+    @State var saveConfirmationTask: Task<Void, Never>?
     /// Collapsed by default — the full editable stop list used to always
     /// take up roughly half the screen over the map itself. Expanding is a
     /// deliberate tap, not automatic, so picking stops on the map still
@@ -330,8 +356,15 @@ struct MapScreen: View {
                 Task { await attachTripPhoto(data) }
             }
         }
-        .sheet(item: $lastEndedTrip) { trip in
-            TripSummarySheet(trip: trip)
+        .sheet(item: $pendingTripRecap) { pending in
+            TripRecapView(
+                trip: pending.trip,
+                xpBefore: pending.xpBefore,
+                xpAfter: pending.xpAfter,
+                levelBefore: pending.levelBefore,
+                levelAfter: pending.levelAfter,
+                myLifetimeTripCount: pending.myLifetimeTripCount
+            )
         }
     }
 
@@ -465,14 +498,17 @@ struct MapScreen: View {
         selectedMapFeature = nil
         poiExplainResult = nil
         poiExplainError = nil
+        userPhotos = []
         lookAroundScene = nil
         resolvedMapFeatureItem = nil
         showingMapItemDetail = false
+        showingDirections = false
         addToCollectionKind = nil
         poiExplainTask?.cancel()
         poiExplainTask = Task { await explainDietaryPin(pin) }
         let coordinate = CLLocationCoordinate2D(latitude: pin.lat, longitude: pin.lng)
         Task { lookAroundScene = try? await MKLookAroundSceneRequest(coordinate: coordinate).scene }
+        Task { await loadUserPhotos(name: pin.name, coordinate: coordinate) }
     }
 
     private func selectMapFeature(_ feature: MKMapFeatureAnnotation) {
@@ -482,13 +518,16 @@ struct MapScreen: View {
         selectedDietaryPin = nil
         poiExplainResult = nil
         poiExplainError = nil
+        userPhotos = []
         lookAroundScene = nil
         resolvedMapFeatureItem = nil
         showingMapItemDetail = false
+        showingDirections = false
         addToCollectionKind = nil
         poiExplainTask?.cancel()
         poiExplainTask = Task { await explainMapFeature(feature) }
         Task { lookAroundScene = try? await MKLookAroundSceneRequest(coordinate: feature.coordinate).scene }
+        Task { await loadUserPhotos(name: feature.title ?? "", coordinate: feature.coordinate) }
     }
 
     private func dismissMapFeature() {
@@ -496,8 +535,10 @@ struct MapScreen: View {
         selectedDietaryPin = nil
         poiExplainResult = nil
         poiExplainError = nil
+        userPhotos = []
         lookAroundScene = nil
         showingMapItemDetail = false
+        showingDirections = false
         addToCollectionKind = nil
         poiExplainTask?.cancel()
     }
@@ -636,6 +677,7 @@ struct MapScreen: View {
             } else if let poiExplainResult {
                 Text(poiExplainResult.headline).font(.subheadline.bold()).foregroundStyle(Theme.gold)
                 POIPhotoGallery(photos: poiExplainResult.photos)
+                UserPhotoSection(poiName: identity.title ?? "", coordinate: identity.coordinate, photos: $userPhotos)
                 if let rating = poiExplainResult.rating {
                     TripAdvisorRatingRow(rating: rating)
                 }
@@ -707,6 +749,18 @@ struct MapScreen: View {
                         resolvedMapFeatureItem.openInMaps()
                     }
                     .buttonStyle(.bordered)
+
+                    Button {
+                        Haptics.light()
+                        withAnimation(.easeInOut(duration: 0.2)) { showingDirections.toggle() }
+                    } label: {
+                        Label("directions.preview.button", systemImage: "arrow.triangle.turn.up.right.circle")
+                    }
+                    .buttonStyle(.bordered)
+                }
+
+                if showingDirections {
+                    DirectionsPreview(destination: identity.coordinate)
                 }
             }
 
@@ -935,6 +989,11 @@ struct MapScreen: View {
             guard !Task.isCancelled else { return }
             poiExplainError = error.localizedDescription
         }
+    }
+
+    private func loadUserPhotos(name: String, coordinate: CLLocationCoordinate2D) async {
+        guard let token = authStore.token else { return }
+        userPhotos = (try? await PhotosAPI.fetchPhotos(name: name, lat: coordinate.latitude, lng: coordinate.longitude, token: token)) ?? []
     }
 
     private func dietaryPinCacheKey(_ pin: DietaryPin, profile: UserProfile) -> String {

@@ -1,0 +1,19 @@
+app = "piri-api"
+primary_region = "fra"
+
+[build]
+
+[http_service]
+  internal_port = 4000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  # 0, not 1 -- the app isn't live yet, so there's no reason to pay for an
+  # always-on machine. Costs a few seconds' cold start on the first request
+  # after idle; bump to 1 before real launch traffic to remove that.
+  min_machines_running = 0
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512

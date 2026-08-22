@@ -10,18 +10,7 @@ struct TripSummarySheet: View {
 
     @Environment(\.dismiss) private var dismiss
 
-    /// The most common category among this trip's stops — not literally
-    /// "time spent" (breadcrumb points aren't linked to which stop was
-    /// nearby at the time, so that isn't a number we actually have), but a
-    /// close, honest proxy: what kind of place did this trip revolve around.
-    private var dominantCategory: (icon: String, label: String)? {
-        let categories = trip.stops.compactMap(\.category)
-        guard !categories.isEmpty else { return nil }
-        let counts = Dictionary(grouping: categories, by: \.rawValue).mapValues(\.count)
-        guard let topRawValue = counts.max(by: { $0.value < $1.value })?.key,
-              let topCategory = categories.first(where: { $0.rawValue == topRawValue }) else { return nil }
-        return (POICategoryGroups.icon(for: topCategory), topCategory.rawValue.replacingOccurrences(of: "MKPOICategory", with: ""))
-    }
+    private var dominantCategory: (icon: String, label: String)? { trip.dominantCategory }
 
     private var shareText: String {
         var lines = [L("tripSummary.share.headline", trip.displayTitle)]

@@ -1,8 +1,24 @@
 import Foundation
 
-enum RouteProfile: String, Encodable {
+enum RouteProfile: String, Encodable, CaseIterable {
     case footWalking = "foot-walking"
     case drivingCar = "driving-car"
+    case cyclingRegular = "cycling-regular"
+    /// Never sent to `/routes/directions` -- ORS has no transit profile at
+    /// all, so this branches client-side to `TransitDirections` instead
+    /// (see `MapScreen+RouteMode.swift`'s `fetchDirectionsResult()`). The
+    /// raw value only needs to be a stable identifier, not a real ORS
+    /// profile name.
+    case transit = "transit"
+
+    var icon: String {
+        switch self {
+        case .footWalking: return "figure.walk"
+        case .drivingCar: return "car.fill"
+        case .cyclingRegular: return "bicycle"
+        case .transit: return "tram.fill"
+        }
+    }
 }
 
 struct DirectionsRequest: Encodable {

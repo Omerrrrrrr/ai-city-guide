@@ -261,11 +261,11 @@ export const usageCounters = pgTable('usage_counters', {
 // exact `${nameNormalized}|${latRounded}|${lngRounded}` scheme already
 // established by poi_photo_cache's `id` (see the /places/photos route),
 // so a submission lands on the same POI identity the rest of the photo
-// pipeline already uses. `photoUrl` holds a data: URI directly for now --
-// there's no object-storage credential configured in this environment
-// (no S3/R2/etc.), so this is the zero-new-infra interim choice, not a
-// production-scale design; swap for a real bucket + CDN URL before photo
-// volume/DB row size becomes a real concern.
+// pipeline already uses. `photoUrl` holds a real Cloudflare R2 URL for an
+// approved photo (see r2.ts) -- falls back to storing the raw `data:` URI
+// directly only when R2 isn't configured (dormant-if-missing-credentials,
+// same contract as every other external module here) or for a rejected
+// submission, which is never served and kept as-is for moderation audit.
 export const userSubmittedPhotos = pgTable('user_submitted_photos', {
   id: varchar('id', { length: 64 }).primaryKey(),
   poiKey: varchar('poi_key', { length: 300 }).notNull(),

@@ -15,7 +15,7 @@ enum APIConfig {
         #if DEBUG
         return URL(string: "http://127.0.0.1:4000")!
         #else
-        return URL(string: "https://api.piriapp.com")!
+        return URL(string: "https://api.getpiri.com")!
         #endif
     }
 }

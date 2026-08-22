@@ -1,0 +1,7 @@
+node_modules
+dist
+.env
+.env.example
+evals
+npm-debug.log
+*.test.ts

@@ -192,19 +192,47 @@ extension MapScreen {
     /// without starting a live trip — `startRoute()` is the separate,
     /// explicit "commit" step (creates the `Trip`, starts breadcrumb
     /// recording) triggered by the user actually tapping "Rotayı Başlat".
+    /// ORS handles walking/driving/cycling in one multi-stop call;
+    /// transit has no ORS profile at all and is computed leg-by-leg
+    /// on-device instead (see `TransitDirections`). Centralized here so
+    /// `previewRoute()`/`startRoute()`/`updateRoute()` don't each
+    /// duplicate the branch.
+    private func fetchDirectionsResult() async throws -> DirectionsResult {
+        if routeProfile == .transit {
+            return try await TransitDirections.fetchMultiLeg(stops: stopCoordinates())
+        }
+        return try await RoutesAPI.directions(coordinates: stopCoordinates(), profile: routeProfile)
+    }
+
+    private func directionsErrorMessage(_ error: Error) -> String {
+        if error is TransitDirectionsError {
+            return String(localized: "map.route.transitFailed")
+        }
+        return String(localized: "map.route.failed")
+    }
+
+    func routeProfileLabel(_ profile: RouteProfile) -> String {
+        switch profile {
+        case .footWalking: return String(localized: "map.route.walking")
+        case .drivingCar: return String(localized: "map.route.driving")
+        case .cyclingRegular: return String(localized: "map.route.cycling")
+        case .transit: return String(localized: "map.route.transit")
+        }
+    }
+
     func previewRoute() async {
         guard plannedStops.count >= 2 else { return }
         isFetchingRoute = true
         routeError = nil
         defer { isFetchingRoute = false }
         do {
-            let result = try await RoutesAPI.directions(coordinates: stopCoordinates(), profile: routeProfile)
+            let result = try await fetchDirectionsResult()
             routeGeometry = result.route
             routeDistanceMeters = result.distanceMeters
             routeDurationSeconds = result.durationSeconds
             routeSteps = result.steps
         } catch {
-            routeError = String(localized: "map.route.failed")
+            routeError = directionsErrorMessage(error)
         }
     }
 
@@ -214,7 +242,7 @@ extension MapScreen {
         routeError = nil
         defer { isFetchingRoute = false }
         do {
-            let result = try await RoutesAPI.directions(coordinates: stopCoordinates(), profile: routeProfile)
+            let result = try await fetchDirectionsResult()
             routeGeometry = result.route
             routeDistanceMeters = result.distanceMeters
             routeDurationSeconds = result.durationSeconds
@@ -227,7 +255,7 @@ extension MapScreen {
             routeProfileDirty = false
             locationManager.startBreadcrumbRecording()
         } catch {
-            routeError = String(localized: "map.route.failed")
+            routeError = directionsErrorMessage(error)
         }
     }
 
@@ -237,7 +265,7 @@ extension MapScreen {
         routeError = nil
         defer { isFetchingRoute = false }
         do {
-            let result = try await RoutesAPI.directions(coordinates: stopCoordinates(), profile: routeProfile)
+            let result = try await fetchDirectionsResult()
             routeGeometry = result.route
             routeDistanceMeters = result.distanceMeters
             routeDurationSeconds = result.durationSeconds
@@ -249,7 +277,7 @@ extension MapScreen {
             )
             routeProfileDirty = false
         } catch {
-            routeError = String(localized: "map.route.failed")
+            routeError = directionsErrorMessage(error)
         }
     }
 
@@ -262,16 +290,51 @@ extension MapScreen {
         let name = trimmed.isEmpty ? Date().formatted(date: .abbreviated, time: .omitted) : trimmed
         savedPlacesStore.createCollection(name: name, kind: .plan, places: plannedStops)
         Haptics.medium()
+        // Deliberately doesn't leave Route Mode or clear `plannedStops` --
+        // saving is additive, not a completing action (you're still free to
+        // tap "Rotayı Başlat" right after). A haptic alone was too easy to
+        // miss as confirmation the save actually happened, so this banner
+        // is the visible half of that feedback; it clears itself.
+        withAnimation(.easeOut(duration: 0.2)) { showingSaveConfirmation = true }
+        saveConfirmationTask?.cancel()
+        saveConfirmationTask = Task {
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeIn(duration: 0.2)) { showingSaveConfirmation = false }
+        }
     }
 
     func endRoute() {
         if let activeTripId = tripsStore.activeTripId {
+            // XP is derived fresh from current counts, not logged (see
+            // Gamification.swift) -- the only way to know what THIS trip
+            // was worth is to snapshot immediately before and after the
+            // one thing that's about to change, completedTripCount.
+            let profile = userProfileStore.profile
+            let savedPlaceCount = savedPlacesStore.collections.reduce(0) { $0 + $1.places.count }
+            let completedBefore = tripsStore.trips.filter { $0.endedAt != nil }.count
+            let visitedCount = recentlyViewedStore.viewed.count
+            let xpBefore = Gamification.xp(profile: profile, savedPlaceCount: savedPlaceCount, completedTripCount: completedBefore, visitedCount: visitedCount)
+
             tripsStore.endTrip(activeTripId)
+
+            let completedAfter = tripsStore.trips.filter { $0.endedAt != nil }.count
+            let xpAfter = Gamification.xp(profile: profile, savedPlaceCount: savedPlaceCount, completedTripCount: completedAfter, visitedCount: visitedCount)
+
             // Snapshot after endTrip() so distanceMeters/durationSeconds and
             // endedAt are already final -- endTrip() keeps the trip in
             // tripsStore.trips (just clears activeTripId), it doesn't
             // delete it, so this lookup is safe.
-            lastEndedTrip = tripsStore.trips.first { $0.id == activeTripId }
+            if let endedTrip = tripsStore.trips.first(where: { $0.id == activeTripId }) {
+                pendingTripRecap = PendingTripRecap(
+                    trip: endedTrip,
+                    xpBefore: xpBefore,
+                    xpAfter: xpAfter,
+                    levelBefore: Gamification.level(forXP: xpBefore),
+                    levelAfter: Gamification.level(forXP: xpAfter),
+                    myLifetimeTripCount: completedAfter
+                )
+            }
         }
         locationManager.stopBreadcrumbRecording()
         hydratedTripId = nil
@@ -345,10 +408,16 @@ extension MapScreen {
                 // saying so — indistinguishable from a driving route at a
                 // glance. Picking a mode here refetches immediately (see
                 // `onChange(of: routeProfile)`), so the map/summary reflect
-                // it right away instead of only after "Güncelle".
+                // it right away instead of only after "Güncelle". Icon-only
+                // labels (not `Label`'s default icon+text) once there are 4
+                // modes to fit in one segmented control, same density
+                // Apple Maps' own mode switcher uses.
                 Picker("", selection: $routeProfile) {
-                    Label(String(localized: "map.route.walking"), systemImage: "figure.walk").tag(RouteProfile.footWalking)
-                    Label(String(localized: "map.route.driving"), systemImage: "car.fill").tag(RouteProfile.drivingCar)
+                    ForEach(RouteProfile.allCases, id: \.self) { profile in
+                        Image(systemName: profile.icon)
+                            .accessibilityLabel(routeProfileLabel(profile))
+                            .tag(profile)
+                    }
                 }
                 .pickerStyle(.segmented)
             }
@@ -367,7 +436,7 @@ extension MapScreen {
                     withAnimation(.easeInOut(duration: 0.2)) { stopsExpanded.toggle() }
                 } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: routeProfile == .drivingCar ? "car.fill" : "figure.walk")
+                        Image(systemName: routeProfile.icon)
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                         Text(LPlural("map.route.stopsCount", count: plannedStops.count))
@@ -496,6 +565,17 @@ extension MapScreen {
     @ViewBuilder
     private func primaryRouteButton(activeTrip: Trip?) -> some View {
         if activeTrip == nil {
+            if showingSaveConfirmation {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                    Text("map.route.saved")
+                }
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(Theme.openGreen)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+                .padding(.bottom, 4)
+            }
+
             HStack(spacing: 10) {
                 Button {
                     saveRouteName = ""

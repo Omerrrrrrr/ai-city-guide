@@ -67,6 +67,21 @@ struct Trip: Codable, Identifiable, Hashable {
         let trimmed = name?.trimmingCharacters(in: .whitespaces) ?? ""
         return trimmed.isEmpty ? dateLabel : trimmed
     }
+
+    /// The most common category among this trip's stops -- not literally
+    /// "time spent" (breadcrumb points aren't linked to which stop was
+    /// nearby at the time, so that isn't a number we actually have), but a
+    /// close, honest proxy: what kind of place did this trip revolve
+    /// around. Shared by `TripSummarySheet` and `TripRecapData` rather than
+    /// computed twice.
+    var dominantCategory: (icon: String, label: String)? {
+        let categories = stops.compactMap(\.category)
+        guard !categories.isEmpty else { return nil }
+        let counts = Dictionary(grouping: categories, by: \.rawValue).mapValues(\.count)
+        guard let topRawValue = counts.max(by: { $0.value < $1.value })?.key,
+              let topCategory = categories.first(where: { $0.rawValue == topRawValue }) else { return nil }
+        return (POICategoryGroups.icon(for: topCategory), topCategory.rawValue.replacingOccurrences(of: "MKPOICategory", with: ""))
+    }
 }
 
 struct RouteInfo {

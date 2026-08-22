@@ -115,6 +115,23 @@
 		D76079FB9A0DC544B7EE236B /* Categories.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95705134320AEBF9CDED2B6A /* Categories.swift */; };
 		DC9FD5DC597F5F2014C89C5A /* LanguageStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D94810B3041C6319D82ADC9 /* LanguageStore.swift */; };
 		E27160D6486A583B1B94CFD5 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8058473616284E6CA48CAEFB /* APIClient.swift */; };
+		F26781A2C98142C8B3DA9F10 /* UGCModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8CFA5D5D4784F639CA66E4E /* UGCModels.swift */; };
+		94F631CC3D5045E098AF19A9 /* DirectionsPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FAA78C204A24207962E0941 /* DirectionsPreview.swift */; };
+		AB2D8ACB22124E648FA44D29 /* TransitDirections.swift in Sources */ = {isa = PBXBuildFile; fileRef = D76428B0B0BF42DF87F2E4D5 /* TransitDirections.swift */; };
+		A8E1A2A69E284DA5B0C680D2 /* StoryContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DA02A022B134588BCBFED4B /* StoryContainer.swift */; };
+		6B17591848A949C7B10B5955 /* CountUpNumber.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA5110BA6A75485A80352771 /* CountUpNumber.swift */; };
+		7B13CEB5808A43379B012C9C /* TripRecapData.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30C7EE3BD6D4D79990DF360 /* TripRecapData.swift */; };
+		605E6553357A4E6689867B2A /* TripRecapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A91664F32B34F1083A5C766 /* TripRecapView.swift */; };
+		186B1BF6EE2841FB9CC83EEE /* RecapCoverCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61998F0FE7CC4D75B532DB6C /* RecapCoverCard.swift */; };
+		8F0C0D94187C43EC8135646B /* RecapRouteCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5506BE847CF949CF99DE2890 /* RecapRouteCard.swift */; };
+		4DF1F96365814AA7BE415B99 /* RecapStatsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 577AEBA779D74BB2BE1E09AC /* RecapStatsCard.swift */; };
+		7100671309194F5ABF9BC1DE /* RecapHighlightCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29D58668F1FE4D888DF5BF23 /* RecapHighlightCard.swift */; };
+		5FBE075ED730477BA8EB1408 /* RecapXPCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E6769542FE14238B4EDC39C /* RecapXPCard.swift */; };
+		E5EB897E4FB943F784ECBEC8 /* RecapSocialCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E376A4F716094932880C1073 /* RecapSocialCard.swift */; };
+		F702E720A30B413AA5D59A79 /* RecapShareCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13008E330EE345E88619A657 /* RecapShareCard.swift */; };
+		5C470E3236C54653BA3CECE9 /* PhotosAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04644C52562849EC9AABE438 /* PhotosAPI.swift */; };
+		2AD4E060F24040A684BE5DF4 /* DataURIImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = E384BAB4528A41A4B218C0BF /* DataURIImage.swift */; };
+		89359AEB836740038DEB176C /* UserPhotoSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 398580593551405E9CE044EB /* UserPhotoSection.swift */; };
 		E39D60A5812D0B843C6BCF04 /* MapScreen+RouteMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C03701EFE9483DB178D3A66 /* MapScreen+RouteMode.swift */; };
 		E460983310B7C6A7B087B2F8 /* AdminAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EA57B06A6E01213B556B858 /* AdminAPI.swift */; };
 		E640521527F5AC8FD9D572B9 /* PlanBuilderUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86DB5417C3A05EBAEE7EB68E /* PlanBuilderUITests.swift */; };
@@ -210,6 +227,23 @@
 		7DBAC07C896E4A79299A7872 /* SavedPlacesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedPlacesStore.swift; sourceTree = "<group>"; };
 		7E07D1E03C83B3FD300DC4C5 /* PiriApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PiriApp.swift; sourceTree = "<group>"; };
 		8058473616284E6CA48CAEFB /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		D8CFA5D5D4784F639CA66E4E /* UGCModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UGCModels.swift; sourceTree = "<group>"; };
+		5FAA78C204A24207962E0941 /* DirectionsPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectionsPreview.swift; sourceTree = "<group>"; };
+		D76428B0B0BF42DF87F2E4D5 /* TransitDirections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransitDirections.swift; sourceTree = "<group>"; };
+		7DA02A022B134588BCBFED4B /* StoryContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryContainer.swift; sourceTree = "<group>"; };
+		DA5110BA6A75485A80352771 /* CountUpNumber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CountUpNumber.swift; sourceTree = "<group>"; };
+		A30C7EE3BD6D4D79990DF360 /* TripRecapData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripRecapData.swift; sourceTree = "<group>"; };
+		3A91664F32B34F1083A5C766 /* TripRecapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripRecapView.swift; sourceTree = "<group>"; };
+		61998F0FE7CC4D75B532DB6C /* RecapCoverCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecapCoverCard.swift; sourceTree = "<group>"; };
+		5506BE847CF949CF99DE2890 /* RecapRouteCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecapRouteCard.swift; sourceTree = "<group>"; };
+		577AEBA779D74BB2BE1E09AC /* RecapStatsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecapStatsCard.swift; sourceTree = "<group>"; };
+		29D58668F1FE4D888DF5BF23 /* RecapHighlightCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecapHighlightCard.swift; sourceTree = "<group>"; };
+		9E6769542FE14238B4EDC39C /* RecapXPCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecapXPCard.swift; sourceTree = "<group>"; };
+		E376A4F716094932880C1073 /* RecapSocialCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecapSocialCard.swift; sourceTree = "<group>"; };
+		13008E330EE345E88619A657 /* RecapShareCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecapShareCard.swift; sourceTree = "<group>"; };
+		04644C52562849EC9AABE438 /* PhotosAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotosAPI.swift; sourceTree = "<group>"; };
+		E384BAB4528A41A4B218C0BF /* DataURIImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataURIImage.swift; sourceTree = "<group>"; };
+		398580593551405E9CE044EB /* UserPhotoSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserPhotoSection.swift; sourceTree = "<group>"; };
 		82D25734E2D392D33ACFF247 /* CollectionDetailScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionDetailScreen.swift; sourceTree = "<group>"; };
 		86C75B0218F5B71CC3B5E384 /* POISearchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POISearchService.swift; sourceTree = "<group>"; };
 		86DB5417C3A05EBAEE7EB68E /* PlanBuilderUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanBuilderUITests.swift; sourceTree = "<group>"; };
@@ -325,6 +359,8 @@
 				6993AA4D03C823EF1D3DCFEE /* ProfileOptions.swift */,
 				156E198E679C89FCF3886BE8 /* TripAdvisorHours.swift */,
 				1947C7437E8516EA0378CFAC /* Gamification.swift */,
+				A30C7EE3BD6D4D79990DF360 /* TripRecapData.swift */,
+				D76428B0B0BF42DF87F2E4D5 /* TransitDirections.swift */,
 			);
 			path = Utils;
 			sourceTree = "<group>";
@@ -351,13 +387,34 @@
 				F88D9297E5E64646338B6975 /* PlaceMiniMap.swift */,
 				A564A59EA1164A5FCB99DDF9 /* POIExplainSheet.swift */,
 				E75B93DCE842287CB76F2A2F /* POIPhotoGallery.swift */,
+				E384BAB4528A41A4B218C0BF /* DataURIImage.swift */,
+				398580593551405E9CE044EB /* UserPhotoSection.swift */,
 				70E1DF84B9EB0D5E98A9BA27 /* StatusBadge.swift */,
 				642AE03D91D3B2C9EC654135 /* TripAdvisorRatingRow.swift */,
 				92DFDDACD42B19290D630D8B /* TripAdvisorReviewsSheet.swift */,
 				AAC41208BF2D68EC120AB9AC /* TripMapView.swift */,
 				2AD9D3415FA1CE99CB46112B /* TripMiniMap.swift */,
+				7DA02A022B134588BCBFED4B /* StoryContainer.swift */,
+				5FAA78C204A24207962E0941 /* DirectionsPreview.swift */,
+				DA5110BA6A75485A80352771 /* CountUpNumber.swift */,
+				3A91664F32B34F1083A5C766 /* TripRecapView.swift */,
+				7FAB40FF3F304AA9B00AB456 /* TripRecap */,
 			);
 			path = Components;
+			sourceTree = "<group>";
+		};
+		7FAB40FF3F304AA9B00AB456 /* TripRecap */ = {
+			isa = PBXGroup;
+			children = (
+				61998F0FE7CC4D75B532DB6C /* RecapCoverCard.swift */,
+				5506BE847CF949CF99DE2890 /* RecapRouteCard.swift */,
+				577AEBA779D74BB2BE1E09AC /* RecapStatsCard.swift */,
+				29D58668F1FE4D888DF5BF23 /* RecapHighlightCard.swift */,
+				9E6769542FE14238B4EDC39C /* RecapXPCard.swift */,
+				E376A4F716094932880C1073 /* RecapSocialCard.swift */,
+				13008E330EE345E88619A657 /* RecapShareCard.swift */,
+			);
+			path = TripRecap;
 			sourceTree = "<group>";
 		};
 		5196F6D3D454993564C8B873 /* Persistence */ = {
@@ -387,6 +444,7 @@
 				96FE584464E381510D16935C /* Trip.swift */,
 				31BFBA845700A3D94868AF4F /* UserProfile.swift */,
 				5A709406E05ADF1CFB117E2E /* Weather.swift */,
+				D8CFA5D5D4784F639CA66E4E /* UGCModels.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -436,6 +494,7 @@
 				C3D750F75E7F67629CB33E00 /* AuthAPI.swift */,
 				3D80572CDE62F7E726A09FF4 /* SocialAPI.swift */,
 				39DBEA8E24D31A30E61F6671 /* PlacesAPI.swift */,
+				04644C52562849EC9AABE438 /* PhotosAPI.swift */,
 			);
 			path = Networking;
 			sourceTree = "<group>";
@@ -680,6 +739,23 @@
 				930282A9E0A3C4532DCF9212 /* AIScreen.swift in Sources */,
 				E27160D6486A583B1B94CFD5 /* APIClient.swift in Sources */,
 				189B088BE06E083C3934876B /* APIConfig.swift in Sources */,
+				F26781A2C98142C8B3DA9F10 /* UGCModels.swift in Sources */,
+				94F631CC3D5045E098AF19A9 /* DirectionsPreview.swift in Sources */,
+				AB2D8ACB22124E648FA44D29 /* TransitDirections.swift in Sources */,
+				A8E1A2A69E284DA5B0C680D2 /* StoryContainer.swift in Sources */,
+				6B17591848A949C7B10B5955 /* CountUpNumber.swift in Sources */,
+				7B13CEB5808A43379B012C9C /* TripRecapData.swift in Sources */,
+				605E6553357A4E6689867B2A /* TripRecapView.swift in Sources */,
+				186B1BF6EE2841FB9CC83EEE /* RecapCoverCard.swift in Sources */,
+				8F0C0D94187C43EC8135646B /* RecapRouteCard.swift in Sources */,
+				4DF1F96365814AA7BE415B99 /* RecapStatsCard.swift in Sources */,
+				7100671309194F5ABF9BC1DE /* RecapHighlightCard.swift in Sources */,
+				5FBE075ED730477BA8EB1408 /* RecapXPCard.swift in Sources */,
+				E5EB897E4FB943F784ECBEC8 /* RecapSocialCard.swift in Sources */,
+				F702E720A30B413AA5D59A79 /* RecapShareCard.swift in Sources */,
+				5C470E3236C54653BA3CECE9 /* PhotosAPI.swift in Sources */,
+				2AD4E060F24040A684BE5DF4 /* DataURIImage.swift in Sources */,
+				89359AEB836740038DEB176C /* UserPhotoSection.swift in Sources */,
 				044CF447A382D7944F38A822 /* AddToCollectionSheet.swift in Sources */,
 				E460983310B7C6A7B087B2F8 /* AdminAPI.swift in Sources */,
 				37343655509BE28F9E393CCC /* AdminAuthStore.swift in Sources */,

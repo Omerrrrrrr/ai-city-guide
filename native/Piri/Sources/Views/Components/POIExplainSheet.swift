@@ -12,9 +12,11 @@ struct POIExplainSheet: View {
 
     @Environment(UserProfileStore.self) private var userProfileStore
     @Environment(SavedPlacesStore.self) private var savedPlacesStore
+    @Environment(AuthStore.self) private var authStore
     @Environment(\.dismiss) private var dismiss
 
     @State private var result: ExplainResult?
+    @State private var userPhotos: [UserSubmittedPhoto] = []
     @State private var loading = true
     @State private var errorMessage: String?
     @State private var chatHistory: [POIChatTurn] = []
@@ -41,6 +43,7 @@ struct POIExplainSheet: View {
     @State private var showingMapItemDetail = false
     @State private var addToCollectionKind: SavedCollectionKind?
     @State private var showingReviews = false
+    @State private var showingDirections = false
 
     var body: some View {
         NavigationStack {
@@ -103,6 +106,7 @@ struct POIExplainSheet: View {
                                 // buried. See the 2026-08 visual-design
                                 // research report, Phase 1.
                                 POIPhotoGallery(photos: result.photos)
+                                UserPhotoSection(poiName: poi.name, coordinate: poi.coordinate, photos: $userPhotos)
                                 if let rating = result.rating {
                                     TripAdvisorRatingRow(rating: rating)
                                     // Only offered when we already know
@@ -170,6 +174,18 @@ struct POIExplainSheet: View {
                                     poi.mapItem.openInMaps()
                                 }
                                 .buttonStyle(.bordered)
+
+                                Button {
+                                    Haptics.light()
+                                    withAnimation(.easeInOut(duration: 0.2)) { showingDirections.toggle() }
+                                } label: {
+                                    Label("directions.preview.button", systemImage: "arrow.triangle.turn.up.right.circle")
+                                }
+                                .buttonStyle(.bordered)
+                            }
+
+                            if showingDirections {
+                                DirectionsPreview(destination: poi.coordinate)
                             }
 
                             // Apple's own street-level imagery — silently
@@ -232,6 +248,7 @@ struct POIExplainSheet: View {
         .task { await explain() }
         .task { await loadLookAroundScene() }
         .task { await weatherQuery.load(lat: poi.coordinate.latitude, lng: poi.coordinate.longitude) }
+        .task { await loadUserPhotos() }
     }
 
     /// Compact, not a card element — current conditions at this POI, one
@@ -270,6 +287,11 @@ struct POIExplainSheet: View {
     private func loadLookAroundScene() async {
         let request = MKLookAroundSceneRequest(coordinate: poi.coordinate)
         lookAroundScene = try? await request.scene
+    }
+
+    private func loadUserPhotos() async {
+        guard let token = authStore.token else { return }
+        userPhotos = (try? await PhotosAPI.fetchPhotos(name: poi.name, lat: poi.coordinate.latitude, lng: poi.coordinate.longitude, token: token)) ?? []
     }
 
     private func chatBubble(_ turn: POIChatTurn) -> some View {
