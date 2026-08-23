@@ -1,6 +1,6 @@
-# AI City Guide
+# Piri
 
-AI City Guide is a Kristiansand-focused city guide with a native iOS (SwiftUI) client and a Fastify API backed by Postgres.
+Piri is a global city guide with a native iOS (SwiftUI) client and a Fastify API backed by Postgres.
 
 ## Workspace
 
