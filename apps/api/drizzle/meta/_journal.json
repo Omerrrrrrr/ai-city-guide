@@ -71,6 +71,13 @@
       "when": 1787048287918,
       "tag": "0009_tough_starfox",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787663217334,
+      "tag": "0010_chubby_gunslinger",
+      "breakpoints": true
     }
   ]
 }

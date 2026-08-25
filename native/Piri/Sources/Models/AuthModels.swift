@@ -23,10 +23,24 @@ struct AuthUser: Codable, Equatable {
     /// sharing is. `showRealName` still defaults `false` (rumuz first).
     var leaderboardVisible: Bool = true
     var showRealName: Bool = false
+    /// Premium tier -- `"free"` | `"basic"` | `"pro"`, mirrors the backend's
+    /// `users.tier` column (`toPublicUser` in `accounts.ts`) 1:1 rather than
+    /// a Swift enum, so an unrecognized future value round-trips instead of
+    /// failing to decode. Use `isPaidTier` rather than comparing this
+    /// directly wherever the only question is "does this account have
+    /// premium access at all."
+    var tier: String = "free"
+    /// ISO date string, or `nil` for a free account or one whose expiry
+    /// isn't known yet. Purely informational (display only) -- access
+    /// itself is always decided server-side against `users.tier`, not by
+    /// the client comparing this against "now".
+    var tierExpiresAt: String?
+
+    var isPaidTier: Bool { tier == "basic" || tier == "pro" }
 
     enum CodingKeys: String, CodingKey {
         case id, email, displayName, username, shareXp, shareTripStats, shareTripHistory
-        case xp, completedTripCount, leaderboardVisible, showRealName
+        case xp, completedTripCount, leaderboardVisible, showRealName, tier, tierExpiresAt
     }
 
     // Custom decode: a non-optional property with a default value is NOT
@@ -52,6 +66,8 @@ struct AuthUser: Codable, Equatable {
         completedTripCount = try container.decodeIfPresent(Int.self, forKey: .completedTripCount) ?? 0
         leaderboardVisible = try container.decodeIfPresent(Bool.self, forKey: .leaderboardVisible) ?? true
         showRealName = try container.decodeIfPresent(Bool.self, forKey: .showRealName) ?? false
+        tier = try container.decodeIfPresent(String.self, forKey: .tier) ?? "free"
+        tierExpiresAt = try container.decodeIfPresent(String.self, forKey: .tierExpiresAt)
     }
 
     init(
@@ -65,7 +81,9 @@ struct AuthUser: Codable, Equatable {
         xp: Int = 0,
         completedTripCount: Int = 0,
         leaderboardVisible: Bool = true,
-        showRealName: Bool = false
+        showRealName: Bool = false,
+        tier: String = "free",
+        tierExpiresAt: String? = nil
     ) {
         self.id = id
         self.email = email
@@ -78,6 +96,8 @@ struct AuthUser: Codable, Equatable {
         self.completedTripCount = completedTripCount
         self.leaderboardVisible = leaderboardVisible
         self.showRealName = showRealName
+        self.tier = tier
+        self.tierExpiresAt = tierExpiresAt
     }
 }
 

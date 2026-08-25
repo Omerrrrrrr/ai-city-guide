@@ -14,6 +14,7 @@ struct PiriApp: App {
     @State private var friendsStore = FriendsStore()
     @State private var placesQuery = PlacesQuery()
     @State private var languageStore = LanguageStore()
+    @State private var purchaseStore = PurchaseStore()
 
     init() {
         SentryConfig.start()
@@ -32,6 +33,7 @@ struct PiriApp: App {
                 .environment(friendsStore)
                 .environment(placesQuery)
                 .environment(languageStore)
+                .environment(purchaseStore)
                 .environment(PushNotificationManager.shared)
         }
     }

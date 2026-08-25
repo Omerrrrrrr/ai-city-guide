@@ -35,6 +35,7 @@ struct ProfileScreen: View {
     @Environment(PlacesQuery.self) private var placesQuery
     @Environment(AuthStore.self) private var authStore
     @Environment(FriendsStore.self) private var friendsStore
+    @Environment(PurchaseStore.self) private var purchaseStore
 
     @State private var isEditingName = false
     @State private var nameInput = ""
@@ -44,6 +45,7 @@ struct ProfileScreen: View {
     @State private var profileTab: ProfileTab = .language
     @State private var newInterestText = ""
     @State private var showingSignIn = false
+    @State private var showingPaywall = false
 
     private var profile: UserProfile { userProfileStore.profile }
     private var displayName: String {
@@ -61,6 +63,7 @@ struct ProfileScreen: View {
                 profileTabContent
                 accountCard
                 if authStore.isSignedIn {
+                    premiumCard
                     friendsCard
                 }
                 cityCard
@@ -102,7 +105,67 @@ struct ProfileScreen: View {
         .sheet(isPresented: $showingCityPicker) { CityPickerScreen() }
         .sheet(item: $showingSaved) { tab in SavedScreen(initialTab: tab) }
         .sheet(isPresented: $showingSignIn) { SignInScreen() }
+        .sheet(isPresented: $showingPaywall) { PaywallScreen() }
         .navigationBarHidden(true)
+    }
+
+    /// The entry point `PaywallScreen`'s own doc comment always claimed
+    /// existed here ("ProfileScreen's account card, signed-in, free
+    /// tier") but never actually did until now -- there was no purchase
+    /// button or active-plan confirmation anywhere in the app. Signed-out
+    /// accounts don't see this at all (matches `accountCard`'s own
+    /// sign-in gate above it -- nothing to upgrade without an account).
+    private var premiumCard: some View {
+        card(titleKey: "settings.premium") {
+            if let user = authStore.user, user.isPaidTier {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.seal.fill").foregroundStyle(Theme.gold)
+                        Text(String(localized: String.LocalizationValue(
+                            user.tier == "pro" ? "settings.premium.proActive" : "settings.premium.basicActive"
+                        )))
+                        .font(.system(size: 15, weight: .semibold))
+                    }
+                    if let expiresAt = user.tierExpiresAt, let date = ISO8601DateFormatter().date(from: expiresAt) {
+                        Text(L("settings.premium.renewsOn", date.formatted(date: .abbreviated, time: .omitted)))
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    if let url = URL(string: "https://apps.apple.com/account/subscriptions") {
+                        Link(destination: url) {
+                            Text(String(localized: String.LocalizationValue("settings.premium.manage")))
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(Theme.navy)
+                        }
+                    }
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(String(localized: String.LocalizationValue("settings.premium.free")))
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                    Button {
+                        showingPaywall = true
+                    } label: {
+                        Text(String(localized: String.LocalizationValue("settings.premium.upgrade")))
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(RoundedRectangle(cornerRadius: 14).fill(Theme.gold))
+                    }
+                    .buttonStyle(.plain)
+                    Button {
+                        Task { await purchaseStore.restorePurchases() }
+                    } label: {
+                        Text(String(localized: String.LocalizationValue("paywall.restore")))
+                            .font(.footnote)
+                            .foregroundStyle(Theme.navy)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
     }
 
     private var header: some View {

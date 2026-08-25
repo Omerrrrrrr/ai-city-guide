@@ -206,10 +206,20 @@ export const users = pgTable('users', {
   // set manually via `PATCH /admin/users/:id/tier` for testing.
   tier: varchar('tier', { length: 16 }).notNull().default('free'),
   tierExpiresAt: varchar('tier_expires_at', { length: 64 }),
+  // Apple's stable per-subscription identifier (constant across renewals
+  // and upgrade/downgrade within the same subscription, unlike the
+  // per-event `transactionId`) -- the unique index below is what actually
+  // stops the same real purchase being claimed by more than one Piri
+  // account. `iapProductId`/`iapEnvironment` are just the last-verified
+  // transaction's own info, kept for support/debugging, not enforced.
+  originalTransactionId: varchar('original_transaction_id', { length: 64 }),
+  iapProductId: varchar('iap_product_id', { length: 64 }),
+  iapEnvironment: varchar('iap_environment', { length: 16 }),
 }, (table) => [
   uniqueIndex('idx_users_email').on(table.email),
   uniqueIndex('idx_users_apple_user_id').on(table.appleUserId),
   uniqueIndex('idx_users_username').on(table.username),
+  uniqueIndex('idx_users_original_transaction_id').on(table.originalTransactionId),
 ]);
 
 // Mutual-follow social graph. No public discovery/search beyond looking up

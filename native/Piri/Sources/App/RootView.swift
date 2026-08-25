@@ -8,6 +8,7 @@ struct RootView: View {
     @Environment(TripsStore.self) private var tripsStore
     @Environment(RecentlyViewedStore.self) private var recentlyViewedStore
     @Environment(AuthStore.self) private var authStore
+    @Environment(PurchaseStore.self) private var purchaseStore
 
     var body: some View {
         Group {
@@ -34,6 +35,15 @@ struct RootView: View {
         }
         .onChange(of: savedPlacesStore.collections) { _, _ in pushStats() }
         .onChange(of: userProfileStore.profile) { _, _ in pushStats() }
+        // Runs for the app's whole lifetime -- picks up a purchase made
+        // outside `PurchaseStore.purchase(_:)`'s own call (another device,
+        // a renewal, App Store's own restore UI) and verifies+syncs it the
+        // same way. Was documented on `PurchaseStore` since it shipped but
+        // never actually started anywhere until now -- StoreKit purchases
+        // were reaching this app with nothing listening for them.
+        .task {
+            await purchaseStore.observeTransactionUpdates(authStore: authStore)
+        }
     }
 
     /// Recomputes `Gamification.xp(...)` (same inputs `ProfileScreen`'s

@@ -1,0 +1,123 @@
+{
+  "identifier" : "9D7C1774-650F-4E44-BBEF-7A4306DE5B30",
+  "nonRenewingSubscriptions" : [],
+  "products" : [],
+  "settings" : {
+    "_askToBuyEnabled" : false,
+    "_billingIssuesEnabled" : false,
+    "_disableDialogs" : false,
+    "_failTransactionsEnabled" : false,
+    "_lastSynchronizedDate" : 0,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : []
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "44F3473E-47CD-4412-B6AC-1F9EC37B1295",
+      "localizations" : [],
+      "name" : "Basic",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "2.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "472226F8-FF1A-4F88-B759-D27AEFFFA9F9",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Basic monthly plan -- more monthly usage for premium POI details.",
+              "displayName" : "Basic Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.piriapp.piri.basic.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Basic Monthly",
+          "subscriptionGroupID" : "44F3473E-47CD-4412-B6AC-1F9EC37B1295",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : []
+        },
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "24.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "C9756E77-DDEF-4E12-8F0A-64E6460DBFFC",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Basic yearly plan -- more monthly usage for premium POI details.",
+              "displayName" : "Basic Yearly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.piriapp.piri.basic.yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Basic Yearly",
+          "subscriptionGroupID" : "44F3473E-47CD-4412-B6AC-1F9EC37B1295",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : []
+        }
+      ]
+    },
+    {
+      "id" : "31B56C46-2BD8-43A1-9E33-E1F0218ECD47",
+      "localizations" : [],
+      "name" : "Pro",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "6.99",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "DCD159C0-2A58-4856-97CE-F76B31912D6F",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Pro monthly plan -- the most monthly usage for premium POI details.",
+              "displayName" : "Pro Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.piriapp.piri.pro.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Pro Monthly",
+          "subscriptionGroupID" : "31B56C46-2BD8-43A1-9E33-E1F0218ECD47",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : []
+        },
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "59.99",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "5A457539-021C-4D3E-9297-85144A68C2FD",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Pro yearly plan -- the most monthly usage for premium POI details.",
+              "displayName" : "Pro Yearly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.piriapp.piri.pro.yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Pro Yearly",
+          "subscriptionGroupID" : "31B56C46-2BD8-43A1-9E33-E1F0218ECD47",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : []
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

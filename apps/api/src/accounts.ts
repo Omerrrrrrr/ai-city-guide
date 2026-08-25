@@ -26,6 +26,7 @@ export function toPublicUser(user: UserRow) {
     leaderboardVisible: user.leaderboardVisible,
     showRealName: user.showRealName,
     tier: user.tier,
+    tierExpiresAt: user.tierExpiresAt,
   };
 }
 
