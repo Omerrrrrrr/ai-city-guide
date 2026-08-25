@@ -9,6 +9,7 @@ import SwiftUI
 struct POIPhotoGallery: View {
     let photos: [POIPhoto]
 
+    @Environment(AuthStore.self) private var authStore
     @State private var viewerIndex: PhotoIndex?
 
     var body: some View {
@@ -28,8 +29,18 @@ struct POIPhotoGallery: View {
                                 .frame(width: 110, height: 110)
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
 
-                                sourceLabel(photo.source)
-                                    .padding(5)
+                                HStack(spacing: 4) {
+                                    sourceLabel(photo.source)
+                                    // Never for a paid account — it's
+                                    // already getting Google's own photos
+                                    // elsewhere in this same gallery
+                                    // whenever Google has any; an "upgrade"
+                                    // hint would be wrong, not just moot.
+                                    if photo.source == .unsplash, authStore.user?.isPaidTier != true {
+                                        lockBadge
+                                    }
+                                }
+                                .padding(5)
                             }
                         }
                         .buttonStyle(.plain)
@@ -80,6 +91,7 @@ private func sourceLabel(_ source: POIPhotoSource) -> some View {
     switch source {
     case .wikipedia: label = "Wikipedia"
     case .tripadvisor: label = "Tripadvisor"
+    case .google: label = "Google"
     case .unsplash: label = "Unsplash"
     }
     return Text(label)
@@ -88,6 +100,18 @@ private func sourceLabel(_ source: POIPhotoSource) -> some View {
         .padding(.horizontal, 6)
         .padding(.vertical, 3)
         .background(.black.opacity(0.55), in: Capsule())
+}
+
+/// Small upsell hint on a free-tier Unsplash photo: paid tiers get a real
+/// Google Places photo of the place itself instead of this generic
+/// category stock photo (see `/places/explain-poi`'s Google-photo
+/// fallback) -- purely visual, doesn't gate anything on its own.
+private var lockBadge: some View {
+    Image(systemName: "lock.fill")
+        .font(.system(size: 8, weight: .semibold))
+        .foregroundStyle(.white)
+        .padding(4)
+        .background(.black.opacity(0.55), in: Circle())
 }
 
 private struct PhotoIndex: Identifiable {

@@ -97,7 +97,7 @@ struct TripMapView: UIViewRepresentable {
             }
             if let playback = annotation as? PlaybackAnnotation {
                 let identifier = "playback"
-                let view = mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? MKAnnotationView
+                let view = mapView.dequeueReusableAnnotationView(withIdentifier: identifier)
                     ?? MKAnnotationView(annotation: playback, reuseIdentifier: identifier)
                 view.annotation = playback
                 view.frame = CGRect(x: 0, y: 0, width: 16, height: 16)

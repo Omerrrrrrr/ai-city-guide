@@ -1,12 +1,27 @@
-import AVFoundation
+// AVFoundation's capture types (`AVCaptureSession`, `AVCapturePhotoOutput`,
+// `AVCapturePhotoSettings`) predate Swift concurrency and aren't marked
+// `Sendable` — `@preconcurrency` tells the compiler to trust this module's
+// own thread-safety contracts at the import boundary instead of flagging
+// every cross-queue capture below as a strict-concurrency error.
+@preconcurrency import AVFoundation
 import Observation
 import UIKit
 
 /// AVFoundation replacement for `expo-camera`'s `CameraView` in
 /// `mobile/app/(tabs)/scan.tsx`. Owns the capture session; `CameraPreviewView`
 /// (a thin `UIViewRepresentable`) just displays whatever this is running.
+///
+/// `@unchecked Sendable`: every mutable stored property is only ever
+/// written from the main actor (SwiftUI/`@Observable` bindings) except
+/// `photoContinuation`, which is only touched from `sessionQueue` (set)
+/// and the `AVCapturePhotoCaptureDelegate` callback (resumed) -- never
+/// both at once for the same capture, since `capturePhoto()` awaits one
+/// continuation at a time. The AVFoundation objects themselves
+/// (`session`/`photoOutput`) are `let`s only ever mutated internally by
+/// AVFoundation on `sessionQueue`, matching Apple's own documented usage
+/// pattern for this API.
 @Observable
-final class CameraController: NSObject {
+final class CameraController: NSObject, @unchecked Sendable {
     private(set) var isAuthorized = false
     private(set) var position: AVCaptureDevice.Position = .back
     private(set) var isFlashOn = false

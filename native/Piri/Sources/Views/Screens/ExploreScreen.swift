@@ -12,6 +12,7 @@ import SwiftUI
 /// curated-data screens this pivot replaces).
 struct ExploreScreen: View {
     @Environment(CityStore.self) private var cityStore
+    @Environment(AuthStore.self) private var authStore
 
     @State private var query = ""
     @State private var selectedCategoryGroup: POICategoryGroup?
@@ -326,13 +327,25 @@ struct ExploreScreen: View {
     private func unsplashBadge(for poi: POIPlace) -> some View {
         if let photo = photos[poi.name], photo.source == "unsplash",
            let photographerUrl = photo.photographerUrl, let url = URL(string: photographerUrl) {
-            Link(destination: url) {
-                Text("Unsplash")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(.black.opacity(0.55), in: Capsule())
+            HStack(spacing: 4) {
+                Link(destination: url) {
+                    Text("Unsplash")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(.black.opacity(0.55), in: Capsule())
+                }
+                // See HomeScreen's identical badge for why this is
+                // tier-gated: a paid account shouldn't see an "upgrade"
+                // hint it's already paid for.
+                if authStore.user?.isPaidTier != true {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(4)
+                        .background(.black.opacity(0.55), in: Circle())
+                }
             }
             .padding(6)
         }
@@ -349,7 +362,7 @@ struct ExploreScreen: View {
             PhotoBulkPlace(name: $0.name, lat: $0.coordinate.latitude, lng: $0.coordinate.longitude, category: $0.categoryLabel.isEmpty ? nil : $0.categoryLabel)
         })
         Task {
-            guard let response = try? await PlacesAPI.photosBulk(request) else { return }
+            guard let response = try? await PlacesAPI.photosBulk(request, token: authStore.token) else { return }
             for result in response.results {
                 photos[result.name] = result
             }

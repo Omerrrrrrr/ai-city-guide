@@ -30,6 +30,7 @@ import {
 import {
   AuthError,
   newUserId,
+  optionalUserId,
   requireUserId,
   signSessionToken,
   timingSafeStringEqual,
@@ -58,7 +59,7 @@ import {
   reassignImageCandidate,
 } from './image-candidate-service';
 import { previewGoogleHoursForPlace } from './google-places-hours';
-import { fetchPremiumPlaceDetails } from './google-places-poi';
+import { fetchPremiumPlaceDetails, type PremiumPlaceDetails } from './google-places-poi';
 import { checkAndIncrementUsage, refundUsage } from './entitlements';
 import { moderatePhotoSubmission } from './moderation';
 import { uploadDataUriToR2 } from './r2';
@@ -93,6 +94,9 @@ import { fetchWikipediaPhoto, WIKIPEDIA_PLAUSIBLE_CATEGORIES } from './wiki-phot
 import { fetchWikidataFacts } from './wikidata';
 import { fetchDietaryPlaces, fetchDietaryTagsForPlace } from './dietary';
 import { fetchUnsplashPhoto } from './unsplash';
+import { verifyTransaction } from './storekit';
+import { resolveCountryCode, fetchUpcomingHolidays, fetchSoonHoliday, type PublicHoliday } from './holidays';
+import { fetchWebsiteExcerpt } from './website-content';
 import { places, cities, liveGridCellStatus, livePlaceCache, poiPhotoCache, users, userSubmittedPhotos, contentReports, blocks } from './schema';
 
 const PORT = Number(process.env.PORT ?? 4000);
@@ -1489,14 +1493,16 @@ async function buildServer() {
       try {
         const { object } = await generateObject({
           model: aiProvider.client.chat(aiProvider.model),
-          maxOutputTokens: 300,
+          maxOutputTokens: 500,
           schema: z.object({
             headline: z
               .string()
               .describe('One punchy sentence that connects this place to who the user is. Max 12 words.'),
             body: z
               .string()
-              .describe('2-3 sentences of personalized insight. Speak directly to this person\'s expertise or interests.'),
+              .describe(
+                '5-7 sentences (a full, substantive paragraph or two) of personalized insight — speak directly to this person\'s expertise or interests, and use the real grounding facts given below to say something genuinely specific, not just padding out the same 2-3 sentences with filler.'
+              ),
             highlights: z
               .array(z.string())
               .min(2)
@@ -1546,6 +1552,7 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
           lat: z.number().optional(),
           lng: z.number().optional(),
           address: z.string().trim().max(300).optional(),
+          website: optionalUrlInput,
           locale: z.string().trim().min(2).max(8).optional(),
           userProfile: userProfileSchema.optional(),
           recentlyViewedPlaceIds: recentlyViewedPlaceIdsSchema,
@@ -1556,7 +1563,12 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         return reply.code(400).send({ error: 'Invalid request' });
       }
 
-      const { name, category, lat, lng, address, locale, userProfile, recentlyViewedPlaceIds } = parsed.data;
+      const { name, category, lat, lng, address, website, locale, userProfile, recentlyViewedPlaceIds } = parsed.data;
+      // Not required -- this endpoint is called for every POI tap by signed-
+      // out and free accounts too. Only used below to gate the Google-photo
+      // fallback + reviews (paid tiers only) behind quota; every other
+      // branch of this handler behaves identically regardless of `userId`.
+      const userId = await optionalUserId(request, AUTH_JWT_SECRET);
       const aiProvider = getAiProviderConfig();
       if (!aiProvider) {
         return reply.code(503).send({ error: 'AI not configured' });
@@ -1615,14 +1627,81 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
       const dietaryTagsPromise =
         lat !== undefined && lng !== undefined ? fetchDietaryTagsForPlace(name, lat, lng) : Promise.resolve([] as string[]);
 
-      const [tripAdvisorInfo, curatedPlace, wikiEnrichment, dietaryTags] = await Promise.all([
-        lat !== undefined && lng !== undefined
-          ? fetchTripAdvisorInfo(name, lat, lng, undefined, false)
-          : Promise.resolve({ rating: null, description: null, photoUrls: [], locationId: null } as TripAdvisorInfo),
-        curatedMatchPromise,
-        wikiPromise,
-        dietaryTagsPromise,
-      ]);
+      // Free for every caller (Nominatim + date.nager.at are both keyless,
+      // no quota to gate) -- a public holiday landing within the next 3
+      // days is grounding, not a premium perk. Deliberately a short
+      // window: this is meant to read as "useful heads-up for a visit
+      // happening imminently," not a general holiday-calendar feature
+      // (that's the Home screen's own 7-day banner and a Plan's own
+      // target-date check, see [[project_holidays_feature]]-style
+      // comments in holidays.ts).
+      const soonHolidayPromise =
+        lat !== undefined && lng !== undefined ? fetchSoonHoliday(lat, lng, 3) : Promise.resolve(null);
+
+      // Free for every caller when Apple's own MapKit data has a website
+      // for this POI (`website`, from the client's `MKMapItem.url`) --
+      // costs nothing (no Google Places call involved), so unlike the
+      // Google-derived fallback below it isn't gated on tier/quota at all.
+      const appleWebsitePromise = website ? fetchWebsiteExcerpt(website) : Promise.resolve(null);
+
+      // Paid-tier-only, run alongside the sources above (not just as a
+      // last-resort photo fallback like before) so its editorial summary
+      // and reviews can ground the AI prompt below, not just supply an
+      // extra photo after the fact. A free account or an exhausted
+      // `google_places` quota (`checkAndIncrementUsage` returning false
+      // either way) just resolves to `null` here -- every branch below
+      // that reads `googlePlace` already treats `null` as "nothing extra
+      // to add," so a free caller's response is byte-for-byte the same
+      // shape it always was.
+      const googlePromise = (async (): Promise<PremiumPlaceDetails | null> => {
+        if (!userId) return null;
+        const allowed = await checkAndIncrementUsage(userId, 'google_places');
+        if (!allowed) return null;
+        try {
+          const details = await fetchPremiumPlaceDetails({ name, lat, lng, address });
+          if (!details) {
+            await refundUsage(userId, 'google_places');
+            return null;
+          }
+          return details;
+        } catch (error) {
+          request.log.error(error);
+          await refundUsage(userId, 'google_places');
+          return null;
+        }
+      })();
+
+      const [tripAdvisorInfo, curatedPlace, wikiEnrichment, dietaryTagsRaw, googlePlace, soonHoliday, appleWebsiteExcerpt] =
+        await Promise.all([
+          lat !== undefined && lng !== undefined
+            ? fetchTripAdvisorInfo(name, lat, lng, undefined, false)
+            : Promise.resolve({ rating: null, description: null, photoUrls: [], locationId: null } as TripAdvisorInfo),
+          curatedMatchPromise,
+          wikiPromise,
+          dietaryTagsPromise,
+          googlePromise,
+          soonHolidayPromise,
+          appleWebsitePromise,
+        ]);
+
+      // Apple's URL (free, tried above) wins when it actually yielded
+      // something; Google's own `websiteUri` (paid tier only) is a
+      // fallback for the POIs Apple doesn't have a website for at all --
+      // a second, sequential fetch here rather than a third parallel slot
+      // above, since it's only worth attempting when the free path came
+      // up empty and it's genuinely a different URL to try.
+      const websiteExcerpt =
+        appleWebsiteExcerpt ??
+        (googlePlace?.websiteUri && googlePlace.websiteUri !== website ? await fetchWebsiteExcerpt(googlePlace.websiteUri) : null);
+
+      // Google's only diet-related signal (no vegan/halal/kosher fields
+      // exist on Places API (New), unlike OSM's `diet:*` tags) -- added
+      // as an extra `'vegetarian'` entry for a paid caller when OSM didn't
+      // already surface one, never overriding/removing what OSM found.
+      const dietaryTags =
+        googlePlace?.servesVegetarianFood && !dietaryTagsRaw.includes('vegetarian')
+          ? [...dietaryTagsRaw, 'vegetarian']
+          : dietaryTagsRaw;
 
       // Wikidata facts depend on the QID Wikipedia just resolved, so this is
       // an unavoidable second hop after the Promise.all above rather than a
@@ -1651,13 +1730,31 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
       // of) the sources above. This does NOT re-enable curated data as a map
       // pin source (see `MapScreen.useCuratedMapData`) — it only enriches
       // the explain response for an Apple POI the user already tapped.
+      const soonHolidayLine = soonHoliday
+        ? (() => {
+            const daysUntil = Math.round((new Date(`${soonHoliday.date}T00:00:00Z`).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+            const when = daysUntil <= 0 ? 'today' : daysUntil === 1 ? 'tomorrow' : `in ${daysUntil} days`;
+            return `Upcoming public holiday: ${soonHoliday.name} (${when}, ${soonHoliday.date})`;
+          })()
+        : null;
+
       const placeContext = [
         `Name: ${name}`,
+        soonHolidayLine,
         category ? `Category: ${category}` : null,
         address ? `Address: ${address}` : null,
         wikiEnrichment.status === 'matched' ? `Wikipedia summary: ${wikiEnrichment.summary}` : null,
         wikidataFactsLine ? `Wikidata: ${wikidataFactsLine}` : null,
         tripAdvisorInfo.description ? `Tripadvisor description: ${tripAdvisorInfo.description}` : null,
+        googlePlace?.editorialSummary ? `Google Places description: ${googlePlace.editorialSummary}` : null,
+        googlePlace?.reviews?.length
+          ? `Recent real Google reviews (${googlePlace.reviews.length} shown${
+              googlePlace.userRatingCount ? ` of ${googlePlace.userRatingCount} total` : ''
+            }, this place's overall Google rating is ${googlePlace.rating ?? 'unrated'}★): ${googlePlace.reviews
+              .map((r) => `"${r.text.slice(0, 160)}"${r.rating != null ? ` (${r.rating}★)` : ''}`)
+              .join(' | ')}`
+          : null,
+        websiteExcerpt ? `Text from the business's own official website: "${websiteExcerpt}"` : null,
         curatedPlace?.shortStory ? `Story: ${curatedPlace.shortStory}` : null,
         curatedPlace?.localVibeMood ? `Vibe: ${curatedPlace.localVibeMood}` : null,
         curatedPlace?.localVibeBestFor ? `Best for: ${curatedPlace.localVibeBestFor}` : null,
@@ -1689,12 +1786,53 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
       const groundingSource: 'wikipedia' | 'tripadvisor' | null =
         wikiEnrichment.status === 'matched' ? 'wikipedia' : tripAdvisorInfo.description ? 'tripadvisor' : null;
 
+      // Tripadvisor's and Google's editorial descriptions sit at the same
+      // trust tier for grounding purposes (both real, business-adjacent
+      // text) — whichever is present stands in for "a secondary real
+      // description exists" in the branching below. Doesn't change
+      // `groundingSource` (the client-facing trust badge above still only
+      // names Wikipedia/Tripadvisor) since Google's contribution here is
+      // meant to be invisible extra texture in the AI text, not a new
+      // named source.
+      const secondaryDescription = tripAdvisorInfo.description ?? googlePlace?.editorialSummary ?? null;
+
       const factualGuard =
         wikiEnrichment.status === 'matched'
-          ? `A real Wikipedia summary of this place is included below${wikidataFactsLine ? ', along with a few structured Wikidata facts' : ''} — ground the historical, architectural, and significance angle in them and don't contradict them; they're the source of truth for this place's history and identity.${tripAdvisorInfo.description ? ` A Tripadvisor description is also included below — you can draw on it for practical, current-visit specifics (food, atmosphere, offerings), but Wikipedia stays the primary source for what this place actually is.` : ''} Still don't invent additional unverifiable specifics (exact founding dates, named owners, awards) beyond what's given anywhere below.`
-          : tripAdvisorInfo.description
-            ? `A real Tripadvisor description of this place is included below — ground your response in it and don't contradict it, but still don't invent additional unverifiable specifics (exact founding dates, named owners, awards) beyond what's given.`
+          ? `A real Wikipedia summary of this place is included below${wikidataFactsLine ? ', along with a few structured Wikidata facts' : ''} — ground the historical, architectural, and significance angle in them and don't contradict them; they're the source of truth for this place's history and identity.${secondaryDescription ? ` A Tripadvisor/Google description is also included below — you can draw on it for practical, current-visit specifics (food, atmosphere, offerings), but Wikipedia stays the primary source for what this place actually is.` : ''} Still don't invent additional unverifiable specifics (exact founding dates, named owners, awards) beyond what's given anywhere below.`
+          : secondaryDescription
+            ? `A real Tripadvisor/Google description of this place is included below — ground your response in it and don't contradict it, but still don't invent additional unverifiable specifics (exact founding dates, named owners, awards) beyond what's given.`
             : `Only the place's name, category, and address are given below — you have no verified facts beyond that. Rely on the given category, not on assumptions from the name alone, for what this place actually offers: a name that echoes a well-known local landmark, area, or food term (e.g. a shop called "Fiskebrygga"/"Fish Wharf", after the historic fish-market building or district it sits in) does NOT mean the business itself sells or specializes in that thing — it may just be located there or use the name for branding. If the category is generic (e.g. "Store"), describe it in general terms plausible for that category rather than inventing a specific product line, cuisine, or specialty you can't verify. Don't invent specific unverifiable claims (exact founding dates, named owners, awards, specific products sold) about it.`;
+
+      // Explicitly steers away from two failure modes seen in an earlier
+      // version of this guard: treating one review's opinion as a settled
+      // fact ("the coffee is the best in town"), and inventing a
+      // consensus the given sample doesn't actually support. A handful of
+      // real reviews is enough to describe a genuine pattern in general
+      // terms (most Google Place pages only show a handful too), but not
+      // enough to declare something universally true.
+      const googleReviewGuard = googlePlace?.reviews?.length
+        ? ` A small real sample of Google reviews is included below, each with its own star rating — you can use them to describe a genuine overall impression in your own words (e.g. "visitors often mention the friendly staff" or "reviews are mixed on the noise level"), grounded in what the sample actually shows, not what you'd expect. Never quote any review verbatim or present a single reviewer's opinion as an established fact ("it's the best X in town") — and never claim a broader consensus (all/everyone/universally loved) than the sample and star ratings actually support; if the sample is small, mixed, or thin, say so plainly (e.g. "early visitors seem to like it") rather than overstating it.`
+        : '';
+
+      // Lower-trust than every other source above on purpose -- unlike
+      // Wikipedia/Tripadvisor/Google (structured, curated-ish data), this
+      // is a raw HTML scrape of the business's own marketing copy: it can
+      // be outdated, exaggerated, in a different language, or mangled by
+      // the naive tag-stripping that produced it (`website-content.ts`).
+      const websiteGuard = websiteExcerpt
+        ? ` Real text scraped from the business's own official website is included below — you can pull genuinely useful factual details from it (specialties, offerings, history, hours mentioned), but treat it skeptically: it's self-promotional, may be stale, and the extraction can be messy. Don't repeat marketing superlatives from it, don't quote it verbatim, and don't treat anything in it as more certain than the other real sources above.`
+        : '';
+
+      // Mention-if-relevant, not mention-always: a holiday only actually
+      // matters for places it could affect (shops/museums/offices closing
+      // or being busier) — forcing a mention into every single POI's
+      // description (a park bench, a hiking trail) would read as a non
+      // sequitur. Left to the model's own judgment rather than a
+      // category allowlist here, matching how this endpoint already
+      // trusts it with e.g. `foodGuidance`'s food-vs-not branching.
+      const holidayGuard = soonHolidayLine
+        ? ` IMPORTANT: a real public holiday is coming up very soon (see below) — you MUST briefly flag it in your response (a short clause is enough, e.g. "note that X is closed/busier around [holiday]") whenever this place is a business, shop, bank, government office, museum, restaurant, or any other venue with set hours that a holiday could plausibly affect. Only skip mentioning it for a place with no real hours/closure concept at all (an open park, a viewpoint, a street, a beach). This is practical, time-sensitive information the traveler needs, not optional color — don't leave it out just because the response is already covering other things.`
+        : '';
 
       const faithMismatchGuard =
         userProfile?.faith && userProfile.faith !== 'secular' && userProfile.faith !== 'prefer_not_to_say'
@@ -1718,21 +1856,23 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         const [{ object }, wikiPhoto, tripAdvisorPhotoUrls] = await Promise.all([
           generateObject({
             model: aiProvider.client.chat(aiProvider.model),
-            maxOutputTokens: 300,
+            maxOutputTokens: 500,
             schema: z.object({
               headline: z
                 .string()
                 .describe('One punchy sentence that connects this place to who the user is. Max 12 words.'),
               body: z
                 .string()
-                .describe('2-3 sentences of personalized insight. Speak directly to this person\'s expertise or interests.'),
+                .describe(
+                  '5-7 sentences (a full, substantive paragraph or two) of personalized insight — speak directly to this person\'s expertise or interests, and use the real grounding facts given below to say something genuinely specific, not just padding out the same 2-3 sentences with filler.'
+                ),
               highlights: z
                 .array(z.string())
                 .min(2)
                 .max(3)
                 .describe('2-3 specific things this particular person would find most interesting here.'),
             }),
-            system: `You are Piri, a deeply knowledgeable personal travel guide. Your job is to explain a place in a way that speaks directly to who the user is — their profession, interests, and worldview. ${factualGuard}${NO_HYPE_GUARD}${profileContext}
+            system: `You are Piri, a deeply knowledgeable personal travel guide. Your job is to explain a place in a way that speaks directly to who the user is — their profession, interests, and worldview.${holidayGuard} ${factualGuard}${googleReviewGuard}${websiteGuard}${NO_HYPE_GUARD}${profileContext}
 
 ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
             prompt: `Explain this place:\n\n${placeContext}`,
@@ -1746,7 +1886,7 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
         // correctly rather than a single blanket label.
         const photos: {
           url: string;
-          source: 'wikipedia' | 'tripadvisor' | 'unsplash';
+          source: 'wikipedia' | 'tripadvisor' | 'google' | 'unsplash';
           attributionUrl?: string;
           photographerName?: string;
           photographerUrl?: string;
@@ -1756,9 +1896,34 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
         }
         photos.push(...tripAdvisorPhotoUrls.map((url) => ({ url, source: 'tripadvisor' as const })));
 
-        // Last-resort visual only when neither real-place photo source had
+        // Paid tiers get Google Places photos added too (not just as an
+        // empty-gallery fallback) — `googlePlace` was already fetched
+        // above, in parallel with Wikipedia/Tripadvisor, so there's no
+        // extra round-trip here. A free account or exhausted quota already
+        // resolved `googlePlace` to `null` above, so this is a no-op for
+        // them and the gallery is Wikipedia/Tripadvisor-only exactly like
+        // before.
+        //
+        // Capped rather than adding all of Google's (up to 5) photos
+        // unconditionally: the priority is still Wikipedia, then
+        // Tripadvisor, then Google (this push order), but live-tested
+        // 2026-08-23 dumping all 5 made the gallery read as "just a Google
+        // gallery" whenever Wikipedia/Tripadvisor only had 1-2 between
+        // them. Capping Google to roughly match what the real sources
+        // above already contributed (never fewer than 2, so a
+        // Wikipedia-only place still gets some Google variety) keeps the
+        // three sources visually balanced instead of one dominating.
+        const realPhotoCountSoFar = photos.length;
+        const googlePhotoCap = Math.max(realPhotoCountSoFar, 2);
+        photos.push(
+          ...(googlePlace?.photoUrls ?? [])
+            .slice(0, googlePhotoCap)
+            .map((url) => ({ url, source: 'google' as const, attributionUrl: googlePlace?.googleMapsUri }))
+        );
+
+        // Last-resort visual only when no real-place photo source had
         // anything — deliberately sequential (not folded into the Promise.all
-        // above), since whether it's needed at all depends on that call's
+        // above), since whether it's needed at all depends on those calls'
         // own results. Only adds latency on the (uncommon) empty-photo path.
         if (photos.length === 0) {
           const unsplashPhoto = await fetchUnsplashPhoto(category ? `${name} ${category}` : name, category);
@@ -1777,6 +1942,7 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
           ...(object as Record<string, unknown>),
           rating: tripAdvisorInfo.rating,
           photos,
+          googleReviews: googlePlace?.reviews ?? null,
           curatedInfo,
           dietaryTags: dietaryTags.length ? dietaryTags : null,
           groundingSource,
@@ -1854,10 +2020,28 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
   // found" too (photoUrl: null) so a place that genuinely has none doesn't
   // get re-queried on every single request forever.
   const PHOTO_CACHE_TTL_DAYS = 30;
+  // A cached `unsplash`/`null` result means "neither real source had a
+  // match at the time" — that can flip to a real Wikipedia/Tripadvisor hit
+  // sooner than 30 days (matching logic improves, a transient API hiccup
+  // resolves), so it's re-checked much sooner than a confirmed real-source
+  // hit. Added 2026-08-23 after a live report of a place with a real
+  // Wikipedia photo (confirmed via /places/explain-poi) still showing a
+  // 3-day-stale cached Unsplash result on the Home grid.
+  const FALLBACK_CACHE_TTL_DAYS = 3;
 
   app.post<{
     Body: { places: { name: string; lat: number; lng: number; category?: string }[] };
   }>('/places/photos-bulk', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (request, reply) => {
+    // Optional — this grid is shown to signed-out/free accounts too, and
+    // the cached result written below is always the free-tier-eligible
+    // one (Wikipedia/Tripadvisor/Unsplash) regardless of who asked, so it
+    // stays correct and shareable for every subsequent caller. A paid
+    // caller gets a live, uncached Google upgrade layered on top per
+    // request below — never written back to this shared cache (Google's
+    // Places ToS forbids persisting its photo data beyond place_id/lat/lng,
+    // same constraint `google-places-poi.ts` already documents).
+    const userId = await optionalUserId(request, AUTH_JWT_SECRET);
+
     const parsedBody = z
       .object({
         places: z
@@ -1907,66 +2091,95 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
           const cacheId = `${nameNormalized}|${latRounded}|${lngRounded}`;
 
           const [cached] = await db.select().from(poiPhotoCache).where(eq(poiPhotoCache.id, cacheId)).limit(1);
+          const ttlDays =
+            cached?.source === 'wikipedia' || cached?.source === 'tripadvisor' ? PHOTO_CACHE_TTL_DAYS : FALLBACK_CACHE_TTL_DAYS;
           const cacheAgeDays = cached ? (Date.now() - new Date(cached.fetchedAt).getTime()) / (1000 * 60 * 60 * 24) : Infinity;
 
-          if (cached && cacheAgeDays < PHOTO_CACHE_TTL_DAYS) {
-            return {
-              name: place.name,
-              photoUrl: cached.photoUrl,
-              source: cached.source,
-              attributionUrl: cached.attributionUrl,
-              photographerName: cached.photographerName,
-              photographerUrl: cached.photographerUrl,
-            };
+          let photoUrl: string | null;
+          let source: 'wikipedia' | 'tripadvisor' | 'unsplash' | 'google' | null;
+          let attributionUrl: string | null;
+          let photographerName: string | null;
+          let photographerUrl: string | null;
+
+          if (cached && cacheAgeDays < ttlDays) {
+            photoUrl = cached.photoUrl;
+            source = cached.source as typeof source;
+            attributionUrl = cached.attributionUrl;
+            photographerName = cached.photographerName;
+            photographerUrl = cached.photographerUrl;
+          } else {
+            // Wikipedia first, matching /places/explain-poi's own priority —
+            // a real Wikimedia Commons photo over a Tripadvisor one when
+            // both exist.
+            const wiki = await fetchWikipediaPhoto(place.name, place.lat, place.lng, place.category ?? undefined);
+            photoUrl = wiki?.url ?? null;
+            source = wiki ? 'wikipedia' : null;
+            attributionUrl = wiki?.pageUrl ?? null;
+            photographerName = null;
+            photographerUrl = null;
+
+            if (!photoUrl) {
+              const info = await fetchTripAdvisorInfo(place.name, place.lat, place.lng);
+              if (info.photoUrls[0]) {
+                photoUrl = info.photoUrls[0];
+                source = 'tripadvisor';
+              }
+            }
+
+            // Same last-resort /places/explain-poi already has — Home/
+            // Explore's grid was falling back to a plain category-icon tile
+            // for most small local businesses (no Wikipedia page, no
+            // Tripadvisor listing), which is exactly what a photo-forward
+            // grid shouldn't look like.
+            if (!photoUrl) {
+              const unsplashPhoto = await fetchUnsplashPhoto(
+                place.category ? `${place.name} ${place.category}` : place.name,
+                place.category ?? undefined
+              );
+              if (unsplashPhoto) {
+                photoUrl = unsplashPhoto.url;
+                source = 'unsplash';
+                attributionUrl = unsplashPhoto.attributionUrl;
+                photographerName = unsplashPhoto.photographerName;
+                photographerUrl = unsplashPhoto.photographerUrl;
+              }
+            }
+
+            const fetchedAt = new Date().toISOString();
+            await db
+              .insert(poiPhotoCache)
+              .values({ id: cacheId, nameNormalized, latRounded, lngRounded, photoUrl, source, attributionUrl, photographerName, photographerUrl, fetchedAt })
+              .onConflictDoUpdate({
+                target: poiPhotoCache.id,
+                set: { photoUrl, source, attributionUrl, photographerName, photographerUrl, fetchedAt },
+              });
           }
 
-          // Wikipedia first, matching /places/explain-poi's own priority — a
-          // real Wikimedia Commons photo over a Tripadvisor one when both exist.
-          const wiki = await fetchWikipediaPhoto(place.name, place.lat, place.lng, place.category ?? undefined);
-          let photoUrl: string | null = wiki?.url ?? null;
-          let source: 'wikipedia' | 'tripadvisor' | 'unsplash' | null = wiki ? 'wikipedia' : null;
-          let attributionUrl: string | null = wiki?.pageUrl ?? null;
-          let photographerName: string | null = null;
-          let photographerUrl: string | null = null;
-
-          if (!photoUrl) {
-            const info = await fetchTripAdvisorInfo(place.name, place.lat, place.lng);
-            if (info.photoUrls[0]) {
-              photoUrl = info.photoUrls[0];
-              source = 'tripadvisor';
+          // Paid-tier live upgrade, layered on top of the shared cache
+          // result above rather than replacing it there — see the route's
+          // own comment for why this never gets written to `poiPhotoCache`.
+          // Only attempted when the free-eligible result above has nothing
+          // better than the generic Unsplash fallback (or nothing at all).
+          if (userId && (!photoUrl || source === 'unsplash')) {
+            const allowed = await checkAndIncrementUsage(userId, 'google_places');
+            if (allowed) {
+              try {
+                const premium = await fetchPremiumPlaceDetails({ name: place.name, lat: place.lat, lng: place.lng });
+                if (premium?.photoUrls[0]) {
+                  photoUrl = premium.photoUrls[0];
+                  source = 'google';
+                  attributionUrl = premium.googleMapsUri ?? null;
+                  photographerName = null;
+                  photographerUrl = null;
+                } else {
+                  await refundUsage(userId, 'google_places');
+                }
+              } catch (error) {
+                request.log.error(error);
+                await refundUsage(userId, 'google_places');
+              }
             }
           }
-
-          // Same last-resort /places/explain-poi already has — Home/
-          // Explore's grid was falling back to a plain category-icon tile
-          // for most small local businesses (no Wikipedia page, no
-          // Tripadvisor listing), which is exactly what a photo-forward
-          // grid shouldn't look like. Cached same as the two real sources
-          // above (30-day TTL, shared across every user), so this doesn't
-          // multiply Unsplash's 50-req/hour demo-tier quota by request
-          // volume -- only by genuinely new places.
-          if (!photoUrl) {
-            const unsplashPhoto = await fetchUnsplashPhoto(
-              place.category ? `${place.name} ${place.category}` : place.name,
-              place.category ?? undefined
-            );
-            if (unsplashPhoto) {
-              photoUrl = unsplashPhoto.url;
-              source = 'unsplash';
-              attributionUrl = unsplashPhoto.attributionUrl;
-              photographerName = unsplashPhoto.photographerName;
-              photographerUrl = unsplashPhoto.photographerUrl;
-            }
-          }
-
-          const fetchedAt = new Date().toISOString();
-          await db
-            .insert(poiPhotoCache)
-            .values({ id: cacheId, nameNormalized, latRounded, lngRounded, photoUrl, source, attributionUrl, photographerName, photographerUrl, fetchedAt })
-            .onConflictDoUpdate({
-              target: poiPhotoCache.id,
-              set: { photoUrl, source, attributionUrl, photographerName, photographerUrl, fetchedAt },
-            });
 
           return { name: place.name, photoUrl, source, attributionUrl, photographerName, photographerUrl };
         })
@@ -2263,6 +2476,7 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
       name: string;
       category?: string;
       address?: string;
+      website?: string;
       locale?: string;
       userProfile?: UserProfileInput;
       history: { role: 'user' | 'assistant'; content: string }[];
@@ -2277,6 +2491,7 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
           name: z.string().trim().min(1).max(200),
           category: z.string().trim().max(100).optional(),
           address: z.string().trim().max(300).optional(),
+          website: optionalUrlInput,
           locale: z.string().trim().min(2).max(8).optional(),
           userProfile: userProfileSchema.optional(),
           // Capped generously just against abuse, not against a normal long
@@ -2302,15 +2517,27 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
         return reply.code(400).send({ error: 'Invalid request' });
       }
 
-      const { name, category, address, locale, userProfile, message } = parsed.data;
+      const { name, category, address, website, locale, userProfile, message } = parsed.data;
       const history = parsed.data.history.slice(-12);
       const aiProvider = getAiProviderConfig();
       if (!aiProvider) {
         return reply.code(503).send({ error: 'AI not configured' });
       }
 
+      // A specific answer (ticket prices, opening hours, a phone number) is
+      // less likely to land in the first few hundred characters than the
+      // general "about this place" framing /places/explain-poi's own
+      // (shorter) excerpt is grounding a description in -- larger cap here
+      // since this is a direct-question use case, not scene-setting.
+      const websiteExcerpt = website ? await fetchWebsiteExcerpt(website, 2500) : null;
+
       const { text: profileContext } = buildUserContext(userProfile);
-      const placeContext = [`Name: ${name}`, category ? `Category: ${category}` : null, address ? `Address: ${address}` : null]
+      const placeContext = [
+        `Name: ${name}`,
+        category ? `Category: ${category}` : null,
+        address ? `Address: ${address}` : null,
+        websiteExcerpt ? `Text scraped from the business's own official website: "${websiteExcerpt}"` : null,
+      ]
         .filter(Boolean)
         .join('\n');
 
@@ -2322,7 +2549,11 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
             {
               role: 'system',
               content: `You are Piri, a knowledgeable personal travel guide, continuing a conversation about one specific place the user is looking at right now:\n${placeContext}\n\nYou have no verified facts beyond what's given above — rely on general knowledge about places of this type and name, and say so plainly if you're not sure of something specific (an exact date, owner, etc.) rather than inventing it.
-
+${
+  websiteExcerpt
+    ? `\nWEBSITE RULE: the text above scraped from this place's own official website is real, but it's just an excerpt (the site's homepage, or close to it) — it will often NOT contain what a specific question asks about (exact ticket prices, a particular tour time, current hours). If the answer genuinely isn't in that excerpt, say so plainly and suggest checking the official website directly rather than guessing a plausible-sounding number. Only answer from it when the actual fact is really there.\n`
+    : ''
+}
 NEARBY-PLACES RULE (found via testing: asked for a nearby restaurant, this chat invented a specific chain's name, then a "500 meters" distance it explicitly admitted not knowing, then fabricated turn-by-turn directions — all confidently, with zero real location or map data behind any of it): this chat has no coordinates, no nearby-search results, and no routing data at all — only the single place named above. Never name a specific other business as if it's a verified real place near here, never state a distance in meters/minutes, and never give directions ("turn right", "walk along X street") — all of that would be invented, not looked up. If asked something like this, say plainly that you don't have real nearby/map data in this chat, and point them to the map or a fresh search instead of guessing. This holds even if an earlier reply in this same conversation already named a specific place — an earlier mistake is not a fact to build on, treat it as unverified too rather than staying "consistent" with it.
 
 SCOPE RULE (found via testing: pushed hard enough, this chat kept inventing increasingly specific restaurants — "Gino's Pizza", "Bellini" — for a request about a completely different town, Grimstad, nowhere near the place this chat is about): if the user asks about a different place, neighborhood, or town that isn't this specific place or its immediate vicinity, don't attempt an answer from general knowledge at all. Say plainly that this chat is focused on ${name} and that Piri's main search (Ask Piri) is the right place to ask about somewhere else, since it can actually search real places there — this chat can't.
@@ -3090,6 +3321,80 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
     return reply.send(toPublicUser(user));
   });
 
+  // ── /iap/verify-transaction — StoreKit 2 purchase → tier upgrade ───────────
+  // `storekit.ts` (Apple's server library, cryptographic verification) was
+  // built and tested in isolation but never actually wired to a route --
+  // the native client (`IAPAPI.swift`) has been calling this exact path
+  // since it was written, silently 404ing every real purchase attempt
+  // until now. Never trusts the client's own claim of what tier it bought;
+  // `verifyTransaction` decodes/verifies the signed Apple payload itself.
+  app.post<{ Body: { signedTransactionInfo: string } }>(
+    '/iap/verify-transaction',
+    { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
+      if (!userId) return;
+
+      const parsed = z.object({ signedTransactionInfo: z.string().trim().min(1) }).safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'Invalid request' });
+      }
+
+      try {
+        const verified = await verifyTransaction(parsed.data.signedTransactionInfo);
+        if (verified.revoked) {
+          return reply.code(400).send({ error: 'Transaction has been revoked' });
+        }
+        if (verified.expiresAt && new Date(verified.expiresAt).getTime() < Date.now()) {
+          return reply.code(400).send({ error: 'Transaction has already expired' });
+        }
+
+        // `originalTransactionId` is stable across renewals for one real
+        // subscription -- without this check, a valid signed receipt for
+        // a single $99 purchase could be replayed against any number of
+        // Piri accounts, each getting premium for free. The unique index
+        // on `users.originalTransactionId` is the actual enforcement (see
+        // the `23505` catch below); this lookup just gives a clear error
+        // instead of a raw constraint-violation one in the common case.
+        const [existingClaim] = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.originalTransactionId, verified.originalTransactionId))
+          .limit(1);
+        if (existingClaim && existingClaim.id !== userId) {
+          return reply.code(409).send({ error: 'This purchase is already linked to a different account.' });
+        }
+
+        let updated;
+        try {
+          [updated] = await db
+            .update(users)
+            .set({
+              tier: verified.tier,
+              tierExpiresAt: verified.expiresAt,
+              originalTransactionId: verified.originalTransactionId,
+              iapProductId: verified.productId,
+              iapEnvironment: verified.environment,
+            })
+            .where(eq(users.id, userId))
+            .returning();
+        } catch (dbError: any) {
+          // Backstop for the race between the check above and this write.
+          if (dbError?.code === '23505') {
+            return reply.code(409).send({ error: 'This purchase is already linked to a different account.' });
+          }
+          throw dbError;
+        }
+
+        if (!updated) return reply.code(401).send({ error: 'Unauthorized' });
+        return reply.send(toPublicUser(updated));
+      } catch (e: any) {
+        request.log.error(e);
+        return reply.code(400).send({ error: e?.message || 'Transaction verification failed' });
+      }
+    }
+  );
+
   app.get('/me/sync', async (request, reply) => {
     const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
     if (!userId) return;
@@ -3384,6 +3689,81 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
         app.log.error(e);
         return reply.code(500).send({ error: 'Failed to fetch weather' });
       }
+    }
+  );
+
+  // ── /holidays/upcoming — Real public holidays + AI "what typically happens" ──
+  // date.nager.at (free, keyless) gives the real date/name; the country is
+  // resolved from the coordinate via Nominatim (`holidays.ts`). The AI
+  // step is best-effort enrichment, not the source of truth for whether a
+  // date IS a holiday — only for describing what a holiday like this
+  // usually involves (parades, ceremonies, family gatherings, etc.), the
+  // same "real fact → AI elaborates" shape /places/explain-poi already
+  // uses. No `AI not configured` 503 here: the holiday dates themselves
+  // are still useful without it, so a missing AI provider just means
+  // `summary`/`activities` come back `null` per holiday instead of
+  // failing the whole request.
+  const holidayEnrichmentCache = new Map<string, { summary: string; activities: string[] }>();
+  const HOLIDAY_ENRICHMENT_LIMIT = 3;
+
+  async function enrichHoliday(holiday: PublicHoliday, locale?: string): Promise<{ summary: string; activities: string[] } | null> {
+    const cacheKey = `${holiday.countryCode}|${holiday.date}|${holiday.name}|${locale ?? ''}`;
+    const cached = holidayEnrichmentCache.get(cacheKey);
+    if (cached) return cached;
+
+    const aiProvider = getAiProviderConfig();
+    if (!aiProvider) return null;
+
+    try {
+      const { object } = await generateObject({
+        model: aiProvider.client.chat(aiProvider.model),
+        maxOutputTokens: 200,
+        schema: z.object({
+          summary: z.string().describe('One sentence on what this holiday is and why it is observed.'),
+          activities: z
+            .array(z.string())
+            .min(2)
+            .max(4)
+            .describe('2-4 specific things that typically happen on this day in this country — real traditions, ceremonies, parades, or customs, not generic filler like "people celebrate."'),
+        }),
+        system: `You are Piri, a knowledgeable local travel guide. Describe a real public holiday factually and specifically — ground everything in genuine, well-known traditions for this holiday in this country; if you're not confident of a specific tradition, describe it in general terms instead of inventing a specific ceremony or event that may not be real.${NO_HYPE_GUARD}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
+        prompt: `Holiday: ${holiday.name} (locally: ${holiday.localName})\nDate: ${holiday.date}\nCountry code: ${holiday.countryCode}`,
+      } as any);
+
+      const result = object as { summary: string; activities: string[] };
+      holidayEnrichmentCache.set(cacheKey, result);
+      return result;
+    } catch {
+      return null;
+    }
+  }
+
+  app.get<{ Querystring: { lat: string; lng: string; days?: string; locale?: string } }>(
+    '/holidays/upcoming',
+    { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const parsedLat = parseFloat(request.query.lat ?? '');
+      const parsedLng = parseFloat(request.query.lng ?? '');
+      if (isNaN(parsedLat) || isNaN(parsedLng)) {
+        return reply.code(400).send({ error: 'lat and lng query params are required' });
+      }
+      const days = Math.min(Math.max(parseInt(request.query.days ?? '30', 10) || 30, 1), 365);
+
+      const countryCode = await resolveCountryCode(parsedLat, parsedLng);
+      if (!countryCode) {
+        return reply.send({ countryCode: null, holidays: [] });
+      }
+
+      const holidays = await fetchUpcomingHolidays(countryCode, new Date(), days);
+
+      const enriched = await Promise.all(
+        holidays.map(async (holiday, index) => {
+          const enrichment = index < HOLIDAY_ENRICHMENT_LIMIT ? await enrichHoliday(holiday, request.query.locale) : null;
+          return { ...holiday, summary: enrichment?.summary ?? null, activities: enrichment?.activities ?? null };
+        })
+      );
+
+      return reply.send({ countryCode, holidays: enriched });
     }
   );
 

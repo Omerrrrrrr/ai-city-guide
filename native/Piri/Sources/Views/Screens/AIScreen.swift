@@ -86,7 +86,7 @@ struct AIScreen: View {
     private var showBackButton: Bool { initialQuery != nil }
 
     private var suggestions: [String] {
-        var base = [
+        let base = [
             String(localized: "ai.suggestions.bestCafes"),
             String(localized: "ai.suggestions.uniqueLocal"),
             String(localized: "ai.suggestions.soloAfternoon"),

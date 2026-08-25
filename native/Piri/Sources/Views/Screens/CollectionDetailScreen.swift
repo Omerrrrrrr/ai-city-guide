@@ -40,6 +40,7 @@ struct CollectionDetailScreen: View {
     @State private var forecastFailed = false
     @State private var hoursResults: [String: HoursCheckResult] = [:]
     @State private var hoursFailed = false
+    @State private var planHolidays: [UpcomingHoliday] = []
     @State private var searchQuery = ""
     @State private var searchResults: [POIPlace] = []
     @State private var isSearchingPlaces = false
@@ -139,6 +140,34 @@ struct CollectionDetailScreen: View {
         }
     }
 
+    /// Checks whether the Plan's target date lands on a real public
+    /// holiday where its places actually are — reuses `/holidays/upcoming`
+    /// (built for the Home screen's own banner) rather than a dedicated
+    /// endpoint: asks for just enough days ahead to cover the target date,
+    /// then filters client-side to the one calendar day that matters here.
+    private func loadHolidaysIfNeeded(for collection: SavedCollection, date: Date) async {
+        guard let coordinate = centroid(for: collection) else {
+            planHolidays = []
+            return
+        }
+        let daysUntilTarget = max(1, Calendar.current.dateComponents([.day], from: .now, to: date).day ?? 1)
+        do {
+            let response = try await HolidayAPI.upcoming(
+                lat: coordinate.lat,
+                lng: coordinate.lng,
+                days: min(daysUntilTarget + 2, 365),
+                locale: Locale.current.language.languageCode?.identifier
+            )
+            planHolidays = response.holidays.filter { holiday in
+                guard let holidayDate = holiday.dateValue else { return false }
+                return Calendar.current.isDate(holidayDate, inSameDayAs: date)
+            }
+        } catch {
+            // non-critical — matches the Home screen's HolidayQuery
+            planHolidays = []
+        }
+    }
+
     var body: some View {
         Group {
             if let collection {
@@ -169,6 +198,7 @@ struct CollectionDetailScreen: View {
                             dateSection(collection)
                             weatherBanner(collection)
                             hoursFailedBanner(collection)
+                            holidayBanner
                             if collection.places.count >= 2 {
                                 optimizeButton(collection)
                                 createRouteButton(collection)
@@ -200,11 +230,13 @@ struct CollectionDetailScreen: View {
                 forecastFailed = false
                 hoursResults = [:]
                 hoursFailed = false
+                planHolidays = []
                 return
             }
             async let weatherTask: Void = loadForecastIfNeeded(for: collection, date: date)
             async let hoursTask: Void = loadHoursIfNeeded(for: collection, date: date)
-            _ = await (weatherTask, hoursTask)
+            async let holidaysTask: Void = loadHolidaysIfNeeded(for: collection, date: date)
+            _ = await (weatherTask, hoursTask, holidaysTask)
         }
         .onChange(of: searchQuery) { _, newValue in scheduleSearch(newValue) }
     }
@@ -426,6 +458,30 @@ struct CollectionDetailScreen: View {
             }
             .padding(14)
             .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemBackground)))
+        }
+    }
+
+    /// Only ever the single holiday landing exactly on the target date
+    /// (`planHolidays` is already pre-filtered to that one calendar day in
+    /// `loadHolidaysIfNeeded`) — a Plan realistically only ever has 0 or 1
+    /// match here, never a list to page through.
+    @ViewBuilder
+    private var holidayBanner: some View {
+        if let holiday = planHolidays.first {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "flag.fill").font(.system(size: 16)).foregroundStyle(Theme.gold)
+                    Text(L("collection.holidayWarning", holiday.name))
+                        .font(.system(size: 14, weight: .medium))
+                    Spacer()
+                }
+                if let summary = holiday.summary {
+                    Text(summary).font(.footnote).foregroundStyle(.secondary).padding(.leading, 26)
+                }
+            }
+            .padding(14)
+            .background(RoundedRectangle(cornerRadius: 14).fill(Theme.gold.opacity(0.1)))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.gold.opacity(0.25)))
         }
     }
 

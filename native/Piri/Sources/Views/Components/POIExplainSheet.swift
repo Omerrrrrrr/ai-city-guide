@@ -105,6 +105,13 @@ struct POIExplainSheet: View {
                                 // three rows of badges/text, effectively
                                 // buried. See the 2026-08 visual-design
                                 // research report, Phase 1.
+                                // No separate "Google details" card here —
+                                // paid tiers get Google's photos folded
+                                // straight into the gallery above and its
+                                // editorial summary/reviews folded into the
+                                // AI body text itself (both server-side, see
+                                // `/places/explain-poi`), so there's nothing
+                                // left for a redundant second card to show.
                                 POIPhotoGallery(photos: result.photos)
                                 UserPhotoSection(poiName: poi.name, coordinate: poi.coordinate, photos: $userPhotos)
                                 if let rating = result.rating {
@@ -133,7 +140,17 @@ struct POIExplainSheet: View {
                                 }
                                 Text(result.body).font(.footnote)
                                 if let source = result.groundingSource {
-                                    SourceCaption(text: String(localized: String.LocalizationValue("poiExplain.source.\(source)")))
+                                    // NOT `LocalizationValue("...\(source)")` -- that treats
+                                    // `source` as a substitution argument of the literal string
+                                    // "poiExplain.source.%@" rather than concatenating it into
+                                    // the lookup key, so the catalog lookup always misses and
+                                    // silently falls back to rendering the raw interpolated
+                                    // text (confirmed live: a real card showed literal
+                                    // "poiExplain.source.wikipedia" instead of the translated
+                                    // caption). Build the key as a plain `String` first, same
+                                    // fix `LPlural` already documents for the identical trap.
+                                    let key = "poiExplain.source." + source
+                                    SourceCaption(text: String(localized: String.LocalizationValue(key)))
                                 }
                                 ForEach(result.highlights, id: \.self) { highlight in
                                     HStack(alignment: .top, spacing: 6) {
@@ -151,11 +168,9 @@ struct POIExplainSheet: View {
                                 }
                             }
 
-                            // Phone/website/address — real plain values,
-                            // laid out as text right here next to each
-                            // other, same section as everything else on
-                            // this page.
-                            placeDetailsRows
+                            // Phone/website/address — real plain values
+                            // from Apple's own MapKit data.
+                            PlaceDetailsCard(mapItem: poi.mapItem)
 
                             // Hours has no plain-value form to put in the
                             // section above (see note on `showingMapItemDetail`)
@@ -262,28 +277,6 @@ struct POIExplainSheet: View {
         .foregroundStyle(.secondary)
     }
 
-    @ViewBuilder
-    private var placeDetailsRows: some View {
-        let phoneNumber = poi.mapItem.phoneNumber
-        let website = poi.mapItem.url
-        let address = poi.mapItem.placemark.title
-
-        if phoneNumber != nil || website != nil || address != nil {
-            VStack(alignment: .leading, spacing: 6) {
-                if let phoneNumber, let telURL = URL(string: "tel:\(phoneNumber.filter { !$0.isWhitespace })") {
-                    Link(phoneNumber, destination: telURL)
-                }
-                if let website {
-                    Link(website.host ?? website.absoluteString, destination: website)
-                }
-                if let address {
-                    Text(address).foregroundStyle(.secondary)
-                }
-            }
-            .font(.footnote)
-        }
-    }
-
     private func loadLookAroundScene() async {
         let request = MKLookAroundSceneRequest(coordinate: poi.coordinate)
         lookAroundScene = try? await request.scene
@@ -349,13 +342,14 @@ struct POIExplainSheet: View {
             lat: poi.coordinate.latitude,
             lng: poi.coordinate.longitude,
             address: poi.mapItem.placemark.title,
+            website: poi.mapItem.url?.absoluteString,
             locale: Locale.current.language.languageCode?.identifier,
             userProfile: personalizationProfile(),
             recentlyViewedPlaceIds: nil
         )
 
         do {
-            result = try await PlacesAPI.explainPOI(request)
+            result = try await PlacesAPI.explainPOI(request, token: authStore.token)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -376,6 +370,7 @@ struct POIExplainSheet: View {
             name: poi.name,
             category: poi.categoryLabel.isEmpty ? nil : poi.categoryLabel,
             address: poi.mapItem.placemark.title,
+            website: poi.mapItem.url?.absoluteString,
             locale: Locale.current.language.languageCode?.identifier,
             userProfile: personalizationProfile(),
             history: historyForRequest,

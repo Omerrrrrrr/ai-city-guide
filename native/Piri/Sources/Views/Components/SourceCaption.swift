@@ -12,8 +12,13 @@ struct SourceCaption: View {
     let text: String
 
     var body: some View {
-        Text(text)
-            .font(.system(size: 10))
-            .foregroundStyle(.secondary)
+        Label {
+            Text(text)
+        } icon: {
+            Image(systemName: "checkmark.seal.fill")
+        }
+        .labelStyle(.titleAndIcon)
+        .font(.system(size: 10, weight: .medium))
+        .foregroundStyle(.secondary)
     }
 }

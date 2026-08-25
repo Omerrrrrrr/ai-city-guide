@@ -14,8 +14,11 @@ struct HomeScreen: View {
     @Environment(CityStore.self) private var cityStore
     @Environment(RecentlyViewedStore.self) private var recentlyViewedStore
     @Environment(TabSelection.self) private var tabSelection
+    @Environment(AuthStore.self) private var authStore
 
     @State private var weatherQuery = WeatherQuery()
+    @State private var holidayQuery = HolidayQuery()
+    @State private var showingHolidayDetail: UpcomingHoliday?
     @State private var locationManager = LocationManager()
     @State private var nearbyUser: [PlaceWithDistance] = []
     @State private var showingCityPicker = false
@@ -133,6 +136,7 @@ struct HomeScreen: View {
             if let lat = cityStore.lat ?? locationManager.currentLocation?.latitude,
                let lng = cityStore.lng ?? locationManager.currentLocation?.longitude {
                 await weatherQuery.load(lat: lat, lng: lng)
+                await holidayQuery.load(lat: lat, lng: lng, locale: Locale.current.language.languageCode?.identifier)
             }
             if let location = locationManager.currentLocation {
                 nearbyUser = placesQuery.nearbyUser(lat: location.latitude, lng: location.longitude)
@@ -154,6 +158,7 @@ struct HomeScreen: View {
         }
         .sheet(isPresented: $showingCityPicker) { CityPickerScreen() }
         .sheet(item: $selectedPOI) { poi in POIExplainSheet(poi: poi) }
+        .sheet(item: $showingHolidayDetail) { holiday in HolidayDetailSheet(holiday: holiday) }
         .sheet(isPresented: $showingWeatherForecast) {
             if let weather = weatherQuery.weather,
                let lat = cityStore.lat ?? locationManager.currentLocation?.latitude,
@@ -496,13 +501,27 @@ struct HomeScreen: View {
     private func unsplashBadge(for poi: POIPlace) -> some View {
         if let photo = poiPhotos[poi.name], photo.source == "unsplash",
            let photographerUrl = photo.photographerUrl, let url = URL(string: photographerUrl) {
-            Link(destination: url) {
-                Text("Unsplash")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(.black.opacity(0.55), in: Capsule())
+            HStack(spacing: 4) {
+                Link(destination: url) {
+                    Text("Unsplash")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(.black.opacity(0.55), in: Capsule())
+                }
+                // Upsell hint only for someone who'd actually benefit from
+                // it — a paid account already gets Google's own photos
+                // (see /places/explain-poi) wherever it matters, so showing
+                // "upgrade for this" to someone who already paid would be
+                // wrong, not just redundant.
+                if authStore.user?.isPaidTier != true {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(4)
+                        .background(.black.opacity(0.55), in: Circle())
+                }
             }
             .padding(6)
         }
@@ -515,7 +534,7 @@ struct HomeScreen: View {
             PhotoBulkPlace(name: $0.name, lat: $0.coordinate.latitude, lng: $0.coordinate.longitude, category: $0.categoryLabel.isEmpty ? nil : $0.categoryLabel)
         })
         Task {
-            guard let response = try? await PlacesAPI.photosBulk(request) else { return }
+            guard let response = try? await PlacesAPI.photosBulk(request, token: authStore.token) else { return }
             for result in response.results {
                 poiPhotos[result.name] = result
             }
@@ -546,11 +565,53 @@ struct HomeScreen: View {
     private var suggestionCard: some View {
         if !hasProfile, !poiLoading {
             profileNudge
+        } else if let holiday = soonHoliday {
+            holidayBanner(holiday)
         } else if let weather = weatherQuery.weather {
             weatherBanner(weather)
         } else {
             aiBanner
         }
+    }
+
+    /// Within a week — close enough to be genuinely useful travel context
+    /// (closed shops, a parade worth planning around) without this slot
+    /// showing a holiday that's still a distant, not-yet-actionable
+    /// two months out. `holidayQuery.holidays` is already sorted
+    /// soonest-first server-side, so the first match here is the next one.
+    private var soonHoliday: UpcomingHoliday? {
+        holidayQuery.holidays.first {
+            guard let days = $0.dateValue.map({ Calendar.current.dateComponents([.day], from: .now, to: $0).day ?? 999 }) else { return false }
+            return days >= 0 && days <= 7
+        }
+    }
+
+    private func holidayBanner(_ holiday: UpcomingHoliday) -> some View {
+        Button {
+            Haptics.light()
+            showingHolidayDetail = holiday
+        } label: {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "flag.fill").font(.system(size: 24)).foregroundStyle(Theme.gold)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(holidayBannerTitle(holiday)).font(.system(size: 14, weight: .medium)).foregroundStyle(.white)
+                    Text("home.holidayBanner.cta").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.gold)
+                }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 18).fill(Theme.navy.opacity(0.85)))
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 20)
+    }
+
+    private func holidayBannerTitle(_ holiday: UpcomingHoliday) -> String {
+        let daysUntil = holiday.dateValue.map { Calendar.current.dateComponents([.day], from: .now, to: $0).day ?? 0 } ?? 0
+        let when = daysUntil <= 0
+            ? String(localized: "home.holidayBanner.today")
+            : LPlural("home.holidayBanner.inDays", count: daysUntil)
+        return L("home.holidayBanner.title", holiday.name, when)
     }
 
     private var profileNudge: some View {

@@ -36,8 +36,16 @@ enum PlacesAPI {
         try await APIClient.shared.post("/places/explain", body: request)
     }
 
-    static func explainPOI(_ request: ExplainPOIRequest) async throws -> ExplainResult {
-        try await APIClient.shared.post("/places/explain-poi", body: request)
+    /// `token` is optional — signed-out/free accounts get the exact same
+    /// response as before — but when a signed-in account's token IS
+    /// passed, the backend can layer in paid-tier-only extras (Google
+    /// photos/description/reviews, see `/places/explain-poi`). Every call
+    /// site should pass `authStore.token` whenever one is available; this
+    /// was missing for a while after that backend support shipped, which
+    /// silently meant no paid account ever actually got the Google data
+    /// despite the entitlement being real (confirmed live 2026-08-23).
+    static func explainPOI(_ request: ExplainPOIRequest, token: String? = nil) async throws -> ExplainResult {
+        try await APIClient.shared.post("/places/explain-poi", body: request, bearerToken: token)
     }
 
     static func chatAboutPOI(_ request: POIChatRequest) async throws -> POIChatResponse {
@@ -97,6 +105,20 @@ enum CitiesAPI {
 
     static func status(cityId: String) async throws -> CityResult {
         try await APIClient.shared.get("/cities/\(cityId)")
+    }
+}
+
+enum HolidayAPI {
+    /// `days` bounds how far ahead to look (backend clamps to 1-365,
+    /// defaults 30). `locale` steers the AI-written `summary`/`activities`
+    /// language — omit for the backend's own default (English).
+    static func upcoming(lat: Double, lng: Double, days: Int = 30, locale: String? = nil) async throws -> HolidaysUpcomingResponse {
+        try await APIClient.shared.get("/holidays/upcoming", query: [
+            "lat": String(lat),
+            "lng": String(lng),
+            "days": String(days),
+            "locale": locale,
+        ])
     }
 }
 
@@ -189,14 +211,23 @@ extension PlacesAPI {
     /// Cache-first — the same request shape hitting the same places
     /// repeatedly (any two people browsing the same city) resolves from
     /// `poi_photo_cache` server-side after the first live lookup, not one
-    /// live Tripadvisor/Wikipedia call per card per screen load.
-    static func photosBulk(_ request: PhotoBulkRequest) async throws -> PhotoBulkResponse {
-        try await APIClient.shared.post("/places/photos-bulk", body: request)
+    /// live Tripadvisor/Wikipedia call per card per screen load. `token`
+    /// is optional, same contract as `explainPOI` above — pass
+    /// `authStore.token` whenever one exists so a paid account can get a
+    /// live Google photo layered onto an otherwise-Unsplash grid result.
+    static func photosBulk(_ request: PhotoBulkRequest, token: String? = nil) async throws -> PhotoBulkResponse {
+        try await APIClient.shared.post("/places/photos-bulk", body: request, bearerToken: token)
     }
 
     /// On-demand only — called when the reviews sheet actually opens, not
     /// as part of the initial POI card load.
     static func reviews(_ request: ReviewsRequest) async throws -> ReviewsResponse {
         try await APIClient.shared.post("/places/reviews", body: request)
+    }
+
+    /// Paid-tier-only (basic/pro) — 403s for a free account, 429s once the
+    /// month's `google_places` quota is spent. See `PremiumDetailsSection`.
+    static func premiumDetails(_ request: PremiumDetailsRequest, token: String) async throws -> PremiumPlaceDetails {
+        try await APIClient.shared.post("/places/premium-details", body: request, bearerToken: token)
     }
 }

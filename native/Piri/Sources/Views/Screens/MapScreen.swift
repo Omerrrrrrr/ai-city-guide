@@ -692,7 +692,12 @@ struct MapScreen: View {
                 }
                 Text(poiExplainResult.body).font(.footnote)
                 if let source = poiExplainResult.groundingSource {
-                    SourceCaption(text: String(localized: String.LocalizationValue("poiExplain.source.\(source)")))
+                    // See POIExplainSheet's identical fix -- interpolating
+                    // `source` straight into `LocalizationValue("...")`
+                    // makes it a substitution argument, not part of the
+                    // lookup key, so the catalog lookup always misses.
+                    let key = "poiExplain.source." + source
+                    SourceCaption(text: String(localized: String.LocalizationValue(key)))
                 }
                 ForEach(poiExplainResult.highlights, id: \.self) { highlight in
                     HStack(alignment: .top, spacing: 6) {
@@ -728,13 +733,7 @@ struct MapScreen: View {
             // have no plain data API (confirmed via research) — "Haritalarda
             // Aç" below is how to reach those from here.
             if let resolvedMapFeatureItem {
-                if let phoneNumber = resolvedMapFeatureItem.phoneNumber,
-                   let telURL = URL(string: "tel:\(phoneNumber.filter { !$0.isWhitespace })") {
-                    Link(phoneNumber, destination: telURL).font(.footnote)
-                }
-                if let website = resolvedMapFeatureItem.url {
-                    Link(website.host ?? website.absoluteString, destination: website).font(.footnote)
-                }
+                PlaceDetailsCard(mapItem: resolvedMapFeatureItem)
                 HStack(spacing: 10) {
                     Button {
                         showingMapItemDetail = true
@@ -967,6 +966,7 @@ struct MapScreen: View {
             lat: feature.coordinate.latitude,
             lng: feature.coordinate.longitude,
             address: address,
+            website: resolvedMapFeatureItem?.url?.absoluteString,
             locale: Locale.current.language.languageCode?.identifier,
             userProfile: PersonalizationProfile(
                 name: profile.name,
@@ -981,7 +981,7 @@ struct MapScreen: View {
         )
 
         do {
-            let result = try await PlacesAPI.explainPOI(request)
+            let result = try await PlacesAPI.explainPOI(request, token: authStore.token)
             guard !Task.isCancelled else { return }
             poiExplainResult = result
             Self.poiExplainCache[cacheKey] = result
@@ -1043,6 +1043,7 @@ struct MapScreen: View {
             lat: pin.lat,
             lng: pin.lng,
             address: nil,
+            website: nil,
             locale: Locale.current.language.languageCode?.identifier,
             userProfile: PersonalizationProfile(
                 name: profile.name,
@@ -1057,7 +1058,7 @@ struct MapScreen: View {
         )
 
         do {
-            let result = try await PlacesAPI.explainPOI(request)
+            let result = try await PlacesAPI.explainPOI(request, token: authStore.token)
             guard !Task.isCancelled else { return }
             poiExplainResult = result
             Self.poiExplainCache[cacheKey] = result

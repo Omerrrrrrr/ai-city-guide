@@ -169,6 +169,7 @@ struct ExplainResult: Codable {
 enum POIPhotoSource: String, Codable {
     case wikipedia
     case tripadvisor
+    case google
     case unsplash
 }
 
@@ -248,6 +249,11 @@ struct ExplainPOIRequest: Encodable {
     var lat: Double?
     var lng: Double?
     var address: String?
+    /// `MKMapItem.url` when Apple's own POI data has one — free for every
+    /// account (no Google Places call involved), lets the backend ground
+    /// the description in the business's real official site regardless of
+    /// tier. `nil` for most POIs (Apple doesn't have this for everything).
+    var website: String?
     var locale: String?
     var userProfile: PersonalizationProfile?
     var recentlyViewedPlaceIds: [String]?
@@ -273,6 +279,10 @@ struct POIChatRequest: Encodable {
     var name: String
     var category: String?
     var address: String?
+    /// `MKMapItem.url` — lets the backend fetch a real excerpt of the
+    /// business's own site to answer specific questions (ticket prices,
+    /// hours) instead of always deflecting to "check their website."
+    var website: String?
     var locale: String?
     var userProfile: PersonalizationProfile?
     var history: [POIChatTurn]

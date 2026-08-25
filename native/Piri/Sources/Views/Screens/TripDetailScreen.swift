@@ -7,6 +7,7 @@ struct TripDetailScreen: View {
     let tripId: String
 
     @Environment(TripsStore.self) private var tripsStore
+    @Environment(AuthStore.self) private var authStore
     @Environment(\.dismiss) private var dismiss
 
     @State private var isPlaying = false
@@ -248,7 +249,7 @@ struct TripDetailScreen: View {
             PhotoBulkPlace(name: $0.name, lat: $0.lat, lng: $0.lng, category: $0.category.map { $0.rawValue.replacingOccurrences(of: "MKPOICategory", with: "") })
         })
         Task {
-            guard let response = try? await PlacesAPI.photosBulk(request) else { return }
+            guard let response = try? await PlacesAPI.photosBulk(request, token: authStore.token) else { return }
             for result in response.results {
                 photoURLs[result.name] = result.photoUrl ?? ""
             }
