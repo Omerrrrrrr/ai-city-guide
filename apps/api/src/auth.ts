@@ -114,3 +114,22 @@ export async function requireUserId(
     return null;
   }
 }
+
+// Same token parsing as `requireUserId`, but for routes that work for both
+// signed-out and signed-in callers (e.g. /places/explain-poi, which every
+// client calls regardless of tier) and just want to know *if* there's a
+// valid session, without ever failing the request over auth. Never writes
+// a reply -- a missing, malformed, or expired token just resolves to `null`
+// the same as no `Authorization` header at all.
+export async function optionalUserId(request: FastifyRequest, secret: string | undefined): Promise<string | null> {
+  if (!secret) return null;
+
+  const [scheme, token] = (request.headers.authorization ?? '').split(' ');
+  if (scheme !== 'Bearer' || !token) return null;
+
+  try {
+    return await verifySessionToken(token, secret);
+  } catch {
+    return null;
+  }
+}

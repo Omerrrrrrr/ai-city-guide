@@ -16,6 +16,13 @@ type GooglePlacesPhoto = {
   heightPx?: number;
 };
 
+type GooglePlacesReview = {
+  text?: { text?: string };
+  rating?: number;
+  authorAttribution?: { displayName?: string };
+  relativePublishTimeDescription?: string;
+};
+
 type GooglePlacesPremiumResult = {
   id?: string;
   displayName?: { text?: string };
@@ -29,6 +36,12 @@ type GooglePlacesPremiumResult = {
   editorialSummary?: { text?: string };
   currentOpeningHours?: { openNow?: boolean; weekdayDescriptions?: string[] };
   photos?: GooglePlacesPhoto[];
+  reviews?: GooglePlacesReview[];
+  /// Google's only diet-related boolean field -- no separate vegan/halal/
+  /// kosher flags exist on Places API (New), unlike OSM's `diet:*` tags
+  /// (see `dietary.ts`). Folded into the same `dietaryTags` output as a
+  /// `'vegetarian'` entry when true, not a whole separate concept.
+  servesVegetarianFood?: boolean;
 };
 
 type GooglePlacesSearchResponse = {
@@ -48,7 +61,14 @@ const FIELD_MASK = [
   'places.editorialSummary',
   'places.currentOpeningHours',
   'places.photos',
+  'places.reviews',
+  'places.servesVegetarianFood',
 ].join(',');
+
+// Google's photo endpoint is one HTTP round-trip per photo (`resolvePhotoUrl`
+// below) -- capped rather than resolving everything Google returns, both to
+// bound latency/cost and to match the review sample's own "up to 5" shape.
+const MAX_PHOTOS = 5;
 
 export type PremiumPlaceDetails = {
   googlePlaceId: string;
@@ -62,12 +82,22 @@ export type PremiumPlaceDetails = {
   editorialSummary?: string;
   openNow?: boolean;
   weekdayDescriptions?: string[];
-  /// A ready-to-hotlink image URL (Google's own `googleusercontent.com`
+  /// Ready-to-hotlink image URLs (Google's own `googleusercontent.com`
   /// host, no API key embedded) -- resolved server-side below via a
-  /// second call so the client/photo URL never carries our key, matching
+  /// second call per photo so the client never carries our key, matching
   /// how unsplash.ts/wiki-photo.ts already hand back plain hotlinkable
-  /// URLs rather than a backend proxy route.
+  /// URLs rather than a backend proxy route. Up to `MAX_PHOTOS`.
+  photoUrls: string[];
+  /// `photoUrls[0]`, kept for the existing single-photo consumer
+  /// (`PremiumDetailsSection`'s hero image).
   photoUrl?: string;
+  /// Whatever Google's own review sample gives us (New Places API returns
+  /// up to 5, not the full set) -- fed into `/places/explain-poi`'s AI
+  /// grounding for a paid caller (see `index.ts`), not otherwise rendered.
+  reviews?: { text: string; rating?: number; authorName?: string; relativeTime?: string }[];
+  /// `true` only when Google explicitly says so -- absent (not `false`)
+  /// means Google has no data either way, not "confirmed non-vegetarian."
+  servesVegetarianFood?: boolean;
 };
 
 /**
@@ -129,8 +159,21 @@ export async function fetchPremiumPlaceDetails(input: {
   const candidate = payload.places?.[0];
   if (!candidate?.id || !candidate.displayName?.text) return null;
 
-  const firstPhoto = candidate.photos?.[0]?.name;
-  const photoUrl = firstPhoto ? await resolvePhotoUrl(firstPhoto, apiKey) : undefined;
+  const photoNames = (candidate.photos ?? []).slice(0, MAX_PHOTOS).map((photo) => photo.name).filter(Boolean) as string[];
+  const resolvedPhotos = await Promise.all(photoNames.map((name) => resolvePhotoUrl(name, apiKey)));
+  const photoUrls = resolvedPhotos.filter((url): url is string => Boolean(url));
+
+  const reviews = candidate.reviews
+    ?.map((review) => ({
+      text: review.text?.text,
+      rating: review.rating,
+      authorName: review.authorAttribution?.displayName,
+      relativeTime: review.relativePublishTimeDescription,
+    }))
+    .filter(
+      (review): review is { text: string; rating: number | undefined; authorName: string | undefined; relativeTime: string | undefined } =>
+        Boolean(review.text)
+    );
 
   return {
     googlePlaceId: candidate.id,
@@ -144,6 +187,9 @@ export async function fetchPremiumPlaceDetails(input: {
     editorialSummary: candidate.editorialSummary?.text,
     openNow: candidate.currentOpeningHours?.openNow,
     weekdayDescriptions: candidate.currentOpeningHours?.weekdayDescriptions,
-    photoUrl,
+    photoUrls,
+    photoUrl: photoUrls[0],
+    reviews: reviews?.length ? reviews : undefined,
+    servesVegetarianFood: candidate.servesVegetarianFood,
   };
 }
