@@ -100,6 +100,9 @@ import { resolveCountryCode, fetchUpcomingHolidays, fetchSoonHoliday, type Publi
 import { fetchExchangeRates } from './currency';
 import { fetchSunTimes } from './sun-times';
 import { fetchWikivoyageGuide } from './wikivoyage';
+import { getCountryInfo } from './country-info';
+import { findTimezone } from './timezone';
+import { fetchNearbyTrails, fetchTrailGeometry } from './overpass';
 import { fetchWebsiteExcerpt } from './website-content';
 import { places, cities, liveGridCellStatus, livePlaceCache, poiPhotoCache, users, userSubmittedPhotos, contentReports, blocks, poiReviews, reviewReports } from './schema';
 
@@ -4039,6 +4042,82 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
     }
   );
 
+  // ── /trails/nearby — Named hiking trails near a coordinate (Overpass/OSM) ────
+  // Lightweight list only (tags + a rough centroid, no geometry) -- a
+  // trail's full walkable line is a separate, per-trail fetch
+  // (/trails/geometry) so browsing a viewport never pulls a 10k-point
+  // relation's geometry for every trail in the list, only the one the
+  // user actually taps.
+  app.get<{ Querystring: { lat: string; lng: string; radiusMeters?: string } }>(
+    '/trails/nearby',
+    { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const parsedLat = parseFloat(request.query.lat ?? '');
+      const parsedLng = parseFloat(request.query.lng ?? '');
+      if (isNaN(parsedLat) || isNaN(parsedLng)) {
+        return reply.code(400).send({ error: 'lat and lng query params are required' });
+      }
+      const radiusMeters = Math.max(parseInt(request.query.radiusMeters ?? '10000', 10) || 10000, 100);
+
+      const trails = await fetchNearbyTrails(parsedLat, parsedLng, radiusMeters);
+      return reply.send({ trails });
+    }
+  );
+
+  // ── /trails/geometry — One trail's walkable line by Overpass relation ID ─────
+  app.get<{ Querystring: { id: string } }>(
+    '/trails/geometry',
+    { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const id = parseInt(request.query.id ?? '', 10);
+      if (isNaN(id)) {
+        return reply.code(400).send({ error: 'id query param must be a valid Overpass relation ID' });
+      }
+
+      const geometry = await fetchTrailGeometry(id);
+      if (!geometry) {
+        return reply.code(404).send({ error: `No trail geometry found for relation ${id}` });
+      }
+
+      return reply.send(geometry);
+    }
+  );
+
+  // ── /country-info — Offline country metadata (world-countries) ───────────────
+  app.get<{ Querystring: { code?: string } }>(
+    '/country-info',
+    { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const code = (request.query.code ?? '').trim();
+      if (!/^[A-Za-z]{2,3}$/.test(code)) {
+        return reply.code(400).send({ error: 'code must be a 2- or 3-letter ISO 3166-1 country code' });
+      }
+
+      const info = getCountryInfo(code);
+      if (!info) {
+        return reply.code(404).send({ error: `No country found for code ${code}` });
+      }
+
+      return reply.send(info);
+    }
+  );
+
+  // ── /timezone — Real IANA timezone for a coordinate (geo-tz) ─────────────────
+  app.get<{ Querystring: { lat: string; lng: string } }>(
+    '/timezone',
+    { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const parsedLat = parseFloat(request.query.lat ?? '');
+      const parsedLng = parseFloat(request.query.lng ?? '');
+      if (isNaN(parsedLat) || isNaN(parsedLng)) {
+        return reply.code(400).send({ error: 'lat and lng query params are required' });
+      }
+
+      const timezones = findTimezone(parsedLat, parsedLng);
+      return reply.send({ timezones });
+    }
+  );
+
   // ── /currency/rates — Latest exchange rates for one base currency ────────────
   // Returns the full rate table (not just one pair) so the client can
   // convert into whatever currency it needs locally without a round trip
@@ -4129,7 +4208,7 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
     }
   );
 
-  // ── /currency/rates — Latest exchange rates for one base currency ────────────
+  // ── /weather/forecast — Proxy OpenWeatherMap's 5-day/3-hour forecast ─────────
   // For a Plan's target date: only meaningfully covers the next ~5 days (the
   // free-tier forecast horizon), which the client is responsible for
   // checking before calling this — a date further out just gets whatever

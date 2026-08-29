@@ -1,0 +1,128 @@
+// Hiking-trail discovery via OpenStreetMap's Overpass API -- free,
+// keyless, genuinely global (any OSM-mapped hiking route relation is
+// queryable; no commercial partner deal needed, unlike Wikiloc/AllTrails/
+// Hiking Project). Deliberately narrow: named trails near a point, plus
+// one trail's walkable geometry -- not general POI search. Google Places
+// has essentially no hiking-trail data at all, so this fills a real gap
+// rather than substituting for anything already in the app.
+
+import { haversineKm } from './geo';
+
+interface OverpassElement {
+  type: string;
+  id: number;
+  center?: { lat: number; lon: number };
+  tags?: Record<string, string>;
+  members?: { type: string; ref: number; geometry?: { lat: number; lon: number }[] }[];
+}
+
+interface OverpassResponse {
+  elements: OverpassElement[];
+}
+
+const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
+// Overpass's public instance rate-limits/blocks requests with no
+// descriptive User-Agent, same as Wikimedia (see wiki-photo.ts).
+const OVERPASS_USER_AGENT = 'AI City Guide/1.0';
+
+async function runOverpassQuery(ql: string, timeoutMs: number): Promise<OverpassElement[]> {
+  try {
+    const res = await fetch(OVERPASS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': OVERPASS_USER_AGENT },
+      body: `data=${encodeURIComponent(ql)}`,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as OverpassResponse;
+    return data.elements ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export interface NearbyTrail {
+  id: number;
+  name: string;
+  /** km, from the trail's own `distance` tag -- not every trail has one. */
+  distanceKm: number | null;
+  /** Who maintains/waymarks it, e.g. "Den Norske Turistforening" -- when tagged. */
+  operator: string | null;
+  /** OSM network tier: "iwn"=international, "nwn"=national, "rwn"=regional, "lwn"=local, or `null` if untagged. */
+  network: string | null;
+  centerLat: number;
+  centerLng: number;
+  /** km from the query point to this trail's rough centroid, not its nearest point -- for sorting/display only. */
+  approxDistanceFromQueryKm: number;
+}
+
+const MAX_TRAIL_SEARCH_RADIUS_M = 30000;
+
+/** Named hiking trails within `radiusMeters` of a coordinate (capped at 30km), nearest-centroid-first. */
+export async function fetchNearbyTrails(lat: number, lng: number, radiusMeters: number): Promise<NearbyTrail[]> {
+  const radius = Math.min(Math.max(radiusMeters, 100), MAX_TRAIL_SEARCH_RADIUS_M);
+  const ql = `[out:json][timeout:20];relation["route"="hiking"]["name"](around:${radius},${lat},${lng});out tags center;`;
+  const elements = await runOverpassQuery(ql, 20000);
+
+  return elements
+    .filter((e): e is OverpassElement & { tags: Record<string, string>; center: { lat: number; lon: number } } =>
+      Boolean(e.tags?.name && e.center)
+    )
+    .map((e) => ({
+      id: e.id,
+      name: e.tags.name,
+      distanceKm: e.tags.distance ? parseFloat(e.tags.distance) || null : null,
+      operator: e.tags.operator ?? null,
+      network: e.tags.network ?? null,
+      centerLat: e.center.lat,
+      centerLng: e.center.lon,
+      approxDistanceFromQueryKm: haversineKm(lat, lng, e.center.lat, e.center.lon),
+    }))
+    .sort((a, b) => a.approxDistanceFromQueryKm - b.approxDistanceFromQueryKm);
+}
+
+export interface TrailGeometry {
+  id: number;
+  name: string | null;
+  points: { lat: number; lng: number }[];
+}
+
+// Some relations (long-distance national/pilgrimage trails) return 10k+
+// points -- confirmed live (Gudbrandsdalsleden: 1042 member ways, 12584
+// points). A mobile map doesn't need per-meter fidelity to render a
+// recognizable line, so this decimates evenly to a flat cap rather than
+// running a real simplification algorithm (Douglas-Peucker etc.), which
+// is more precision than this needs.
+const MAX_GEOMETRY_POINTS = 600;
+
+function decimate<T>(points: T[], max: number): T[] {
+  if (points.length <= max) return points;
+  const step = points.length / max;
+  const result: T[] = [];
+  for (let i = 0; i < max; i++) result.push(points[Math.floor(i * step)]);
+  return result;
+}
+
+/**
+ * Full (decimated) geometry for one trail by its Overpass relation ID (from
+ * `fetchNearbyTrails`). Points follow the relation's member-way order,
+ * which is usually but not guaranteed to be geographically sequential --
+ * good enough to render a recognizable line, not survey-grade routing.
+ */
+export async function fetchTrailGeometry(relationId: number): Promise<TrailGeometry | null> {
+  const ql = `[out:json][timeout:25];relation(${relationId});out geom;`;
+  const elements = await runOverpassQuery(ql, 25000);
+  const relation = elements.find((e) => e.type === 'relation');
+  if (!relation) return null;
+
+  const points = (relation.members ?? []).flatMap(
+    (m) => m.geometry?.map((g) => ({ lat: g.lat, lng: g.lon })) ?? []
+  );
+  if (points.length === 0) return null;
+
+  return {
+    id: relation.id,
+    name: relation.tags?.name ?? null,
+    points: decimate(points, MAX_GEOMETRY_POINTS),
+  };
+}
