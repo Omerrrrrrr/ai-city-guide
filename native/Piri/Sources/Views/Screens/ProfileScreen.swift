@@ -11,6 +11,12 @@ private let languageOptions: [(code: String?, icon: String, labelKey: String)] =
     ("nb", "globe", "settings.language.nb"),
 ]
 
+private let appearanceOptions: [(scheme: ColorScheme?, icon: String, labelKey: String)] = [
+    (nil, "circle.righthalf.filled", "settings.appearance.system"),
+    (.light, "sun.max.fill", "settings.appearance.light"),
+    (.dark, "moon.fill", "settings.appearance.dark"),
+]
+
 /// Groups the same way `OnboardingScreen`'s wizard steps already do:
 /// interests+faith together, pace+budget+group ("who are you traveling
 /// with") together under "Preferences" — mirrored here as tabs instead of
@@ -29,6 +35,7 @@ struct ProfileScreen: View {
     @Environment(UserProfileStore.self) private var userProfileStore
     @Environment(CityStore.self) private var cityStore
     @Environment(LanguageStore.self) private var languageStore
+    @Environment(AppearanceStore.self) private var appearanceStore
     @Environment(SavedPlacesStore.self) private var savedPlacesStore
     @Environment(RecentlyViewedStore.self) private var recentlyViewedStore
     @Environment(TripsStore.self) private var tripsStore
@@ -300,7 +307,9 @@ struct ProfileScreen: View {
     @ViewBuilder
     private var profileTabContent: some View {
         switch profileTab {
-        case .language: languageCard
+        case .language:
+            languageCard
+            appearanceCard
         case .profession: professionCard
         case .interests: interestsTabContent
         case .plan: planTabContent
@@ -475,6 +484,33 @@ struct ProfileScreen: View {
         }
         .alert(String(localized: "settings.language.restartHint"), isPresented: $showingRestartHint) {
             Button(String(localized: "common.done"), role: .cancel) {}
+        }
+    }
+
+    private var appearanceCard: some View {
+        card(titleKey: "settings.appearance.label") {
+            HStack(spacing: 8) {
+                ForEach(appearanceOptions, id: \.labelKey) { option in
+                    let active = appearanceStore.scheme == option.scheme
+                    Button {
+                        guard !active else { return }
+                        Haptics.light()
+                        appearanceStore.setScheme(option.scheme)
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: option.icon)
+                            Text(String(localized: String.LocalizationValue(option.labelKey)))
+                        }
+                        .font(.system(size: 14, weight: .medium))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(Capsule().fill(active ? Theme.navy : Color(.secondarySystemBackground)))
+                        .foregroundStyle(active ? .white : .primary)
+                        .overlay(Capsule().stroke(active ? Theme.navy : Color(.separator), lineWidth: 1.5))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
         }
     }
 
