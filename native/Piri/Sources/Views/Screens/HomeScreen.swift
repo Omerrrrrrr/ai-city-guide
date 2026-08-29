@@ -135,7 +135,7 @@ struct HomeScreen: View {
             }
             if let lat = cityStore.lat ?? locationManager.currentLocation?.latitude,
                let lng = cityStore.lng ?? locationManager.currentLocation?.longitude {
-                await weatherQuery.load(lat: lat, lng: lng)
+                await weatherQuery.load(lat: lat, lng: lng, cityName: cityStore.cityName)
                 await holidayQuery.load(lat: lat, lng: lng, locale: Locale.current.language.languageCode?.identifier)
             }
             if let location = locationManager.currentLocation {
