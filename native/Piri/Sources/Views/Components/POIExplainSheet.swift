@@ -31,16 +31,6 @@ struct POIExplainSheet: View {
     @State private var chatError: String?
     @State private var lookAroundScene: MKLookAroundScene?
     @State private var weatherQuery = WeatherQuery()
-    /// Drives Apple's own full Place Card via `mapItemDetailSheet` — the
-    /// only place hours show up. `MKMapItem` has no `hours`/`openingHours`
-    /// property at all (confirmed against the SDK header directly, not just
-    /// docs) — `phoneNumber`/`url` are real plain values we can lay out as
-    /// text ourselves, hours genuinely is not, in any form, on any OS
-    /// version. Every embedded-map variant tried this session (full/compact
-    /// callout, sync/async selection) either rendered blank or showed a
-    /// plain name-only bubble with no hours inside it — this sheet is the
-    /// only surface Apple actually renders that data on.
-    @State private var showingMapItemDetail = false
     @State private var addToCollectionKind: SavedCollectionKind?
     @State private var showingReviews = false
     @State private var showingDirections = false
@@ -99,6 +89,9 @@ struct POIExplainSheet: View {
                                 }
                             } else if let result {
                                 Text(result.headline).font(.subheadline.bold()).foregroundStyle(Theme.gold)
+                                if let weather = weatherQuery.weather {
+                                    weatherBadge(weather)
+                                }
                                 // The real photo (Wikipedia/Tripadvisor, never
                                 // AI-generated) is the most visually engaging
                                 // thing this card has — it used to sit below
@@ -135,9 +128,6 @@ struct POIExplainSheet: View {
                                 if let dietaryTags = result.dietaryTags {
                                     DietaryTagsRow(tags: dietaryTags)
                                 }
-                                if let weather = weatherQuery.weather {
-                                    weatherBadge(weather)
-                                }
                                 Text(result.body).font(.footnote)
                                 if let source = result.groundingSource {
                                     // NOT `LocalizationValue("...\(source)")` -- that treats
@@ -172,19 +162,7 @@ struct POIExplainSheet: View {
                             // from Apple's own MapKit data.
                             PlaceDetailsCard(mapItem: poi.mapItem)
 
-                            // Hours has no plain-value form to put in the
-                            // section above (see note on `showingMapItemDetail`)
-                            // — this is the only way to see it at all.
                             HStack(spacing: 10) {
-                                Button {
-                                    showingMapItemDetail = true
-                                } label: {
-                                    Label("poiExplain.fullDetails", systemImage: "info.circle.fill")
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .tint(Theme.gold)
-                                .mapItemDetailSheet(isPresented: $showingMapItemDetail, item: poi.mapItem)
-
                                 Button("common.openInMaps") {
                                     poi.mapItem.openInMaps()
                                 }
