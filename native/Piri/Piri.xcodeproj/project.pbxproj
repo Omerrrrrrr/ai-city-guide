@@ -16,6 +16,7 @@
 		0D35B8C79D71E8C31949CA4C /* MapAnnotations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 135A602CC00ED4B1E83016AB /* MapAnnotations.swift */; };
 		0EB61088A791BAD6B6545C85 /* CountUpNumber.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89EE4F34384F33035AA46EF5 /* CountUpNumber.swift */; };
 		100F6128B1DA42E96537D83B /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24DA0F5384457944827F2EA /* Theme.swift */; };
+		117784DE26E3A0CEFAFC7D6C /* PiriReviewsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33D012FA9EDA42951CDFFC55 /* PiriReviewsSection.swift */; };
 		11902DAA906C544983E91F21 /* AuthModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A544BF4AD464B79EB03452C /* AuthModels.swift */; };
 		13D0A453750CBC43093708EE /* POIExplainSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A564A59EA1164A5FCB99DDF9 /* POIExplainSheet.swift */; };
 		143884C22161F00A193C7395 /* PlacesAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39DBEA8E24D31A30E61F6671 /* PlacesAPI.swift */; };
@@ -37,6 +38,7 @@
 		27BAFBDDF6A6B11B1B689497 /* LevelBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE4FB2EC8C88CAD7F3BAAE98 /* LevelBadge.swift */; };
 		27D4BD57C3E95D9DE99E3113 /* StoryContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DDA3F9385FABCAC46ECDD7F /* StoryContainer.swift */; };
 		2AB24C0177982CE14D50DE58 /* ExploreScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D0AAD7772B7FF41780137D3 /* ExploreScreen.swift */; };
+		2BF28BBBE042ACEA4C9FEA83 /* POIReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3246AD3064341B617A3F899 /* POIReview.swift */; };
 		2BFD74B5E4B77E868A6F8FD7 /* RecapHighlightCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68905E98C7E1C1A318D4AAFF /* RecapHighlightCard.swift */; };
 		2DE8A2EAC38DD7CAFFA6C4FD /* LivePin.swift in Sources */ = {isa = PBXBuildFile; fileRef = F887777DB4455F61F087FC46 /* LivePin.swift */; };
 		2E41F392EAC4D122E071071C /* DietaryTagsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11A78B071D171A67DEF9FDB /* DietaryTagsRow.swift */; };
@@ -102,6 +104,7 @@
 		9CEA2601DD279A5F0E8A8BB3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DD664E9C3165D45C042C8BD0 /* Assets.xcassets */; };
 		9DBB1505F2DC9C2E7A9B406F /* GeoDistance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 919CD348C1A4DAC8457484D8 /* GeoDistance.swift */; };
 		9DDC6A7D2595EB487B32DFA3 /* SavedCollection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C808B025C8E9ED7515733584 /* SavedCollection.swift */; };
+		9F1604A9F0894E4862BD1BF2 /* PiriReviewsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C685AE76A5254718EC426C /* PiriReviewsAPI.swift */; };
 		A09820EA73906B8317F7ECA7 /* TripRecapData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D39D77604DA21EEA57D1133 /* TripRecapData.swift */; };
 		A2D65D1C6851A7802697F3BE /* TripPhotoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D8F55E9E6F23F30F9323E2F /* TripPhotoStore.swift */; };
 		A785BBB4AFF5DC51F15C29A3 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = E712507F714C68342D7027E7 /* Localizable.xcstrings */; };
@@ -201,6 +204,7 @@
 		2AD9D3415FA1CE99CB46112B /* TripMiniMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripMiniMap.swift; sourceTree = "<group>"; };
 		2D599D1F2D04446888B8C6DD /* PlaceFilters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceFilters.swift; sourceTree = "<group>"; };
 		31BFBA845700A3D94868AF4F /* UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
+		33D012FA9EDA42951CDFFC55 /* PiriReviewsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PiriReviewsSection.swift; sourceTree = "<group>"; };
 		393739D613FFAA494380B5A7 /* Piri.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Piri.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		39DBEA8E24D31A30E61F6671 /* PlacesAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlacesAPI.swift; sourceTree = "<group>"; };
 		3A6344FD16ACEE6A9600CDCC /* SavedScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedScreen.swift; sourceTree = "<group>"; };
@@ -284,12 +288,14 @@
 		B05066D4D6C47F50C5385DE8 /* CameraPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraPreviewView.swift; sourceTree = "<group>"; };
 		B26F2F82581B09C946DED399 /* LookAroundCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LookAroundCard.swift; sourceTree = "<group>"; };
 		B2CF56955C50F1411F4DD5A4 /* RecapXPCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecapXPCard.swift; sourceTree = "<group>"; };
+		B3C685AE76A5254718EC426C /* PiriReviewsAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PiriReviewsAPI.swift; sourceTree = "<group>"; };
 		B4E1D5C6C2393EFD66129BD2 /* SourceCaption.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceCaption.swift; sourceTree = "<group>"; };
 		B5BF8793AD992C8BC1764725 /* AdminHoursScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminHoursScreen.swift; sourceTree = "<group>"; };
 		B77BE47CE50CC6B0329712C3 /* TripsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripsStore.swift; sourceTree = "<group>"; };
 		BC8F163C06D3A8442906C142 /* TransitDirections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransitDirections.swift; sourceTree = "<group>"; };
 		C03AA8FC29DF1B7AFBACE82E /* PlaceFixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceFixtures.swift; sourceTree = "<group>"; };
 		C18F994C80467821115BB102 /* DataURIImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataURIImage.swift; sourceTree = "<group>"; };
+		C3246AD3064341B617A3F899 /* POIReview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POIReview.swift; sourceTree = "<group>"; };
 		C3697524D1BF8C6046C882FD /* PremiumDetailsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PremiumDetailsSection.swift; sourceTree = "<group>"; };
 		C3D750F75E7F67629CB33E00 /* AuthAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthAPI.swift; sourceTree = "<group>"; };
 		C808B025C8E9ED7515733584 /* SavedCollection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedCollection.swift; sourceTree = "<group>"; };
@@ -409,6 +415,7 @@
 				B26F2F82581B09C946DED399 /* LookAroundCard.swift */,
 				135A602CC00ED4B1E83016AB /* MapAnnotations.swift */,
 				6ADF11F38A3CEEA0D5E874A8 /* PiriMapView.swift */,
+				33D012FA9EDA42951CDFFC55 /* PiriReviewsSection.swift */,
 				50FD2DF17CD5CD4993333BDF /* PlaceDetailsCard.swift */,
 				09D28590C586B93899BAF76D /* PlaceImageView.swift */,
 				F88D9297E5E64646338B6975 /* PlaceMiniMap.swift */,
@@ -467,6 +474,7 @@
 				F887777DB4455F61F087FC46 /* LivePin.swift */,
 				D51DBC290790323812C65938 /* Place.swift */,
 				FFE56DF7DF9101D7624A7945 /* POIPlace.swift */,
+				C3246AD3064341B617A3F899 /* POIReview.swift */,
 				1FE7D1EDB333E183637FAB23 /* PremiumPlaceModels.swift */,
 				C808B025C8E9ED7515733584 /* SavedCollection.swift */,
 				D81083A6ED959FC685F77BB0 /* SavedPOIReference.swift */,
@@ -525,6 +533,7 @@
 				C3D750F75E7F67629CB33E00 /* AuthAPI.swift */,
 				89AA07F7D8CB8178893C5435 /* IAPAPI.swift */,
 				1530083D374F1577F01CCC2A /* PhotosAPI.swift */,
+				B3C685AE76A5254718EC426C /* PiriReviewsAPI.swift */,
 				39DBEA8E24D31A30E61F6671 /* PlacesAPI.swift */,
 				5D7DBC93975CDAB8A7207027 /* SocialAPI.swift */,
 			);
@@ -860,11 +869,14 @@
 				13D0A453750CBC43093708EE /* POIExplainSheet.swift in Sources */,
 				16F13DE199FF3A9D2659F35C /* POIPhotoGallery.swift in Sources */,
 				25B756C97A73DF9878AC1832 /* POIPlace.swift in Sources */,
+				2BF28BBBE042ACEA4C9FEA83 /* POIReview.swift in Sources */,
 				F0F144BF16851A2F462FDD25 /* POISearchService.swift in Sources */,
 				952A7F300C8B1D4E3AE93DD5 /* PaywallScreen.swift in Sources */,
 				5C242D300F5FFE7B47AE16E9 /* PhotosAPI.swift in Sources */,
 				01A3C3BDAD05942A6556DB5E /* PiriApp.swift in Sources */,
 				0155A2DD517BD53E3E115093 /* PiriMapView.swift in Sources */,
+				9F1604A9F0894E4862BD1BF2 /* PiriReviewsAPI.swift in Sources */,
+				117784DE26E3A0CEFAFC7D6C /* PiriReviewsSection.swift in Sources */,
 				43BB82F44992911849EBCF73 /* Place.swift in Sources */,
 				7DFB7CABF5BF0E2C456052FA /* PlaceDetailScreen.swift in Sources */,
 				57F1A7F22308BA7C30BCA219 /* PlaceDetailsCard.swift in Sources */,

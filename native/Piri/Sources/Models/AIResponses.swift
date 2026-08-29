@@ -164,6 +164,18 @@ struct ExplainResult: Codable {
     /// `SourceCaption` so that distinction (fact-grounded vs. plausible
     /// inference) isn't invisible to the person reading it.
     var groundingSource: String?
+    /// Google Places' own aggregate rating — `nil` unless the caller is on
+    /// a paid tier with quota remaining (same gate as `curatedInfo`'s
+    /// Google-photo fallback). Read-only, like Tripadvisor's; Piri's own
+    /// rating lives separately via `/poi/reviews`.
+    var googleRating: SourceRating?
+}
+
+/// A third-party source's rating, reduced to just what a combined-average
+/// display needs — score + how many ratings it's built on.
+struct SourceRating: Codable {
+    var rating: Double
+    var count: Int
 }
 
 enum POIPhotoSource: String, Codable {

@@ -122,6 +122,7 @@ struct POIExplainSheet: View {
                                             .font(.footnote.weight(.semibold))
                                     }
                                 }
+                                PiriReviewsSection(poi: poi, tripAdvisorRating: result.rating, googleRating: result.googleRating)
                                 if let curatedInfo = result.curatedInfo {
                                     CuratedInfoRow(info: curatedInfo)
                                 }
