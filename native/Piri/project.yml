@@ -50,7 +50,7 @@ targets:
         NSCameraUsageDescription: "Piri uses your camera to identify places and give you personalized explanations."
         NSPhotoLibraryAddUsageDescription: "Piri can save trip photos to your library."
         CFBundleShortVersionString: "1.0.0"
-        CFBundleVersion: "1"
+        CFBundleVersion: "4"
         # `APIConfig.baseURL` reads this if present. Debug defaults to
         # `127.0.0.1:4000`, which only reaches the dev server from the
         # Simulator (shares the Mac's own network namespace) -- a real

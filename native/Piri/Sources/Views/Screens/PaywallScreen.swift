@@ -32,6 +32,12 @@ struct PaywallScreen: View {
                     tierCard(id: "basic", titleKey: "paywall.basic.title", featureKey: "paywall.basic.feature")
                     tierCard(id: "pro", titleKey: "paywall.pro.title", featureKey: "paywall.pro.feature")
 
+                    if let loadError = purchaseStore.loadError {
+                        Text(loadError)
+                            .font(.footnote)
+                            .foregroundStyle(Theme.closedRed)
+                    }
+
                     if let error = purchaseStore.purchaseError {
                         Text(error)
                             .font(.footnote)

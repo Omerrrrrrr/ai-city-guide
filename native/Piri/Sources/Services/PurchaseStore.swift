@@ -21,6 +21,7 @@ final class PurchaseStore {
 
     private(set) var products: [Product] = []
     private(set) var isLoadingProducts = false
+    private(set) var loadError: String?
     var purchaseError: String?
 
     // StoreKit product loading (`loadProducts` below) only returns real
@@ -39,7 +40,14 @@ final class PurchaseStore {
         guard products.isEmpty else { return }
         isLoadingProducts = true
         defer { isLoadingProducts = false }
-        products = (try? await Product.products(for: Self.productIDs)) ?? []
+        do {
+            products = try await Product.products(for: Self.productIDs)
+            if products.isEmpty {
+                loadError = "StoreKit returned zero products for the 4 configured IDs."
+            }
+        } catch {
+            loadError = "\(error)"
+        }
     }
 
     /// Returns `true` only once the purchase has been both made and
