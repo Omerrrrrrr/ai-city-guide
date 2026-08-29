@@ -1,13 +1,26 @@
-// Public holiday lookup: date.nager.at (free, keyless, ~200 countries,
+// Public holiday lookup: date.nager.at (free, keyless, ~204 countries,
 // MIT-licensed) for real holiday dates/names, resolved from a lat/lng via
 // OpenStreetMap's Nominatim reverse geocoder (free, keyless, no new
 // dependency -- same service `reverseGeocode()` in `index.ts` already
 // uses for address lookups, just called separately here to keep this
 // module self-contained the same way `dietary.ts`/`wiki-photo.ts` are).
+//
+// Nager doesn't cover a number of countries that matter for a travel app --
+// notably Saudi Arabia, the UAE, Israel, Iran, India, Pakistan, Thailand
+// and Taiwan. For those (and as a resilience fallback if Nager's live call
+// ever fails), `date-holidays` computes public holidays offline from
+// bundled rule data (incl. Islamic/Hebrew calendar conversions for movable
+// dates like Eid/Ramadan) -- no network call, no rate limit, no key. It
+// still doesn't have real data for a handful of countries (Jordan, Kuwait,
+// Lebanon, Qatar, Syria, Yemen, Iraq, Afghanistan are stubs in the package
+// as of v3.36.0), so this is a strict improvement over Nager alone, not a
+// complete "every country" guarantee.
+//
 // Same graceful-fallback contract as every other external-data module in
 // this codebase: never throws, returns `null`/`[]` on any failure (no
 // match, network error, unsupported country) so a slow or unavailable
 // service never blocks the caller.
+import Holidays from 'date-holidays';
 
 export interface PublicHoliday {
   /** ISO date string, e.g. "2026-05-17". */
@@ -69,23 +82,59 @@ export async function resolveCountryCode(lat: number, lng: number): Promise<stri
 // for what's static data.
 const yearCache = new Map<string, NagerHoliday[]>();
 
-async function fetchHolidaysForYear(countryCode: string, year: number): Promise<NagerHoliday[]> {
-  const cacheKey = `${countryCode}|${year}`;
-  const cached = yearCache.get(cacheKey);
-  if (cached) return cached;
-
+async function fetchHolidaysFromNager(countryCode: string, year: number): Promise<NagerHoliday[]> {
   try {
     const res = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/${countryCode}`, {
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return [];
-
-    const data = (await res.json()) as NagerHoliday[];
-    yearCache.set(cacheKey, data);
-    return data;
+    return (await res.json()) as NagerHoliday[];
   } catch {
     return [];
   }
+}
+
+// One `Holidays` instance per country code, reused across years/requests --
+// construction parses that country's bundled rule data, cheap but no need
+// to repeat it.
+const holidaysInstanceCache = new Map<string, Holidays>();
+
+function getHolidaysInstance(countryCode: string): Holidays {
+  let instance = holidaysInstanceCache.get(countryCode);
+  if (!instance) {
+    instance = new Holidays(countryCode);
+    holidaysInstanceCache.set(countryCode, instance);
+  }
+  return instance;
+}
+
+// `date-holidays` returns names in one language per call. Fetch the
+// country's own language(s) for `localName` and English separately for
+// `name`, then pair them up by `rule` (a stable per-holiday key) so the
+// shape matches what Nager gives us.
+function computeHolidaysOffline(countryCode: string, year: number): NagerHoliday[] {
+  const hd = getHolidaysInstance(countryCode);
+  const local = hd.getHolidays(year).filter((h) => h.type === 'public');
+  const english = hd.getHolidays(year, 'en').filter((h) => h.type === 'public');
+  const englishNameByRule = new Map(english.map((h) => [h.rule, h.name]));
+
+  return local.map((h) => ({
+    date: h.date.slice(0, 10),
+    name: englishNameByRule.get(h.rule) ?? h.name,
+    localName: h.name,
+    countryCode,
+  }));
+}
+
+async function fetchHolidaysForYear(countryCode: string, year: number): Promise<NagerHoliday[]> {
+  const cacheKey = `${countryCode}|${year}`;
+  const cached = yearCache.get(cacheKey);
+  if (cached) return cached;
+
+  const fromNager = await fetchHolidaysFromNager(countryCode, year);
+  const data = fromNager.length > 0 ? fromNager : computeHolidaysOffline(countryCode, year);
+  yearCache.set(cacheKey, data);
+  return data;
 }
 
 /**

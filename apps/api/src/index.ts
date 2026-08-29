@@ -61,7 +61,7 @@ import {
 import { previewGoogleHoursForPlace } from './google-places-hours';
 import { fetchPremiumPlaceDetails, type PremiumPlaceDetails } from './google-places-poi';
 import { checkAndIncrementUsage, refundUsage } from './entitlements';
-import { moderatePhotoSubmission } from './moderation';
+import { moderatePhotoSubmission, moderateTextSubmission } from './moderation';
 import { uploadDataUriToR2 } from './r2';
 import { PRIVACY_POLICY_HTML } from './privacy-policy';
 import { SUPPORT_PAGE_HTML } from './support-page';
@@ -97,8 +97,11 @@ import { fetchDietaryPlaces, fetchDietaryTagsForPlace } from './dietary';
 import { fetchUnsplashPhoto } from './unsplash';
 import { verifyTransaction } from './storekit';
 import { resolveCountryCode, fetchUpcomingHolidays, fetchSoonHoliday, type PublicHoliday } from './holidays';
+import { fetchExchangeRates } from './currency';
+import { fetchSunTimes } from './sun-times';
+import { fetchWikivoyageGuide } from './wikivoyage';
 import { fetchWebsiteExcerpt } from './website-content';
-import { places, cities, liveGridCellStatus, livePlaceCache, poiPhotoCache, users, userSubmittedPhotos, contentReports, blocks } from './schema';
+import { places, cities, liveGridCellStatus, livePlaceCache, poiPhotoCache, users, userSubmittedPhotos, contentReports, blocks, poiReviews, reviewReports } from './schema';
 
 const PORT = Number(process.env.PORT ?? 4000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY?.trim();
@@ -133,6 +136,20 @@ function mapOpenWeatherCondition(weatherId: number): OpenWeatherCondition {
   if (weatherId >= 700 && weatherId < 800) return 'foggy';
   if (weatherId === 800) return 'sunny';
   return 'cloudy';
+}
+
+type AirQualityLevel = 'good' | 'fair' | 'moderate' | 'poor' | 'very_poor';
+
+// OpenWeatherMap's Air Pollution API returns its own 1-5 index (not the US
+// EPA 0-500 AQI scale) -- https://openweathermap.org/api/air-pollution.
+function mapAirQualityLevel(aqi: number): AirQualityLevel {
+  switch (aqi) {
+    case 1: return 'good';
+    case 2: return 'fair';
+    case 3: return 'moderate';
+    case 4: return 'poor';
+    default: return 'very_poor';
+  }
 }
 const MAX_CONTEXT_PLACES = 14;
 const MIN_AI_RECOMMENDATIONS = 4;
@@ -1656,11 +1673,32 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
       const soonHolidayPromise =
         lat !== undefined && lng !== undefined ? fetchSoonHoliday(lat, lng, 3) : Promise.resolve(null);
 
+      // Golden-hour badge, not grounding — sun times don't feed the AI
+      // prompt below, just a client-facing "best light for photos" field.
+      // Gated on the same WIKIPEDIA_PLAUSIBLE_CATEGORIES list already used
+      // to decide whether a place is a sight worth this kind of treatment
+      // (see wiki-photo.ts) — a supermarket or ATM doesn't need one.
+      const isPhotogenicCategory = !!category && WIKIPEDIA_PLAUSIBLE_CATEGORIES.has(category.toLowerCase());
+      const goldenHourPromise =
+        isPhotogenicCategory && lat !== undefined && lng !== undefined
+          ? fetchSunTimes(lat, lng, new Date())
+          : Promise.resolve(null);
+
       // Free for every caller when Apple's own MapKit data has a website
       // for this POI (`website`, from the client's `MKMapItem.url`) --
       // costs nothing (no Google Places call involved), so unlike the
       // Google-derived fallback below it isn't gated on tier/quota at all.
       const appleWebsitePromise = website ? fetchWebsiteExcerpt(website) : Promise.resolve(null);
+
+      // Wikivoyage covers cities/regions, not individual POIs, so this
+      // grounds the *surrounding area's* real character (a genuine
+      // travel-guide editor's words, not AI filler) rather than any fact
+      // about this specific place — `fetchWikivoyageGuide`'s own geosearch
+      // fallback (see wikivoyage.ts) resolves whatever city/region article
+      // is nearest this POI's coordinates when (as is almost always the
+      // case) the POI's own name isn't a Wikivoyage article title itself.
+      const wikivoyagePromise =
+        lat !== undefined && lng !== undefined ? fetchWikivoyageGuide(name, lat, lng) : Promise.resolve(null);
 
       // Paid-tier-only, run alongside the sources above (not just as a
       // last-resort photo fallback like before) so its editorial summary
@@ -1689,18 +1727,38 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         }
       })();
 
-      const [tripAdvisorInfo, curatedPlace, wikiEnrichment, dietaryTagsRaw, googlePlace, soonHoliday, appleWebsiteExcerpt] =
-        await Promise.all([
-          lat !== undefined && lng !== undefined
-            ? fetchTripAdvisorInfo(name, lat, lng, undefined, false)
-            : Promise.resolve({ rating: null, description: null, photoUrls: [], locationId: null } as TripAdvisorInfo),
-          curatedMatchPromise,
-          wikiPromise,
-          dietaryTagsPromise,
-          googlePromise,
-          soonHolidayPromise,
-          appleWebsitePromise,
-        ]);
+      const [
+        tripAdvisorInfo,
+        curatedPlace,
+        wikiEnrichment,
+        dietaryTagsRaw,
+        googlePlace,
+        soonHoliday,
+        appleWebsiteExcerpt,
+        sunTimes,
+        wikivoyageGuide,
+      ] = await Promise.all([
+        lat !== undefined && lng !== undefined
+          ? fetchTripAdvisorInfo(name, lat, lng, undefined, false)
+          : Promise.resolve({ rating: null, description: null, photoUrls: [], locationId: null } as TripAdvisorInfo),
+        curatedMatchPromise,
+        wikiPromise,
+        dietaryTagsPromise,
+        googlePromise,
+        soonHolidayPromise,
+        appleWebsitePromise,
+        goldenHourPromise,
+        wikivoyagePromise,
+      ]);
+
+      const goldenHour = sunTimes
+        ? {
+            sunrise: sunTimes.sunrise,
+            sunset: sunTimes.sunset,
+            morningEndsAt: sunTimes.goldenHourMorningEnd,
+            eveningStartsAt: sunTimes.goldenHourEveningStart,
+          }
+        : null;
 
       // Apple's URL (free, tried above) wins when it actually yielded
       // something; Google's own `websiteUri` (paid tier only) is a
@@ -1773,6 +1831,9 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
               .join(' | ')}`
           : null,
         websiteExcerpt ? `Text from the business's own official website: "${websiteExcerpt}"` : null,
+        wikivoyageGuide
+          ? `Wikivoyage travel-guide excerpt about the surrounding area/city ("${wikivoyageGuide.title}"), NOT about this specific place: "${wikivoyageGuide.extract.slice(0, 500)}"`
+          : null,
         curatedPlace?.shortStory ? `Story: ${curatedPlace.shortStory}` : null,
         curatedPlace?.localVibeMood ? `Vibe: ${curatedPlace.localVibeMood}` : null,
         curatedPlace?.localVibeBestFor ? `Best for: ${curatedPlace.localVibeBestFor}` : null,
@@ -1852,6 +1913,16 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         ? ` IMPORTANT: a real public holiday is coming up very soon (see below) — you MUST briefly flag it in your response (a short clause is enough, e.g. "note that X is closed/busier around [holiday]") whenever this place is a business, shop, bank, government office, museum, restaurant, or any other venue with set hours that a holiday could plausibly affect. Only skip mentioning it for a place with no real hours/closure concept at all (an open park, a viewpoint, a street, a beach). This is practical, time-sensitive information the traveler needs, not optional color — don't leave it out just because the response is already covering other things.`
         : '';
 
+      // A real Wikivoyage excerpt is area-level, not about this specific
+      // place — good for general local color/atmosphere (history, what
+      // the city/district is like), never as a source of facts about the
+      // POI itself. Kept as a soft nudge, not an IMPORTANT/MUST directive
+      // like holidayGuard, since using it at all (let alone every time) is
+      // optional color, unlike the holiday warning's practical urgency.
+      const wikivoyageGuard = wikivoyageGuide
+        ? ` A Wikivoyage excerpt about the surrounding area is included below — you may draw on it for general local color or historical atmosphere about the city/district, but never attribute anything from it specifically to this place unless the excerpt is unmistakably describing this exact place.`
+        : '';
+
       const faithMismatchGuard =
         userProfile?.faith && userProfile.faith !== 'secular' && userProfile.faith !== 'prefer_not_to_say'
           ? ` If this place belongs to a different faith tradition than the user's, don't invent or overstate religious or architectural connections that aren't real. Only mention a genuine interfaith link if you're actually confident of it.`
@@ -1890,7 +1961,7 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
                 .max(3)
                 .describe('2-3 specific things this particular person would find most interesting here.'),
             }),
-            system: `You are Piri, a deeply knowledgeable personal travel guide. Your job is to explain a place in a way that speaks directly to who the user is — their profession, interests, and worldview.${holidayGuard} ${factualGuard}${googleReviewGuard}${websiteGuard}${NO_HYPE_GUARD}${profileContext}
+            system: `You are Piri, a deeply knowledgeable personal travel guide. Your job is to explain a place in a way that speaks directly to who the user is — their profession, interests, and worldview.${holidayGuard} ${factualGuard}${googleReviewGuard}${websiteGuard}${wikivoyageGuard}${NO_HYPE_GUARD}${profileContext}
 
 ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
             prompt: `Explain this place:\n\n${placeContext}`,
@@ -1961,9 +2032,14 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
           rating: tripAdvisorInfo.rating,
           photos,
           googleReviews: googlePlace?.reviews ?? null,
+          googleRating:
+            googlePlace?.rating != null && googlePlace?.userRatingCount != null
+              ? { rating: googlePlace.rating, count: googlePlace.userRatingCount }
+              : null,
           curatedInfo,
           dietaryTags: dietaryTags.length ? dietaryTags : null,
           groundingSource,
+          goldenHour,
         });
       } catch (e: any) {
         return sendServerError(request, reply, e, 'Failed to explain place');
@@ -2412,6 +2488,166 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
           createdAt: row.createdAt,
         })),
       });
+    }
+  );
+
+  // ── UGC: Piri's own star+text reviews ───────────────────────────────────
+  // Separate from Tripadvisor's/Google's ratings (both third-party, read
+  // only) -- this is the one rating source actually generated inside the
+  // app. One review per (poiKey, user): resubmitting overwrites rather than
+  // stacking, so editing a review is just posting again.
+  app.post<{
+    Body: { poiName: string; lat: number; lng: number; rating: number; text?: string };
+  }>(
+    '/poi/reviews',
+    { config: { rateLimit: { max: 10, timeWindow: '1 day' } } },
+    async (request, reply) => {
+      const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
+      if (!userId) return;
+
+      const parsed = z
+        .object({
+          poiName: z.string().trim().min(1).max(200),
+          lat: z.number(),
+          lng: z.number(),
+          rating: z.number().int().min(1).max(5),
+          text: z.string().trim().max(2000).optional(),
+        })
+        .safeParse(request.body);
+
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'Invalid request' });
+      }
+
+      const { poiName, lat, lng, rating, text } = parsed.data;
+      const nameNormalized = normalizeName(poiName);
+      const latRounded = Math.round(lat * 1000) / 1000;
+      const lngRounded = Math.round(lng * 1000) / 1000;
+      const poiKey = `${nameNormalized}|${latRounded}|${lngRounded}`;
+
+      const moderation = text?.trim() ? await moderateTextSubmission(text.trim()) : { flagged: false, reason: null };
+      const status = moderation.flagged ? 'rejected' : 'approved';
+
+      const [created] = await db
+        .insert(poiReviews)
+        .values({
+          id: newUserId().replace('user_', 'review_'),
+          poiKey,
+          poiName,
+          userId,
+          rating,
+          text: text?.trim() || null,
+          status,
+          moderationReason: moderation.reason,
+          createdAt: new Date().toISOString(),
+        })
+        .onConflictDoUpdate({
+          target: [poiReviews.poiKey, poiReviews.userId],
+          set: {
+            rating,
+            text: text?.trim() || null,
+            status,
+            moderationReason: moderation.reason,
+            createdAt: new Date().toISOString(),
+          },
+        })
+        .returning();
+
+      return reply.code(201).send({
+        id: created.id,
+        status: created.status,
+        moderationReason: created.status === 'rejected' ? created.moderationReason : null,
+      });
+    }
+  );
+
+  app.get<{ Querystring: { name?: string; lat?: string; lng?: string } }>(
+    '/poi/reviews',
+    async (request, reply) => {
+      const userId = await optionalUserId(request, AUTH_JWT_SECRET);
+
+      const parsed = z
+        .object({
+          name: z.string().trim().min(1),
+          lat: z.coerce.number(),
+          lng: z.coerce.number(),
+        })
+        .safeParse(request.query ?? {});
+
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'Invalid request' });
+      }
+
+      const nameNormalized = normalizeName(parsed.data.name);
+      const latRounded = Math.round(parsed.data.lat * 1000) / 1000;
+      const lngRounded = Math.round(parsed.data.lng * 1000) / 1000;
+      const poiKey = `${nameNormalized}|${latRounded}|${lngRounded}`;
+
+      const blockedIds = new Set<string>();
+      if (userId) {
+        const blockedRows = await db.select({ blockedId: blocks.blockedId }).from(blocks).where(eq(blocks.blockerId, userId));
+        blockedRows.forEach((row) => blockedIds.add(row.blockedId));
+      }
+
+      const rows = await db
+        .select()
+        .from(poiReviews)
+        .where(and(eq(poiReviews.poiKey, poiKey), eq(poiReviews.status, 'approved')));
+
+      const visible = rows.filter((row) => !blockedIds.has(row.userId)).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      const average = visible.length ? visible.reduce((sum, row) => sum + row.rating, 0) / visible.length : null;
+
+      return reply.send({
+        reviews: visible.map((row) => ({
+          id: row.id,
+          userId: row.userId,
+          rating: row.rating,
+          text: row.text,
+          createdAt: row.createdAt,
+        })),
+        average,
+        count: visible.length,
+      });
+    }
+  );
+
+  // Apple Guideline 1.2 (b) reporting for reviews -- same shape/threshold
+  // pattern as /content-reports (photos), kept separate since it targets
+  // `poiReviews` rows instead.
+  app.post<{ Body: { reviewId?: string; reason?: string } }>(
+    '/review-reports',
+    { config: { rateLimit: { max: 20, timeWindow: '1 hour' } } },
+    async (request, reply) => {
+      const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
+      if (!userId) return;
+
+      const parsed = z
+        .object({ reviewId: z.string().trim().min(1), reason: z.string().trim().min(1).max(300) })
+        .safeParse(request.body ?? {});
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'Invalid request' });
+      }
+
+      const { reviewId, reason } = parsed.data;
+      const review = await db.query.poiReviews.findFirst({ where: eq(poiReviews.id, reviewId) });
+      if (!review) {
+        return reply.code(404).send({ error: 'Review not found' });
+      }
+
+      await db
+        .insert(reviewReports)
+        .values({ id: newUserId().replace('user_', 'report_'), reviewId, reporterId: userId, reason, createdAt: new Date().toISOString() })
+        .onConflictDoNothing({ target: [reviewReports.reviewId, reviewReports.reporterId] });
+
+      const reports = await db.select().from(reviewReports).where(eq(reviewReports.reviewId, reviewId));
+      if (reports.length >= REPORT_AUTO_REJECT_THRESHOLD && review.status !== 'rejected') {
+        await db
+          .update(poiReviews)
+          .set({ status: 'rejected', moderationReason: 'Auto-hidden after multiple reports' })
+          .where(eq(poiReviews.id, reviewId));
+      }
+
+      return reply.code(201).send({ ok: true });
     }
   );
 
@@ -3687,12 +3923,29 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
 
       try {
         const owUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${parsedLat}&lon=${parsedLng}&units=metric&appid=${OPENWEATHER_API_KEY}`;
-        const res = await fetch(owUrl);
+        const airUrl = `https://api.openweathermap.org/data/2.5/air_pollution?lat=${parsedLat}&lon=${parsedLng}&appid=${OPENWEATHER_API_KEY}`;
+        // Air Pollution is bundled into the same OpenWeatherMap free-tier
+        // key, no separate signup -- fetched alongside current conditions
+        // so the client gets both in one round trip. Best-effort: a failure
+        // here degrades to `air_quality: null` rather than failing the
+        // whole /weather response, since the AQI reading is supplementary
+        // to the actual weather data this endpoint exists for.
+        const [res, airRes] = await Promise.all([fetch(owUrl), fetch(airUrl).catch(() => null)]);
         if (!res.ok) throw new Error(`OpenWeather ${res.status}`);
         const data = await res.json() as any;
 
         const weatherId: number = data.weather?.[0]?.id ?? 800;
         const condition = mapOpenWeatherCondition(weatherId);
+
+        let airQuality: { aqi: number; level: AirQualityLevel; components: Record<string, number> } | null = null;
+        if (airRes?.ok) {
+          const airData = (await airRes.json()) as any;
+          const entry = airData.list?.[0];
+          if (entry) {
+            const aqi: number = entry.main?.aqi ?? 1;
+            airQuality = { aqi, level: mapAirQualityLevel(aqi), components: entry.components ?? {} };
+          }
+        }
 
         return reply.send({
           city: data.name as string,
@@ -3702,6 +3955,7 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
           description: (data.weather?.[0]?.description ?? '') as string,
           humidity: data.main.humidity as number,
           wind_speed: Math.round((data.wind?.speed ?? 0) as number),
+          air_quality: airQuality,
         });
       } catch (e: any) {
         app.log.error(e);
@@ -3785,7 +4039,97 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
     }
   );
 
-  // ── /weather/forecast — Proxy OpenWeatherMap's 5-day/3-hour forecast ─────────
+  // ── /currency/rates — Latest exchange rates for one base currency ────────────
+  // Returns the full rate table (not just one pair) so the client can
+  // convert into whatever currency it needs locally without a round trip
+  // per pair -- e.g. a trip budget screen showing several line items at
+  // once. `open.er-api.com`'s free tier, keyless.
+  app.get<{ Querystring: { base?: string } }>(
+    '/currency/rates',
+    { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const base = (request.query.base ?? 'USD').trim().toUpperCase();
+      if (!/^[A-Z]{3}$/.test(base)) {
+        return reply.code(400).send({ error: 'base must be a 3-letter ISO 4217 currency code' });
+      }
+
+      const rates = await fetchExchangeRates(base);
+      if (!rates) {
+        return reply.code(502).send({ error: `Exchange rates unavailable for ${base}` });
+      }
+
+      return reply.send(rates);
+    }
+  );
+
+  // ── /currency/convert — Convert one amount between two currencies ────────────
+  app.get<{ Querystring: { amount?: string; from?: string; to?: string } }>(
+    '/currency/convert',
+    { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const amount = parseFloat(request.query.amount ?? '');
+      const from = (request.query.from ?? '').trim().toUpperCase();
+      const to = (request.query.to ?? '').trim().toUpperCase();
+      if (isNaN(amount) || !/^[A-Z]{3}$/.test(from) || !/^[A-Z]{3}$/.test(to)) {
+        return reply.code(400).send({ error: 'amount, from and to (3-letter ISO 4217 codes) are required' });
+      }
+
+      const rates = await fetchExchangeRates(from);
+      const rate = rates?.rates[to];
+      if (!rates || rate == null) {
+        return reply.code(502).send({ error: `Exchange rate unavailable for ${from} -> ${to}` });
+      }
+
+      return reply.send({ amount, from, to, rate, converted: amount * rate, updatedAt: rates.updatedAt });
+    }
+  );
+
+  // ── /sun-times — Sunrise/sunset/golden-hour for a coordinate + date ──────────
+  // Genuinely global -- computed astronomically, not looked up from a
+  // location database, so it works for any lat/lng on Earth.
+  app.get<{ Querystring: { lat: string; lng: string; date?: string } }>(
+    '/sun-times',
+    { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const parsedLat = parseFloat(request.query.lat ?? '');
+      const parsedLng = parseFloat(request.query.lng ?? '');
+      if (isNaN(parsedLat) || isNaN(parsedLng)) {
+        return reply.code(400).send({ error: 'lat and lng query params are required' });
+      }
+      const date = request.query.date ? new Date(request.query.date) : new Date();
+      if (isNaN(date.getTime())) {
+        return reply.code(400).send({ error: 'date query param must be a valid ISO date' });
+      }
+
+      const sunTimes = await fetchSunTimes(parsedLat, parsedLng, date);
+      if (!sunTimes) {
+        return reply.code(502).send({ error: 'Sun times unavailable' });
+      }
+
+      return reply.send(sunTimes);
+    }
+  );
+
+  // ── /wikivoyage/guide — Travel-guide intro for a city ─────────────────────────
+  // Coverage is uneven by design (see wikivoyage.ts) -- a `null`/404 here
+  // just means no article, not a broken lookup.
+  app.get<{ Querystring: { city: string; lat?: string; lng?: string } }>(
+    '/wikivoyage/guide',
+    { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const city = (request.query.city ?? '').trim();
+      if (!city) {
+        return reply.code(400).send({ error: 'city query param is required' });
+      }
+      const lat = request.query.lat !== undefined ? parseFloat(request.query.lat) : undefined;
+      const lng = request.query.lng !== undefined ? parseFloat(request.query.lng) : undefined;
+
+      const guide = await fetchWikivoyageGuide(city, isNaN(lat as number) ? undefined : lat, isNaN(lng as number) ? undefined : lng);
+      return reply.send({ guide });
+    }
+  );
+
+  // ── /currency/rates — Latest exchange rates for one base currency ────────────
   // For a Plan's target date: only meaningfully covers the next ~5 days (the
   // free-tier forecast horizon), which the client is responsible for
   // checking before calling this — a date further out just gets whatever
