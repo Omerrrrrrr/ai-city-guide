@@ -303,7 +303,7 @@ async function geocodeCityName(query: string) {
     'city', 'town', 'village', 'hamlet', 'municipality', 'suburb', 'city_district',
   ]);
 
-  return results
+  const mapped = results
     .filter((result) => result.category === 'place' || SETTLEMENT_ADDRESS_TYPES.has(result.addresstype ?? ''))
     .map((result) => ({
       // Nominatim's top-level `name` is the exact matched entity — e.g.
@@ -316,6 +316,19 @@ async function geocodeCityName(query: string) {
       lat: Number(result.lat),
       lng: Number(result.lon),
     }));
+
+  // Nominatim's own `dedupe=1` only merges exact-duplicate places -- it
+  // doesn't catch e.g. Kristiansand existing as both a "city" place node
+  // and a "municipality" admin boundary, two distinct OSM entities that
+  // show up identically in this UI (just name + country). Keep the
+  // first (highest-relevance) hit per name+country.
+  const seen = new Set<string>();
+  return mapped.filter((result) => {
+    const key = `${result.name.toLowerCase()}|${result.country.toLowerCase()}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 type AiProviderName = 'openai' | 'openrouter' | 'google';
