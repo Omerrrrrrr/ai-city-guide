@@ -622,6 +622,7 @@
 			buildConfigurationList = 006A6EB23FED69378428D03E /* Build configuration list for PBXNativeTarget "Piri" */;
 			buildPhases = (
 				CE8D6FD9995660938823D1D2 /* Sources */,
+				9609FD680325E4F2125EBE79 /* Upload debug symbols to Sentry */,
 				26CB1299511426A08B9BB877 /* Resources */,
 				A8122DF432EAEB7DA8A544D1 /* Frameworks */,
 			);
@@ -735,6 +736,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		9609FD680325E4F2125EBE79 /* Upload debug symbols to Sentry */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Upload debug symbols to Sentry";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if which sentry-cli >/dev/null; then\n  sentry-cli debug-files upload --include-sources \"$DWARF_DSYM_FOLDER_PATH\" \"$BUILT_PRODUCTS_DIR\" || echo \"warning: sentry-cli debug-files upload failed\"\nelse\n  echo \"warning: sentry-cli not installed, skipping Sentry dSYM upload (brew install getsentry/tools/sentry-cli)\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		06358232BE7AFD819E116F8C /* Sources */ = {

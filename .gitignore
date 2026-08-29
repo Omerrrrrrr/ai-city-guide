@@ -36,3 +36,7 @@ yarn-error.log*
 tmp/
 .env
 apps/api/.env
+
+# Sentry CLI auth token — never commit, one per machine/developer
+.sentryclirc
+native/Piri/.sentryclirc

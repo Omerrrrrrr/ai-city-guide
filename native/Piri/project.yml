@@ -104,6 +104,22 @@ targets:
           PIRI_API_BASE_URL: http://10.0.0.7:4000
         Release:
           PIRI_APS_ENVIRONMENT: production
+    postCompileScripts:
+      # SPM-distributed Sentry.framework doesn't get its own dSYM copied
+      # into an archive automatically (a known Sentry-Cocoa/SPM gap,
+      # confirmed live 2026-08-25: `xcodebuild -exportArchive` warned
+      # "did not include a dSYM for the Sentry.framework"). Uploading
+      # debug files directly to Sentry via sentry-cli sidesteps needing
+      # the archive to have it at all -- App Store Connect's own symbol
+      # server is irrelevant once Sentry has its own copy. Auth lives in
+      # `.sentryclirc` (gitignored, one per machine), not here.
+      - name: Upload debug symbols to Sentry
+        script: |
+          if which sentry-cli >/dev/null; then
+            sentry-cli debug-files upload --include-sources "$DWARF_DSYM_FOLDER_PATH" "$BUILT_PRODUCTS_DIR" || echo "warning: sentry-cli debug-files upload failed"
+          else
+            echo "warning: sentry-cli not installed, skipping Sentry dSYM upload (brew install getsentry/tools/sentry-cli)"
+          fi
   PiriTests:
     type: bundle.unit-test
     platform: iOS
@@ -151,6 +167,13 @@ schemes:
       targets:
         Piri: all
         PiriTests: [test]
+    run:
+      # Without this, the app talks to real StoreKit -- which returns no
+      # products in Simulator for subscriptions still in "Prepare for
+      # Submission" on App Store Connect, so every PaywallScreen price
+      # button silently showed "--" instead of a price. Confirmed via a
+      # live screenshot 2026-08-25.
+      storeKitConfiguration: Piri.storekit
     test:
       targets:
         - PiriTests

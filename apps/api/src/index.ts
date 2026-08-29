@@ -64,6 +64,7 @@ import { checkAndIncrementUsage, refundUsage } from './entitlements';
 import { moderatePhotoSubmission } from './moderation';
 import { uploadDataUriToR2 } from './r2';
 import { PRIVACY_POLICY_HTML } from './privacy-policy';
+import { SUPPORT_PAGE_HTML } from './support-page';
 import { openingHoursSchema } from './opening-hours';
 import { enrichPlaceWithWikipedia, type AiProviderConfig } from './wiki-enrichment';
 import { toPlaceDto } from './place-dto';
@@ -494,6 +495,10 @@ async function buildServer() {
   // not JSON, so it bypasses the rest of this file's response conventions.
   app.get('/privacy', async (_request, reply) => {
     reply.type('text/html').send(PRIVACY_POLICY_HTML);
+  });
+  // App Store Connect requires a Support URL on the app's first version.
+  app.get('/support', async (_request, reply) => {
+    reply.type('text/html').send(SUPPORT_PAGE_HTML);
   });
   app.get('/app-status', async () => {
     const aiProvider = getAiProviderConfig();
