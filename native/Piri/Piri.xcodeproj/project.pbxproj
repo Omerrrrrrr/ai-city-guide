@@ -974,7 +974,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PIRI_API_BASE_URL = "http://10.0.0.7:4000";
+				PIRI_API_BASE_URL = "http://10.40.29.2:4000";
 				PIRI_APS_ENVIRONMENT = development;
 				PRODUCT_BUNDLE_IDENTIFIER = com.piriapp.piri;
 				SDKROOT = iphoneos;

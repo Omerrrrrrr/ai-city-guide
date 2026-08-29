@@ -67,7 +67,7 @@ targets:
         # it) and not the kind of global HTTP allowance App Review flags.
         NSAppTransportSecurity:
           NSExceptionDomains:
-            10.0.0.7:
+            10.40.29.2:
               NSExceptionAllowsInsecureHTTPLoads: true
         # Standard HTTPS/TLS only, no proprietary/non-exempt encryption --
         # declaring this here answers Apple's export-compliance question
@@ -101,7 +101,7 @@ targets:
           # (different network, DHCP renewal) or a real-device Debug
           # build will fail to reach the local dev server with the exact
           # "Kunne ikke koble til tjeneren" symptom this was added to fix.
-          PIRI_API_BASE_URL: http://10.0.0.7:4000
+          PIRI_API_BASE_URL: http://10.40.29.2:4000
         Release:
           PIRI_APS_ENVIRONMENT: production
     postCompileScripts:
