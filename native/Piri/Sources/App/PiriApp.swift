@@ -16,6 +16,7 @@ struct PiriApp: App {
     @State private var languageStore = LanguageStore()
     @State private var purchaseStore = PurchaseStore()
     @State private var appearanceStore = AppearanceStore()
+    @State private var weatherCitiesStore = WeatherCitiesStore()
 
     init() {
         SentryConfig.start()
@@ -36,6 +37,7 @@ struct PiriApp: App {
                 .environment(languageStore)
                 .environment(purchaseStore)
                 .environment(appearanceStore)
+                .environment(weatherCitiesStore)
                 .environment(PushNotificationManager.shared)
                 .preferredColorScheme(appearanceStore.scheme)
         }
