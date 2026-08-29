@@ -317,6 +317,41 @@ export const blocks = pgTable('blocks', {
   uniqueIndex('idx_blocks_pair').on(table.blockerId, table.blockedId),
 ]);
 
+// Piri's own star+text reviews -- same poiKey normalization as
+// `userSubmittedPhotos` (name+lat+lng rounded, computed at the route layer)
+// so a review lands on the same place regardless of which POI source the
+// user tapped it from. One review per user per place (see the unique
+// index) -- resubmitting overwrites rather than stacking duplicates.
+export const poiReviews = pgTable('poi_reviews', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  poiKey: varchar('poi_key', { length: 300 }).notNull(),
+  poiName: varchar('poi_name', { length: 256 }).notNull(),
+  userId: varchar('user_id', { length: 64 }).notNull(),
+  rating: integer('rating').notNull(), // 1-5
+  text: text('text'),
+  status: varchar('status', { length: 16 }).notNull().default('pending'), // 'pending' | 'approved' | 'rejected'
+  moderationReason: text('moderation_reason'),
+  createdAt: varchar('created_at', { length: 64 }).notNull(),
+}, (table) => [
+  index('idx_poi_reviews_poi_key').on(table.poiKey),
+  index('idx_poi_reviews_user').on(table.userId),
+  uniqueIndex('idx_poi_reviews_poi_user').on(table.poiKey, table.userId),
+]);
+
+// Apple Guideline 1.2 (b) reporting mechanism, same shape/threshold pattern
+// as `contentReports` (photos) but scoped to reviews -- kept as its own
+// table rather than overloading `contentReports.photoId` with a second
+// meaning.
+export const reviewReports = pgTable('review_reports', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  reviewId: varchar('review_id', { length: 64 }).notNull(),
+  reporterId: varchar('reporter_id', { length: 64 }).notNull(),
+  reason: varchar('reason', { length: 300 }).notNull(),
+  createdAt: varchar('created_at', { length: 64 }).notNull(),
+}, (table) => [
+  uniqueIndex('idx_review_reports_review_reporter').on(table.reviewId, table.reporterId),
+]);
+
 export type PlaceRow = typeof places.$inferSelect;
 export type PoiPhotoCacheRow = typeof poiPhotoCache.$inferSelect;
 export type PlaceImageCandidateRow = typeof placeImageCandidates.$inferSelect;
@@ -331,3 +366,5 @@ export type UsageCounterRow = typeof usageCounters.$inferSelect;
 export type UserSubmittedPhotoRow = typeof userSubmittedPhotos.$inferSelect;
 export type ContentReportRow = typeof contentReports.$inferSelect;
 export type BlockRow = typeof blocks.$inferSelect;
+export type PoiReviewRow = typeof poiReviews.$inferSelect;
+export type ReviewReportRow = typeof reviewReports.$inferSelect;
