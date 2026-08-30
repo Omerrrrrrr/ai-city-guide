@@ -1,3 +1,4 @@
+import CoreLocation
 import Foundation
 import Observation
 
@@ -112,5 +113,30 @@ final class TripsStore {
 
     private func persist() {
         persistence.save(TripsState(trips: trips, activeTripId: activeTripId))
+    }
+
+    private static let verifiedVisitRadiusMeters: CLLocationDistance = 150
+
+    /// Whether this device has real evidence of a physical visit near
+    /// `lat`/`lng` -- either GPS breadcrumb from a trip that actually
+    /// passed within range (recorded live during an in-progress trip, not
+    /// just planned), or a stop on a trip that was *completed* (not just
+    /// started). A stop on a still-active or abandoned trip doesn't count
+    /// -- planning to go somewhere isn't evidence of having gone. Backs
+    /// the "verified visit" flag sent with a new review (see
+    /// `WriteReviewSheet`) -- self-reported to the server, which has no
+    /// way to check GPS itself, but grounded in real location data the
+    /// app already collected rather than a bare checkbox.
+    func hasVisited(lat: Double, lng: Double, radiusMeters: CLLocationDistance = verifiedVisitRadiusMeters) -> Bool {
+        let target = CLLocation(latitude: lat, longitude: lng)
+        for trip in trips {
+            if trip.breadcrumb.contains(where: { CLLocation(latitude: $0.lat, longitude: $0.lng).distance(from: target) <= radiusMeters }) {
+                return true
+            }
+            if trip.endedAt != nil, trip.stops.contains(where: { CLLocation(latitude: $0.lat, longitude: $0.lng).distance(from: target) <= radiusMeters }) {
+                return true
+            }
+        }
+        return false
     }
 }

@@ -12,7 +12,7 @@ import Foundation
 enum Gamification {
     static let xpPerLevel = 100
 
-    static func xp(profile: UserProfile, savedPlaceCount: Int, completedTripCount: Int, visitedCount: Int) -> Int {
+    static func xp(profile: UserProfile, savedPlaceCount: Int, completedTripCount: Int, visitedCount: Int, reviewCount: Int) -> Int {
         let profileXP = ProfileOptions.summaryParts(for: profile).count * 20
         let savedXP = savedPlaceCount * 5
         let tripXP = completedTripCount * 50
@@ -20,7 +20,15 @@ enum Gamification {
         // card) -- capped so it can't dominate the score the way actually
         // saving a place or completing a trip should.
         let visitedXP = min(visitedCount, 30) * 2
-        return profileXP + savedXP + tripXP + visitedXP
+        // Writing a review is a real, useful contribution -- weighted
+        // above a save (5) but below completing a whole trip (50).
+        // Required, not defaulted -- every call site reads
+        // `MyReviewsStore.count`, deliberately so a future call site that
+        // forgets it fails to compile instead of silently under-counting
+        // (which would show a different XP/level for the same person
+        // depending which screen computed it).
+        let reviewXP = reviewCount * 15
+        return profileXP + savedXP + tripXP + visitedXP + reviewXP
     }
 
     static func level(forXP xp: Int) -> Int {

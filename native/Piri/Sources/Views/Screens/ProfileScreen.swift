@@ -30,6 +30,13 @@ private enum ProfileTab: Hashable, Identifiable {
     var id: Self { self }
 }
 
+/// Which side of the currency converter `CurrencyPickerSheet` is currently
+/// open for -- see `ProfileScreen.cityCard`.
+private enum CurrencySide: Identifiable {
+    case home, destination
+    var id: Self { self }
+}
+
 /// Port of `mobile/app/(tabs)/settings.tsx`.
 struct ProfileScreen: View {
     @Environment(UserProfileStore.self) private var userProfileStore
@@ -37,8 +44,10 @@ struct ProfileScreen: View {
     @Environment(LanguageStore.self) private var languageStore
     @Environment(AppearanceStore.self) private var appearanceStore
     @Environment(MapsProviderStore.self) private var mapsProviderStore
+    @Environment(PreferredCurrencyStore.self) private var preferredCurrencyStore
     @Environment(SavedPlacesStore.self) private var savedPlacesStore
     @Environment(RecentlyViewedStore.self) private var recentlyViewedStore
+    @Environment(MyReviewsStore.self) private var myReviewsStore
     @Environment(TripsStore.self) private var tripsStore
     @Environment(PlacesQuery.self) private var placesQuery
     @Environment(AuthStore.self) private var authStore
@@ -49,6 +58,10 @@ struct ProfileScreen: View {
     @State private var isEditingProfileDetails = false
     @State private var nameInput = ""
     @State private var showingCityPicker = false
+    @State private var pickingCurrencySide: CurrencySide?
+    @State private var destinationCurrencyOverride: String?
+    @State private var liveRate: Double?
+    @State private var liveRateTask: Task<Void, Never>?
     @State private var showingSaved: SavedTab?
     @State private var showingRestartHint = false
     @State private var profileTab: ProfileTab = .language
@@ -97,6 +110,15 @@ struct ProfileScreen: View {
                         .buttonStyle(.plain)
                         NavigationLink(destination: AdminImagesScreen()) {
                             Text("settings.imageReview")
+                                .font(.system(size: 15, weight: .semibold))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(RoundedRectangle(cornerRadius: 14).fill(Theme.navy.opacity(0.04)))
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.navy.opacity(0.14)))
+                        }
+                        .buttonStyle(.plain)
+                        NavigationLink(destination: AdminReviewsScreen()) {
+                            Text("settings.reviewModeration")
                                 .font(.system(size: 15, weight: .semibold))
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 14)
@@ -272,7 +294,8 @@ struct ProfileScreen: View {
             profile: profile,
             savedPlaceCount: savedPlaceCount,
             completedTripCount: completedTrips,
-            visitedCount: recentlyViewedStore.viewed.count
+            visitedCount: recentlyViewedStore.viewed.count,
+            reviewCount: myReviewsStore.count
         )
         let level = Gamification.level(forXP: xp)
 
@@ -589,22 +612,105 @@ struct ProfileScreen: View {
                     .foregroundStyle(.secondary)
                     .padding(.top, 2)
             }
+
+            // Two independently-pickable sides, not one auto-derived from
+            // the city -- a first version only let the destination side
+            // follow the current city's currency automatically, but the
+            // point of a converter is comparing whatever two currencies
+            // the traveler actually cares about (their own, and a
+            // *specific* one they're pricing against), not just "here vs.
+            // home." Both open the same `CurrencyPickerSheet`, just for a
+            // different side.
+            currencyRow(
+                icon: "banknote",
+                labelKey: "settings.homeCurrency",
+                code: preferredCurrencyStore.code
+            ) { pickingCurrencySide = .home }
+
+            currencyRow(
+                icon: "arrow.left.arrow.right",
+                labelKey: "settings.counterpartCurrency",
+                code: destinationCurrencyCode
+            ) { pickingCurrencySide = .destination }
+
+            if let liveRate {
+                Text("1 \(preferredCurrencyStore.code) ≈ \(String(format: "%.3f", liveRate)) \(destinationCurrencyCode)")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+            }
         }
+        .sheet(item: $pickingCurrencySide) { side in
+            CurrencyPickerSheet(
+                title: side == .home ? String(localized: "settings.homeCurrency.title") : String(localized: "settings.counterpartCurrency.title"),
+                selectedCode: side == .home ? preferredCurrencyStore.code : destinationCurrencyCode
+            ) { code in
+                if side == .home {
+                    preferredCurrencyStore.setCode(code)
+                } else {
+                    destinationCurrencyOverride = code
+                }
+            }
+        }
+        .task { await refreshLiveRate() }
+        .onChange(of: preferredCurrencyStore.code) { _, _ in Task { await refreshLiveRate() } }
+        .onChange(of: destinationCurrencyOverride) { _, _ in Task { await refreshLiveRate() } }
+        .onChange(of: cityStore.countryInfo) { _, _ in Task { await refreshLiveRate() } }
     }
 
-    /// Reads `CityStore`'s per-city cache (country/timezone/currency,
-    /// fetched once per city change -- see `CityStore.refreshContext`)
-    /// rather than making its own network call, exactly the pattern that
-    /// cache exists to enable for any screen that wants one of these
-    /// signals without repeating the fetch.
+    private func currencyRow(icon: String, labelKey: String, code: String, action: @escaping () -> Void) -> some View {
+        Button {
+            Haptics.light()
+            action()
+        } label: {
+            HStack {
+                Image(systemName: icon).foregroundStyle(.primary)
+                Text(L(labelKey, code))
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.primary)
+                Spacer()
+                Text("settings.changeCurrency").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.gold)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// `nil` (the default) means "follow the current city's own currency" --
+    /// set once the traveler explicitly picks a different counterpart, at
+    /// which point it stops tracking city changes until cleared. Falls back
+    /// to USD when neither a city nor an override is set, same reasoning as
+    /// `PreferredCurrencyStore`'s own default.
+    private var destinationCurrencyCode: String {
+        destinationCurrencyOverride ?? cityStore.countryInfo?.currencies.first?.code ?? "USD"
+    }
+
+    /// Independent of `CityStore.exchangeRates` (which is always keyed to
+    /// the current city's own currency as `base`) -- once the counterpart
+    /// side can be overridden away from the city's currency, that cache no
+    /// longer necessarily has the right base, so this fetches fresh
+    /// whenever either side changes instead.
+    private func refreshLiveRate() async {
+        liveRateTask?.cancel()
+        let task = Task {
+            let rates = try? await CityContextAPI.currencyRates(base: preferredCurrencyStore.code)
+            guard !Task.isCancelled else { return }
+            liveRate = rates?.rates[destinationCurrencyCode]
+        }
+        liveRateTask = task
+        await task.value
+    }
+
+    /// Reads `CityStore`'s per-city cache (country/timezone, fetched once
+    /// per city change -- see `CityStore.refreshContext`) rather than
+    /// making its own network call. No currency here anymore -- that's the
+    /// two picker rows + live-rate line below instead of a passive label,
+    /// and no flag emoji -- confirmed live it renders as two broken tofu
+    /// boxes rather than the intended flag glyph, not worth the risk.
     private var cityContextSubtitle: String? {
         guard let info = cityStore.countryInfo else { return nil }
-        var parts = ["\(info.flagEmoji) \(info.name)"]
+        var parts = [info.name]
         if let timezone = cityStore.timezones.first {
             parts.append(timezone)
-        }
-        if let rates = cityStore.exchangeRates, rates.base != "USD", let usdRate = rates.rates["USD"] {
-            parts.append("1 \(rates.base) ≈ \(String(format: "%.3f", usdRate)) USD")
         }
         return parts.joined(separator: " · ")
     }

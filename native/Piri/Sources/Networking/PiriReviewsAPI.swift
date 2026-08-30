@@ -22,6 +22,22 @@ enum PiriReviewsAPI {
             bearerToken: token
         )
     }
+
+    /// Casts (or changes) the caller's helpful/not-helpful vote on a
+    /// review -- an upsert server-side, so calling this again with a
+    /// different `helpful` value just changes the vote rather than
+    /// stacking a second one.
+    static func vote(reviewId: String, helpful: Bool, token: String) async throws {
+        let _: OkResponse = try await APIClient.shared.post(
+            "/poi/reviews/\(reviewId)/vote",
+            body: ReviewVoteRequest(helpful: helpful),
+            bearerToken: token
+        )
+    }
+}
+
+private struct ReviewVoteRequest: Encodable {
+    var helpful: Bool
 }
 
 struct POIReviewSubmitResponse: Decodable {

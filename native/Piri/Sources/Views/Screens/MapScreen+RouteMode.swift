@@ -314,12 +314,13 @@ extension MapScreen {
             let savedPlaceCount = savedPlacesStore.collections.reduce(0) { $0 + $1.places.count }
             let completedBefore = tripsStore.trips.filter { $0.endedAt != nil }.count
             let visitedCount = recentlyViewedStore.viewed.count
-            let xpBefore = Gamification.xp(profile: profile, savedPlaceCount: savedPlaceCount, completedTripCount: completedBefore, visitedCount: visitedCount)
+            let reviewCount = myReviewsStore.count
+            let xpBefore = Gamification.xp(profile: profile, savedPlaceCount: savedPlaceCount, completedTripCount: completedBefore, visitedCount: visitedCount, reviewCount: reviewCount)
 
             tripsStore.endTrip(activeTripId)
 
             let completedAfter = tripsStore.trips.filter { $0.endedAt != nil }.count
-            let xpAfter = Gamification.xp(profile: profile, savedPlaceCount: savedPlaceCount, completedTripCount: completedAfter, visitedCount: visitedCount)
+            let xpAfter = Gamification.xp(profile: profile, savedPlaceCount: savedPlaceCount, completedTripCount: completedAfter, visitedCount: visitedCount, reviewCount: reviewCount)
 
             // Snapshot after endTrip() so distanceMeters/durationSeconds and
             // endedAt are already final -- endTrip() keeps the trip in

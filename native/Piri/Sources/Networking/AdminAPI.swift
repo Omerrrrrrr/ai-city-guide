@@ -37,4 +37,19 @@ enum AdminAPI {
     static func applyImageCandidate(id: String, token: String) async throws {
         let _: EmptyResponse = try await APIClient.shared.post("/admin/image-candidates/\(id)/apply", bearerToken: token)
     }
+
+    /// `status` defaults to the moderation queue itself ("flagged") --
+    /// see the trust-scaled two-tier algorithm in `apps/api/src/index.ts`
+    /// that puts reviews here instead of auto-approving/-rejecting them.
+    static func fetchReviews(status: String = "flagged", token: String) async throws -> [AdminReviewRow] {
+        try await APIClient.shared.get("/admin/reviews", query: ["status": status], bearerToken: token)
+    }
+
+    static func approveReview(id: String, token: String) async throws {
+        let _: AdminReviewActionResponse = try await APIClient.shared.post("/admin/reviews/\(id)/approve", bearerToken: token)
+    }
+
+    static func rejectReview(id: String, token: String) async throws {
+        let _: AdminReviewActionResponse = try await APIClient.shared.post("/admin/reviews/\(id)/reject", bearerToken: token)
+    }
 }

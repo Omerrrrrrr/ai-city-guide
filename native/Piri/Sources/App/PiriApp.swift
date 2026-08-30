@@ -18,6 +18,8 @@ struct PiriApp: App {
     @State private var appearanceStore = AppearanceStore()
     @State private var weatherCitiesStore = WeatherCitiesStore()
     @State private var mapsProviderStore = MapsProviderStore()
+    @State private var preferredCurrencyStore = PreferredCurrencyStore()
+    @State private var myReviewsStore = MyReviewsStore()
 
     init() {
         SentryConfig.start()
@@ -40,6 +42,8 @@ struct PiriApp: App {
                 .environment(appearanceStore)
                 .environment(weatherCitiesStore)
                 .environment(mapsProviderStore)
+                .environment(preferredCurrencyStore)
+                .environment(myReviewsStore)
                 .environment(PushNotificationManager.shared)
                 .preferredColorScheme(appearanceStore.scheme)
         }

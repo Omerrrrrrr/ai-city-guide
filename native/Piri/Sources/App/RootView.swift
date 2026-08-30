@@ -7,6 +7,7 @@ struct RootView: View {
     @Environment(SavedPlacesStore.self) private var savedPlacesStore
     @Environment(TripsStore.self) private var tripsStore
     @Environment(RecentlyViewedStore.self) private var recentlyViewedStore
+    @Environment(MyReviewsStore.self) private var myReviewsStore
     @Environment(AuthStore.self) private var authStore
     @Environment(PurchaseStore.self) private var purchaseStore
 
@@ -35,6 +36,7 @@ struct RootView: View {
         }
         .onChange(of: savedPlacesStore.collections) { _, _ in pushStats() }
         .onChange(of: userProfileStore.profile) { _, _ in pushStats() }
+        .onChange(of: myReviewsStore.count) { _, _ in pushStats() }
         // Runs for the app's whole lifetime -- picks up a purchase made
         // outside `PurchaseStore.purchase(_:)`'s own call (another device,
         // a renewal, App Store's own restore UI) and verifies+syncs it the
@@ -61,7 +63,8 @@ struct RootView: View {
             profile: userProfileStore.profile,
             savedPlaceCount: savedPlaceCount,
             completedTripCount: completedTrips.count,
-            visitedCount: recentlyViewedStore.viewed.count
+            visitedCount: recentlyViewedStore.viewed.count,
+            reviewCount: myReviewsStore.count
         )
         let history = completedTrips.map {
             TripHistoryEntry(name: $0.displayTitle, date: ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: $0.startedAt / 1000)))

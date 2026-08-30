@@ -10,13 +10,40 @@ struct PiriReviewsSection: View {
     let poi: POIPlace
     let tripAdvisorRating: TripAdvisorRating?
     let googleRating: SourceRating?
+    /// `ExplainResult.piriRating` — already resolved server-side, so the
+    /// combined average below can include Piri's number immediately
+    /// instead of waiting on this section's own `GET /poi/reviews` call
+    /// (still made, for the full review list/text) to come back first.
+    let initialPiriRating: SourceRating?
+    /// `ExplainResult.reviewsSummary` — an AI-synthesized "what reviewers
+    /// say" sentence, already grounded server-side; `nil` when there
+    /// wasn't enough real review text to honestly summarize.
+    let reviewsSummary: String?
+    /// `ExplainResult.aspectHighlights` — specific things real reviewers
+    /// discussed, each with its own sentiment; empty when there wasn't
+    /// enough real review text to draw any from.
+    let aspectHighlights: [AspectHighlight]
 
     @Environment(AuthStore.self) private var authStore
+    @Environment(LanguageStore.self) private var languageStore
     @State private var piriReviews: POIReviewsResponse?
     @State private var showingWriteReview = false
+    @State private var translations: [String: TranslationResult] = [:]
+    @State private var translatingIds: Set<String> = []
+    @State private var showingTranslated: Set<String> = []
+
+    /// `LanguageStore.code` is `nil` for "follow system" -- falls back to
+    /// the device's own language, then plain English.
+    private var targetLangCode: String {
+        languageStore.code ?? Locale.current.language.languageCode?.identifier ?? "en"
+    }
 
     private var piriSource: SourceRating? {
-        guard let piriReviews, let average = piriReviews.average, piriReviews.count > 0 else { return nil }
+        // Not loaded yet -- use the value handed to us already rather than
+        // showing "no Piri rating" for the second or two this section's
+        // own fetch takes.
+        guard let piriReviews else { return initialPiriRating }
+        guard let average = piriReviews.average, piriReviews.count > 0 else { return nil }
         return SourceRating(rating: average, count: piriReviews.count)
     }
 
@@ -50,6 +77,21 @@ struct PiriReviewsSection: View {
                     Text(L("poiReviews.combinedFrom", sources.count))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                }
+            }
+
+            if let reviewsSummary {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "quote.bubble.fill").font(.caption).foregroundStyle(Theme.gold)
+                    Text(reviewsSummary).font(.footnote.italic())
+                }
+            }
+
+            if !aspectHighlights.isEmpty {
+                FlowLayout(spacing: 6) {
+                    ForEach(aspectHighlights, id: \.aspect) { highlight in
+                        aspectChip(highlight)
+                    }
                 }
             }
 
@@ -87,6 +129,25 @@ struct PiriReviewsSection: View {
         }
     }
 
+    private func aspectChip(_ highlight: AspectHighlight) -> some View {
+        let color: Color = {
+            switch highlight.sentiment {
+            case .positive: return Theme.openGreen
+            case .mixed: return .secondary
+            case .negative: return Theme.closedRed
+            }
+        }()
+        return HStack(spacing: 4) {
+            Circle().fill(color).frame(width: 6, height: 6)
+            Text(highlight.aspect)
+        }
+        .font(.caption2.weight(.medium))
+        .foregroundStyle(color)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Capsule().fill(color.opacity(0.1)))
+    }
+
     private func reviewRow(_ review: POIReview) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 4) {
@@ -95,10 +156,100 @@ struct PiriReviewsSection: View {
                         .font(.caption2)
                         .foregroundStyle(Theme.gold)
                 }
+                if review.verifiedVisit {
+                    HStack(spacing: 2) {
+                        Image(systemName: "checkmark.seal.fill")
+                        Text("poiReviews.verifiedVisit")
+                    }
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(Theme.openGreen)
+                    .padding(.leading, 4)
+                }
             }
             if let text = review.text, !text.isEmpty {
-                Text(text).font(.footnote)
+                if showingTranslated.contains(review.id), let translation = translations[review.id] {
+                    Text(translation.translatedText).font(.footnote)
+                    if let source = translation.detectedSourceLang {
+                        Text(L("poiReviews.translatedFrom", source.uppercased()))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Text(text).font(.footnote)
+                }
+                translateButton(review: review, text: text)
             }
+            HStack(spacing: 14) {
+                voteButton(review: review, helpful: true, icon: "hand.thumbsup", count: review.helpfulCount)
+                voteButton(review: review, helpful: false, icon: "hand.thumbsdown", count: review.notHelpfulCount)
+            }
+            .padding(.top, 2)
+        }
+    }
+
+    private func voteButton(review: POIReview, helpful: Bool, icon: String, count: Int) -> some View {
+        let active = review.myVote == helpful
+        return Button {
+            castVote(reviewId: review.id, helpful: helpful)
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: active ? "\(icon).fill" : icon)
+                if count > 0 {
+                    Text("\(count)")
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(active ? Theme.gold : .secondary)
+        }
+        .buttonStyle(.plain)
+        .disabled(authStore.token == nil)
+        .opacity(authStore.token == nil ? 0.5 : 1)
+    }
+
+    private func castVote(reviewId: String, helpful: Bool) {
+        guard let token = authStore.token else { return }
+        Haptics.light()
+        Task {
+            try? await PiriReviewsAPI.vote(reviewId: reviewId, helpful: helpful, token: token)
+            await loadReviews()
+        }
+    }
+
+    private func translateButton(review: POIReview, text: String) -> some View {
+        Button {
+            Haptics.light()
+            if translations[review.id] != nil {
+                if showingTranslated.contains(review.id) {
+                    showingTranslated.remove(review.id)
+                } else {
+                    showingTranslated.insert(review.id)
+                }
+            } else {
+                Task { await translate(review: review, text: text) }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                if translatingIds.contains(review.id) {
+                    ProgressView().controlSize(.mini)
+                } else {
+                    Image(systemName: "globe")
+                    Text(showingTranslated.contains(review.id) ? "poiReviews.showOriginal" : "poiReviews.translate")
+                }
+            }
+            .font(.caption2.weight(.medium))
+            .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .disabled(translatingIds.contains(review.id))
+        .padding(.top, 2)
+    }
+
+    private func translate(review: POIReview, text: String) async {
+        translatingIds.insert(review.id)
+        defer { translatingIds.remove(review.id) }
+        if let result = try? await TranslateAPI.translate(text: text, targetLang: targetLangCode) {
+            translations[review.id] = result
+            showingTranslated.insert(review.id)
         }
     }
 
@@ -119,6 +270,8 @@ private struct WriteReviewSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(AuthStore.self) private var authStore
+    @Environment(MyReviewsStore.self) private var myReviewsStore
+    @Environment(TripsStore.self) private var tripsStore
     @State private var rating = 0
     @State private var text = ""
     @State private var submitting = false
@@ -184,10 +337,17 @@ private struct WriteReviewSheet: View {
                     lat: poi.coordinate.latitude,
                     lng: poi.coordinate.longitude,
                     rating: rating,
-                    text: text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : text
+                    text: text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : text,
+                    visited: tripsStore.hasVisited(lat: poi.coordinate.latitude, lng: poi.coordinate.longitude)
                 ),
                 token: token
             )
+            // Only a genuinely new review earns XP -- `existing` is set
+            // when this sheet opened to edit one already written, which
+            // re-uses the same backend upsert and shouldn't grant it twice.
+            if existing == nil {
+                myReviewsStore.recordReviewWritten()
+            }
             onSubmitted()
             dismiss()
         } catch {

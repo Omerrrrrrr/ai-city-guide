@@ -166,14 +166,43 @@ struct ExplainResult: Codable {
     var groundingSource: String?
     /// Google Places' own aggregate rating — `nil` unless the caller is on
     /// a paid tier with quota remaining (same gate as `curatedInfo`'s
-    /// Google-photo fallback). Read-only, like Tripadvisor's; Piri's own
-    /// rating lives separately via `/poi/reviews`.
+    /// Google-photo fallback). Read-only, like Tripadvisor's.
     var googleRating: SourceRating?
     /// Present only for photogenic categories (see the server's
     /// `WIKIPEDIA_PLAUSIBLE_CATEGORIES` gate) with known coordinates —
     /// `nil` for a run-of-the-mill shop/office where "best light for
     /// photos" isn't a meaningful thing to tell someone.
     var goldenHour: GoldenHour?
+    /// Piri's own average/count from `poiReviews`, folded in here so
+    /// `PiriReviewsSection`'s combined-average can render immediately
+    /// instead of popping in after a separate `GET /poi/reviews` round
+    /// trip resolves. That endpoint is still called separately for the
+    /// full review list/text (only needed once the reviews section is
+    /// actually opened) — this is just the number.
+    var piriRating: SourceRating?
+    /// One AI-synthesized sentence on what real reviewers (Google and/or
+    /// Piri) commonly say, grounded in the actual review text the server
+    /// had on hand — `nil` when there wasn't enough real review text to
+    /// honestly summarize (the model is explicitly told not to invent
+    /// one in that case, see the `reviewsSummaryGuard` server-side).
+    var reviewsSummary: String?
+    /// 0-4 specific things real reviewers discussed (from the same review
+    /// text `reviewsSummary` draws from), each with its own honest
+    /// sentiment — never a fixed food/service/price grid forced onto
+    /// every place, only what the actual sample supports. Always present
+    /// (possibly empty), not optional -- the server always includes it.
+    var aspectHighlights: [AspectHighlight]
+}
+
+/// One aspect real reviewers discussed, e.g. `{aspect: "Coffee quality",
+/// sentiment: .positive}` — see `ExplainResult.aspectHighlights`.
+struct AspectHighlight: Codable, Hashable {
+    var aspect: String
+    var sentiment: AspectSentiment
+}
+
+enum AspectSentiment: String, Codable {
+    case positive, mixed, negative
 }
 
 /// Today's sunrise/sunset and the two golden-hour windows around them, all
@@ -313,7 +342,16 @@ struct CityContextSummary: Encodable {
     var currencyCode: String?
     var currencyName: String?
     var timezone: String?
-    var usdPerLocalCurrency: Double?
+    /// Currency code -> how many units of it equal 1 unit of `currencyCode`
+    /// — the whole table `CityStore` already cached (`open.er-api.com`
+    /// covers ~160 currencies per call), not trimmed down to a handful of
+    /// guessed-likely codes. Sending it costs nothing extra: it's already
+    /// sitting in memory from the one fetch per city change, so there's no
+    /// reason not to let the AI answer whatever currency someone actually
+    /// asks about (this trip or, since `CityStore` re-fetches fresh per
+    /// city, a completely different one next trip) instead of only the 2-3
+    /// codes a fixed shortlist happened to guess.
+    var referenceRates: [String: Double]?
 
     init?(countryInfo: CountryInfo?, timezone: String?, exchangeRates: ExchangeRates?) {
         guard let countryInfo else { return nil }
@@ -322,7 +360,7 @@ struct CityContextSummary: Encodable {
         self.currencyCode = countryInfo.currencies.first?.code
         self.currencyName = countryInfo.currencies.first?.name
         self.timezone = timezone
-        self.usdPerLocalCurrency = exchangeRates?.rates["USD"]
+        self.referenceRates = exchangeRates?.rates
     }
 }
 
