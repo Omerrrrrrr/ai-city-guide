@@ -36,6 +36,16 @@ struct POIExplainSheet: View {
     @State private var addToCollectionKind: SavedCollectionKind?
     @State private var showingReviews = false
     @State private var showingDirections = false
+    /// Drives Apple's own full Place Card via `mapItemDetailSheet` — the
+    /// only place hours show up. `MKMapItem` has no `hours`/`openingHours`
+    /// property at all (confirmed against the SDK header directly, not just
+    /// docs) — `phoneNumber`/`url` are real plain values we can lay out as
+    /// text ourselves, hours genuinely is not, in any form, on any OS
+    /// version. Every embedded-map variant tried previously (full/compact
+    /// callout, sync/async selection) either rendered blank or showed a
+    /// plain name-only bubble with no hours inside it — this sheet is the
+    /// only surface Apple actually renders that data on.
+    @State private var showingMapItemDetail = false
 
     var body: some View {
         NavigationStack {
@@ -129,7 +139,7 @@ struct POIExplainSheet: View {
                                             .font(.footnote.weight(.semibold))
                                     }
                                 }
-                                PiriReviewsSection(poi: poi, tripAdvisorRating: result.rating, googleRating: result.googleRating)
+                                PiriReviewsSection(poi: poi, tripAdvisorRating: result.rating, googleRating: result.googleRating, initialPiriRating: result.piriRating, reviewsSummary: result.reviewsSummary, aspectHighlights: result.aspectHighlights)
                                 if let curatedInfo = result.curatedInfo {
                                     CuratedInfoRow(info: curatedInfo)
                                 }
@@ -170,7 +180,19 @@ struct POIExplainSheet: View {
                             // from Apple's own MapKit data.
                             PlaceDetailsCard(mapItem: poi.mapItem)
 
+                            // Hours has no plain-value form to put in the
+                            // section above (see note on `showingMapItemDetail`)
+                            // — this is the only way to see it at all.
                             HStack(spacing: 10) {
+                                Button {
+                                    showingMapItemDetail = true
+                                } label: {
+                                    Label("poiExplain.fullDetails", systemImage: "info.circle.fill")
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(Theme.gold)
+                                .mapItemDetailSheet(isPresented: $showingMapItemDetail, item: poi.mapItem)
+
                                 Button("common.openInMaps") {
                                     let opensInApp = PlaceDirections.opensInApp
                                     PlaceDirections.openInMaps(name: poi.name, coordinate: poi.coordinate, tabSelection: tabSelection)

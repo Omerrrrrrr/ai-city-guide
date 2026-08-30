@@ -48,6 +48,25 @@ final class CameraController: NSObject, @unchecked Sendable {
         }
     }
 
+    /// `true` once the user has already said no once (or the profile
+    /// restricts it) -- iOS never re-shows its own permission dialog past
+    /// that point, no matter how many times `requestAccess` is called
+    /// again, so `ScanScreen`'s "Allow Camera" button silently did nothing
+    /// on a second tap here: same `.notDetermined`-only branch above ran,
+    /// found `.denied`, and just set `isAuthorized = false` again. The only
+    /// way to actually grant it past this point is the Settings app (see
+    /// `openSystemSettings`), which the button now offers instead once this
+    /// is `true`.
+    var isPermissionDenied: Bool {
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        return status == .denied || status == .restricted
+    }
+
+    func openSystemSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
+    }
+
     func stop() {
         sessionQueue.async { [session] in
             if session.isRunning { session.stopRunning() }

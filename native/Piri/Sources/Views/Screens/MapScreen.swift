@@ -42,6 +42,7 @@ struct MapScreen: View {
     @Environment(TabSelection.self) private var tabSelection
     @Environment(AuthStore.self) private var authStore
     @Environment(RecentlyViewedStore.self) var recentlyViewedStore
+    @Environment(MyReviewsStore.self) var myReviewsStore
 
     @State var locationManager = LocationManager()
     @State private var places: [Place] = []
@@ -292,6 +293,7 @@ struct MapScreen: View {
         }
         .overlay(alignment: .bottomTrailing) {
             VStack(spacing: 12) {
+                locationButton
                 mapTypeButton
                 trailsToggleButton
                 routeModeToggleButton
@@ -382,8 +384,15 @@ struct MapScreen: View {
             }
         }
         .onChange(of: trailsEnabled) { _, enabled in
-            if enabled, let currentRegion {
-                fetchTrailsIfNeeded(for: currentRegion)
+            // `currentRegion` only gets set once MapKit's own
+            // `regionDidChangeAnimated` delegate has fired at least once
+            // (see `handleRegionChange`) -- falling back to `initialRegion`
+            // covers the edge case of tapping this toggle before that first
+            // callback lands, which otherwise silently did nothing at all
+            // (the `if let` failed, so this fell straight to the `else`
+            // branch and never fetched anything).
+            if enabled, let region = currentRegion ?? initialRegion {
+                fetchTrailsIfNeeded(for: region)
             } else {
                 trailPins = []
                 selectedTrail = nil
@@ -426,6 +435,28 @@ struct MapScreen: View {
             }
         } label: {
             Image(systemName: mapTypeIconName)
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(.primary)
+                .frame(width: 48, height: 48)
+                .background(Circle().fill(.thinMaterial))
+                .shadow(radius: 3)
+        }
+    }
+
+    /// Re-centers on the user's live GPS position -- distinct from
+    /// `initialRegion`'s own one-time snapshot (set once at launch from the
+    /// saved city or an early GPS fix, then never updated), so panning away
+    /// and tapping this later actually returns to *now*, not to wherever
+    /// the map happened to open. Reuses the same `initialRegion` +
+    /// `recenterTrigger` plumbing `performSearch` already re-centers with
+    /// (see below), rather than adding a second recenter mechanism.
+    private var locationButton: some View {
+        Button {
+            guard let location = locationManager.currentLocation else { return }
+            initialRegion = MKCoordinateRegion(center: location, span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01))
+            recenterTrigger = UUID()
+        } label: {
+            Image(systemName: "location.fill")
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(.primary)
                 .frame(width: 48, height: 48)
@@ -671,17 +702,12 @@ struct MapScreen: View {
                 }
                 .font(.title3)
             }
-            Button {
-                Task { await showTrailRoute(trail) }
-            } label: {
-                if loadingTrailGeometry {
-                    ProgressView().frame(maxWidth: .infinity)
-                } else {
-                    Text("map.trails.showRoute").frame(maxWidth: .infinity)
+            if loadingTrailGeometry {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("map.trails.loadingRoute").font(.footnote).foregroundStyle(.secondary)
                 }
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(loadingTrailGeometry)
         }
         .padding()
         .piriGlassCard(cornerRadius: 16)
@@ -1063,6 +1089,10 @@ struct MapScreen: View {
         selectedMapFeature = nil
         selectedDietaryPin = nil
         poiExplainTask?.cancel()
+        // Drawn right away, not behind a second "Show Route" tap -- tapping
+        // a pin is already the explicit request to see this trail, a
+        // follow-up button just added a redundant step.
+        Task { await showTrailRoute(trail) }
     }
 
     private func showTrailRoute(_ trail: Trail) async {

@@ -78,6 +78,20 @@ struct ExploreScreen: View {
             searchTask?.cancel()
             Task { await search() }
         }
+        // `.task` above only fires once per view identity, not on every
+        // re-appear -- switching the selected city elsewhere (e.g.
+        // `ProfileScreen`'s city picker) while this tab stays alive in a
+        // `TabView` left `results` showing the *previous* city's places
+        // (only the `header`'s city-name label re-rendered, since that
+        // reads `cityStore` directly), until some unrelated interaction
+        // (typing, tapping a category) happened to call `search()` again.
+        .onChange(of: cityStore.cityId) { _, _ in
+            searchTask?.cancel()
+            Task { await search() }
+            if let dietaryFilter {
+                Task { await loadDietaryResults(dietaryFilter) }
+            }
+        }
         .onChange(of: dietaryFilter) { _, filter in
             guard let filter else {
                 dietaryResults = []

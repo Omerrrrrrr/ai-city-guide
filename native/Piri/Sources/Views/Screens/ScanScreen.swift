@@ -117,9 +117,13 @@ struct ScanScreen: View {
                     Text("scan.permission.title").font(.system(size: 24, weight: .bold)).foregroundStyle(.white).multilineTextAlignment(.center)
                     Text("scan.permission.body").foregroundStyle(.white.opacity(0.7)).multilineTextAlignment(.center)
                     Button {
-                        Task { await camera.requestAuthorizationAndStart() }
+                        if camera.isPermissionDenied {
+                            camera.openSystemSettings()
+                        } else {
+                            Task { await camera.requestAuthorizationAndStart() }
+                        }
                     } label: {
-                        Text("scan.permission.allow")
+                        Text(camera.isPermissionDenied ? "scan.permission.openSettings" : "scan.permission.allow")
                             .font(.system(size: 17, weight: .bold))
                             .foregroundStyle(Theme.navy)
                             .padding(.horizontal, 32)
