@@ -1,0 +1,1 @@
+ALTER TABLE "poi_reviews" ADD COLUMN "verified_visit" boolean DEFAULT false NOT NULL;

@@ -3,7 +3,7 @@ import 'dotenv/config';
 import Fastify, { type FastifyError, type FastifyReply, type FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
-import { and, eq, gte, ilike, inArray, lte } from 'drizzle-orm';
+import { and, desc, eq, gte, ilike, inArray, lte } from 'drizzle-orm';
 import { generateObject, generateText } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
@@ -103,8 +103,9 @@ import { fetchWikivoyageGuide } from './wikivoyage';
 import { getCountryInfo } from './country-info';
 import { findTimezone } from './timezone';
 import { fetchNearbyTrails, fetchTrailGeometry } from './overpass';
+import { translateText } from './translate';
 import { fetchWebsiteExcerpt } from './website-content';
-import { places, cities, liveGridCellStatus, livePlaceCache, poiPhotoCache, users, userSubmittedPhotos, contentReports, blocks, poiReviews, reviewReports } from './schema';
+import { places, cities, liveGridCellStatus, livePlaceCache, poiPhotoCache, users, userSubmittedPhotos, contentReports, blocks, poiReviews, reviewReports, reviewVotes } from './schema';
 
 const PORT = Number(process.env.PORT ?? 4000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY?.trim();
@@ -1705,6 +1706,42 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
       const wikivoyagePromise =
         lat !== undefined && lng !== undefined ? fetchWikivoyageGuide(name, lat, lng) : Promise.resolve(null);
 
+      // Piri's own UGC rating -- folded in here instead of the second
+      // `GET /poi/reviews` round trip the client previously needed before
+      // it could render the 3-source combined average (`PiriReviewsSection`),
+      // which showed as the combined average popping in a moment after
+      // everything else on the card. Same poiKey scheme (normalized name +
+      // lat/lng rounded to 3 decimals, ~111m) as `/poi/reviews` and the
+      // photo endpoints. Also pulls a small sample of real review text
+      // (capped, most recent first) -- not for display here (the full list
+      // stays a separate lazy fetch for when the reviews section is
+      // actually opened), but as grounding for `reviewsSummary` below.
+      const PIRI_REVIEW_TEXT_SAMPLE_LIMIT = 5;
+      const piriReviewPromise: Promise<{ rating: number; count: number; sampleTexts: string[] } | null> =
+        lat !== undefined && lng !== undefined
+          ? (async () => {
+              const nameNormalized = normalizeName(name);
+              const latRounded = Math.round(lat * 1000) / 1000;
+              const lngRounded = Math.round(lng * 1000) / 1000;
+              const poiKey = `${nameNormalized}|${latRounded}|${lngRounded}`;
+              const rows = await db
+                .select({ rating: poiReviews.rating, text: poiReviews.text, createdAt: poiReviews.createdAt })
+                .from(poiReviews)
+                .where(and(eq(poiReviews.poiKey, poiKey), eq(poiReviews.status, 'approved')));
+              if (rows.length === 0) return null;
+              const average = rows.reduce((sum, row) => sum + row.rating, 0) / rows.length;
+              const sampleTexts = rows
+                .filter((row): row is typeof row & { text: string } => Boolean(row.text?.trim()))
+                .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+                .slice(0, PIRI_REVIEW_TEXT_SAMPLE_LIMIT)
+                .map((row) => row.text.trim());
+              // Field named `rating` (not `average`) to match `googleRating`'s
+              // shape -- lets the client reuse the same `SourceRating` model
+              // for both instead of a third bespoke one.
+              return { rating: average, count: rows.length, sampleTexts };
+            })()
+          : Promise.resolve(null);
+
       // Paid-tier-only, run alongside the sources above (not just as a
       // last-resort photo fallback like before) so its editorial summary
       // and reviews can ground the AI prompt below, not just supply an
@@ -1742,6 +1779,7 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         appleWebsiteExcerpt,
         sunTimes,
         wikivoyageGuide,
+        piriReview,
       ] = await Promise.all([
         lat !== undefined && lng !== undefined
           ? fetchTripAdvisorInfo(name, lat, lng, undefined, false)
@@ -1754,6 +1792,7 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         appleWebsitePromise,
         goldenHourPromise,
         wikivoyagePromise,
+        piriReviewPromise,
       ]);
 
       const goldenHour = sunTimes
@@ -1835,6 +1874,11 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
               .map((r) => `"${r.text.slice(0, 160)}"${r.rating != null ? ` (${r.rating}★)` : ''}`)
               .join(' | ')}`
           : null,
+        piriReview?.sampleTexts.length
+          ? `Recent real Piri reviews (${piriReview.sampleTexts.length} shown of ${piriReview.count} total, average ${piriReview.rating.toFixed(1)}★): ${piriReview.sampleTexts
+              .map((t) => `"${t.slice(0, 160)}"`)
+              .join(' | ')}`
+          : null,
         websiteExcerpt ? `Text from the business's own official website: "${websiteExcerpt}"` : null,
         wikivoyageGuide
           ? `Wikivoyage travel-guide excerpt about the surrounding area/city ("${wikivoyageGuide.title}"), NOT about this specific place: "${wikivoyageGuide.extract.slice(0, 500)}"`
@@ -1897,6 +1941,27 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
       const googleReviewGuard = googlePlace?.reviews?.length
         ? ` A small real sample of Google reviews is included below, each with its own star rating — you can use them to describe a genuine overall impression in your own words (e.g. "visitors often mention the friendly staff" or "reviews are mixed on the noise level"), grounded in what the sample actually shows, not what you'd expect. Never quote any review verbatim or present a single reviewer's opinion as an established fact ("it's the best X in town") — and never claim a broader consensus (all/everyone/universally loved) than the sample and star ratings actually support; if the sample is small, mixed, or thin, say so plainly (e.g. "early visitors seem to like it") rather than overstating it.`
         : '';
+
+      // Drives the separate `reviewsSummary` schema field (shown in its own
+      // "what reviewers say" spot on the card, distinct from the main body
+      // paragraph) -- same anti-overstatement rules as googleReviewGuard
+      // above, extended to cover Piri's own reviews too, whichever real
+      // source(s) actually have text. Explicitly optional: nothing in this
+      // schema forces the model to invent a summary when there's no real
+      // review text to summarize.
+      const hasReviewText = Boolean(googlePlace?.reviews?.length) || Boolean(piriReview?.sampleTexts.length);
+      const reviewsSummaryGuard = hasReviewText
+        ? ` For the separate "reviewsSummary" field: write ONE sentence synthesizing what real reviewers (Google and/or Piri, whichever are given below) commonly say — a genuine pattern from the actual sample, never a single reviewer's opinion presented as consensus, never a claim stronger than "all/everyone" the sample doesn't support, and never a verbatim quote. If the two sources disagree, say so plainly rather than picking one. Set it to null if you can't honestly summarize anything from the real text given.`
+        : ` Set the "reviewsSummary" field to null — no real review text is given below for this place, so there is nothing genuine to summarize; do not invent one.`;
+
+      // Same real-text-only discipline as reviewsSummaryGuard, for the
+      // "aspectHighlights" field -- the failure mode this specifically
+      // guards against is forcing a generic "Food / Service / Price" grid
+      // onto every place regardless of whether reviewers actually talked
+      // about those things (a museum's reviews rarely discuss "price").
+      const aspectHighlightsGuard = hasReviewText
+        ? ` For the separate "aspectHighlights" field: list 0-4 specific things real reviewers actually discussed in the review text given below — a short label plus an honest positive/mixed/negative sentiment for each, strictly grounded in what the sample shows. Never invent an aspect nobody mentioned, and never force a fixed category (food/service/price/atmosphere) onto the list just to fill it out — if the sample only really supports one or two genuine aspects, list just those; an empty list is correct if nothing specific comes through.`
+        : ` Leave "aspectHighlights" as an empty array — no real review text is given below for this place.`;
 
       // Lower-trust than every other source above on purpose -- unlike
       // Wikipedia/Tripadvisor/Google (structured, curated-ish data), this
@@ -1965,8 +2030,37 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
                 .min(2)
                 .max(3)
                 .describe('2-3 specific things this particular person would find most interesting here.'),
+              // `.nullable()`, not `.optional()` -- OpenAI's structured-output
+              // strict mode requires every schema property to be listed in
+              // `required` (confirmed live: `.optional()` alone made every
+              // /places/explain-poi call fail with "'required' ... Missing
+              // 'reviewsSummary'"), so the field must always be present in
+              // the response and `null` is how the model opts out of it.
+              reviewsSummary: z
+                .string()
+                .nullable()
+                .describe(
+                  'One sentence synthesizing what real reviewers (Google/Piri) commonly say, or null if no real review text was given below — never invent one.'
+                ),
+              // A plain array (not `.nullable()`) -- unlike `reviewsSummary`
+              // this doesn't need the null escape hatch, since an empty
+              // array `[]` already means "nothing to report" without
+              // needing a second way to say the same thing.
+              aspectHighlights: z
+                .array(
+                  z.object({
+                    aspect: z
+                      .string()
+                      .describe('A short 1-3 word label for something real reviewers specifically discussed, in the same language as the rest of the response.'),
+                    sentiment: z.enum(['positive', 'mixed', 'negative']),
+                  })
+                )
+                .max(4)
+                .describe(
+                  '0-4 specific things real reviewers actually discussed (from the review text given below), each with an honest sentiment — empty array if there is no real review text to draw from. Never force a fixed category (food/service/price) that was not genuinely discussed just to fill the list.'
+                ),
             }),
-            system: `You are Piri, a deeply knowledgeable personal travel guide. Your job is to explain a place in a way that speaks directly to who the user is — their profession, interests, and worldview.${holidayGuard} ${factualGuard}${googleReviewGuard}${websiteGuard}${wikivoyageGuard}${NO_HYPE_GUARD}${profileContext}
+            system: `You are Piri, a deeply knowledgeable personal travel guide. Your job is to explain a place in a way that speaks directly to who the user is — their profession, interests, and worldview.${holidayGuard} ${factualGuard}${googleReviewGuard}${reviewsSummaryGuard}${aspectHighlightsGuard}${websiteGuard}${wikivoyageGuard}${NO_HYPE_GUARD}${profileContext}
 
 ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
             prompt: `Explain this place:\n\n${placeContext}`,
@@ -2045,6 +2139,7 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
           dietaryTags: dietaryTags.length ? dietaryTags : null,
           groundingSource,
           goldenHour,
+          piriRating: piriReview ? { rating: piriReview.rating, count: piriReview.count } : null,
         });
       } catch (e: any) {
         return sendServerError(request, reply, e, 'Failed to explain place');
@@ -2502,7 +2597,7 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
   // app. One review per (poiKey, user): resubmitting overwrites rather than
   // stacking, so editing a review is just posting again.
   app.post<{
-    Body: { poiName: string; lat: number; lng: number; rating: number; text?: string };
+    Body: { poiName: string; lat: number; lng: number; rating: number; text?: string; visited?: boolean };
   }>(
     '/poi/reviews',
     { config: { rateLimit: { max: 10, timeWindow: '1 day' } } },
@@ -2517,6 +2612,11 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
           lng: z.number(),
           rating: z.number().int().min(1).max(5),
           text: z.string().trim().max(2000).optional(),
+          // Self-reported by the client from real local GPS history
+          // (`TripsStore.hasVisited`) -- see schema.ts's comment on
+          // `verifiedVisit` for the trust model. Absent/false is the safe
+          // default for older client versions that don't send it yet.
+          visited: z.boolean().optional(),
         })
         .safeParse(request.body);
 
@@ -2524,7 +2624,7 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
         return reply.code(400).send({ error: 'Invalid request' });
       }
 
-      const { poiName, lat, lng, rating, text } = parsed.data;
+      const { poiName, lat, lng, rating, text, visited } = parsed.data;
       const nameNormalized = normalizeName(poiName);
       const latRounded = Math.round(lat * 1000) / 1000;
       const lngRounded = Math.round(lng * 1000) / 1000;
@@ -2544,6 +2644,7 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
           text: text?.trim() || null,
           status,
           moderationReason: moderation.reason,
+          verifiedVisit: visited ?? false,
           createdAt: new Date().toISOString(),
         })
         .onConflictDoUpdate({
@@ -2553,6 +2654,7 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
             text: text?.trim() || null,
             status,
             moderationReason: moderation.reason,
+            verifiedVisit: visited ?? false,
             createdAt: new Date().toISOString(),
           },
         })
@@ -2602,12 +2704,32 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
       const visible = rows.filter((row) => !blockedIds.has(row.userId)).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
       const average = visible.length ? visible.reduce((sum, row) => sum + row.rating, 0) / visible.length : null;
 
+      // Helpful/not-helpful counts, one query for every visible review at
+      // once rather than N+1 -- `mine` (the caller's own vote, if any)
+      // only gets populated when signed in, same as the blocked-list gate
+      // above.
+      const visibleIds = visible.map((row) => row.id);
+      const votes = visibleIds.length > 0 ? await db.select().from(reviewVotes).where(inArray(reviewVotes.reviewId, visibleIds)) : [];
+      const voteTallies = new Map<string, { helpful: number; notHelpful: number; mine: boolean | null }>();
+      for (const id of visibleIds) voteTallies.set(id, { helpful: 0, notHelpful: 0, mine: null });
+      for (const vote of votes) {
+        const tally = voteTallies.get(vote.reviewId);
+        if (!tally) continue;
+        if (vote.helpful) tally.helpful += 1;
+        else tally.notHelpful += 1;
+        if (userId && vote.voterId === userId) tally.mine = vote.helpful;
+      }
+
       return reply.send({
         reviews: visible.map((row) => ({
           id: row.id,
           userId: row.userId,
           rating: row.rating,
           text: row.text,
+          verifiedVisit: row.verifiedVisit,
+          helpfulCount: voteTallies.get(row.id)?.helpful ?? 0,
+          notHelpfulCount: voteTallies.get(row.id)?.notHelpful ?? 0,
+          myVote: voteTallies.get(row.id)?.mine ?? null,
           createdAt: row.createdAt,
         })),
         average,
@@ -2616,9 +2738,97 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
     }
   );
 
-  // Apple Guideline 1.2 (b) reporting for reviews -- same shape/threshold
-  // pattern as /content-reports (photos), kept separate since it targets
-  // `poiReviews` rows instead.
+  // "Helpful"/"not helpful" voting on a review -- upserts, so casting a
+  // second vote just changes it rather than stacking. `helpful`/
+  // `notHelpfulCount` above are recomputed from this table on every GET,
+  // not stored on `poiReviews` itself -- one less thing that could drift.
+  app.post<{ Params: { reviewId: string }; Body: { helpful?: boolean } }>(
+    '/poi/reviews/:reviewId/vote',
+    { config: { rateLimit: { max: 60, timeWindow: '1 hour' } } },
+    async (request, reply) => {
+      const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
+      if (!userId) return;
+
+      const parsed = z.object({ helpful: z.boolean() }).safeParse(request.body ?? {});
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'Invalid request' });
+      }
+
+      const { reviewId } = request.params;
+      const review = await db.query.poiReviews.findFirst({ where: eq(poiReviews.id, reviewId) });
+      if (!review) {
+        return reply.code(404).send({ error: 'Review not found' });
+      }
+
+      await db
+        .insert(reviewVotes)
+        .values({
+          id: newUserId().replace('user_', 'vote_'),
+          reviewId,
+          voterId: userId,
+          helpful: parsed.data.helpful,
+          createdAt: new Date().toISOString(),
+        })
+        .onConflictDoUpdate({
+          target: [reviewVotes.reviewId, reviewVotes.voterId],
+          set: { helpful: parsed.data.helpful, createdAt: new Date().toISOString() },
+        });
+
+      return reply.code(201).send({ ok: true });
+    }
+  );
+
+  // Removes the caller's own vote entirely (tap-to-toggle-off in the
+  // client) -- distinct from changing it via the POST above.
+  app.delete<{ Params: { reviewId: string } }>('/poi/reviews/:reviewId/vote', async (request, reply) => {
+    const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
+    if (!userId) return;
+
+    await db.delete(reviewVotes).where(and(eq(reviewVotes.reviewId, request.params.reviewId), eq(reviewVotes.voterId, userId)));
+    return reply.code(204).send();
+  });
+
+  // Trust-scaled two-tier moderation for review reports -- replaces a flat
+  // report count (still used for photos, REPORT_AUTO_REJECT_THRESHOLD
+  // above) with something that treats a brand-new account's first review
+  // and an established reviewer's tenth very differently. Two thresholds:
+  // crossing the lower one moves a review to `flagged` (hidden from public
+  // view, sitting in the admin queue -- see /admin/reviews below) rather
+  // than straight to `rejected`; only crossing the higher one auto-rejects
+  // outright. Deliberately scoped to reviews only for now, not photos.
+  const REVIEW_FLAG_BASE = 2;
+  const REVIEW_REJECT_BASE = 4;
+  // Caps how much a clean track record can buy -- otherwise a reviewer
+  // with hundreds of old approved reviews would become nearly
+  // unreportable, which defeats the point of having a threshold at all.
+  const REVIEW_TRUST_BONUS_CAP = 3;
+
+  // "Clean" = approved and never reported. Two plain queries + a JS set
+  // rather than a single correlated-subquery one, both to stay legible and
+  // because this only runs on the (low-frequency) report path, not
+  // anything hot.
+  async function reviewerTrustBonus(userId: string, excludingReviewId: string): Promise<number> {
+    const approved = await db
+      .select({ id: poiReviews.id })
+      .from(poiReviews)
+      .where(and(eq(poiReviews.userId, userId), eq(poiReviews.status, 'approved')));
+    const otherApprovedIds = approved.map((row) => row.id).filter((id) => id !== excludingReviewId);
+    if (otherApprovedIds.length === 0) return 0;
+
+    const reportedRows = await db
+      .selectDistinct({ reviewId: reviewReports.reviewId })
+      .from(reviewReports)
+      .where(inArray(reviewReports.reviewId, otherApprovedIds));
+    const reportedIds = new Set(reportedRows.map((row) => row.reviewId));
+
+    const cleanCount = otherApprovedIds.filter((id) => !reportedIds.has(id)).length;
+    return Math.min(REVIEW_TRUST_BONUS_CAP, cleanCount);
+  }
+
+  // Apple Guideline 1.2 (b) reporting for reviews -- same overall shape as
+  // /content-reports (photos), kept separate since it targets `poiReviews`
+  // rows instead, and (see above) now has its own moderation algorithm
+  // rather than sharing the photos' flat threshold.
   app.post<{ Body: { reviewId?: string; reason?: string } }>(
     '/review-reports',
     { config: { rateLimit: { max: 20, timeWindow: '1 hour' } } },
@@ -2645,16 +2855,59 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
         .onConflictDoNothing({ target: [reviewReports.reviewId, reviewReports.reporterId] });
 
       const reports = await db.select().from(reviewReports).where(eq(reviewReports.reviewId, reviewId));
-      if (reports.length >= REPORT_AUTO_REJECT_THRESHOLD && review.status !== 'rejected') {
+      const bonus = await reviewerTrustBonus(review.userId, reviewId);
+      const flagThreshold = REVIEW_FLAG_BASE + bonus;
+      const rejectThreshold = REVIEW_REJECT_BASE + bonus;
+
+      if (reports.length >= rejectThreshold && review.status !== 'rejected') {
         await db
           .update(poiReviews)
           .set({ status: 'rejected', moderationReason: 'Auto-hidden after multiple reports' })
+          .where(eq(poiReviews.id, reviewId));
+      } else if (reports.length >= flagThreshold && review.status === 'approved') {
+        await db
+          .update(poiReviews)
+          .set({ status: 'flagged', moderationReason: 'Reported enough times to need a human look' })
           .where(eq(poiReviews.id, reviewId));
       }
 
       return reply.code(201).send({ ok: true });
     }
   );
+
+  // ── Admin: flagged review queue ─────────────────────────────────────────
+  // A review that crosses REVIEW_FLAG_BASE lands here (hidden from
+  // /poi/reviews' public 'approved'-only query in the meantime) instead of
+  // being silently auto-rejected or left visible with reports piling up
+  // unseen -- same "no fully-automated verdict for the ambiguous middle"
+  // shape as the image-candidate queue above.
+  app.get<{ Querystring: { status?: string } }>('/admin/reviews', async (request) => {
+    const status = request.query.status === 'rejected' || request.query.status === 'approved' ? request.query.status : 'flagged';
+    // Bare array, not `{ reviews: [...] }` -- matches
+    // /admin/image-candidates' own shape (`listImageCandidates` returns
+    // the array directly), which the client's `AdminAPI` already expects.
+    return await db.select().from(poiReviews).where(eq(poiReviews.status, status)).orderBy(desc(poiReviews.createdAt));
+  });
+
+  app.post<{ Params: { reviewId: string } }>('/admin/reviews/:reviewId/approve', async (request, reply) => {
+    const [updated] = await db
+      .update(poiReviews)
+      .set({ status: 'approved', moderationReason: null })
+      .where(eq(poiReviews.id, request.params.reviewId))
+      .returning();
+    if (!updated) return reply.code(404).send({ error: 'Review not found' });
+    return { review: updated };
+  });
+
+  app.post<{ Params: { reviewId: string } }>('/admin/reviews/:reviewId/reject', async (request, reply) => {
+    const [updated] = await db
+      .update(poiReviews)
+      .set({ status: 'rejected', moderationReason: 'Rejected by admin review' })
+      .where(eq(poiReviews.id, request.params.reviewId))
+      .returning();
+    if (!updated) return reply.code(404).send({ error: 'Review not found' });
+    return { review: updated };
+  });
 
   // Apple Guideline 1.2 (b): a report mechanism for UGC. One report per
   // (photo, reporter) pair; once a photo crosses REPORT_AUTO_REJECT_THRESHOLD
@@ -2766,7 +3019,11 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
               currencyCode: z.string().trim().max(10).optional(),
               currencyName: z.string().trim().max(200).optional(),
               timezone: z.string().trim().max(100).optional(),
-              usdPerLocalCurrency: z.number().optional(),
+              // Currency code -> how many units of it equal 1 unit of
+              // `currencyCode`, e.g. { USD: 0.029, EUR: 0.027 } -- lets the
+              // model actually compute an amount conversion ("500 TRY is
+              // about 14.50 USD"), not just recite a single fixed ratio.
+              referenceRates: z.record(z.string(), z.number()).optional(),
             })
             .optional(),
           // Capped generously just against abuse, not against a normal long
@@ -2807,6 +3064,27 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
       const websiteExcerpt = website ? await fetchWebsiteExcerpt(website, 2500) : null;
 
       const { text: profileContext } = buildUserContext(userProfile);
+      // The client's `CityStore` already cached the whole exchange-rate
+      // table (open.er-api.com covers ~160 currencies), so there's no
+      // extra *fetch* cost to having it available -- but dropping all ~160
+      // lines into the prompt on every single chat message would still add
+      // real, wasted input tokens (cost + a little latency) to every
+      // "what's the history of this place"-style question that has
+      // nothing to do with money. Only inlined when this specific message
+      // actually looks like a currency question -- worst case on a miss is
+      // just this codebase's old always-include behavior for one turn, not
+      // a wrong answer (the model already knows to say so if it's missing
+      // the number it needs).
+      const looksLikeCurrencyQuestion =
+        /\d|currency|convert|exchange|price|cost|dollar|euro|pound|\busd\b|\beur\b|\bgbp\b|\bjpy\b|kur\b|döviz|dolar|çevir|fiyat|ücret|valuta|kronekurs/i.test(
+          message
+        );
+      const referenceRatesLine =
+        looksLikeCurrencyQuestion && cityContext?.referenceRates && Object.keys(cityContext.referenceRates).length
+          ? Object.entries(cityContext.referenceRates)
+              .map(([code, rate]) => `1 ${cityContext.currencyCode} ≈ ${Number(rate.toPrecision(6))} ${code}`)
+              .join(', ')
+          : null;
       const cityContextLine = cityContext
         ? `Country/local context for the city this place is in (real, looked-up data): ${cityContext.countryName}${
             cityContext.callingCode ? `, international calling code ${cityContext.callingCode}` : ''
@@ -2815,7 +3093,7 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
               ? `, local currency ${cityContext.currencyCode}${cityContext.currencyName ? ` (${cityContext.currencyName})` : ''}`
               : ''
           }${cityContext.timezone ? `, timezone ${cityContext.timezone}` : ''}${
-            cityContext.usdPerLocalCurrency ? `, ≈ ${cityContext.usdPerLocalCurrency} USD per 1 ${cityContext.currencyCode}` : ''
+            referenceRatesLine ? `. Exchange rates: ${referenceRatesLine}` : ''
           }.`
         : null;
       const placeContext = [
@@ -2843,7 +3121,11 @@ ${
 }
 ${
   cityContextLine
-    ? `\nCITY CONTEXT RULE: the country/currency/timezone line above is real, looked-up data (not a guess) — use it when genuinely relevant (currency questions, "what time is it there," calling codes, what country/language this is), but don't volunteer it unprompted or force it into an answer about something else.\n`
+    ? `\nCITY CONTEXT RULE: the country/currency/timezone line above is real, looked-up data (not a guess) — use it when genuinely relevant ("what time is it there," calling codes, what country/language this is), but don't volunteer it unprompted or force it into an answer about something else.${
+        referenceRatesLine
+          ? ` Real exchange rates are also included above (as "1 ${cityContext?.currencyCode ?? 'local currency'} ≈ ... CODE" pairs) — if asked to convert an amount, you may do the multiplication/division yourself using the given rate and state the result plainly, but only for a currency actually listed there (it covers most real-world currencies, so this is rarely a limit in practice); if a specific one genuinely isn't listed, say you don't have a real rate for it rather than estimating one. Always note the result is approximate (rates fluctuate) and never claim more precision than the given rate actually supports.`
+          : ` No exchange-rate numbers are included this turn — if a currency conversion is genuinely asked for, say you don't have the current rate handy rather than guessing one from general knowledge.`
+      }\n`
     : ''
 }
 NEARBY-PLACES RULE (found via testing: asked for a nearby restaurant, this chat invented a specific chain's name, then a "500 meters" distance it explicitly admitted not knowing, then fabricated turn-by-turn directions — all confidently, with zero real location or map data behind any of it): this chat has no coordinates, no nearby-search results, and no routing data at all — only the single place named above. Never name a specific other business as if it's a verified real place near here, never state a distance in meters/minutes, and never give directions ("turn right", "walk along X street") — all of that would be invented, not looked up. If asked something like this, say plainly that you don't have real nearby/map data in this chat, and point them to the map or a fresh search instead of guessing. This holds even if an earlier reply in this same conversation already named a specific place — an earlier mistake is not a fact to build on, treat it as unverified too rather than staying "consistent" with it.
@@ -4236,6 +4518,34 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
       }
 
       return reply.send(sunTimes);
+    }
+  );
+
+  // ── /translate — Translate arbitrary text (MyMemory, free, keyless) ──────────
+  // Generic, not review-specific -- the first caller is `PiriReviewsSection`
+  // (translating a foreign-language Piri/Google review into the reader's
+  // own app language), but nothing here is tied to reviews.
+  app.post<{ Body: { text?: string; targetLang?: string } }>(
+    '/translate',
+    { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const parsed = z
+        .object({
+          text: z.string().trim().min(1).max(2000),
+          targetLang: z.string().trim().min(2).max(5),
+        })
+        .safeParse(request.body);
+
+      if (!parsed.success) {
+        return reply.code(400).send({ error: 'Invalid request' });
+      }
+
+      const translation = await translateText(parsed.data.text, parsed.data.targetLang);
+      if (!translation) {
+        return reply.code(502).send({ error: 'Translation unavailable' });
+      }
+
+      return reply.send(translation);
     }
   );
 

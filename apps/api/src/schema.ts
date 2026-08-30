@@ -329,7 +329,17 @@ export const poiReviews = pgTable('poi_reviews', {
   userId: varchar('user_id', { length: 64 }).notNull(),
   rating: integer('rating').notNull(), // 1-5
   text: text('text'),
-  status: varchar('status', { length: 16 }).notNull().default('pending'), // 'pending' | 'approved' | 'rejected'
+  // Self-reported by the client at submission time from real local GPS
+  // history (`TripsStore.hasVisited` -- breadcrumb/stop proximity), not
+  // something this server can independently verify. Grounded in real
+  // location data the app already collected, not a bare checkbox --
+  // see the same trust level `Gamification.xp()`'s locally-derived
+  // inputs already rely on client-side.
+  verifiedVisit: boolean('verified_visit').notNull().default(false),
+  // 'flagged' -- crossed the report-based trust threshold but not the
+  // reject one; hidden from public view like 'rejected' but sits in
+  // /admin/reviews for a human verdict instead of being auto-rejected.
+  status: varchar('status', { length: 16 }).notNull().default('pending'), // 'pending' | 'approved' | 'flagged' | 'rejected'
   moderationReason: text('moderation_reason'),
   createdAt: varchar('created_at', { length: 64 }).notNull(),
 }, (table) => [
@@ -350,6 +360,23 @@ export const reviewReports = pgTable('review_reports', {
   createdAt: varchar('created_at', { length: 64 }).notNull(),
 }, (table) => [
   uniqueIndex('idx_review_reports_review_reporter').on(table.reviewId, table.reporterId),
+]);
+
+// "Helpful"/"not helpful" voting on Piri's own reviews -- a lightweight
+// community quality signal surfaced as counts on each review (see
+// /poi/reviews). One vote per (review, voter), changeable (upsert) --
+// same shape as reviewReports, but this is a quality signal, not an abuse
+// report, so it's a separate table rather than overloading that one with
+// a second meaning.
+export const reviewVotes = pgTable('review_votes', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  reviewId: varchar('review_id', { length: 64 }).notNull(),
+  voterId: varchar('voter_id', { length: 64 }).notNull(),
+  helpful: boolean('helpful').notNull(),
+  createdAt: varchar('created_at', { length: 64 }).notNull(),
+}, (table) => [
+  index('idx_review_votes_review').on(table.reviewId),
+  uniqueIndex('idx_review_votes_review_voter').on(table.reviewId, table.voterId),
 ]);
 
 export type PlaceRow = typeof places.$inferSelect;

@@ -103,11 +103,71 @@ function decimate<T>(points: T[], max: number): T[] {
   return result;
 }
 
+interface LatLng {
+  lat: number;
+  lng: number;
+}
+
+function distanceSq(a: LatLng, b: LatLng): number {
+  const dLat = a.lat - b.lat;
+  const dLng = a.lng - b.lng;
+  return dLat * dLat + dLng * dLng;
+}
+
+// A route relation's member ways come back in insertion order, not
+// geographic order, and each way's own point sequence can run either
+// direction along the trail -- confirmed live on Kristiansand's
+// "Turbostien": concatenating members as Overpass returns them drew a line
+// that jumped back and forth across the trail instead of tracing it,
+// exactly the "overlapping, nonsensical route" this fixes. Greedily
+// chains each remaining segment onto whichever end of the line-so-far it's
+// closest to (reversing it first if that end is the closer match), same
+// idea as stitching a jigsaw puzzle's edge pieces one at a time. O(n^2) in
+// the number of member *ways*, not points -- confirmed fine even for
+// Gudbrandsdalsleden's 1042 ways.
+function stitchSegments(segments: LatLng[][]): LatLng[] {
+  const remaining = segments.filter((segment) => segment.length > 0).map((segment) => segment.slice());
+  if (remaining.length === 0) return [];
+
+  const result = remaining.shift()!;
+  while (remaining.length > 0) {
+    const tail = result[result.length - 1];
+    let bestIndex = 0;
+    let bestReversed = false;
+    let bestDistSq = Infinity;
+
+    remaining.forEach((segment, index) => {
+      const distToStart = distanceSq(tail, segment[0]);
+      if (distToStart < bestDistSq) {
+        bestDistSq = distToStart;
+        bestIndex = index;
+        bestReversed = false;
+      }
+      const distToEnd = distanceSq(tail, segment[segment.length - 1]);
+      if (distToEnd < bestDistSq) {
+        bestDistSq = distToEnd;
+        bestIndex = index;
+        bestReversed = true;
+      }
+    });
+
+    const next = remaining.splice(bestIndex, 1)[0];
+    const oriented = bestReversed ? next.slice().reverse() : next;
+    // Adjacent ways in a route relation share their connecting node, so
+    // `oriented`'s first point is usually the exact same coordinate as
+    // `tail` -- drop it rather than doubling up every real junction.
+    const toAppend = distanceSq(tail, oriented[0]) === 0 ? oriented.slice(1) : oriented;
+    result.push(...toAppend);
+  }
+
+  return result;
+}
+
 /**
  * Full (decimated) geometry for one trail by its Overpass relation ID (from
- * `fetchNearbyTrails`). Points follow the relation's member-way order,
- * which is usually but not guaranteed to be geographically sequential --
- * good enough to render a recognizable line, not survey-grade routing.
+ * `fetchNearbyTrails`) -- member ways are stitched into one continuous
+ * line by endpoint proximity (see `stitchSegments`) rather than trusting
+ * the relation's own member order.
  */
 export async function fetchTrailGeometry(relationId: number): Promise<TrailGeometry | null> {
   const ql = `[out:json][timeout:25];relation(${relationId});out geom;`;
@@ -115,9 +175,10 @@ export async function fetchTrailGeometry(relationId: number): Promise<TrailGeome
   const relation = elements.find((e) => e.type === 'relation');
   if (!relation) return null;
 
-  const points = (relation.members ?? []).flatMap(
-    (m) => m.geometry?.map((g) => ({ lat: g.lat, lng: g.lon })) ?? []
-  );
+  const segments = (relation.members ?? [])
+    .filter((m) => m.type === 'way')
+    .map((m) => m.geometry?.map((g) => ({ lat: g.lat, lng: g.lon })) ?? []);
+  const points = stitchSegments(segments);
   if (points.length === 0) return null;
 
   return {
