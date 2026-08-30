@@ -72,17 +72,25 @@ export interface VerifiedTransaction {
   revoked: boolean;
 }
 
-/**
- * Decodes and (outside local Xcode/LocalTesting environments) cryptographically
- * verifies a StoreKit 2 transaction JWS. Throws on a config/verification
- * failure, an unparseable payload, or a `productId` that isn't one of this
- * app's 4 known products -- never trust the client's own claim of what it
- * bought.
- */
-export async function verifyTransaction(signedTransactionInfo: string): Promise<VerifiedTransaction> {
-  if (!verifier) throw new Error('StoreKit verification is not configured');
+/** The subset of Apple's decoded `JWSTransactionDecodedPayload` this app
+ * actually reads -- split out from `verifyTransaction` so the business
+ * logic below (product validation, tier mapping, revoked/expiry shape) is
+ * unit-testable without needing a real signed JWS or Apple's verifier. */
+export interface DecodedTransactionFields {
+  productId?: string | null;
+  originalTransactionId?: string | null;
+  expiresDate?: number | null;
+  environment?: string | null;
+  revocationDate?: number | null;
+}
 
-  const decoded = await verifier.verifyAndDecodeTransaction(signedTransactionInfo);
+/**
+ * Pure validation/mapping over an already-decoded transaction -- never
+ * trust the client's own claim of what it bought, so an unknown
+ * `productId` throws same as a missing required field, rather than
+ * defaulting to some tier.
+ */
+export function buildVerifiedTransaction(decoded: DecodedTransactionFields): VerifiedTransaction {
   const { productId, originalTransactionId, expiresDate, environment: txEnvironment, revocationDate } = decoded;
 
   if (!productId || !originalTransactionId) {
@@ -101,4 +109,18 @@ export async function verifyTransaction(signedTransactionInfo: string): Promise<
     environment: String(txEnvironment ?? environmentName),
     revoked: revocationDate != null,
   };
+}
+
+/**
+ * Decodes and (outside local Xcode/LocalTesting environments) cryptographically
+ * verifies a StoreKit 2 transaction JWS. Throws on a config/verification
+ * failure, an unparseable payload, or a `productId` that isn't one of this
+ * app's 4 known products -- never trust the client's own claim of what it
+ * bought.
+ */
+export async function verifyTransaction(signedTransactionInfo: string): Promise<VerifiedTransaction> {
+  if (!verifier) throw new Error('StoreKit verification is not configured');
+
+  const decoded = await verifier.verifyAndDecodeTransaction(signedTransactionInfo);
+  return buildVerifiedTransaction(decoded);
 }

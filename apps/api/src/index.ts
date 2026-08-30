@@ -62,6 +62,7 @@ import { previewGoogleHoursForPlace } from './google-places-hours';
 import { fetchPremiumPlaceDetails, type PremiumPlaceDetails } from './google-places-poi';
 import { checkAndIncrementUsage, refundUsage } from './entitlements';
 import { moderatePhotoSubmission, moderateTextSubmission } from './moderation';
+import { decideReviewModerationStatus, REVIEW_TRUST_BONUS_CAP } from './review-moderation';
 import { uploadDataUriToR2 } from './r2';
 import { PRIVACY_POLICY_HTML } from './privacy-policy';
 import { SUPPORT_PAGE_HTML } from './support-page';
@@ -2788,21 +2789,6 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
     return reply.code(204).send();
   });
 
-  // Trust-scaled two-tier moderation for review reports -- replaces a flat
-  // report count (still used for photos, REPORT_AUTO_REJECT_THRESHOLD
-  // above) with something that treats a brand-new account's first review
-  // and an established reviewer's tenth very differently. Two thresholds:
-  // crossing the lower one moves a review to `flagged` (hidden from public
-  // view, sitting in the admin queue -- see /admin/reviews below) rather
-  // than straight to `rejected`; only crossing the higher one auto-rejects
-  // outright. Deliberately scoped to reviews only for now, not photos.
-  const REVIEW_FLAG_BASE = 2;
-  const REVIEW_REJECT_BASE = 4;
-  // Caps how much a clean track record can buy -- otherwise a reviewer
-  // with hundreds of old approved reviews would become nearly
-  // unreportable, which defeats the point of having a threshold at all.
-  const REVIEW_TRUST_BONUS_CAP = 3;
-
   // "Clean" = approved and never reported. Two plain queries + a JS set
   // rather than a single correlated-subquery one, both to stay legible and
   // because this only runs on the (low-frequency) report path, not
@@ -2856,19 +2842,10 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
 
       const reports = await db.select().from(reviewReports).where(eq(reviewReports.reviewId, reviewId));
       const bonus = await reviewerTrustBonus(review.userId, reviewId);
-      const flagThreshold = REVIEW_FLAG_BASE + bonus;
-      const rejectThreshold = REVIEW_REJECT_BASE + bonus;
+      const decision = decideReviewModerationStatus(reports.length, bonus, review.status);
 
-      if (reports.length >= rejectThreshold && review.status !== 'rejected') {
-        await db
-          .update(poiReviews)
-          .set({ status: 'rejected', moderationReason: 'Auto-hidden after multiple reports' })
-          .where(eq(poiReviews.id, reviewId));
-      } else if (reports.length >= flagThreshold && review.status === 'approved') {
-        await db
-          .update(poiReviews)
-          .set({ status: 'flagged', moderationReason: 'Reported enough times to need a human look' })
-          .where(eq(poiReviews.id, reviewId));
+      if (decision) {
+        await db.update(poiReviews).set(decision).where(eq(poiReviews.id, reviewId));
       }
 
       return reply.code(201).send({ ok: true });
