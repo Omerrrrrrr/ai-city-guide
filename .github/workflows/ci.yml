@@ -54,10 +54,33 @@ jobs:
         run: brew install xcodegen
       - name: Generate Xcode project
         run: xcodegen generate
-      - name: Build
+      - name: Build and test
+        # `PiriTests` (PluralsTests, TripsStoreTests, CategoriesTests,
+        # PlaceHoursTests, PlaceFiltersTests) already exist and are already
+        # wired into the `Piri` scheme's Test action -- this workflow just
+        # never actually ran them, only compiled the app
+        # (`xcodebuild build` against the generic destination below, which
+        # can't run anything at all). `xcodebuild test` needs a concrete,
+        # booted-capable simulator (the generic destination is build-only),
+        # resolved here rather than hardcoded by name -- a name pinned today
+        # can vanish from a future runner image's simulator set entirely.
         run: |
-          xcodebuild build \
+          DESTINATION_NAME=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          for devices in data['devices'].values():
+              for device in devices:
+                  if 'iPhone' in device['name']:
+                      print(device['name'])
+                      sys.exit(0)
+          ")
+          if [ -z "$DESTINATION_NAME" ]; then
+            echo "No available iPhone simulator found on this runner" >&2
+            exit 1
+          fi
+          echo "Testing against: $DESTINATION_NAME"
+          xcodebuild test \
             -project Piri.xcodeproj \
             -scheme Piri \
-            -destination 'generic/platform=iOS Simulator' \
+            -destination "platform=iOS Simulator,name=$DESTINATION_NAME" \
             CODE_SIGNING_ALLOWED=NO
