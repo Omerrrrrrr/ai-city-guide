@@ -57,9 +57,29 @@ final class DietaryPinAnnotation: NSObject, MKAnnotation {
     }
 }
 
+/// A nearby named hiking trail from `/trails/nearby` — its own pin/cluster
+/// layer, distinct from `LivePinAnnotation`, since tapping one shows a
+/// lightweight trail card (name/operator/distance + "show route"), not the
+/// AI-explain flow every other pin type triggers.
+final class TrailAnnotation: NSObject, MKAnnotation {
+    let trail: Trail
+
+    var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: trail.centerLat, longitude: trail.centerLng)
+    }
+
+    var title: String? { trail.name }
+    var subtitle: String? { trail.operatorName }
+
+    init(trail: Trail) {
+        self.trail = trail
+    }
+}
+
 enum MapAnnotationReuseID {
     static let place = "PlaceAnnotation"
     static let livePin = "LivePinAnnotation"
     static let dietaryPin = "DietaryPinAnnotation"
+    static let trailPin = "TrailAnnotation"
     static let cluster = "ClusterAnnotation"
 }

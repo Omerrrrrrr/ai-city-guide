@@ -1,3 +1,4 @@
+import Foundation
 import Observation
 
 /// Lets any screen jump to another tab (e.g. the weather banner and AI
@@ -18,4 +19,17 @@ final class TabSelection {
     /// planned and a real route already fetched. Same cross-tab hand-off
     /// pattern as `pendingAIQuery` — `MapScreen` consumes and clears this.
     var pendingRouteStops: [SavedPOIReference]?
+    /// Set alongside `selection = 2` when a screen wants Map to jump to and
+    /// center on a single coordinate — the "Piri Haritası" maps-provider
+    /// option's hand-off (see `MapsProvider`/`PlaceDirections`), distinct
+    /// from `pendingRouteStops`' multi-stop route hand-off. `trigger` is a
+    /// fresh `UUID` every time so re-focusing the same coordinate twice in
+    /// a row (e.g. two taps on the same POI from Home) still re-fires —
+    /// same reasoning as `PiriMapView`'s own `recenterTrigger`.
+    struct MapFocusRequest: Equatable {
+        var lat: Double
+        var lng: Double
+        var trigger = UUID()
+    }
+    var pendingMapFocus: MapFocusRequest?
 }

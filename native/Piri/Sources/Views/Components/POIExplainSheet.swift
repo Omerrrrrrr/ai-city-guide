@@ -13,6 +13,8 @@ struct POIExplainSheet: View {
     @Environment(UserProfileStore.self) private var userProfileStore
     @Environment(SavedPlacesStore.self) private var savedPlacesStore
     @Environment(AuthStore.self) private var authStore
+    @Environment(CityStore.self) private var cityStore
+    @Environment(TabSelection.self) private var tabSelection
     @Environment(\.dismiss) private var dismiss
 
     @State private var result: ExplainResult?
@@ -89,8 +91,13 @@ struct POIExplainSheet: View {
                                 }
                             } else if let result {
                                 Text(result.headline).font(.subheadline.bold()).foregroundStyle(Theme.gold)
-                                if let weather = weatherQuery.weather {
-                                    weatherBadge(weather)
+                                HStack(spacing: 12) {
+                                    if let weather = weatherQuery.weather {
+                                        weatherBadge(weather)
+                                    }
+                                    if let goldenHour = result.goldenHour, let window = goldenHourWindow(goldenHour) {
+                                        goldenHourBadge(window)
+                                    }
                                 }
                                 // The real photo (Wikipedia/Tripadvisor, never
                                 // AI-generated) is the most visually engaging
@@ -165,7 +172,9 @@ struct POIExplainSheet: View {
 
                             HStack(spacing: 10) {
                                 Button("common.openInMaps") {
-                                    poi.mapItem.openInMaps()
+                                    let opensInApp = PlaceDirections.opensInApp
+                                    PlaceDirections.openInMaps(name: poi.name, coordinate: poi.coordinate, tabSelection: tabSelection)
+                                    if opensInApp { dismiss() }
                                 }
                                 .buttonStyle(.bordered)
 
@@ -254,6 +263,32 @@ struct POIExplainSheet: View {
         }
         .font(.caption)
         .foregroundStyle(.secondary)
+    }
+
+    /// Whichever golden-hour window (this morning's, already past, or this
+    /// evening's, still ahead) hasn't happened yet today -- `nil` once both
+    /// have passed, since showing a window that already closed isn't useful.
+    private func goldenHourWindow(_ golden: GoldenHour) -> (start: Date, end: Date)? {
+        let formatter = ISO8601DateFormatter()
+        guard let sunrise = formatter.date(from: golden.sunrise),
+              let sunset = formatter.date(from: golden.sunset),
+              let morningEnd = formatter.date(from: golden.morningEndsAt),
+              let eveningStart = formatter.date(from: golden.eveningStartsAt) else { return nil }
+        let now = Date()
+        if now < morningEnd { return (sunrise, morningEnd) }
+        if now < sunset { return (eveningStart, sunset) }
+        return nil
+    }
+
+    private func goldenHourBadge(_ window: (start: Date, end: Date)) -> some View {
+        let timeFormatter = DateFormatter()
+        timeFormatter.timeStyle = .short
+        return HStack(spacing: 4) {
+            Image(systemName: "sun.horizon.fill")
+            Text(L("poiExplain.goldenHour", timeFormatter.string(from: window.start), timeFormatter.string(from: window.end)))
+        }
+        .font(.caption)
+        .foregroundStyle(Theme.gold)
     }
 
     private func loadLookAroundScene() async {
@@ -352,6 +387,11 @@ struct POIExplainSheet: View {
             website: poi.mapItem.url?.absoluteString,
             locale: Locale.current.language.languageCode?.identifier,
             userProfile: personalizationProfile(),
+            cityContext: CityContextSummary(
+                countryInfo: cityStore.countryInfo,
+                timezone: cityStore.timezones.first,
+                exchangeRates: cityStore.exchangeRates
+            ),
             history: historyForRequest,
             message: message
         )

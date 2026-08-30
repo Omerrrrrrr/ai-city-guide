@@ -36,6 +36,7 @@ struct ProfileScreen: View {
     @Environment(CityStore.self) private var cityStore
     @Environment(LanguageStore.self) private var languageStore
     @Environment(AppearanceStore.self) private var appearanceStore
+    @Environment(MapsProviderStore.self) private var mapsProviderStore
     @Environment(SavedPlacesStore.self) private var savedPlacesStore
     @Environment(RecentlyViewedStore.self) private var recentlyViewedStore
     @Environment(TripsStore.self) private var tripsStore
@@ -45,6 +46,7 @@ struct ProfileScreen: View {
     @Environment(PurchaseStore.self) private var purchaseStore
 
     @State private var isEditingName = false
+    @State private var isEditingProfileDetails = false
     @State private var nameInput = ""
     @State private var showingCityPicker = false
     @State private var showingSaved: SavedTab?
@@ -65,17 +67,16 @@ struct ProfileScreen: View {
             VStack(alignment: .leading, spacing: 14) {
                 header
                 profileSummaryCard
-                xpLevelCard
-                profileTabsSegment
-                profileTabContent
-                accountCard
                 if authStore.isSignedIn {
-                    premiumCard
                     friendsCard
                 }
                 cityCard
                 savedDataCard
                 tripsCard
+                if authStore.isSignedIn {
+                    premiumCard
+                }
+                accountCard
 
                 Text(L("settings.version", (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.0.0"))
                     .font(.system(size: 13))
@@ -176,7 +177,7 @@ struct ProfileScreen: View {
     }
 
     private var header: some View {
-        HStack(spacing: 14) {
+        HStack(alignment: .top, spacing: 14) {
             ZStack {
                 Circle().fill(.white.opacity(0.15))
                 Text(displayName.prefix(1).uppercased()).font(.system(size: 24, weight: .bold)).foregroundStyle(Theme.gold)
@@ -215,6 +216,9 @@ struct ProfileScreen: View {
                     Text(subline).font(.system(size: 14)).foregroundStyle(.white.opacity(0.6))
                 }
             }
+
+            Spacer(minLength: 8)
+            levelIndicator
         }
         .padding(.horizontal, 20)
         .padding(.top, 12)
@@ -234,16 +238,23 @@ struct ProfileScreen: View {
     /// sensitive field driving something they themselves triggered (the
     /// halal filter, already built that way) but not with it appearing as
     /// a passive, always-visible label about them.
-    @ViewBuilder
     private var profileSummaryCard: some View {
         let parts = ProfileOptions.summaryParts(for: profile)
-        if !parts.isEmpty {
-            card(titleKey: "settings.profileSummary.title", trailing: {
-                Button(String(localized: "settings.profileSummary.edit")) { profileTab = .profession }
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Theme.gold)
-            }) {
-                Text(parts.joined(separator: " · ")).font(.system(size: 15))
+        return card(titleKey: "settings.profileSummary.title", trailing: {
+            Button(String(localized: isEditingProfileDetails ? "common.done" : "settings.profileSummary.edit")) {
+                withAnimation { isEditingProfileDetails.toggle() }
+            }
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(Theme.gold)
+        }) {
+            VStack(alignment: .leading, spacing: 14) {
+                if !parts.isEmpty {
+                    Text(parts.joined(separator: " · ")).font(.system(size: 15))
+                }
+                if isEditingProfileDetails {
+                    profileTabsSegment
+                    profileTabContent
+                }
             }
         }
     }
@@ -252,7 +263,9 @@ struct ProfileScreen: View {
     /// completeness, saved places, completed trips, recently-viewed count)
     /// rather than a separately persisted counter -- see `Gamification`.
     /// Personal-only: no leaderboard, no public profile, nothing shared.
-    private var xpLevelCard: some View {
+    /// Lives in the header, to the right of the name, rather than its own
+    /// scrolled-past card.
+    private var levelIndicator: some View {
         let completedTrips = tripsStore.trips.filter { $0.endedAt != nil }.count
         let savedPlaceCount = savedPlacesStore.collections.reduce(0) { $0 + $1.places.count }
         let xp = Gamification.xp(
@@ -263,18 +276,19 @@ struct ProfileScreen: View {
         )
         let level = Gamification.level(forXP: xp)
 
-        return card(titleKey: "settings.xp.title") {
-            HStack(spacing: 14) {
-                LevelBadge(level: level)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(L("settings.xp.level", level)).font(.system(size: 15, weight: .semibold))
-                    ProgressView(value: Gamification.progressIntoCurrentLevel(xp))
-                        .tint(Theme.gold)
-                    Text(L("settings.xp.remaining", Gamification.xpRemainingToNextLevel(xp)))
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+        return VStack(alignment: .trailing, spacing: 4) {
+            HStack(spacing: 6) {
+                Text(String(localized: "settings.xp.title"))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.85))
+                ZStack {
+                    Circle().fill(Theme.gold.opacity(0.18)).frame(width: 28, height: 28)
+                    Text("\(level)").font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.gold)
                 }
             }
+            ProgressView(value: Gamification.progressIntoCurrentLevel(xp))
+                .tint(Theme.gold)
+                .frame(width: 90)
         }
     }
 
@@ -310,6 +324,7 @@ struct ProfileScreen: View {
         case .language:
             languageCard
             appearanceCard
+            mapsProviderCard
         case .profession: professionCard
         case .interests: interestsTabContent
         case .plan: planTabContent
@@ -514,6 +529,36 @@ struct ProfileScreen: View {
         }
     }
 
+    /// Which app "Open in Maps" hands off to, app-wide (`PlaceDirections`
+    /// reads this same preference) — not just Apple Maps, since not every
+    /// traveler has or prefers it.
+    private var mapsProviderCard: some View {
+        card(titleKey: "settings.mapsProvider.label") {
+            HStack(spacing: 8) {
+                ForEach(MapsProvider.allCases) { option in
+                    let active = mapsProviderStore.provider == option
+                    Button {
+                        guard !active else { return }
+                        Haptics.light()
+                        mapsProviderStore.setProvider(option)
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: option.icon)
+                            Text(String(localized: String.LocalizationValue(option.labelKey)))
+                        }
+                        .font(.system(size: 14, weight: .medium))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(Capsule().fill(active ? Theme.navy : Color(.secondarySystemBackground)))
+                        .foregroundStyle(active ? .white : .primary)
+                        .overlay(Capsule().stroke(active ? Theme.navy : Color(.separator), lineWidth: 1.5))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
     private var cityCard: some View {
         card(titleKey: "settings.currentCity") {
             Button {
@@ -537,7 +582,31 @@ struct ProfileScreen: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+
+            if let subtitle = cityContextSubtitle {
+                Text(subtitle)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 2)
+            }
         }
+    }
+
+    /// Reads `CityStore`'s per-city cache (country/timezone/currency,
+    /// fetched once per city change -- see `CityStore.refreshContext`)
+    /// rather than making its own network call, exactly the pattern that
+    /// cache exists to enable for any screen that wants one of these
+    /// signals without repeating the fetch.
+    private var cityContextSubtitle: String? {
+        guard let info = cityStore.countryInfo else { return nil }
+        var parts = ["\(info.flagEmoji) \(info.name)"]
+        if let timezone = cityStore.timezones.first {
+            parts.append(timezone)
+        }
+        if let rates = cityStore.exchangeRates, rates.base != "USD", let usdRate = rates.rates["USD"] {
+            parts.append("1 \(rates.base) ≈ \(String(format: "%.3f", usdRate)) USD")
+        }
+        return parts.joined(separator: " · ")
     }
 
     private var accountCard: some View {

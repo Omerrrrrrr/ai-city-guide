@@ -131,19 +131,34 @@ private struct WeatherForecastPageView: View {
     }
 
     private func currentRow(_ current: Weather) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: current.condition.icon)
-                .font(.system(size: 32))
-                .foregroundStyle(Theme.gold)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(cityName).font(.headline)
-                Text(current.description.capitalized).font(.subheadline).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                Image(systemName: current.condition.icon)
+                    .font(.system(size: 32))
+                    .foregroundStyle(Theme.gold)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(cityName).font(.headline)
+                    Text(current.description.capitalized).font(.subheadline).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Text("\(Int(current.temp))°").font(.system(size: 34, weight: .bold))
             }
-            Spacer()
-            Text("\(Int(current.temp))°").font(.system(size: 34, weight: .bold))
+            if let airQuality = current.airQuality {
+                airQualityRow(airQuality)
+            }
         }
         .padding(16)
         .piriGlassCard(cornerRadius: 16)
+    }
+
+    private func airQualityRow(_ airQuality: AirQuality) -> some View {
+        HStack(spacing: 6) {
+            Circle().fill(airQuality.level.color).frame(width: 8, height: 8)
+            Text(String(localized: String.LocalizationValue(airQuality.level.labelKey)))
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.top, 2)
     }
 
     private func dailyRow(_ day: DailyForecast) -> some View {

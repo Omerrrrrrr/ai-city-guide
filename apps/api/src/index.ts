@@ -91,7 +91,7 @@ import {
 } from './user-context';
 import { haversineKm } from './geo';
 import { fetchTripAdvisorInfo, fetchTripAdvisorPhotos, fetchTripAdvisorReviews, normalizeName, type TripAdvisorInfo } from './tripadvisor';
-import { fetchWikipediaPhoto, WIKIPEDIA_PLAUSIBLE_CATEGORIES } from './wiki-photo';
+import { fetchWikipediaPhoto, WIKIPEDIA_PLAUSIBLE_CATEGORIES, GOLDEN_HOUR_CATEGORIES } from './wiki-photo';
 import { fetchWikidataFacts } from './wikidata';
 import { fetchDietaryPlaces, fetchDietaryTagsForPlace } from './dietary';
 import { fetchUnsplashPhoto } from './unsplash';
@@ -1678,10 +1678,12 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
 
       // Golden-hour badge, not grounding — sun times don't feed the AI
       // prompt below, just a client-facing "best light for photos" field.
-      // Gated on the same WIKIPEDIA_PLAUSIBLE_CATEGORIES list already used
-      // to decide whether a place is a sight worth this kind of treatment
-      // (see wiki-photo.ts) — a supermarket or ATM doesn't need one.
-      const isPhotogenicCategory = !!category && WIKIPEDIA_PLAUSIBLE_CATEGORIES.has(category.toLowerCase());
+      // Gated on `GOLDEN_HOUR_CATEGORIES`, not the broader
+      // `WIKIPEDIA_PLAUSIBLE_CATEGORIES` set — a museum or theater is a
+      // plausible Wikipedia subject but not somewhere outdoor light at
+      // golden hour actually matters (see wiki-photo.ts's comment on the
+      // split); a supermarket or ATM doesn't need either.
+      const isPhotogenicCategory = !!category && GOLDEN_HOUR_CATEGORIES.has(category.toLowerCase());
       const goldenHourPromise =
         isPhotogenicCategory && lat !== undefined && lng !== undefined
           ? fetchSunTimes(lat, lng, new Date())
@@ -2751,6 +2753,22 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
           website: optionalUrlInput,
           locale: z.string().trim().min(2).max(8).optional(),
           userProfile: userProfileSchema.optional(),
+          // Client-supplied, not re-fetched here -- same pattern
+          // `/places/recommend`'s own `weather` field already uses. The
+          // client's `CityStore` fetches and caches these once per city
+          // change (see `CityStore.refreshContext`); re-resolving country/
+          // timezone/currency from lat/lng on every single chat message
+          // would just repeat that same work server-side for no benefit.
+          cityContext: z
+            .object({
+              countryName: z.string().trim().max(200),
+              callingCode: z.string().trim().max(10).optional(),
+              currencyCode: z.string().trim().max(10).optional(),
+              currencyName: z.string().trim().max(200).optional(),
+              timezone: z.string().trim().max(100).optional(),
+              usdPerLocalCurrency: z.number().optional(),
+            })
+            .optional(),
           // Capped generously just against abuse, not against a normal long
           // chat -- a real conversation (confirmed live) can run well past
           // 20 turns, and hard-rejecting the whole request past that point
@@ -2774,7 +2792,7 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
         return reply.code(400).send({ error: 'Invalid request' });
       }
 
-      const { name, category, address, website, locale, userProfile, message } = parsed.data;
+      const { name, category, address, website, locale, userProfile, cityContext, message } = parsed.data;
       const history = parsed.data.history.slice(-12);
       const aiProvider = getAiProviderConfig();
       if (!aiProvider) {
@@ -2789,10 +2807,22 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
       const websiteExcerpt = website ? await fetchWebsiteExcerpt(website, 2500) : null;
 
       const { text: profileContext } = buildUserContext(userProfile);
+      const cityContextLine = cityContext
+        ? `Country/local context for the city this place is in (real, looked-up data): ${cityContext.countryName}${
+            cityContext.callingCode ? `, international calling code ${cityContext.callingCode}` : ''
+          }${
+            cityContext.currencyCode
+              ? `, local currency ${cityContext.currencyCode}${cityContext.currencyName ? ` (${cityContext.currencyName})` : ''}`
+              : ''
+          }${cityContext.timezone ? `, timezone ${cityContext.timezone}` : ''}${
+            cityContext.usdPerLocalCurrency ? `, ≈ ${cityContext.usdPerLocalCurrency} USD per 1 ${cityContext.currencyCode}` : ''
+          }.`
+        : null;
       const placeContext = [
         `Name: ${name}`,
         category ? `Category: ${category}` : null,
         address ? `Address: ${address}` : null,
+        cityContextLine,
         websiteExcerpt ? `Text scraped from the business's own official website: "${websiteExcerpt}"` : null,
       ]
         .filter(Boolean)
@@ -2809,6 +2839,11 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
 ${
   websiteExcerpt
     ? `\nWEBSITE RULE: the text above scraped from this place's own official website is real, but it's just an excerpt (the site's homepage, or close to it) — it will often NOT contain what a specific question asks about (exact ticket prices, a particular tour time, current hours). If the answer genuinely isn't in that excerpt, say so plainly and suggest checking the official website directly rather than guessing a plausible-sounding number. Only answer from it when the actual fact is really there.\n`
+    : ''
+}
+${
+  cityContextLine
+    ? `\nCITY CONTEXT RULE: the country/currency/timezone line above is real, looked-up data (not a guess) — use it when genuinely relevant (currency questions, "what time is it there," calling codes, what country/language this is), but don't volunteer it unprompted or force it into an answer about something else.\n`
     : ''
 }
 NEARBY-PLACES RULE (found via testing: asked for a nearby restaurant, this chat invented a specific chain's name, then a "500 meters" distance it explicitly admitted not knowing, then fabricated turn-by-turn directions — all confidently, with zero real location or map data behind any of it): this chat has no coordinates, no nearby-search results, and no routing data at all — only the single place named above. Never name a specific other business as if it's a verified real place near here, never state a distance in meters/minutes, and never give directions ("turn right", "walk along X street") — all of that would be invented, not looked up. If asked something like this, say plainly that you don't have real nearby/map data in this chat, and point them to the map or a fresh search instead of guessing. This holds even if an earlier reply in this same conversation already named a specific place — an earlier mistake is not a fact to build on, treat it as unverified too rather than staying "consistent" with it.
@@ -4084,13 +4119,28 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
   );
 
   // ── /country-info — Offline country metadata (world-countries) ───────────────
-  app.get<{ Querystring: { code?: string } }>(
+  // Accepts either an explicit `code`, or `lat`/`lng` to resolve one via the
+  // same Nominatim reverse-geocode `resolveCountryCode` already uses for
+  // holidays -- the client only ever knows a city's coordinates (`CityStore`
+  // has no country field), not its ISO code, so making it look one up
+  // itself would just be the same Nominatim call duplicated client-side.
+  app.get<{ Querystring: { code?: string; lat?: string; lng?: string } }>(
     '/country-info',
     { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } },
     async (request, reply) => {
-      const code = (request.query.code ?? '').trim();
+      let code = (request.query.code ?? '').trim();
+
+      if (!code && request.query.lat && request.query.lng) {
+        const lat = parseFloat(request.query.lat);
+        const lng = parseFloat(request.query.lng);
+        if (isNaN(lat) || isNaN(lng)) {
+          return reply.code(400).send({ error: 'lat and lng must be valid numbers' });
+        }
+        code = (await resolveCountryCode(lat, lng)) ?? '';
+      }
+
       if (!/^[A-Za-z]{2,3}$/.test(code)) {
-        return reply.code(400).send({ error: 'code must be a 2- or 3-letter ISO 3166-1 country code' });
+        return reply.code(400).send({ error: 'code (or lat+lng to resolve one) must be given, as a 2- or 3-letter ISO 3166-1 country code' });
       }
 
       const info = getCountryInfo(code);

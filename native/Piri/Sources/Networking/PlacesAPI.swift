@@ -86,6 +86,45 @@ enum DietaryPlacesAPI {
     }
 }
 
+enum TrailsAPI {
+    static func nearby(lat: Double, lng: Double, radiusMeters: Int = 10000) async throws -> [Trail] {
+        let response: NearbyTrailsResponse = try await APIClient.shared.get("/trails/nearby", query: [
+            "lat": String(lat),
+            "lng": String(lng),
+            "radiusMeters": String(radiusMeters),
+        ])
+        return response.trails
+    }
+
+    static func geometry(id: Int) async throws -> TrailGeometry {
+        try await APIClient.shared.get("/trails/geometry", query: ["id": String(id)])
+    }
+}
+
+/// Backs `CityStore`'s per-city context cache -- all three are constant for
+/// every POI within the same city, so they're fetched once per city change
+/// there rather than per-POI-tap like `/places/explain-poi`'s own signals.
+enum CityContextAPI {
+    static func countryInfo(lat: Double, lng: Double) async throws -> CountryInfo {
+        try await APIClient.shared.get("/country-info", query: ["lat": String(lat), "lng": String(lng)])
+    }
+
+    static func timezone(lat: Double, lng: Double) async throws -> [String] {
+        let response: TimezoneResponse = try await APIClient.shared.get("/timezone", query: [
+            "lat": String(lat), "lng": String(lng),
+        ])
+        return response.timezones
+    }
+
+    static func currencyRates(base: String) async throws -> ExchangeRates {
+        try await APIClient.shared.get("/currency/rates", query: ["base": base])
+    }
+}
+
+private struct TimezoneResponse: Decodable {
+    var timezones: [String]
+}
+
 enum RoutesAPI {
     static func directions(coordinates: [PlaceCoordinate], profile: RouteProfile = .footWalking) async throws -> DirectionsResult {
         try await APIClient.shared.post("/routes/directions", body: DirectionsRequest(coordinates: coordinates, profile: profile))

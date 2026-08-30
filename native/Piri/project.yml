@@ -50,30 +50,39 @@ targets:
         NSCameraUsageDescription: "Piri uses your camera to identify places and give you personalized explanations."
         NSPhotoLibraryAddUsageDescription: "Piri can save trip photos to your library."
         CFBundleShortVersionString: "1.0.0"
-        CFBundleVersion: "4"
-        # `APIConfig.baseURL` reads this if present. Debug defaults to
-        # `127.0.0.1:4000`, which only reaches the dev server from the
-        # Simulator (shares the Mac's own network namespace) -- a real
-        # device needs the Mac's actual LAN IP instead, since to the
-        # phone "127.0.0.1" just means itself. Only meaningful for a
-        # Debug real-device build on this same Wi-Fi network; Release
-        # ignores this key entirely (hardcoded to api.getpiri.com).
+        CFBundleVersion: "5"
+        # `APIConfig.baseURL` reads this if present, but only on a real
+        # device -- the Simulator (shares the Mac's own network namespace)
+        # ignores this key entirely and always uses `127.0.0.1:4000`
+        # (see `APIConfig.swift`), since a real device needs the Mac's
+        # actual LAN IP instead: to the phone, "127.0.0.1" just means
+        # itself. Only meaningful for a Debug real-device build on this
+        # same Wi-Fi network; Release ignores this key entirely
+        # (hardcoded to api.getpiri.com).
         PiriAPIBaseURL: $(PIRI_API_BASE_URL)
         # Scoped ATS exception for exactly that one private LAN IP --
         # iOS blocks plain HTTP by default on a real device (Simulator's
         # 127.0.0.1 is exempt automatically, a LAN IP isn't). Deliberately
-        # not a blanket NSAllowsArbitraryLoads: this only exempts
-        # 10.0.0.7 specifically, inert for Release (which never points at
-        # it) and not the kind of global HTTP allowance App Review flags.
+        # not a blanket NSAllowsArbitraryLoads: this only exempts the one
+        # LAN IP above, inert for Release (which never points at it) and
+        # not the kind of global HTTP allowance App Review flags.
         NSAppTransportSecurity:
           NSExceptionDomains:
-            10.40.29.2:
+            10.40.29.11:
               NSExceptionAllowsInsecureHTTPLoads: true
         # Standard HTTPS/TLS only, no proprietary/non-exempt encryption --
         # declaring this here answers Apple's export-compliance question
         # automatically at each submission instead of it being asked in
         # App Store Connect every time.
         ITSAppUsesNonExemptEncryption: false
+        # `PlaceDirections.canOpenURL` needs each external maps app's
+        # scheme declared here or it always reports `false` (even when the
+        # app is installed) — without this, picking Google or Yandex as
+        # the preferred maps app in Settings would silently always fall
+        # back to the web URL, never actually opening the installed app.
+        LSApplicationQueriesSchemes:
+          - comgooglemaps
+          - yandexmaps
     entitlements:
       path: Piri.entitlements
       properties:
@@ -101,7 +110,7 @@ targets:
           # (different network, DHCP renewal) or a real-device Debug
           # build will fail to reach the local dev server with the exact
           # "Kunne ikke koble til tjeneren" symptom this was added to fix.
-          PIRI_API_BASE_URL: http://10.40.29.2:4000
+          PIRI_API_BASE_URL: http://10.40.29.11:4000
         Release:
           PIRI_APS_ENVIRONMENT: production
     postCompileScripts:

@@ -14,12 +14,23 @@ struct PiriMapView: UIViewRepresentable {
     /// Halal/kosher/vegetarian/vegan matches for the currently-selected
     /// `DietTag`, if any — empty when no dietary filter is active.
     var dietaryPins: [DietaryPin] = []
+    /// Nearby named hiking trails from `/trails/nearby` — a separate,
+    /// opt-in layer (see `MapScreen`'s trail toggle), not tied to
+    /// `pointOfInterestCategories` since Apple's own POI data has no
+    /// concept of a trail.
+    var trailPins: [Trail] = []
+    /// The currently-selected trail's walkable line, from
+    /// `/trails/geometry` — separate from `routeCoordinates` (the user's
+    /// own navigation route) so the two never visually collide; rendered
+    /// in a distinct color (see `Coordinator.mapView(_:rendererFor:)`).
+    var trailCoordinates: [CLLocationCoordinate2D] = []
     var routeCoordinates: [CLLocationCoordinate2D]
     var showsUserLocation: Bool
     var onRegionChange: (MKCoordinateRegion) -> Void
     var onSelectPlace: (Place) -> Void
     var onSelectLivePin: (LivePin) -> Void
     var onSelectDietaryPin: (DietaryPin) -> Void = { _ in }
+    var onSelectTrailPin: (Trail) -> Void = { _ in }
     /// Apple's own base-map points of interest (restaurants, shops,
     /// landmarks baked into the map tiles themselves) — not our data at
     /// all, but the user still expects every pin on the map to respond to a
@@ -58,6 +69,7 @@ struct PiriMapView: UIViewRepresentable {
         mapView.register(MKMarkerAnnotationView.self, forAnnotationViewWithReuseIdentifier: MapAnnotationReuseID.place)
         mapView.register(MKMarkerAnnotationView.self, forAnnotationViewWithReuseIdentifier: MapAnnotationReuseID.livePin)
         mapView.register(MKMarkerAnnotationView.self, forAnnotationViewWithReuseIdentifier: MapAnnotationReuseID.dietaryPin)
+        mapView.register(MKMarkerAnnotationView.self, forAnnotationViewWithReuseIdentifier: MapAnnotationReuseID.trailPin)
         mapView.register(MKMarkerAnnotationView.self, forAnnotationViewWithReuseIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier)
         if let centerOnce {
             mapView.setRegion(centerOnce, animated: false)
@@ -72,6 +84,7 @@ struct PiriMapView: UIViewRepresentable {
         }
         reconcileAnnotations(on: mapView)
         reconcileRoute(on: mapView, coordinator: context.coordinator)
+        reconcileTrailRoute(on: mapView, coordinator: context.coordinator)
         reconcileSelection(on: mapView, coordinator: context.coordinator)
 
         // Re-assigning `pointOfInterestFilter` forces MapKit to reload the
@@ -109,6 +122,7 @@ struct PiriMapView: UIViewRepresentable {
         let existingPlace = mapView.annotations.compactMap { $0 as? PlaceAnnotation }
         let existingLivePin = mapView.annotations.compactMap { $0 as? LivePinAnnotation }
         let existingDietaryPin = mapView.annotations.compactMap { $0 as? DietaryPinAnnotation }
+        let existingTrailPin = mapView.annotations.compactMap { $0 as? TrailAnnotation }
 
         let currentPlaceIds = Set(existingPlace.map(\.place.id))
         let targetPlaceIds = Set(places.map(\.id))
@@ -116,15 +130,20 @@ struct PiriMapView: UIViewRepresentable {
         let targetLiveIds = Set(livePins.map(\.id))
         let currentDietaryIds = Set(existingDietaryPin.map(\.dietaryPin.id))
         let targetDietaryIds = Set(dietaryPins.map(\.id))
+        let currentTrailIds = Set(existingTrailPin.map(\.trail.id))
+        let targetTrailIds = Set(trailPins.map(\.id))
 
-        guard currentPlaceIds != targetPlaceIds || currentLiveIds != targetLiveIds || currentDietaryIds != targetDietaryIds else { return }
+        guard currentPlaceIds != targetPlaceIds || currentLiveIds != targetLiveIds || currentDietaryIds != targetDietaryIds
+            || currentTrailIds != targetTrailIds else { return }
 
         let toRemovePlace = existingPlace.filter { !targetPlaceIds.contains($0.place.id) }
         let toRemoveLive = existingLivePin.filter { !targetLiveIds.contains($0.livePin.id) }
         let toRemoveDietary = existingDietaryPin.filter { !targetDietaryIds.contains($0.dietaryPin.id) }
+        let toRemoveTrail = existingTrailPin.filter { !targetTrailIds.contains($0.trail.id) }
         mapView.removeAnnotations(toRemovePlace)
         mapView.removeAnnotations(toRemoveLive)
         mapView.removeAnnotations(toRemoveDietary)
+        mapView.removeAnnotations(toRemoveTrail)
 
         let toAddPlace = places
             .filter { $0.location != nil && !currentPlaceIds.contains($0.id) }
@@ -135,9 +154,13 @@ struct PiriMapView: UIViewRepresentable {
         let toAddDietary = dietaryPins
             .filter { !currentDietaryIds.contains($0.id) }
             .map(DietaryPinAnnotation.init)
+        let toAddTrail = trailPins
+            .filter { !currentTrailIds.contains($0.id) }
+            .map(TrailAnnotation.init)
         mapView.addAnnotations(toAddPlace)
         mapView.addAnnotations(toAddLive)
         mapView.addAnnotations(toAddDietary)
+        mapView.addAnnotations(toAddTrail)
     }
 
     /// Tints already-placed place pins gold/blue in place, without touching
@@ -158,9 +181,22 @@ struct PiriMapView: UIViewRepresentable {
         guard coordinator.lastRouteCoordinates.map(\.latitude) != routeCoordinates.map(\.latitude)
             || coordinator.lastRouteCoordinates.map(\.longitude) != routeCoordinates.map(\.longitude) else { return }
         coordinator.lastRouteCoordinates = routeCoordinates
-        mapView.removeOverlays(mapView.overlays)
+        // Only this layer's own overlays -- `reconcileTrailRoute` manages
+        // `TrailPolyline` independently, so the two can coexist (e.g. a
+        // trail shown while route-mode preview is also active) without
+        // one wiping the other out.
+        mapView.removeOverlays(mapView.overlays.filter { $0 is RoutePolyline })
         guard routeCoordinates.count > 1 else { return }
-        mapView.addOverlay(MKPolyline(coordinates: routeCoordinates, count: routeCoordinates.count))
+        mapView.addOverlay(RoutePolyline(coordinates: routeCoordinates, count: routeCoordinates.count))
+    }
+
+    private func reconcileTrailRoute(on mapView: MKMapView, coordinator: Coordinator) {
+        guard coordinator.lastTrailCoordinates.map(\.latitude) != trailCoordinates.map(\.latitude)
+            || coordinator.lastTrailCoordinates.map(\.longitude) != trailCoordinates.map(\.longitude) else { return }
+        coordinator.lastTrailCoordinates = trailCoordinates
+        mapView.removeOverlays(mapView.overlays.filter { $0 is TrailPolyline })
+        guard trailCoordinates.count > 1 else { return }
+        mapView.addOverlay(TrailPolyline(coordinates: trailCoordinates, count: trailCoordinates.count))
     }
 
     final class Coordinator: NSObject, MKMapViewDelegate {
@@ -170,6 +206,7 @@ struct PiriMapView: UIViewRepresentable {
         var lastPOICategories: Set<MKPointOfInterestCategory>?
         var didApplyPOIFilter = false
         var lastRouteCoordinates: [CLLocationCoordinate2D] = []
+        var lastTrailCoordinates: [CLLocationCoordinate2D] = []
         var lastSelectedPlaceIds: Set<String> = []
 
         init(parent: PiriMapView) {
@@ -207,6 +244,15 @@ struct PiriMapView: UIViewRepresentable {
                 return view
             }
 
+            if let trailAnnotation = annotation as? TrailAnnotation {
+                let view = mapView.dequeueReusableAnnotationView(withIdentifier: MapAnnotationReuseID.trailPin, for: trailAnnotation) as? MKMarkerAnnotationView
+                view?.clusteringIdentifier = MapAnnotationReuseID.trailPin
+                view?.markerTintColor = .systemBrown
+                view?.glyphImage = UIImage(systemName: "figure.hiking")
+                view?.canShowCallout = true
+                return view
+            }
+
             return nil
         }
 
@@ -217,6 +263,8 @@ struct PiriMapView: UIViewRepresentable {
                 parent.onSelectLivePin(liveAnnotation.livePin)
             } else if let dietaryAnnotation = annotation as? DietaryPinAnnotation {
                 parent.onSelectDietaryPin(dietaryAnnotation.dietaryPin)
+            } else if let trailAnnotation = annotation as? TrailAnnotation {
+                parent.onSelectTrailPin(trailAnnotation.trail)
             } else if let cluster = annotation as? MKClusterAnnotation {
                 // Tapping a cluster badge did nothing before this — MapKit
                 // doesn't auto-expand clusters on tap, so every clustered pin
@@ -246,9 +294,24 @@ struct PiriMapView: UIViewRepresentable {
                 return MKOverlayRenderer(overlay: overlay)
             }
             let renderer = MKPolylineRenderer(polyline: polyline)
-            renderer.strokeColor = .systemBlue
-            renderer.lineWidth = 4
+            if polyline is TrailPolyline {
+                // Brown + dashed, matching the trail pin color (`.systemBrown`)
+                // and distinguishing it at a glance from the solid blue
+                // navigation route — the two can be on screen at once.
+                renderer.strokeColor = .systemBrown
+                renderer.lineWidth = 3
+                renderer.lineDashPattern = [8, 6]
+            } else {
+                renderer.strokeColor = .systemBlue
+                renderer.lineWidth = 4
+            }
             return renderer
         }
     }
 }
+
+/// Tagged `MKPolyline` subclasses so `reconcileRoute`/`reconcileTrailRoute`
+/// can each remove only their own overlay instead of wiping every overlay
+/// on the map (the plain-`MKPolyline` approach this replaced).
+private final class RoutePolyline: MKPolyline {}
+private final class TrailPolyline: MKPolyline {}

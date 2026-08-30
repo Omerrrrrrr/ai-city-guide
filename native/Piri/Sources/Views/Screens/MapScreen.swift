@@ -64,6 +64,15 @@ struct MapScreen: View {
     @State private var dietaryPins: [DietaryPin] = []
     @State private var dietaryFetchTask: Task<Void, Never>?
     @State private var selectedDietaryPin: DietaryPin?
+    /// Session-only (unlike `dietaryFilter`) — this is a Map-only layer
+    /// with no other screen to share state with, so a plain toggle is
+    /// enough; no need for `@AppStorage`.
+    @State private var trailsEnabled = false
+    @State private var trailPins: [Trail] = []
+    @State private var trailFetchTask: Task<Void, Never>?
+    @State private var selectedTrail: Trail?
+    @State private var trailGeometryPoints: [CLLocationCoordinate2D] = []
+    @State private var loadingTrailGeometry = false
     /// Updated on every `handleRegionChange` call (unlike `initialRegion`,
     /// which is set once and deliberately not kept in sync with panning) so
     /// toggling `dietaryFilter` can immediately fetch against wherever the
@@ -211,6 +220,8 @@ struct MapScreen: View {
                         places: filteredPlaces,
                         livePins: Self.useCuratedMapData ? livePins : [],
                         dietaryPins: routeMode ? [] : dietaryPins,
+                        trailPins: routeMode ? [] : trailPins,
+                        trailCoordinates: routeMode ? [] : trailGeometryPoints,
                         // In route mode, a fetched-but-not-yet-started route
                         // (`previewRoute()`) draws here as a preview line —
                         // this is still the plain picking map, not
@@ -222,6 +233,7 @@ struct MapScreen: View {
                         onSelectPlace: { selectPlace($0) },
                         onSelectLivePin: { selectLivePin($0) },
                         onSelectDietaryPin: { selectDietaryPin($0) },
+                        onSelectTrailPin: { selectTrail($0) },
                         onSelectMapFeature: { feature in
                             if routeMode {
                                 Task { await toggleStop(fromFeature: feature) }
@@ -270,6 +282,8 @@ struct MapScreen: View {
                         title: selectedDietaryPin.name,
                         coordinate: CLLocationCoordinate2D(latitude: selectedDietaryPin.lat, longitude: selectedDietaryPin.lng)
                     ))
+                } else if let selectedTrail {
+                    trailCard(for: selectedTrail)
                 } else if let selectedMapFeature {
                     mapFeatureCard(for: MapFeatureIdentity(title: selectedMapFeature.title, coordinate: selectedMapFeature.coordinate))
                 }
@@ -279,6 +293,7 @@ struct MapScreen: View {
         .overlay(alignment: .bottomTrailing) {
             VStack(spacing: 12) {
                 mapTypeButton
+                trailsToggleButton
                 routeModeToggleButton
             }
             .padding(20)
@@ -315,6 +330,21 @@ struct MapScreen: View {
             await startPendingRoute(stops)
             tabSelection.pendingRouteStops = nil
         }
+        // "Piri Haritası" maps-provider hand-off (see `PlaceDirections`) --
+        // same `.task(id:)`-not-`.onChange` reasoning as `pendingRouteStops`
+        // above. Fires even when already on this tab (tapping "Open in
+        // Maps" on this screen's own card): `MapFocusRequest`'s fresh
+        // `trigger` UUID each time still changes the task's `id`, so it
+        // reruns and recenters instead of being treated as a no-op.
+        .task(id: tabSelection.pendingMapFocus) {
+            guard let focus = tabSelection.pendingMapFocus else { return }
+            initialRegion = MKCoordinateRegion(
+                center: CLLocationCoordinate2D(latitude: focus.lat, longitude: focus.lng),
+                span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+            )
+            recenterTrigger = focus.trigger
+            tabSelection.pendingMapFocus = nil
+        }
         .onChange(of: locationManager.breadcrumb) { _, points in
             guard let activeTripId = tripsStore.activeTripId, let last = points.last else { return }
             tripsStore.addBreadcrumb(activeTripId, point: last)
@@ -349,6 +379,15 @@ struct MapScreen: View {
                 fetchDietaryPinsIfNeeded(for: currentRegion)
             } else {
                 dietaryPins = []
+            }
+        }
+        .onChange(of: trailsEnabled) { _, enabled in
+            if enabled, let currentRegion {
+                fetchTrailsIfNeeded(for: currentRegion)
+            } else {
+                trailPins = []
+                selectedTrail = nil
+                trailGeometryPoints = []
             }
         }
         .sheet(isPresented: $showTripPhotoCapture) {
@@ -389,6 +428,19 @@ struct MapScreen: View {
             Image(systemName: mapTypeIconName)
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(.primary)
+                .frame(width: 48, height: 48)
+                .background(Circle().fill(.thinMaterial))
+                .shadow(radius: 3)
+        }
+    }
+
+    private var trailsToggleButton: some View {
+        Button {
+            trailsEnabled.toggle()
+        } label: {
+            Image(systemName: "figure.hiking")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(trailsEnabled ? Color.accentColor : .primary)
                 .frame(width: 48, height: 48)
                 .background(Circle().fill(.thinMaterial))
                 .shadow(radius: 3)
@@ -480,6 +532,8 @@ struct MapScreen: View {
         selectedLivePin = nil
         selectedMapFeature = nil
         selectedDietaryPin = nil
+        selectedTrail = nil
+        trailGeometryPoints = []
         poiExplainTask?.cancel()
     }
 
@@ -488,6 +542,8 @@ struct MapScreen: View {
         selectedPlace = nil
         selectedMapFeature = nil
         selectedDietaryPin = nil
+        selectedTrail = nil
+        trailGeometryPoints = []
         poiExplainTask?.cancel()
     }
 
@@ -496,6 +552,8 @@ struct MapScreen: View {
         selectedPlace = nil
         selectedLivePin = nil
         selectedMapFeature = nil
+        selectedTrail = nil
+        trailGeometryPoints = []
         poiExplainResult = nil
         poiExplainError = nil
         userPhotos = []
@@ -516,6 +574,8 @@ struct MapScreen: View {
         selectedPlace = nil
         selectedLivePin = nil
         selectedDietaryPin = nil
+        selectedTrail = nil
+        trailGeometryPoints = []
         poiExplainResult = nil
         poiExplainError = nil
         userPhotos = []
@@ -576,6 +636,60 @@ struct MapScreen: View {
         .piriGlassCard(cornerRadius: 16)
     }
 
+    /// No AI-explain call, unlike every other pin card on this screen — a
+    /// trail's name/operator/distance already came fully formed from
+    /// `/trails/nearby` (real OSM tags, not something to elaborate on), so
+    /// this just offers to draw its line.
+    private func trailCard(for trail: Trail) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(trail.name).font(.headline)
+                    HStack(spacing: 6) {
+                        if let operatorName = trail.operatorName {
+                            Text(operatorName)
+                        }
+                        if trail.operatorName != nil, trail.distanceKm != nil {
+                            Text("·")
+                        }
+                        if let distanceKm = trail.distanceKm {
+                            Text(formattedKm(distanceKm))
+                        }
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button {
+                    selectedTrail = nil
+                    trailGeometryPoints = []
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                        .frame(width: 36, height: 36)
+                        .contentShape(Rectangle())
+                }
+                .font(.title3)
+            }
+            Button {
+                Task { await showTrailRoute(trail) }
+            } label: {
+                if loadingTrailGeometry {
+                    ProgressView().frame(maxWidth: .infinity)
+                } else {
+                    Text("map.trails.showRoute").frame(maxWidth: .infinity)
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(loadingTrailGeometry)
+        }
+        .padding()
+        .piriGlassCard(cornerRadius: 16)
+    }
+
+    private func formattedKm(_ km: Double) -> String {
+        "\(km.formatted(.number.precision(.fractionLength(0...1)))) km"
+    }
 
     /// Card for ANY tapped map POI — Piri's own pins have a stable DB record
     /// to explain, but most pins on the map are Apple's own base-tile POIs
@@ -655,6 +769,31 @@ struct MapScreen: View {
                     .font(.title3)
                     .padding(.trailing, 10)
                 }
+                // Apple's own rating (the "👍 92% (240)" style figure) has
+                // no plain data API — `MKMapItem` genuinely has no rating
+                // property (confirmed against the SDK headers), Apple only
+                // exposes it through this native popover. Previously a
+                // full-width gold "Full Details" button down in the action
+                // row that opened as a full sheet — live-tested 2026-08-30
+                // and found it showed nothing else genuinely new beyond the
+                // rating (address/directions are already on this same card
+                // via `PlaceDetailsCard` below), so it was real navigation
+                // for one small stat. A small icon here, using a *popover*
+                // instead of a sheet, keeps the rating reachable without
+                // ever leaving this card.
+                if let resolvedMapFeatureItem {
+                    Button {
+                        showingMapItemDetail = true
+                    } label: {
+                        Image(systemName: "hand.thumbsup")
+                            .foregroundStyle(.secondary)
+                            .frame(width: 36, height: 36)
+                            .contentShape(Rectangle())
+                    }
+                    .font(.title3)
+                    .padding(.trailing, 10)
+                    .mapItemDetailPopover(isPresented: $showingMapItemDetail, item: resolvedMapFeatureItem)
+                }
                 Button {
                     dismissMapFeature()
                 } label: {
@@ -666,109 +805,115 @@ struct MapScreen: View {
                 .font(.title3)
             }
 
-            // AI explanation first — the reason this card is showing at
-            // all — before any of Apple's own place data below.
-            if poiExplainLoading {
-                VStack(alignment: .leading, spacing: 8) {
-                    SkeletonBox().frame(width: 180, height: 14)
-                    SkeletonBox().frame(height: 12)
-                    SkeletonBox().frame(width: 220, height: 12)
-                }
-            } else if let poiExplainResult {
-                Text(poiExplainResult.headline).font(.subheadline.bold()).foregroundStyle(Theme.gold)
-                POIPhotoGallery(photos: poiExplainResult.photos)
-                UserPhotoSection(poiName: identity.title ?? "", coordinate: identity.coordinate, photos: $userPhotos)
-                if let rating = poiExplainResult.rating {
-                    TripAdvisorRatingRow(rating: rating)
-                }
-                if let curatedInfo = poiExplainResult.curatedInfo {
-                    CuratedInfoRow(info: curatedInfo)
-                }
-                if let dietaryTags = poiExplainResult.dietaryTags {
-                    DietaryTagsRow(tags: dietaryTags)
-                }
-                if let weather = mapFeatureWeatherQuery.weather {
-                    weatherBadge(weather)
-                }
-                Text(poiExplainResult.body).font(.footnote)
-                if let source = poiExplainResult.groundingSource {
-                    // See POIExplainSheet's identical fix -- interpolating
-                    // `source` straight into `LocalizationValue("...")`
-                    // makes it a substitution argument, not part of the
-                    // lookup key, so the catalog lookup always misses.
-                    let key = "poiExplain.source." + source
-                    SourceCaption(text: String(localized: String.LocalizationValue(key)))
-                }
-                ForEach(poiExplainResult.highlights, id: \.self) { highlight in
-                    HStack(alignment: .top, spacing: 6) {
-                        Circle().fill(Theme.gold).frame(width: 5, height: 5).padding(.top, 6)
-                        Text(highlight).font(.caption)
-                    }
-                }
-            } else if let poiExplainError {
-                HStack(spacing: 8) {
-                    Text(poiExplainError).font(.footnote).foregroundStyle(.secondary).lineLimit(2)
-                    Spacer()
-                    Button("common.retry") {
-                        poiExplainTask?.cancel()
-                        if let selectedDietaryPin {
-                            poiExplainTask = Task { await explainDietaryPin(selectedDietaryPin) }
-                        } else if let selectedMapFeature {
-                            poiExplainTask = Task { await explainMapFeature(selectedMapFeature) }
+            // Scrollable — this card floats over the map with no
+            // surrounding ScrollView (unlike `POIExplainSheet`, a real
+            // sheet), and its content (photo gallery, community photos,
+            // weather, a 5-7 sentence AI body, highlights, address) can
+            // easily be taller than the screen. Un-scrolled, the excess
+            // just extended off the top of the visible area with nothing
+            // to indicate it — live-confirmed 2026-08-30: the AI body text
+            // was cut off mid-sentence with no way to read the rest.
+            ScrollView {
+                VStack(alignment: .leading, spacing: 10) {
+                    // AI explanation first — the reason this card is showing
+                    // at all — before any of Apple's own place data below.
+                    if poiExplainLoading {
+                        VStack(alignment: .leading, spacing: 8) {
+                            SkeletonBox().frame(width: 180, height: 14)
+                            SkeletonBox().frame(height: 12)
+                            SkeletonBox().frame(width: 220, height: 12)
+                        }
+                    } else if let poiExplainResult {
+                        Text(poiExplainResult.headline).font(.subheadline.bold()).foregroundStyle(Theme.gold)
+                        POIPhotoGallery(photos: poiExplainResult.photos)
+                        UserPhotoSection(poiName: identity.title ?? "", coordinate: identity.coordinate, photos: $userPhotos)
+                        if let rating = poiExplainResult.rating {
+                            TripAdvisorRatingRow(rating: rating)
+                        }
+                        if let curatedInfo = poiExplainResult.curatedInfo {
+                            CuratedInfoRow(info: curatedInfo)
+                        }
+                        if let dietaryTags = poiExplainResult.dietaryTags {
+                            DietaryTagsRow(tags: dietaryTags)
+                        }
+                        if let weather = mapFeatureWeatherQuery.weather {
+                            weatherBadge(weather)
+                        }
+                        Text(poiExplainResult.body).font(.footnote)
+                        if let source = poiExplainResult.groundingSource {
+                            // See POIExplainSheet's identical fix -- interpolating
+                            // `source` straight into `LocalizationValue("...")`
+                            // makes it a substitution argument, not part of the
+                            // lookup key, so the catalog lookup always misses.
+                            let key = "poiExplain.source." + source
+                            SourceCaption(text: String(localized: String.LocalizationValue(key)))
+                        }
+                        ForEach(poiExplainResult.highlights, id: \.self) { highlight in
+                            HStack(alignment: .top, spacing: 6) {
+                                Circle().fill(Theme.gold).frame(width: 5, height: 5).padding(.top, 6)
+                                Text(highlight).font(.caption)
+                            }
+                        }
+                    } else if let poiExplainError {
+                        HStack(spacing: 8) {
+                            Text(poiExplainError).font(.footnote).foregroundStyle(.secondary).lineLimit(2)
+                            Spacer()
+                            Button("common.retry") {
+                                poiExplainTask?.cancel()
+                                if let selectedDietaryPin {
+                                    poiExplainTask = Task { await explainDietaryPin(selectedDietaryPin) }
+                                } else if let selectedMapFeature {
+                                    poiExplainTask = Task { await explainMapFeature(selectedMapFeature) }
+                                }
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
                         }
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                }
-            }
 
-            // Phone/website are plain `MKMapItem` properties — shown
-            // directly on this card rather than behind Apple's own Place
-            // Card sheet/popover, which would open as a second, separate
-            // page stacked on top of this one (confirmed broken both ways:
-            // an embedded mini map for the selection-accessory callout
-            // rendered as a messy duplicate over the real map already
-            // behind this card; the sheet/popover is a fine surface but
-            // always its own disconnected screen). Hours/ratings/photos
-            // have no plain data API (confirmed via research) — "Haritalarda
-            // Aç" below is how to reach those from here.
-            if let resolvedMapFeatureItem {
-                PlaceDetailsCard(mapItem: resolvedMapFeatureItem)
-                HStack(spacing: 10) {
-                    Button {
-                        showingMapItemDetail = true
-                    } label: {
-                        Label("poiExplain.fullDetails", systemImage: "info.circle.fill")
+                    // Phone/website are plain `MKMapItem` properties — shown
+                    // directly on this card rather than behind Apple's own
+                    // Place Card sheet/popover, which would open as a
+                    // second, separate page stacked on top of this one
+                    // (confirmed broken both ways: an embedded mini map for
+                    // the selection-accessory callout rendered as a messy
+                    // duplicate over the real map already behind this card;
+                    // the sheet/popover is a fine surface but always its own
+                    // disconnected screen). Hours/photos still have no plain
+                    // data API (confirmed via research) — "Haritalarda Aç"
+                    // below is how to reach those from here; the rating is
+                    // reachable via the header icon above instead.
+                    if let resolvedMapFeatureItem {
+                        PlaceDetailsCard(mapItem: resolvedMapFeatureItem)
+                        HStack(spacing: 10) {
+                            Button("common.openInMaps") {
+                                PlaceDirections.openInMaps(name: identity.title ?? "", coordinate: identity.coordinate, tabSelection: tabSelection)
+                            }
+                            .buttonStyle(.bordered)
+
+                            Button {
+                                Haptics.light()
+                                withAnimation(.easeInOut(duration: 0.2)) { showingDirections.toggle() }
+                            } label: {
+                                Label("directions.preview.button", systemImage: "arrow.triangle.turn.up.right.circle")
+                            }
+                            .buttonStyle(.bordered)
+                        }
+
+                        if showingDirections {
+                            DirectionsPreview(destination: identity.coordinate)
+                        }
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Theme.gold)
-                    .mapItemDetailSheet(isPresented: $showingMapItemDetail, item: resolvedMapFeatureItem)
 
-                    Button("common.openInMaps") {
-                        resolvedMapFeatureItem.openInMaps()
+                    if let lookAroundScene {
+                        LookAroundCard(scene: lookAroundScene, height: 140)
                     }
-                    .buttonStyle(.bordered)
-
-                    Button {
-                        Haptics.light()
-                        withAnimation(.easeInOut(duration: 0.2)) { showingDirections.toggle() }
-                    } label: {
-                        Label("directions.preview.button", systemImage: "arrow.triangle.turn.up.right.circle")
-                    }
-                    .buttonStyle(.bordered)
                 }
-
-                if showingDirections {
-                    DirectionsPreview(destination: identity.coordinate)
-                }
-            }
-
-            if let lookAroundScene {
-                LookAroundCard(scene: lookAroundScene, height: 140)
             }
         }
         .padding()
         .piriGlassCard(cornerRadius: 16)
+        .frame(maxHeight: UIScreen.main.bounds.height * 0.6)
         .sheet(item: $addToCollectionKind) { kind in
             if let poi { AddToCollectionSheet(poi: poi, kind: kind) }
         }
@@ -824,6 +969,7 @@ struct MapScreen: View {
     private func handleRegionChange(_ region: MKCoordinateRegion) {
         currentRegion = region
         fetchDietaryPinsIfNeeded(for: region)
+        fetchTrailsIfNeeded(for: region)
 
         guard Self.useCuratedMapData else { return }
         liveFetchTask?.cancel()
@@ -883,6 +1029,51 @@ struct MapScreen: View {
             guard !Task.isCancelled else { return }
             dietaryPins = pins
         }
+    }
+
+    /// Mirrors `fetchDietaryPinsIfNeeded` -- same debounce, same
+    /// no-error-banner treatment (Overpass is a best-effort free service;
+    /// an empty result here is an unremarkable outcome, not an app error).
+    /// Unlike the dietary/live fetches, this isn't bbox-shaped -- Overpass's
+    /// `around:radius` query takes a center + radius, so the region's span
+    /// is converted to an equivalent radius instead.
+    private func fetchTrailsIfNeeded(for region: MKCoordinateRegion) {
+        trailFetchTask?.cancel()
+        guard trailsEnabled else {
+            trailPins = []
+            return
+        }
+
+        trailFetchTask = Task {
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return }
+
+            let radiusMeters = Int(max(region.span.latitudeDelta, region.span.longitudeDelta) * 111_000 / 2)
+            let pins = (try? await TrailsAPI.nearby(lat: region.center.latitude, lng: region.center.longitude, radiusMeters: max(radiusMeters, 2000))) ?? []
+            guard !Task.isCancelled else { return }
+            trailPins = pins
+        }
+    }
+
+    private func selectTrail(_ trail: Trail) {
+        selectedTrail = trail
+        trailGeometryPoints = []
+        selectedPlace = nil
+        selectedLivePin = nil
+        selectedMapFeature = nil
+        selectedDietaryPin = nil
+        poiExplainTask?.cancel()
+    }
+
+    private func showTrailRoute(_ trail: Trail) async {
+        loadingTrailGeometry = true
+        defer { loadingTrailGeometry = false }
+        // Best-effort, matching `fetchTrailsIfNeeded` -- a trail whose
+        // geometry fails to load just doesn't draw a line; the card itself
+        // (name/operator/distance) already came from `fetchNearbyTrails`
+        // and stays showing either way.
+        guard let geometry = try? await TrailsAPI.geometry(id: trail.id) else { return }
+        trailGeometryPoints = geometry.points.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng) }
     }
 
     private func fetchDirections(to place: Place) async {

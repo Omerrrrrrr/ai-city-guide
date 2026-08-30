@@ -13,6 +13,7 @@ struct PlaceDetailScreen: View {
     // integration below is stubbed out rather than wired to them.
     @Environment(PlacesQuery.self) private var placesQuery
     @Environment(UserProfileStore.self) private var userProfileStore
+    @Environment(TabSelection.self) private var tabSelection
     @Environment(\.dismiss) private var dismiss
 
     @State private var place: Place?
@@ -186,7 +187,9 @@ struct PlaceDetailScreen: View {
             actionBarButton(icon: inPlan ? "checkmark" : "list.bullet.clipboard", label: inPlan ? "placeDetail.actionBar.inPlan" : "placeDetail.actionBar.addToPlan") {}
             Divider().frame(height: 32)
             actionBarButton(icon: "arrow.up.right", label: "placeDetail.actionBar.directions", disabled: !PlaceDirections.canOpenInMaps(place)) {
-                PlaceDirections.openInMaps(place)
+                let opensInApp = PlaceDirections.opensInApp
+                PlaceDirections.openInMaps(place, tabSelection: tabSelection)
+                if opensInApp { dismiss() }
             }
             Divider().frame(height: 32)
             ShareLink(item: shareText(for: place)) {
@@ -366,7 +369,9 @@ struct PlaceDetailScreen: View {
             }
             if PlaceDirections.canOpenInMaps(place) {
                 Button {
-                    PlaceDirections.openInMaps(place)
+                    let opensInApp = PlaceDirections.opensInApp
+                    PlaceDirections.openInMaps(place, tabSelection: tabSelection)
+                    if opensInApp { dismiss() }
                 } label: {
                     Text("common.openInMaps")
                         .font(.system(size: 15, weight: .bold))

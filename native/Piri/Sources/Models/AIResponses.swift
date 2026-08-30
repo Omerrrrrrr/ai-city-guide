@@ -169,6 +169,21 @@ struct ExplainResult: Codable {
     /// Google-photo fallback). Read-only, like Tripadvisor's; Piri's own
     /// rating lives separately via `/poi/reviews`.
     var googleRating: SourceRating?
+    /// Present only for photogenic categories (see the server's
+    /// `WIKIPEDIA_PLAUSIBLE_CATEGORIES` gate) with known coordinates —
+    /// `nil` for a run-of-the-mill shop/office where "best light for
+    /// photos" isn't a meaningful thing to tell someone.
+    var goldenHour: GoldenHour?
+}
+
+/// Today's sunrise/sunset and the two golden-hour windows around them, all
+/// as ISO 8601 timestamps in the place's own local time (computed
+/// server-side from lat/lng, not the device's timezone).
+struct GoldenHour: Codable, Hashable {
+    var sunrise: String
+    var sunset: String
+    var morningEndsAt: String
+    var eveningStartsAt: String
 }
 
 /// A third-party source's rating, reduced to just what a combined-average
@@ -287,6 +302,30 @@ struct POIChatTurn: Codable, Identifiable, Equatable {
     }
 }
 
+/// Client-supplied, from `CityStore`'s per-city cache (country/timezone/
+/// currency, fetched once per city change — see `CityStore.refreshContext`)
+/// rather than making the backend re-resolve them from scratch on every
+/// single chat message. Same shape as the server's own `cityContext` zod
+/// schema in `/places/explain-poi/chat`.
+struct CityContextSummary: Encodable {
+    var countryName: String
+    var callingCode: String?
+    var currencyCode: String?
+    var currencyName: String?
+    var timezone: String?
+    var usdPerLocalCurrency: Double?
+
+    init?(countryInfo: CountryInfo?, timezone: String?, exchangeRates: ExchangeRates?) {
+        guard let countryInfo else { return nil }
+        self.countryName = countryInfo.name
+        self.callingCode = countryInfo.callingCode
+        self.currencyCode = countryInfo.currencies.first?.code
+        self.currencyName = countryInfo.currencies.first?.name
+        self.timezone = timezone
+        self.usdPerLocalCurrency = exchangeRates?.rates["USD"]
+    }
+}
+
 struct POIChatRequest: Encodable {
     var name: String
     var category: String?
@@ -297,6 +336,7 @@ struct POIChatRequest: Encodable {
     var website: String?
     var locale: String?
     var userProfile: PersonalizationProfile?
+    var cityContext: CityContextSummary?
     var history: [POIChatTurn]
     var message: String
 }

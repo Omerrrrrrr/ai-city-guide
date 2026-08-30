@@ -57,6 +57,7 @@
 		43BB82F44992911849EBCF73 /* Place.swift in Sources */ = {isa = PBXBuildFile; fileRef = D51DBC290790323812C65938 /* Place.swift */; };
 		46BF181ED5C32670F9475103 /* PlaceHoursTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57103CE5924DEF3637376683 /* PlaceHoursTests.swift */; };
 		46C1DE0B4CACBC4421D3495A /* SignInScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E9E8644DC0121E0AFBE29F9 /* SignInScreen.swift */; };
+		47374E794B9091972E789B41 /* MapsProviderStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94761900BBBF0C38ECAAFDDA /* MapsProviderStore.swift */; };
 		475E18A765EBE2CB149976B6 /* PlanThemes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 627629055B808FB73F268A0F /* PlanThemes.swift */; };
 		47AB0C4FD2F7C0A3F1D3ED47 /* PlaceFiltersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A38B8B967050DA7D5EAE0DF7 /* PlaceFiltersTests.swift */; };
 		48790D92967906C9FC6A3E14 /* AdminModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A62E305A14B628DFA79318E3 /* AdminModels.swift */; };
@@ -80,6 +81,7 @@
 		7296C8E006BE3C8B454F1169 /* CityStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F1514436FA3675EF8BA0636 /* CityStore.swift */; };
 		737D514619BDEF84E89EE64A /* PlaceImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09D28590C586B93899BAF76D /* PlaceImageView.swift */; };
 		74EC746834BB0E2FA0A8CF45 /* UGCModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E974BC5964E6D8CCE005338 /* UGCModels.swift */; };
+		780EC6DFE07A7961BD0A8960 /* Trail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E35D60A6FBD6CDAE5041146 /* Trail.swift */; };
 		7908DAD14DD0E5B061B17068 /* RecapShareCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 633AA6A64F71CB8C69DC66D8 /* RecapShareCard.swift */; };
 		7DFB7CABF5BF0E2C456052FA /* PlaceDetailScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91B07B83A416DD09A796DDAB /* PlaceDetailScreen.swift */; };
 		81F20D7059319A96CE0940C2 /* PremiumDetailsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3697524D1BF8C6046C882FD /* PremiumDetailsSection.swift */; };
@@ -99,6 +101,7 @@
 		9558015CF2CE4C6AC4AEE174 /* ProfileScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE6342530F052E87F0BEA86F /* ProfileScreen.swift */; };
 		99B10342C23D6CFD234E0CCA /* WeatherForecastSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F0244DC3EB59A135BADD63F /* WeatherForecastSheet.swift */; };
 		9A8D2E7A8F6B7CF500CED79E /* LanguageManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EE61E58BF0F9281015C1F99 /* LanguageManager.swift */; };
+		9C347DFB917A53496F996207 /* CityContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5D7A413694570B437836662 /* CityContext.swift */; };
 		9C7BD3A34ECD36CC28095E12 /* FriendProfileScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFBF63B0A5DD7B0744A87938 /* FriendProfileScreen.swift */; };
 		9CB5696D4212C71E930A80BD /* UserPhotoSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21D1785CDFCFB09E030F12FC /* UserPhotoSection.swift */; };
 		9CEA2601DD279A5F0E8A8BB3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DD664E9C3165D45C042C8BD0 /* Assets.xcassets */; };
@@ -188,6 +191,7 @@
 		09D28590C586B93899BAF76D /* PlaceImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceImageView.swift; sourceTree = "<group>"; };
 		0DCA1094E66C258A4211AC15 /* APIConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIConfig.swift; sourceTree = "<group>"; };
 		0DDA307816D14E50993A0021 /* CollectionDetailUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionDetailUITests.swift; sourceTree = "<group>"; };
+		0E35D60A6FBD6CDAE5041146 /* Trail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Trail.swift; sourceTree = "<group>"; };
 		11883AE4B6ACC73CC45E883E /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		135A602CC00ED4B1E83016AB /* MapAnnotations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapAnnotations.swift; sourceTree = "<group>"; };
 		1530083D374F1577F01CCC2A /* PhotosAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotosAPI.swift; sourceTree = "<group>"; };
@@ -264,6 +268,7 @@
 		91B07B83A416DD09A796DDAB /* PlaceDetailScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceDetailScreen.swift; sourceTree = "<group>"; };
 		92330389545E4A09616C146D /* HomeScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeScreen.swift; sourceTree = "<group>"; };
 		92DFDDACD42B19290D630D8B /* TripAdvisorReviewsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripAdvisorReviewsSheet.swift; sourceTree = "<group>"; };
+		94761900BBBF0C38ECAAFDDA /* MapsProviderStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapsProviderStore.swift; sourceTree = "<group>"; };
 		95705134320AEBF9CDED2B6A /* Categories.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Categories.swift; sourceTree = "<group>"; };
 		96EF6CE3617825D5ADD787AF /* DirectionsPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectionsPreview.swift; sourceTree = "<group>"; };
 		96FE584464E381510D16935C /* Trip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Trip.swift; sourceTree = "<group>"; };
@@ -279,6 +284,7 @@
 		A4CD77F9E31006DCD1F8804F /* DietaryFilterButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DietaryFilterButton.swift; sourceTree = "<group>"; };
 		A559EA917EE2CAFE7D251A4B /* AddToCollectionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddToCollectionSheet.swift; sourceTree = "<group>"; };
 		A564A59EA1164A5FCB99DDF9 /* POIExplainSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POIExplainSheet.swift; sourceTree = "<group>"; };
+		A5D7A413694570B437836662 /* CityContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CityContext.swift; sourceTree = "<group>"; };
 		A62E305A14B628DFA79318E3 /* AdminModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminModels.swift; sourceTree = "<group>"; };
 		A68702D28EE9D44DB8D6FFB9 /* FriendsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendsScreen.swift; sourceTree = "<group>"; };
 		A93188E4925629A97DF4B4F0 /* CameraController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraController.swift; sourceTree = "<group>"; };
@@ -468,6 +474,7 @@
 				05C12B028A3AA7D0966851D5 /* AIResponses.swift */,
 				5A544BF4AD464B79EB03452C /* AuthModels.swift */,
 				8DDB1F8B09EEB0E1E5A7C23D /* City.swift */,
+				A5D7A413694570B437836662 /* CityContext.swift */,
 				8B8966ACC928E3CDCF8199CC /* DietaryPin.swift */,
 				05E08798A1304146E73129B0 /* Directions.swift */,
 				D977BAA37BFC620E4871D165 /* Holiday.swift */,
@@ -480,6 +487,7 @@
 				D81083A6ED959FC685F77BB0 /* SavedPOIReference.swift */,
 				259416D8BE5BCC617795A41F /* SavedWeatherCity.swift */,
 				6BD62E1F5E0AE84C4B51C72C /* SocialModels.swift */,
+				0E35D60A6FBD6CDAE5041146 /* Trail.swift */,
 				96FE584464E381510D16935C /* Trip.swift */,
 				5E974BC5964E6D8CCE005338 /* UGCModels.swift */,
 				31BFBA845700A3D94868AF4F /* UserProfile.swift */,
@@ -589,6 +597,7 @@
 				8F1514436FA3675EF8BA0636 /* CityStore.swift */,
 				F146295244C70DC7156EB3B3 /* FriendsStore.swift */,
 				7D94810B3041C6319D82ADC9 /* LanguageStore.swift */,
+				94761900BBBF0C38ECAAFDDA /* MapsProviderStore.swift */,
 				40632CC354EF9E493BB92DED /* RecentlyViewedStore.swift */,
 				7DBAC07C896E4A79299A7872 /* SavedPlacesStore.swift */,
 				B77BE47CE50CC6B0329712C3 /* TripsStore.swift */,
@@ -827,6 +836,7 @@
 				D76079FB9A0DC544B7EE236B /* Categories.swift in Sources */,
 				94AB9FD4D6C37DFD9D08B4BC /* ChipGrid.swift in Sources */,
 				025D3E8C3D65AEFD244455F4 /* City.swift in Sources */,
+				9C347DFB917A53496F996207 /* CityContext.swift in Sources */,
 				33AC9CF316C079973DFE5B23 /* CityPickerScreen.swift in Sources */,
 				7296C8E006BE3C8B454F1169 /* CityStore.swift in Sources */,
 				56DA6B62203238017FC83366 /* CollectionDetailScreen.swift in Sources */,
@@ -864,6 +874,7 @@
 				C64388BDBC04BECD6F767E63 /* MapRegion.swift in Sources */,
 				E39D60A5812D0B843C6BCF04 /* MapScreen+RouteMode.swift in Sources */,
 				64F6516C4768A3BD003CD2EE /* MapScreen.swift in Sources */,
+				47374E794B9091972E789B41 /* MapsProviderStore.swift in Sources */,
 				B8F002588A7356E943EE2281 /* OnboardingScreen.swift in Sources */,
 				B35C8AE24419CF47051D65D4 /* POICategoryGroups.swift in Sources */,
 				13D0A453750CBC43093708EE /* POIExplainSheet.swift in Sources */,
@@ -919,6 +930,7 @@
 				27D4BD57C3E95D9DE99E3113 /* StoryContainer.swift in Sources */,
 				5AA6F51FFA86B9EA366E41E4 /* TabSelection.swift in Sources */,
 				100F6128B1DA42E96537D83B /* Theme.swift in Sources */,
+				780EC6DFE07A7961BD0A8960 /* Trail.swift in Sources */,
 				4D8E5B9CF73647905F280D37 /* TransitDirections.swift in Sources */,
 				B76B20B3FEABC73E69373793 /* Trip.swift in Sources */,
 				A9C92E48B29B6A75FF48802E /* TripAdvisorHours.swift in Sources */,
@@ -994,7 +1006,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PIRI_API_BASE_URL = "http://10.40.29.2:4000";
+				PIRI_API_BASE_URL = "http://10.40.29.11:4000";
 				PIRI_APS_ENVIRONMENT = development;
 				PRODUCT_BUNDLE_IDENTIFIER = com.piriapp.piri;
 				SDKROOT = iphoneos;

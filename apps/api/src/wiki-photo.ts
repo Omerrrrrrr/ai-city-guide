@@ -38,6 +38,24 @@ export const WIKIPEDIA_PLAUSIBLE_CATEGORIES = new Set([
   'beach', 'marina',
 ]);
 
+// A narrower subset of the set above, for a different question: not "does
+// this place likely have a Wikipedia article" but "does the outdoor light
+// at golden hour actually matter for visiting/photographing this place."
+// Historic landmarks/monuments genuinely belong here -- shooting a castle
+// or a mosque's facade in the low, warm light before sunset is standard
+// photography advice, not just a nature/viewpoint thing. Excluded on
+// purpose: `museum`, `library`, `theater`, `movietheater`, `musicvenue`,
+// `planetarium`, `aquarium` -- these are indoor-experience venues where a
+// visitor goes inside regardless of the hour, and unless the building
+// itself is an architectural landmark (which would already be tagged
+// `landmark`/`nationalmonument` instead), the ambient outdoor light isn't
+// something worth telling anyone about.
+export const GOLDEN_HOUR_CATEGORIES = new Set([
+  'landmark', 'nationalmonument', 'castle', 'fortress', 'park',
+  'nationalpark', 'campground', 'hiking', 'zoo', 'religioussite', 'beach',
+  'marina',
+]);
+
 /**
  * Finds the nearest Wikipedia article within 300m whose title overlaps the
  * given POI name, and returns its main image. Returns `null` on any failure
