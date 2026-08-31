@@ -450,6 +450,17 @@ function languageInstruction(locale?: string): string {
       return '\n\nRespond in Turkish (Türkçe). Write naturally as a native Turkish speaker would — not a literal translation.';
     case 'nb':
       return '\n\nRespond in Norwegian Bokmål (norsk). Write naturally as a native Norwegian speaker would — not a literal translation.';
+    case 'es':
+      return '\n\nRespond in Spanish (español). Write naturally as a native Spanish speaker would — not a literal translation.';
+    case 'de':
+      return '\n\nRespond in German (Deutsch). Write naturally as a native German speaker would — not a literal translation.';
+    case 'fr':
+      return '\n\nRespond in French (français). Write naturally as a native French speaker would — not a literal translation.';
+    case 'it':
+      return '\n\nRespond in Italian (italiano). Write naturally as a native Italian speaker would — not a literal translation.';
+    case 'pt-BR':
+    case 'pt':
+      return '\n\nRespond in Brazilian Portuguese (português do Brasil). Write naturally as a native Brazilian Portuguese speaker would — not a literal translation.';
     default:
       return '';
   }

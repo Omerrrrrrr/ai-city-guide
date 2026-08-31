@@ -9,6 +9,11 @@ private let languageOptions: [(code: String?, icon: String, labelKey: String)] =
     ("en", "globe", "settings.language.en"),
     ("tr", "globe", "settings.language.tr"),
     ("nb", "globe", "settings.language.nb"),
+    ("es", "globe", "settings.language.es"),
+    ("de", "globe", "settings.language.de"),
+    ("fr", "globe", "settings.language.fr"),
+    ("it", "globe", "settings.language.it"),
+    ("pt-BR", "globe", "settings.language.pt"),
 ]
 
 private let appearanceOptions: [(scheme: ColorScheme?, icon: String, labelKey: String)] = [

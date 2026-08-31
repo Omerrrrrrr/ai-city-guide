@@ -14,11 +14,14 @@ func L(_ key: String, _ args: CVarArg...) -> String {
     return String(format: template, arguments: args)
 }
 
-/// Plural counterpart: English, Turkish and Norwegian Bokmal (the app's only
-/// three languages) all use just the CLDR "one"/"other" categories, and
-/// "one" always means exactly count == 1 in each — see
+/// Plural counterpart: every language this app supports (English, Turkish,
+/// Norwegian Bokmål, Spanish, German, French, Italian, Brazilian
+/// Portuguese) uses just the CLDR "one"/"other" categories, and "one"
+/// always means exactly count == 1 in each — see
 /// `mobile/src/i18n/__tests__/plurals.test.ts`'s Turkish regression test.
 /// So the suffix is picked directly rather than consulting ICU plural rules.
+/// A language with a genuinely different plural system (Polish's
+/// few/many, Arabic's dual, ...) would need real ICU rules here instead.
 func LPlural(_ key: String, count: Int) -> String {
     let suffix = count == 1 ? "one" : "other"
     // Build the full key as a plain `String` *first*. Passing a `"\(...)"`
