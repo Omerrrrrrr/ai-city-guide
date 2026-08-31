@@ -44,7 +44,10 @@ struct PaywallScreen: View {
                             .foregroundStyle(Theme.closedRed)
                     }
 
+                    autoRenewDisclosure
+
                     restoreButton
+                    legalLinks
                 }
                 .padding(24)
             }
@@ -128,5 +131,34 @@ struct PaywallScreen: View {
                 .foregroundStyle(Theme.navy)
         }
         .buttonStyle(.plain)
+    }
+
+    /// Required by App Review guideline 3.1.2 -- the length/price/
+    /// auto-renewal terms of an auto-renewing subscription must be stated
+    /// on the purchase screen itself, not just in App Store Connect's own
+    /// product metadata.
+    private var autoRenewDisclosure: some View {
+        Text(String(localized: String.LocalizationValue(
+            period == .monthly ? "paywall.autoRenew.monthly" : "paywall.autoRenew.yearly"
+        )))
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+        .multilineTextAlignment(.center)
+    }
+
+    /// Also required by 3.1.2 -- functional links to the Privacy Policy and
+    /// Terms of Use (EULA) must be reachable from the subscription purchase
+    /// screen itself. No custom EULA exists, so this links Apple's own
+    /// standard one (the same one App Store Connect's License Agreement
+    /// field defaults to when a developer hasn't supplied a custom EULA).
+    private var legalLinks: some View {
+        HStack(spacing: 16) {
+            Link(String(localized: String.LocalizationValue("paywall.termsOfUse")),
+                 destination: URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!)
+            Link(String(localized: String.LocalizationValue("paywall.privacyPolicy")),
+                 destination: URL(string: "https://api.getpiri.com/privacy")!)
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
     }
 }
