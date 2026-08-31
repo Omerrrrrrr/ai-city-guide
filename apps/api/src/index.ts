@@ -86,6 +86,8 @@ import { subscribeToCityDiscovery } from './push-notifications';
 import {
   buildUserContext,
   placeSummariesSchema,
+  tripSummariesSchema,
+  fetchOwnReviewSummaries,
   userProfileSchema,
   type UserProfileInput,
   type PlaceSummary,
@@ -1587,6 +1589,7 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
       userProfile?: UserProfileInput;
       recentlyViewed?: PlaceSummary[];
       savedPlaces?: PlaceSummary[];
+      pastTrips?: string[];
     };
   }>(
     '/places/explain-poi',
@@ -1604,6 +1607,7 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
           userProfile: userProfileSchema.optional(),
           recentlyViewed: placeSummariesSchema,
           savedPlaces: placeSummariesSchema,
+          pastTrips: tripSummariesSchema,
         })
         .safeParse(request.body);
 
@@ -1611,7 +1615,7 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         return reply.code(400).send({ error: 'Invalid request' });
       }
 
-      const { name, category, lat, lng, address, website, locale, userProfile, recentlyViewed, savedPlaces } = parsed.data;
+      const { name, category, lat, lng, address, website, locale, userProfile, recentlyViewed, savedPlaces, pastTrips } = parsed.data;
       // Not required -- this endpoint is called for every POI tap by signed-
       // out and free accounts too. Only used below to gate the Google-photo
       // fallback + reviews (paid tiers only) behind quota; every other
@@ -1622,7 +1626,8 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         return reply.code(503).send({ error: 'AI not configured' });
       }
 
-      const { text: profileContext, hasProfile } = buildUserContext(userProfile, recentlyViewed, savedPlaces);
+      const ownReviews = await fetchOwnReviewSummaries(userId);
+      const { text: profileContext, hasProfile } = buildUserContext(userProfile, recentlyViewed, savedPlaces, pastTrips, ownReviews);
 
       // Rating + description are fetched ahead of the AI call (not run in
       // parallel with it) so a real Tripadvisor description, when there is
@@ -2975,6 +2980,8 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
       website?: string;
       lat?: number;
       lng?: number;
+      userLat?: number;
+      userLng?: number;
       locale?: string;
       userProfile?: UserProfileInput;
       history: { role: 'user' | 'assistant'; content: string }[];
@@ -2992,6 +2999,13 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
           website: optionalUrlInput,
           lat: z.number().optional(),
           lng: z.number().optional(),
+          // Only sent (and only used) when the client detects a real
+          // transit question worth acting on -- see `looksLikeTransitQuestion`
+          // below. Not this place's own coordinates (already have those via
+          // lat/lng above) -- this is where the user actually is right now,
+          // the required "from" half of a real Transitous route query.
+          userLat: z.number().optional(),
+          userLng: z.number().optional(),
           locale: z.string().trim().min(2).max(8).optional(),
           userProfile: userProfileSchema.optional(),
           // Client-supplied, not re-fetched here -- same pattern
@@ -3037,7 +3051,7 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
         return reply.code(400).send({ error: 'Invalid request' });
       }
 
-      const { name, category, address, website, lat, lng, locale, userProfile, cityContext, message } = parsed.data;
+      const { name, category, address, website, lat, lng, userLat, userLng, locale, userProfile, cityContext, message } = parsed.data;
       const history = parsed.data.history.slice(-12);
       const aiProvider = getAiProviderConfig();
       if (!aiProvider) {
@@ -3049,7 +3063,28 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
       // general "about this place" framing /places/explain-poi's own
       // (shorter) excerpt is grounding a description in -- larger cap here
       // since this is a direct-question use case, not scene-setting.
-      const websiteExcerpt = website ? await fetchWebsiteExcerpt(website, 2500) : null;
+      // Wikivoyage runs alongside it, same best-effort/never-throws contract
+      // -- a real travel-guide-editor intro for the area, when one exists
+      // (see wikivoyage.ts's own comment on coverage being uneven).
+      const [websiteExcerpt, wikivoyageGuide] = await Promise.all([
+        website ? fetchWebsiteExcerpt(website, 2500) : Promise.resolve(null),
+        lat != null && lng != null ? fetchWikivoyageGuide(name, lat, lng) : Promise.resolve(null),
+      ]);
+
+      // Only attempted when the message actually looks like a transit
+      // question and the client sent where the user actually is -- same
+      // "don't pay the cost for every message" precedent as
+      // `looksLikeCurrencyQuestion` below. `fetchTransitousLeg` is the same
+      // function `/routes/directions`'s transit profile already uses (see
+      // that route's own comment on why Transitous, not a national API).
+      const looksLikeTransitQuestion =
+        /\bbus\b|\bferry\b|\btrain\b|\btram\b|transit|public transport|how (do|can) i get|get (there|here)|otob[üu]s|feribot|vapur|tren|tramvay|toplu ta[şs][ıi]ma|nas[ıi]l (giderim|ulaş[ıi]r[ıi]m|gidilir)|hvordan kommer jeg|buss\b|ferge|kollektiv/i.test(
+          message
+        );
+      const transitResult =
+        looksLikeTransitQuestion && userLat != null && userLng != null && lat != null && lng != null
+          ? await fetchTransitousLeg({ lat: userLat, lng: userLng }, { lat, lng })
+          : null;
 
       const { text: profileContext } = buildUserContext(userProfile);
       // The client's `CityStore` already cached the whole exchange-rate
@@ -3084,6 +3119,11 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
             referenceRatesLine ? `. Exchange rates: ${referenceRatesLine}` : ''
           }.`
         : null;
+      const transitLine = transitResult
+        ? `Real public-transit route (via Transitous, a live routing service) from the user's current location to this place: ${transitResult.steps
+            .map((s) => s.instruction)
+            .join(' → ')}. Total time: ${Math.round(transitResult.durationSeconds / 60)} minutes.`
+        : null;
       const placeContext = [
         `Name: ${name}`,
         category ? `Category: ${category}` : null,
@@ -3091,6 +3131,8 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
         lat != null && lng != null ? `Coordinates: ${lat}, ${lng}` : null,
         cityContextLine,
         websiteExcerpt ? `Text scraped from the business's own official website: "${websiteExcerpt}"` : null,
+        wikivoyageGuide ? `Wikivoyage travel-guide excerpt for this area (written by real travel-guide editors, not AI): "${wikivoyageGuide.extract}"` : null,
+        transitLine,
       ]
         .filter(Boolean)
         .join('\n');
@@ -3109,6 +3151,11 @@ ${
     : ''
 }
 ${
+  wikivoyageGuide
+    ? `\nWIKIVOYAGE RULE: the travel-guide excerpt above is real text written by Wikivoyage's volunteer editors, not generated by you — you may draw on it for general area context (what the neighborhood/region is like, what it's known for), but it's an excerpt of a larger article and may not cover a specific detail asked about. Don't present it as if you wrote it yourself, and don't invent additional "facts" in the same voice to fill gaps it doesn't cover.\n`
+    : ''
+}
+${
   cityContextLine
     ? `\nCITY CONTEXT RULE: the country/currency/timezone line above is real, looked-up data (not a guess) — use it when genuinely relevant ("what time is it there," calling codes, what country/language this is), but don't volunteer it unprompted or force it into an answer about something else.${
         referenceRatesLine
@@ -3117,7 +3164,11 @@ ${
       }\n`
     : ''
 }
-NEARBY-PLACES RULE (found via testing: asked for a nearby restaurant, this chat invented a specific chain's name, then a "500 meters" distance it explicitly admitted not knowing, then fabricated turn-by-turn directions — all confidently, with zero real location or map data behind any of it): this chat has no nearby-search results and no routing data at all — only the single place named above${lat != null && lng != null ? ' (this place\'s own coordinates are given, so you may state or lightly describe where THIS place itself is when asked, e.g. "it is on the coast just south of the city" -- but that is the one location fact you actually have)' : ''}. Never name a specific OTHER business as if it's a verified real place near here, never state a distance to another place in meters/minutes, and never give directions ("turn right", "walk along X street") — all of that would be invented, not looked up. If asked about nearby places, other businesses, or how to travel there, say plainly that you don't have real nearby/map/transit data in this chat, and point them to the map or a fresh search instead of guessing. This holds even if an earlier reply in this same conversation already named a specific place — an earlier mistake is not a fact to build on, treat it as unverified too rather than staying "consistent" with it.
+NEARBY-PLACES RULE (found via testing: asked for a nearby restaurant, this chat invented a specific chain's name, then a "500 meters" distance it explicitly admitted not knowing, then fabricated turn-by-turn directions — all confidently, with zero real location or map data behind any of it): this chat has no nearby-search results and no general routing data at all — only the single place named above${lat != null && lng != null ? ' (this place\'s own coordinates are given, so you may state or lightly describe where THIS place itself is when asked, e.g. "it is on the coast just south of the city" -- but that is the one location fact you actually have)' : ''}${transitLine ? ' — EXCEPT the real transit route given above, which you may describe accurately (the mode(s), stops, and total time given) when asked how to get here' : ''}. Never name a specific OTHER business as if it's a verified real place near here, never state a distance to another place in meters/minutes, and never give walking/driving directions ("turn right", "walk along X street") — all of that would be invented, not looked up.${
+  transitLine
+    ? ' The one exception is the real transit route already given above -- restate what it actually says, don\'t embellish it with streets or turns it doesn\'t mention.'
+    : ''
+} If asked about nearby places, other businesses, or how to travel there${transitLine ? ' and no real transit route is given above for it' : ''}, say plainly that you don't have real nearby/map/transit data in this chat, and point them to the map or a fresh search instead of guessing. This holds even if an earlier reply in this same conversation already named a specific place — an earlier mistake is not a fact to build on, treat it as unverified too rather than staying "consistent" with it.
 
 SCOPE RULE (found via testing: pushed hard enough, this chat kept inventing increasingly specific restaurants — "Gino's Pizza", "Bellini" — for a request about a completely different town, Grimstad, nowhere near the place this chat is about): if the user asks about a different place, neighborhood, or town that isn't this specific place or its immediate vicinity, don't attempt an answer from general knowledge at all. Say plainly that this chat is focused on ${name} and that Piri's main search (Ask Piri) is the right place to ask about somewhere else, since it can actually search real places there — this chat can't.
 
@@ -3467,6 +3518,7 @@ ${placeContext.length > 0 ? `Available shortlist:\n${JSON.stringify(placeContext
       userProfile?: UserProfileInput;
       recentlyViewed?: PlaceSummary[];
       savedPlaces?: PlaceSummary[];
+      pastTrips?: string[];
       weather?: { condition: string; temp: number; city: string; description: string };
       poiCandidates?: Array<{ name: string; category?: string; lat?: number; lng?: number; address?: string }>;
     };
@@ -3484,6 +3536,7 @@ ${placeContext.length > 0 ? `Available shortlist:\n${JSON.stringify(placeContext
         userProfile: userProfileSchema.optional(),
         recentlyViewed: placeSummariesSchema,
         savedPlaces: placeSummariesSchema,
+        pastTrips: tripSummariesSchema,
         weather: z
           .object({
             condition: z.string(),
@@ -3528,11 +3581,17 @@ ${placeContext.length > 0 ? `Available shortlist:\n${JSON.stringify(placeContext
       userProfile,
       recentlyViewed,
       savedPlaces,
+      pastTrips,
       weather,
       poiCandidates,
     } = parsedBody.data;
 
-    const { text: userContext } = buildUserContext(userProfile, recentlyViewed, savedPlaces);
+    // Not required -- guest browsing is allowed here, same as
+    // /places/explain-poi. Only used to pull this account's own written
+    // reviews into context; every other branch behaves the same regardless.
+    const userId = await optionalUserId(request, AUTH_JWT_SECRET);
+    const ownReviews = await fetchOwnReviewSummaries(userId);
+    const { text: userContext } = buildUserContext(userProfile, recentlyViewed, savedPlaces, pastTrips, ownReviews);
     const profileContext = userContext ? `${userContext}\nPersonalize your answer to this person.` : '';
 
     const weatherContext = weather

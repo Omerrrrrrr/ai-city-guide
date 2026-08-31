@@ -24,6 +24,29 @@ final class TripsStore {
         return trips.first { $0.id == activeTripId && $0.endedAt == nil }
     }
 
+    /// For AI personalization context (see `PlaceSummaryInput`'s siblings in
+    /// `AIResponses.swift`) — one compact line per completed trip (an
+    /// in-progress trip has no real shape to summarize yet), most recent
+    /// first, capped to 5. Plain English regardless of the app's own
+    /// language, same as `RecentlyViewedStore`/`SavedPlacesStore`'s
+    /// summaries -- this text is for the AI prompt, not shown to the user,
+    /// and `languageInstruction(locale)` already tells the model what
+    /// language to reply in separately.
+    var asPersonalizationSummaries: [String] {
+        let completed = trips
+            .filter { $0.endedAt != nil }
+            .sorted { $0.startedAt > $1.startedAt }
+            .prefix(5)
+        let now = Date().timeIntervalSince1970 * 1000
+        return completed.map { trip in
+            let stopNames = trip.stops.prefix(4).map(\.name).joined(separator: ", ")
+            let daysAgo = max(0, Int((now - trip.startedAt) / (1000 * 60 * 60 * 24)))
+            let recency = daysAgo == 0 ? "today" : "\(daysAgo)d ago"
+            let label = trip.name?.trimmingCharacters(in: .whitespaces).isEmpty == false ? trip.name! : "Trip"
+            return stopNames.isEmpty ? "\(label) (\(recency))" : "\(label): \(stopNames) (\(recency))"
+        }
+    }
+
     private let persistence: UserDefaultsStore<TripsState>
 
     init(defaults: UserDefaults = .standard) {

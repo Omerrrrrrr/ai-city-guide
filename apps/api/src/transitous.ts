@@ -11,6 +11,15 @@
 // as a Google-encoded polyline at precision 6 (v2+ of this API family).
 
 const TRANSITOUS_BASE_URL = 'https://api.transitous.org/api/v6/plan';
+// Required, not just polite -- confirmed live: Transitous rejects a request
+// with no User-Agent outright ("Empty user-agent header is not allowed",
+// 403), and Node's own `fetch` sends an empty one by default (unlike curl,
+// which sends its own default -- a raw `curl` test during development
+// looked like this integration worked end-to-end when only the manual curl
+// half actually did; the real `fetchTransitousLeg` code path was silently
+// 403ing the whole time). Same requirement Wikimedia's API already has
+// (see wiki-photo.ts's WIKIMEDIA_USER_AGENT).
+const TRANSITOUS_USER_AGENT = 'Piri/1.0 (travel app; contact: omerrgulluce@gmail.com)';
 
 interface MotisLeg {
   mode?: string;
@@ -102,7 +111,7 @@ export async function fetchTransitousLeg(
     url.searchParams.set('transitModes', 'TRANSIT');
     url.searchParams.set('detailedLegs', 'true');
 
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000), headers: { 'User-Agent': TRANSITOUS_USER_AGENT } });
     if (!res.ok) return null;
 
     const data = (await res.json()) as MotisPlanResponse;

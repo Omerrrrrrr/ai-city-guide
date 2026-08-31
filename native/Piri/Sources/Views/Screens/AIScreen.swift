@@ -44,6 +44,7 @@ struct AIScreen: View {
     @Environment(UserProfileStore.self) private var userProfileStore
     @Environment(RecentlyViewedStore.self) private var recentlyViewedStore
     @Environment(SavedPlacesStore.self) private var savedPlacesStore
+    @Environment(TripsStore.self) private var tripsStore
     @Environment(CityStore.self) private var cityStore
     @Environment(TabSelection.self) private var tabSelection
     @Environment(\.dismiss) private var dismiss
@@ -607,7 +608,8 @@ struct AIScreen: View {
             mimeType: imageForRequest != nil ? "image/jpeg" : nil,
             locale: Locale.current.language.languageCode?.identifier,
             recentlyViewed: recentlyViewedStore.asPersonalizationSummaries,
-            savedPlaces: savedPlacesStore.asPersonalizationSummaries
+            savedPlaces: savedPlacesStore.asPersonalizationSummaries,
+            pastTrips: tripsStore.asPersonalizationSummaries
         )
 
         do {

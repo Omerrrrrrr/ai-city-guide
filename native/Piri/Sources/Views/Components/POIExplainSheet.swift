@@ -27,6 +27,7 @@ struct POIExplainContent: View {
     @Environment(UserProfileStore.self) private var userProfileStore
     @Environment(SavedPlacesStore.self) private var savedPlacesStore
     @Environment(RecentlyViewedStore.self) private var recentlyViewedStore
+    @Environment(TripsStore.self) private var tripsStore
     @Environment(AuthStore.self) private var authStore
     @Environment(CityStore.self) private var cityStore
     @Environment(TabSelection.self) private var tabSelection
@@ -61,6 +62,12 @@ struct POIExplainContent: View {
     /// plain name-only bubble with no hours inside it — this sheet is the
     /// only surface Apple actually renders that data on.
     @State private var showingMapItemDetail = false
+    /// Only ever touched when a chat message looks like a transit question
+    /// (see `sendChat()`) -- a plain `LocationManager()` instance, same
+    /// per-view-owns-its-own convention every other screen that needs
+    /// location already uses (no shared/injected instance anywhere in the
+    /// app). Never started/prompted-for on a normal chat message.
+    @State private var chatLocationManager = LocationManager()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -402,7 +409,8 @@ struct POIExplainContent: View {
             locale: Locale.current.language.languageCode?.identifier,
             userProfile: personalizationProfile(),
             recentlyViewed: recentlyViewedStore.asPersonalizationSummaries,
-            savedPlaces: savedPlacesStore.asPersonalizationSummaries
+            savedPlaces: savedPlacesStore.asPersonalizationSummaries,
+            pastTrips: tripsStore.asPersonalizationSummaries
         )
 
         do {
@@ -423,6 +431,13 @@ struct POIExplainContent: View {
         chatError = nil
         defer { chatSending = false }
 
+        // Mirrors the backend's own `looksLikeTransitQuestion` -- only fetch
+        // (and only prompt for, on a first ask) the user's location when the
+        // message actually looks like it needs it, not on every message.
+        let userLocation = Self.looksLikeTransitQuestion(message)
+            ? await chatLocationManager.currentLocationOnce()
+            : nil
+
         let request = POIChatRequest(
             name: poi.name,
             category: poi.categoryLabel.isEmpty ? nil : poi.categoryLabel,
@@ -430,6 +445,8 @@ struct POIExplainContent: View {
             website: poi.mapItem.url?.absoluteString,
             lat: poi.coordinate.latitude,
             lng: poi.coordinate.longitude,
+            userLat: userLocation?.latitude,
+            userLng: userLocation?.longitude,
             locale: Locale.current.language.languageCode?.identifier,
             userProfile: personalizationProfile(),
             cityContext: CityContextSummary(
@@ -447,6 +464,16 @@ struct POIExplainContent: View {
         } catch {
             chatError = error.localizedDescription
         }
+    }
+
+    /// Mirrors the backend's own `looksLikeTransitQuestion` regex exactly
+    /// (index.ts, `/places/explain-poi/chat`) -- kept in sync by hand since
+    /// there's no shared source between a Swift client and a Node backend.
+    private static func looksLikeTransitQuestion(_ message: String) -> Bool {
+        message.range(
+            of: #"\bbus\b|\bferry\b|\btrain\b|\btram\b|transit|public transport|how (do|can) i get|get (there|here)|otob[üu]s|feribot|vapur|tren|tramvay|toplu ta[şs][ıi]ma|nas[ıi]l (giderim|ulaş[ıi]r[ıi]m|gidilir)|hvordan kommer jeg|buss\b|ferge|kollektiv"#,
+            options: [.regularExpression, .caseInsensitive]
+        ) != nil
     }
 }
 

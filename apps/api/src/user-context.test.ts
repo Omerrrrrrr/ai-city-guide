@@ -84,3 +84,46 @@ test('buildUserContext handles a saved-place summary with no category', () => {
   const result = buildUserContext(undefined, undefined, [{ name: 'Kunstsilo' }]);
   assert.match(result.text, /Saved by this user for future visits: Kunstsilo\. This is a strong/);
 });
+
+test('buildUserContext appends past-trip context between saved-places and recently-viewed', () => {
+  const result = buildUserContext(
+    undefined,
+    [{ name: 'Réal mat', category: 'restaurant' }],
+    [{ name: 'Kunstsilo', category: 'museum' }],
+    ['Weekend in Bergen: KODE Art Museum, Fløyen (12d ago)']
+  );
+  assert.match(result.text, /This user's past trips: Weekend in Bergen: KODE Art Museum, Fløyen \(12d ago\)\./);
+  assert.match(result.text, /Saved by this user.*past trips.*Recently explored/s);
+});
+
+test('buildUserContext ignores an empty past-trips array', () => {
+  const result = buildUserContext({ profession: 'foodie' }, undefined, undefined, []);
+  assert.doesNotMatch(result.text, /past trips/);
+});
+
+test('buildUserContext renders own reviews first, with rating and quoted text', () => {
+  const result = buildUserContext(undefined, undefined, undefined, undefined, [
+    { name: 'Egon Restaurant', rating: 2, text: 'too noisy and slow service' },
+  ]);
+  assert.match(result.text, /Egon Restaurant — 2\/5, "too noisy and slow service"/);
+  assert.match(result.text, /strongest, most direct preference signal/);
+});
+
+test('buildUserContext renders a bare rating when a review has no text', () => {
+  const result = buildUserContext(undefined, undefined, undefined, undefined, [
+    { name: 'Kunstsilo', rating: 5, text: null },
+  ]);
+  assert.match(result.text, /Kunstsilo — 5\/5\./);
+  assert.doesNotMatch(result.text, /Kunstsilo — 5\/5, "/);
+});
+
+test('buildUserContext orders own reviews before everything else', () => {
+  const result = buildUserContext(
+    undefined,
+    [{ name: 'Réal mat', category: 'restaurant' }],
+    [{ name: 'Kunstsilo', category: 'museum' }],
+    ['Weekend in Bergen (12d ago)'],
+    [{ name: 'Egon Restaurant', rating: 2, text: null }]
+  );
+  assert.match(result.text, /own past reviews.*Saved by this user.*past trips.*Recently explored/s);
+});

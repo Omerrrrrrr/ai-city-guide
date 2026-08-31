@@ -1,4 +1,8 @@
+import { and, desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
+
+import { db } from './db';
+import { poiReviews } from './schema';
 
 // Shared bounds for free-text fields that get interpolated into AI system
 // prompts. These are user-supplied and untrusted — capping length limits
@@ -32,6 +36,32 @@ export const placeSummarySchema = z.object({
 export const placeSummariesSchema = z.array(placeSummarySchema).max(15).optional();
 export type PlaceSummary = { name: string; category?: string };
 
+// One compact line per completed trip (destination stops + rough recency),
+// summarized client-side from `TripsStore`'s full `Trip` records (route
+// geometry, breadcrumb, photos -- far more than a prompt needs). Same
+// free-text trust model as `placeSummarySchema` above; there's no server-side
+// trip data to cross-check this against, TripsStore is local-only.
+export const tripSummariesSchema = z.array(z.string().trim().max(300)).max(5).optional();
+
+export type OwnReviewSummary = { name: string; rating: number; text: string | null };
+
+// Reviews this account has actually written, in their own words -- the
+// strongest personalization signal of the four this module handles: unlike
+// a save/view/trip (all *inferred* taste), a review is the user directly
+// stating an opinion. Server-side (not client-summarized like trips) since
+// reviews already live in `poi_reviews`, keyed by `userId` from auth --
+// no reason to have the client re-fetch and re-send its own review history.
+export async function fetchOwnReviewSummaries(userId: string | null): Promise<OwnReviewSummary[]> {
+  if (!userId) return [];
+  const rows = await db
+    .select({ name: poiReviews.poiName, rating: poiReviews.rating, text: poiReviews.text })
+    .from(poiReviews)
+    .where(and(eq(poiReviews.userId, userId), eq(poiReviews.status, 'approved')))
+    .orderBy(desc(poiReviews.createdAt))
+    .limit(10);
+  return rows;
+}
+
 // Single source for turning a user profile (+ optional recently-viewed and
 // saved-place history) into prompt text, reused by /places/identify,
 // /places/explain-poi, and /places/recommend-poi -- previously each endpoint
@@ -39,7 +69,9 @@ export type PlaceSummary = { name: string; category?: string };
 export function buildUserContext(
   userProfile: UserProfileInput | undefined,
   recentlyViewed?: PlaceSummary[],
-  savedPlaces?: PlaceSummary[]
+  savedPlaces?: PlaceSummary[],
+  pastTrips?: string[],
+  ownReviews?: OwnReviewSummary[]
 ): { text: string; hasProfile: boolean } {
   const lines: string[] = [];
   if (userProfile?.name) lines.push(`Name: ${userProfile.name}`);
@@ -61,6 +93,18 @@ export function buildUserContext(
   const parts: string[] = [];
   if (lines.length > 0) parts.push(`User profile:\n${lines.join('\n')}`);
 
+  // Strongest signal first: a review is the user directly stating an
+  // opinion, not something inferred from a save/view/trip. Includes the
+  // rating even when there's no free-text comment -- a bare "2/5" is still
+  // real, useful signal.
+  if (ownReviews && ownReviews.length > 0) {
+    parts.push(
+      `This user's own past reviews, in their own words (their strongest, most direct preference signal -- weight this heavily): ${ownReviews
+        .map((r) => (r.text ? `${r.name} — ${r.rating}/5, "${r.text}"` : `${r.name} — ${r.rating}/5`))
+        .join('; ')}.`
+    );
+  }
+
   // Saved places before recently-viewed, and worded more strongly -- saving
   // a place is a deliberate, higher-intent action than merely having tapped
   // it once, so it's a stronger taste signal.
@@ -69,6 +113,15 @@ export function buildUserContext(
       `Saved by this user for future visits: ${savedPlaces
         .map((p) => (p.category ? `${p.name} (${p.category})` : p.name))
         .join(', ')}. This is a strong preference signal -- actively lean into these tastes.`
+    );
+  }
+  // Reveals travel style/pattern over time (repeat categories, pace, how far
+  // they range) that a single save or view can't -- softer than a review or
+  // save (nobody curated this specifically to say "I liked this"), but
+  // richer than a passive view since it's a whole completed trip, not one tap.
+  if (pastTrips && pastTrips.length > 0) {
+    parts.push(
+      `This user's past trips: ${pastTrips.join('; ')}. Use this as a soft signal of their travel style and pace, not a literal request to repeat these.`
     );
   }
   if (recentlyViewed && recentlyViewed.length > 0) {

@@ -112,6 +112,7 @@ struct RecommendPOIRequest: Encodable {
     var locale: String?
     var recentlyViewed: [PlaceSummaryInput]?
     var savedPlaces: [PlaceSummaryInput]?
+    var pastTrips: [String]?
 }
 
 /// References a candidate by its index in the request's `poiCandidates`,
@@ -324,6 +325,7 @@ struct ExplainPOIRequest: Encodable {
     var userProfile: PersonalizationProfile?
     var recentlyViewed: [PlaceSummaryInput]?
     var savedPlaces: [PlaceSummaryInput]?
+    var pastTrips: [String]?
 }
 
 /// One turn in a `/places/explain-poi/chat` follow-up conversation.
@@ -389,6 +391,14 @@ struct POIChatRequest: Encodable {
     /// forbids inventing anything about *other* businesses or routes.
     var lat: Double?
     var lng: Double?
+    /// Where the user actually is right now -- not this place's own
+    /// coordinates (`lat`/`lng` above). Only populated when the message
+    /// looks like a transit/directions question (see the call site), so a
+    /// normal chat message never triggers a location fetch/permission
+    /// prompt. Lets the backend answer with a real Transitous route instead
+    /// of refusing every "how do I get there" question outright.
+    var userLat: Double?
+    var userLng: Double?
     var locale: String?
     var userProfile: PersonalizationProfile?
     var cityContext: CityContextSummary?
