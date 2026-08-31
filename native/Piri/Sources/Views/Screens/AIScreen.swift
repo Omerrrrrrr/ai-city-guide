@@ -606,10 +606,8 @@ struct AIScreen: View {
             imageBase64: imageForRequest?.jpegData(compressionQuality: 0.6)?.base64EncodedString(),
             mimeType: imageForRequest != nil ? "image/jpeg" : nil,
             locale: Locale.current.language.languageCode?.identifier,
-            // `RecentlyViewedStore` holds Apple POI references now, not
-            // curated DB ids — nothing left for the backend to resolve
-            // recently-viewed summaries against.
-            recentlyViewedPlaceIds: nil
+            recentlyViewed: recentlyViewedStore.asPersonalizationSummaries,
+            savedPlaces: savedPlacesStore.asPersonalizationSummaries
         )
 
         do {

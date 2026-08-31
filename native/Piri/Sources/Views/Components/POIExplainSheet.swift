@@ -12,6 +12,7 @@ struct POIExplainSheet: View {
 
     @Environment(UserProfileStore.self) private var userProfileStore
     @Environment(SavedPlacesStore.self) private var savedPlacesStore
+    @Environment(RecentlyViewedStore.self) private var recentlyViewedStore
     @Environment(AuthStore.self) private var authStore
     @Environment(CityStore.self) private var cityStore
     @Environment(TabSelection.self) private var tabSelection
@@ -381,7 +382,8 @@ struct POIExplainSheet: View {
             website: poi.mapItem.url?.absoluteString,
             locale: Locale.current.language.languageCode?.identifier,
             userProfile: personalizationProfile(),
-            recentlyViewedPlaceIds: nil
+            recentlyViewed: recentlyViewedStore.asPersonalizationSummaries,
+            savedPlaces: savedPlacesStore.asPersonalizationSummaries
         )
 
         do {

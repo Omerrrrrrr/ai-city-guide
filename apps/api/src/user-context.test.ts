@@ -63,3 +63,24 @@ test('buildUserContext ignores an empty recently-viewed array', () => {
   const result = buildUserContext({ profession: 'foodie' }, []);
   assert.doesNotMatch(result.text, /Recently explored/);
 });
+
+test('buildUserContext appends saved-places context, worded more strongly than recently-viewed', () => {
+  const result = buildUserContext(undefined, undefined, [{ name: 'Kunstsilo', category: 'museum' }]);
+  assert.equal(result.hasProfile, false);
+  assert.match(result.text, /Saved by this user for future visits: Kunstsilo \(museum\)/);
+  assert.match(result.text, /strong preference signal/);
+});
+
+test('buildUserContext includes both saved-places and recently-viewed together, saved first', () => {
+  const result = buildUserContext(
+    undefined,
+    [{ name: 'Réal mat', category: 'restaurant' }],
+    [{ name: 'Kunstsilo', category: 'museum' }]
+  );
+  assert.match(result.text, /Saved by this user.*Recently explored/s);
+});
+
+test('buildUserContext handles a saved-place summary with no category', () => {
+  const result = buildUserContext(undefined, undefined, [{ name: 'Kunstsilo' }]);
+  assert.match(result.text, /Saved by this user for future visits: Kunstsilo\. This is a strong/);
+});

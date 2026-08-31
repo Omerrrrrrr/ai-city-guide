@@ -22,6 +22,20 @@ struct SavedPOIReference: Codable, Identifiable, Hashable {
     var category: MKPointOfInterestCategory? {
         categoryRawValue.map { MKPointOfInterestCategory(rawValue: $0) }
     }
+
+    /// Same "MKPOICategory" prefix strip as `POIPlace.categoryLabel` — kept
+    /// as a separate copy since the two types don't share a common protocol.
+    var categoryLabel: String? {
+        guard let categoryRawValue, !categoryRawValue.isEmpty else { return nil }
+        return categoryRawValue.replacingOccurrences(of: "MKPOICategory", with: "")
+    }
+
+    /// Wire representation for AI personalization context (see
+    /// `PlaceSummaryInput`) — used for both recently-viewed and saved-place
+    /// signals sent to `/places/explain-poi` and `/places/recommend-poi`.
+    var asSummary: PlaceSummaryInput {
+        PlaceSummaryInput(name: name, category: categoryLabel)
+    }
 }
 
 extension POIPlace {

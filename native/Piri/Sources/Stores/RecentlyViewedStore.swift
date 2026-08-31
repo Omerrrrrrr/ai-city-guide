@@ -12,6 +12,12 @@ private struct RecentlyViewedState: Codable {
 final class RecentlyViewedStore {
     private(set) var viewed: [SavedPOIReference] = []
 
+    /// For AI personalization context (see `PlaceSummaryInput`) — not for
+    /// display. Already capped to `maxRecent` (8), under the backend's limit.
+    var asPersonalizationSummaries: [PlaceSummaryInput] {
+        viewed.map(\.asSummary)
+    }
+
     private let persistence = UserDefaultsStore<RecentlyViewedState>(key: "recently-viewed")
 
     init() {

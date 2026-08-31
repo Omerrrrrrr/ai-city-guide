@@ -1371,7 +1371,8 @@ struct MapScreen: View {
                 groupType: profile.groupType?.rawValue,
                 pace: profile.pace?.rawValue
             ),
-            recentlyViewedPlaceIds: nil
+            recentlyViewed: recentlyViewedStore.asPersonalizationSummaries,
+            savedPlaces: savedPlacesStore.asPersonalizationSummaries
         )
 
         do {
@@ -1448,7 +1449,8 @@ struct MapScreen: View {
                 groupType: profile.groupType?.rawValue,
                 pace: profile.pace?.rawValue
             ),
-            recentlyViewedPlaceIds: nil
+            recentlyViewed: recentlyViewedStore.asPersonalizationSummaries,
+            savedPlaces: savedPlacesStore.asPersonalizationSummaries
         )
 
         do {

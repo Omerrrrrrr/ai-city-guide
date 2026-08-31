@@ -66,8 +66,7 @@ struct PlaceDetailScreen: View {
                 groupType: profile.groupType?.rawValue,
                 pace: profile.pace?.rawValue
             ),
-            locale: Locale.current.language.languageCode?.identifier,
-            recentlyViewedPlaceIds: nil
+            locale: Locale.current.language.languageCode?.identifier
         )
         explainResult = try? await PlacesAPI.explain(request)
     }

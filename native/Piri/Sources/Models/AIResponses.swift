@@ -29,6 +29,17 @@ struct WeatherContext: Encodable {
     var description: String
 }
 
+/// A place name/category pair sent inline as personalization context —
+/// `RecentlyViewedStore`/`SavedPlacesStore` hold Apple MapKit POI
+/// references, not curated-DB ids, so there's nothing for the backend to
+/// resolve an id against; the client just sends the summary directly. Same
+/// wire shape for both "recently viewed" (soft signal) and "saved" (strong
+/// signal) — the backend treats them differently in the prompt.
+struct PlaceSummaryInput: Encodable {
+    var name: String
+    var category: String?
+}
+
 struct RecommendRequest: Encodable {
     var query: String
     var messages: [AIConversationMessage]
@@ -40,7 +51,6 @@ struct RecommendRequest: Encodable {
     var imageBase64: String?
     var mimeType: String?
     var locale: String?
-    var recentlyViewedPlaceIds: [String]?
 }
 
 struct AIRecommendation: Codable, Identifiable, Hashable {
@@ -100,7 +110,8 @@ struct RecommendPOIRequest: Encodable {
     var imageBase64: String?
     var mimeType: String?
     var locale: String?
-    var recentlyViewedPlaceIds: [String]?
+    var recentlyViewed: [PlaceSummaryInput]?
+    var savedPlaces: [PlaceSummaryInput]?
 }
 
 /// References a candidate by its index in the request's `poiCandidates`,
@@ -126,7 +137,6 @@ struct ExplainRequest: Encodable {
     var placeId: String
     var userProfile: PersonalizationProfile?
     var locale: String?
-    var recentlyViewedPlaceIds: [String]?
 }
 
 struct ExplainResult: Codable {
@@ -312,7 +322,8 @@ struct ExplainPOIRequest: Encodable {
     var website: String?
     var locale: String?
     var userProfile: PersonalizationProfile?
-    var recentlyViewedPlaceIds: [String]?
+    var recentlyViewed: [PlaceSummaryInput]?
+    var savedPlaces: [PlaceSummaryInput]?
 }
 
 /// One turn in a `/places/explain-poi/chat` follow-up conversation.

@@ -20,6 +20,20 @@ final class SavedPlacesStore {
     var savedLists: [SavedCollection] { collections.filter { $0.kind == .saved } }
     var plans: [SavedCollection] { collections.filter { $0.kind == .plan } }
 
+    /// Flattened across every saved list and plan, deduped by identifier,
+    /// capped to match the backend's `placeSummariesSchema` limit (15) — for
+    /// AI personalization context (see `PlaceSummaryInput`), not for display.
+    var asPersonalizationSummaries: [PlaceSummaryInput] {
+        var seen = Set<String>()
+        var result: [PlaceSummaryInput] = []
+        for place in collections.flatMap(\.places) {
+            guard seen.insert(place.identifier).inserted else { continue }
+            result.append(place.asSummary)
+            if result.count >= 15 { break }
+        }
+        return result
+    }
+
     private let persistence = KeychainStore<SavedPlacesState>(key: "ai-city-guide.saved-places")
 
     init() {

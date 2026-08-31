@@ -85,10 +85,10 @@ import {
 import { subscribeToCityDiscovery } from './push-notifications';
 import {
   buildUserContext,
-  recentlyViewedPlaceIdsSchema,
-  resolveRecentlyViewedSummaries,
+  placeSummariesSchema,
   userProfileSchema,
   type UserProfileInput,
+  type PlaceSummary,
 } from './user-context';
 import { haversineKm } from './geo';
 import { fetchTripAdvisorInfo, fetchTripAdvisorPhotos, fetchTripAdvisorReviews, normalizeName, type TripAdvisorInfo } from './tripadvisor';
@@ -1467,7 +1467,6 @@ async function buildServer() {
       placeId: string;
       locale?: string;
       userProfile?: UserProfileInput;
-      recentlyViewedPlaceIds?: string[];
     };
   }>(
     '/places/explain',
@@ -1478,7 +1477,6 @@ async function buildServer() {
           placeId: z.string().min(1),
           locale: z.string().trim().min(2).max(8).optional(),
           userProfile: userProfileSchema.optional(),
-          recentlyViewedPlaceIds: recentlyViewedPlaceIdsSchema,
         })
         .safeParse(request.body);
 
@@ -1486,7 +1484,7 @@ async function buildServer() {
         return reply.code(400).send({ error: 'Invalid request' });
       }
 
-      const { placeId, locale, userProfile, recentlyViewedPlaceIds } = parsed.data;
+      const { placeId, locale, userProfile } = parsed.data;
       const aiProvider = getAiProviderConfig();
       if (!aiProvider) {
         return reply.code(503).send({ error: 'AI not configured' });
@@ -1495,11 +1493,7 @@ async function buildServer() {
       const [placeRow] = await db.select().from(places).where(eq(places.id, placeId)).limit(1);
       if (!placeRow) return reply.code(404).send({ error: 'Place not found' });
 
-      // Exclude the place being explained from its own "recently viewed" context.
-      const recentlyViewedSummaries = await resolveRecentlyViewedSummaries(
-        recentlyViewedPlaceIds?.filter((id) => id !== placeId)
-      );
-      const { text: profileContext, hasProfile } = buildUserContext(userProfile, recentlyViewedSummaries);
+      const { text: profileContext, hasProfile } = buildUserContext(userProfile);
 
       const placeContext = [
         `Name: ${placeRow.name}`,
@@ -1579,7 +1573,8 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
       address?: string;
       locale?: string;
       userProfile?: UserProfileInput;
-      recentlyViewedPlaceIds?: string[];
+      recentlyViewed?: PlaceSummary[];
+      savedPlaces?: PlaceSummary[];
     };
   }>(
     '/places/explain-poi',
@@ -1595,7 +1590,8 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
           website: optionalUrlInput,
           locale: z.string().trim().min(2).max(8).optional(),
           userProfile: userProfileSchema.optional(),
-          recentlyViewedPlaceIds: recentlyViewedPlaceIdsSchema,
+          recentlyViewed: placeSummariesSchema,
+          savedPlaces: placeSummariesSchema,
         })
         .safeParse(request.body);
 
@@ -1603,7 +1599,7 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         return reply.code(400).send({ error: 'Invalid request' });
       }
 
-      const { name, category, lat, lng, address, website, locale, userProfile, recentlyViewedPlaceIds } = parsed.data;
+      const { name, category, lat, lng, address, website, locale, userProfile, recentlyViewed, savedPlaces } = parsed.data;
       // Not required -- this endpoint is called for every POI tap by signed-
       // out and free accounts too. Only used below to gate the Google-photo
       // fallback + reviews (paid tiers only) behind quota; every other
@@ -1614,8 +1610,7 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         return reply.code(503).send({ error: 'AI not configured' });
       }
 
-      const recentlyViewedSummaries = await resolveRecentlyViewedSummaries(recentlyViewedPlaceIds);
-      const { text: profileContext, hasProfile } = buildUserContext(userProfile, recentlyViewedSummaries);
+      const { text: profileContext, hasProfile } = buildUserContext(userProfile, recentlyViewed, savedPlaces);
 
       // Rating + description are fetched ahead of the AI call (not run in
       // parallel with it) so a real Tripadvisor description, when there is
@@ -3135,7 +3130,6 @@ Keep replies short and conversational (1-4 sentences) — this is a chat, not an
       locale?: string;
       messages?: Array<{ role: 'user' | 'assistant'; content: string }>;
       userProfile?: UserProfileInput;
-      recentlyViewedPlaceIds?: string[];
       weather?: {
         condition: string;
         temp: number;
@@ -3155,7 +3149,6 @@ Keep replies short and conversational (1-4 sentences) — this is a chat, not an
         locale: z.string().trim().min(2).max(8).optional(),
         messages: z.array(chatMessageSchema).max(8).optional(),
         userProfile: userProfileSchema.optional(),
-        recentlyViewedPlaceIds: recentlyViewedPlaceIdsSchema,
         weather: z
           .object({
             condition: z.string(),
@@ -3181,12 +3174,10 @@ Keep replies short and conversational (1-4 sentences) — this is a chat, not an
       locale,
       messages = [],
       userProfile,
-      recentlyViewedPlaceIds,
       weather,
     } = parsedBody.data;
 
-    const recentlyViewedSummaries = await resolveRecentlyViewedSummaries(recentlyViewedPlaceIds);
-    const { text: userContext } = buildUserContext(userProfile, recentlyViewedSummaries);
+    const { text: userContext } = buildUserContext(userProfile);
     const profileContext = userContext ? `${userContext}\nPersonalize your answer to this person.` : '';
 
     const weatherContext = weather
@@ -3457,7 +3448,8 @@ ${placeContext.length > 0 ? `Available shortlist:\n${JSON.stringify(placeContext
       locale?: string;
       messages?: Array<{ role: 'user' | 'assistant'; content: string }>;
       userProfile?: UserProfileInput;
-      recentlyViewedPlaceIds?: string[];
+      recentlyViewed?: PlaceSummary[];
+      savedPlaces?: PlaceSummary[];
       weather?: { condition: string; temp: number; city: string; description: string };
       poiCandidates?: Array<{ name: string; category?: string; lat?: number; lng?: number; address?: string }>;
     };
@@ -3473,7 +3465,8 @@ ${placeContext.length > 0 ? `Available shortlist:\n${JSON.stringify(placeContext
         locale: z.string().trim().min(2).max(8).optional(),
         messages: z.array(chatMessageSchema).max(8).optional(),
         userProfile: userProfileSchema.optional(),
-        recentlyViewedPlaceIds: recentlyViewedPlaceIdsSchema,
+        recentlyViewed: placeSummariesSchema,
+        savedPlaces: placeSummariesSchema,
         weather: z
           .object({
             condition: z.string(),
@@ -3516,13 +3509,13 @@ ${placeContext.length > 0 ? `Available shortlist:\n${JSON.stringify(placeContext
       locale,
       messages = [],
       userProfile,
-      recentlyViewedPlaceIds,
+      recentlyViewed,
+      savedPlaces,
       weather,
       poiCandidates,
     } = parsedBody.data;
 
-    const recentlyViewedSummaries = await resolveRecentlyViewedSummaries(recentlyViewedPlaceIds);
-    const { text: userContext } = buildUserContext(userProfile, recentlyViewedSummaries);
+    const { text: userContext } = buildUserContext(userProfile, recentlyViewed, savedPlaces);
     const profileContext = userContext ? `${userContext}\nPersonalize your answer to this person.` : '';
 
     const weatherContext = weather
