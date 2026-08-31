@@ -44,6 +44,18 @@
             "state": "translated",
             "value": " %1$@%2$@"
           }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " %1$@%2$@"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " %1$@%2$@"
+          }
         }
       }
     },
@@ -102,6 +114,18 @@
             "state": "translated",
             "value": "%1$.1f (%2$@)"
           }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$.1f (%2$@)"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$.1f (%2$@)"
+          }
         }
       }
     },
@@ -146,6 +170,18 @@
             "state": "translated",
             "value": "%1$@ · %2$@"
           }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ · %2$@"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ · %2$@"
+          }
         }
       }
     },
@@ -184,6 +220,18 @@
           }
         },
         "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ / %2$@"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ / %2$@"
+          }
+        },
+        "nb": {
           "stringUnit": {
             "state": "translated",
             "value": "%1$@ / %2$@"
@@ -234,6 +282,18 @@
           }
         },
         "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@°, %2$@"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@°, %2$@"
+          }
+        },
+        "nb": {
           "stringUnit": {
             "state": "translated",
             "value": "%1$@°, %2$@"
@@ -296,6 +356,18 @@
           }
         },
         "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 %1$@ ≈ %2$@ %3$@"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 %1$@ ≈ %2$@ %3$@"
+          }
+        },
+        "nb": {
           "stringUnit": {
             "state": "translated",
             "value": "1 %1$@ ≈ %2$@ %3$@"
@@ -42693,6 +42765,75 @@
           "stringUnit": {
             "state": "translated",
             "value": "Trilhas"
+          }
+        }
+      }
+    },
+    "profile.avatar.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profile Photo"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profil Fotoğrafı"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Profilbilde"
+          }
+        }
+      }
+    },
+    "profile.avatar.choosePhoto": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose Photo"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fotoğraf Seç"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velg bilde"
+          }
+        }
+      }
+    },
+    "profile.avatar.remove": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove Photo"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fotoğrafı Kaldır"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fjern bilde"
           }
         }
       }
