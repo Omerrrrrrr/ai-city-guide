@@ -383,6 +383,12 @@ struct POIChatRequest: Encodable {
     /// business's own site to answer specific questions (ticket prices,
     /// hours) instead of always deflecting to "check their website."
     var website: String?
+    /// Lets the backend answer a direct "where is this" about the place
+    /// itself (previously it had zero spatial grounding, even for the one
+    /// place it's actually discussing) — the NEARBY-PLACES RULE still
+    /// forbids inventing anything about *other* businesses or routes.
+    var lat: Double?
+    var lng: Double?
     var locale: String?
     var userProfile: PersonalizationProfile?
     var cityContext: CityContextSummary?

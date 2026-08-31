@@ -124,9 +124,17 @@ private struct POIPhotoViewer: View {
     @State var index: Int
     @Environment(\.dismiss) private var dismiss
 
+    // Live-reported bugs, both traced to the same cause: the close button's
+    // tap target used to be exactly the glyph's own tiny frame (no padding,
+    // no contentShape), which read as "the X doesn't work" as often as "hard
+    // to tap." A drag-to-dismiss gesture is the requested second way out.
+    @State private var dragOffset: CGFloat = 0
+    private let dismissDragThreshold: CGFloat = 120
+
     var body: some View {
         ZStack(alignment: .top) {
             Color.black.ignoresSafeArea()
+                .opacity(Double(1 - min(abs(dragOffset) / 600, 0.6)))
             TabView(selection: $index) {
                 ForEach(Array(photos.enumerated()), id: \.element.id) { photoIndex, photo in
                     CachedAsyncImage(url: URL(string: photo.url), maxPixelSize: 1600) { image in
@@ -138,6 +146,23 @@ private struct POIPhotoViewer: View {
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
+            .offset(y: dragOffset)
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        // Vertical-dominant only, so a horizontal swipe
+                        // between photos in the pager still works normally.
+                        guard abs(value.translation.height) > abs(value.translation.width) else { return }
+                        dragOffset = value.translation.height
+                    }
+                    .onEnded { value in
+                        if abs(value.translation.height) > dismissDragThreshold {
+                            dismiss()
+                        } else {
+                            withAnimation(.spring(response: 0.3)) { dragOffset = 0 }
+                        }
+                    }
+            )
 
             HStack {
                 Text("\(index + 1) / \(photos.count)").foregroundStyle(.white)
@@ -149,10 +174,13 @@ private struct POIPhotoViewer: View {
                     dismiss()
                 } label: {
                     Image(systemName: "xmark").foregroundStyle(.white)
+                        .font(.system(size: 15, weight: .semibold))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
+            .padding(.horizontal, 12)
+            .padding(.top, 4)
         }
     }
 }

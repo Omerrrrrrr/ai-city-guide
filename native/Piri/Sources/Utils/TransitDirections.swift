@@ -10,18 +10,34 @@ enum TransitDirectionsError: Error {
     case noRouteFound
 }
 
-/// Public transit has no OpenRouteService profile at all (confirmed against
-/// their docs), so unlike walking/driving/cycling this never goes through
-/// `/routes/directions` -- it's computed entirely on-device via
-/// `MKDirections`, free and keyless, the same async MapKit request pattern
-/// already used for `MKLookAroundSceneRequest` elsewhere in the app.
-/// `MKDirections` only computes one origin→destination leg at a time (ORS's
-/// single call handles a whole multi-stop route), so this fetches leg by
-/// leg and stitches the results into the same `DirectionsResult` shape ORS
-/// returns -- route rendering, `Trip.routeGeometry`, etc. need no knowledge
-/// of which source produced it.
+/// Public transit routing, tried in two layers:
+///
+/// 1. `/routes/directions` with `profile: .transit` -- the backend calls
+///    Transitous (transitous.ts), a free/keyless service aggregating GTFS
+///    feeds from 60+ countries into one API. Picked over a national transit
+///    API (e.g. Norway's Entur) specifically to avoid one bespoke
+///    integration per country -- confirmed live that Apple's own transit
+///    coverage in Norway is capital-cities-only (Oslo/Bergen), leaving
+///    Kristiansand (this app's own dev/test city) with no Apple transit
+///    data at all, which is what made this gap visible in the first place.
+/// 2. On-device `MKDirections` with `.transportType = .transit`, leg by leg
+///    -- kept as a fallback for wherever Transitous's crowd-sourced feed
+///    coverage is thinner than Apple's own (the two don't necessarily
+///    overlap), and for offline resilience if the backend call fails for
+///    an unrelated reason (network, backend down).
+///
+/// Both return the same `DirectionsResult` shape ORS's walking/driving/
+/// cycling profiles already do -- route rendering, `Trip.routeGeometry`,
+/// etc. need no knowledge of which of the three sources produced it.
 enum TransitDirections {
     static func fetchMultiLeg(stops: [PlaceCoordinate]) async throws -> DirectionsResult {
+        if let result = try? await RoutesAPI.directions(coordinates: stops, profile: .transit) {
+            return result
+        }
+        return try await fetchMultiLegOnDevice(stops: stops)
+    }
+
+    private static func fetchMultiLegOnDevice(stops: [PlaceCoordinate]) async throws -> DirectionsResult {
         var routeGeometry: [[Double]] = []
         var totalDistance: Double = 0
         var totalDuration: Double = 0
@@ -44,7 +60,22 @@ enum TransitDirections {
         request.destination = MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: to.lat, longitude: to.lng)))
         request.transportType = .transit
 
-        let response = try await MKDirections(request: request).calculate()
+        // `calculate()` itself throws (rather than returning an empty
+        // `routes` array) whenever Apple simply has no transit data for the
+        // region at all -- confirmed live: a ferry-only route (Kristiansand
+        // to a small island) surfaced the generic "Rota hesaplanamadı.
+        // Bağlantını kontrol et." (misleadingly implying a network problem)
+        // instead of the accurate, already-written `map.route.transitFailed`
+        // copy, because this threw before ever reaching the empty-`routes`
+        // check below. Every failure from `calculate()` under `.transit`
+        // means the same thing in practice -- no real connectivity check is
+        // possible here, so there's no lost information in normalizing it.
+        let response: MKDirections.Response
+        do {
+            response = try await MKDirections(request: request).calculate()
+        } catch {
+            throw TransitDirectionsError.noRouteFound
+        }
         guard let route = response.routes.first else { throw TransitDirectionsError.noRouteFound }
 
         var coordinates = [CLLocationCoordinate2D](repeating: kCLLocationCoordinate2DInvalid, count: route.polyline.pointCount)

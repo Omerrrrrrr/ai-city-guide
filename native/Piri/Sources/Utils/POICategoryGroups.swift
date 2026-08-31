@@ -45,7 +45,12 @@ enum POICategoryGroups {
         // religion a given place belongs to, so this can't be split further
         // than "places of worship" as one group.
         POICategoryGroup(labelKey: "mapPoiCategories.worship", categories: [.religiousSite], icon: "building.2.fill"),
-        POICategoryGroup(labelKey: "mapPoiCategories.nature", categories: [.park, .nationalPark, .campground, .hiking, .zoo], icon: "leaf.fill"),
+        POICategoryGroup(labelKey: "mapPoiCategories.nature", categories: [.park, .nationalPark, .campground, .zoo], icon: "leaf.fill"),
+        // Split out from nature -- same precedent as `.religiousSite` above:
+        // lumped into a general "Nature & Parks" chip, `.hiking` had no chip
+        // of its own to find it by (reported live: "Hiking çıkmıyor" while
+        // scanning the chip row for one).
+        POICategoryGroup(labelKey: "mapPoiCategories.hiking", categories: [.hiking], icon: "figure.hiking"),
         POICategoryGroup(labelKey: "mapPoiCategories.culture", categories: [.theater, .movieTheater, .musicVenue, .planetarium, .aquarium], icon: "theatermasks.fill"),
         POICategoryGroup(labelKey: "mapPoiCategories.beaches", categories: [.beach, .marina, .surfing, .kayaking], icon: "beach.umbrella.fill"),
         POICategoryGroup(labelKey: "mapPoiCategories.cafes", categories: [.cafe, .bakery], icon: "cup.and.saucer.fill"),

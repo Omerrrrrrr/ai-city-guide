@@ -94,6 +94,7 @@ import { haversineKm } from './geo';
 import { fetchTripAdvisorInfo, fetchTripAdvisorPhotos, fetchTripAdvisorReviews, normalizeName, type TripAdvisorInfo } from './tripadvisor';
 import { fetchWikipediaPhoto, WIKIPEDIA_PLAUSIBLE_CATEGORIES, GOLDEN_HOUR_CATEGORIES } from './wiki-photo';
 import { fetchWikidataFacts } from './wikidata';
+import { fetchTransitousLeg } from './transitous';
 import { fetchDietaryPlaces, fetchDietaryTagsForPlace } from './dietary';
 import { fetchUnsplashPhoto } from './unsplash';
 import { verifyTransaction } from './storekit';
@@ -2961,6 +2962,8 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
       category?: string;
       address?: string;
       website?: string;
+      lat?: number;
+      lng?: number;
       locale?: string;
       userProfile?: UserProfileInput;
       history: { role: 'user' | 'assistant'; content: string }[];
@@ -2976,6 +2979,8 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
           category: z.string().trim().max(100).optional(),
           address: z.string().trim().max(300).optional(),
           website: optionalUrlInput,
+          lat: z.number().optional(),
+          lng: z.number().optional(),
           locale: z.string().trim().min(2).max(8).optional(),
           userProfile: userProfileSchema.optional(),
           // Client-supplied, not re-fetched here -- same pattern
@@ -3021,7 +3026,7 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
         return reply.code(400).send({ error: 'Invalid request' });
       }
 
-      const { name, category, address, website, locale, userProfile, cityContext, message } = parsed.data;
+      const { name, category, address, website, lat, lng, locale, userProfile, cityContext, message } = parsed.data;
       const history = parsed.data.history.slice(-12);
       const aiProvider = getAiProviderConfig();
       if (!aiProvider) {
@@ -3072,6 +3077,7 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
         `Name: ${name}`,
         category ? `Category: ${category}` : null,
         address ? `Address: ${address}` : null,
+        lat != null && lng != null ? `Coordinates: ${lat}, ${lng}` : null,
         cityContextLine,
         websiteExcerpt ? `Text scraped from the business's own official website: "${websiteExcerpt}"` : null,
       ]
@@ -3100,7 +3106,7 @@ ${
       }\n`
     : ''
 }
-NEARBY-PLACES RULE (found via testing: asked for a nearby restaurant, this chat invented a specific chain's name, then a "500 meters" distance it explicitly admitted not knowing, then fabricated turn-by-turn directions — all confidently, with zero real location or map data behind any of it): this chat has no coordinates, no nearby-search results, and no routing data at all — only the single place named above. Never name a specific other business as if it's a verified real place near here, never state a distance in meters/minutes, and never give directions ("turn right", "walk along X street") — all of that would be invented, not looked up. If asked something like this, say plainly that you don't have real nearby/map data in this chat, and point them to the map or a fresh search instead of guessing. This holds even if an earlier reply in this same conversation already named a specific place — an earlier mistake is not a fact to build on, treat it as unverified too rather than staying "consistent" with it.
+NEARBY-PLACES RULE (found via testing: asked for a nearby restaurant, this chat invented a specific chain's name, then a "500 meters" distance it explicitly admitted not knowing, then fabricated turn-by-turn directions — all confidently, with zero real location or map data behind any of it): this chat has no nearby-search results and no routing data at all — only the single place named above${lat != null && lng != null ? ' (this place\'s own coordinates are given, so you may state or lightly describe where THIS place itself is when asked, e.g. "it is on the coast just south of the city" -- but that is the one location fact you actually have)' : ''}. Never name a specific OTHER business as if it's a verified real place near here, never state a distance to another place in meters/minutes, and never give directions ("turn right", "walk along X street") — all of that would be invented, not looked up. If asked about nearby places, other businesses, or how to travel there, say plainly that you don't have real nearby/map/transit data in this chat, and point them to the map or a fresh search instead of guessing. This holds even if an earlier reply in this same conversation already named a specific place — an earlier mistake is not a fact to build on, treat it as unverified too rather than staying "consistent" with it.
 
 SCOPE RULE (found via testing: pushed hard enough, this chat kept inventing increasingly specific restaurants — "Gino's Pizza", "Bellini" — for a request about a completely different town, Grimstad, nowhere near the place this chat is about): if the user asks about a different place, neighborhood, or town that isn't this specific place or its immediate vicinity, don't attempt an answer from general knowledge at all. Say plainly that this chat is focused on ${name} and that Piri's main search (Ask Piri) is the right place to ask about somewhere else, since it can actually search real places there — this chat can't.
 
@@ -4773,7 +4779,7 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
   app.post<{
     Body: {
       coordinates: { lat: number; lng: number }[];
-      profile?: 'foot-walking' | 'driving-car' | 'cycling-regular';
+      profile?: 'foot-walking' | 'driving-car' | 'cycling-regular' | 'transit';
     };
   }>(
     '/routes/directions',
@@ -4785,7 +4791,7 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
             .array(z.object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) }))
             .min(2)
             .max(10),
-          profile: z.enum(['foot-walking', 'driving-car', 'cycling-regular']).optional().default('foot-walking'),
+          profile: z.enum(['foot-walking', 'driving-car', 'cycling-regular', 'transit']).optional().default('foot-walking'),
         })
         .safeParse(request.body);
 
@@ -4794,6 +4800,37 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
       }
 
       const { coordinates, profile } = parsed.data;
+
+      // Transit has no OpenRouteService profile at all, and no honest
+      // straight-line fallback either (unlike walking/driving/cycling, a
+      // straight line at some assumed speed doesn't approximate "wait for a
+      // bus, ride it, transfer" in any useful way) -- routed to Transitous
+      // (transitous.ts) instead, one leg per consecutive stop pair, same
+      // multi-leg stitching `TransitDirections.swift` used to do entirely
+      // client-side via on-device MKDirections. A `null` leg here means
+      // Transitous genuinely has no itinerary for that pair (no coverage in
+      // this region, or no real route) -- surfaced as 404 so the client can
+      // fall back to on-device MKDirections rather than reading it as a
+      // network failure.
+      if (profile === 'transit') {
+        const route: [number, number][] = [];
+        let distanceMeters = 0;
+        let durationSeconds = 0;
+        const steps: { instruction: string; distanceMeters: number }[] = [];
+
+        for (let i = 0; i < coordinates.length - 1; i++) {
+          const leg = await fetchTransitousLeg(coordinates[i], coordinates[i + 1]);
+          if (!leg) {
+            return reply.code(404).send({ error: 'No transit route found for this leg' });
+          }
+          route.push(...leg.route);
+          distanceMeters += leg.distanceMeters;
+          durationSeconds += leg.durationSeconds;
+          steps.push(...leg.steps);
+        }
+
+        return reply.send({ route, distanceMeters, durationSeconds, steps });
+      }
 
       // Straight-line fallback: connects the stops in the given order with
       // a direct line and estimates distance/duration from haversine

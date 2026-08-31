@@ -26,7 +26,7 @@ private let appearanceOptions: [(scheme: ColorScheme?, icon: String, labelKey: S
 /// (shown a few cards below as the "Planlar" stat) read as the same
 /// feature when it very much isn't.
 private enum ProfileTab: Hashable, Identifiable {
-    case language, profession, interests, plan
+    case profession, interests, plan
     var id: Self { self }
 }
 
@@ -64,7 +64,7 @@ struct ProfileScreen: View {
     @State private var liveRateTask: Task<Void, Never>?
     @State private var showingSaved: SavedTab?
     @State private var showingRestartHint = false
-    @State private var profileTab: ProfileTab = .language
+    @State private var profileTab: ProfileTab = .profession
     @State private var newInterestText = ""
     @State private var showingSignIn = false
     @State private var showingPaywall = false
@@ -80,6 +80,17 @@ struct ProfileScreen: View {
             VStack(alignment: .leading, spacing: 14) {
                 header
                 profileSummaryCard
+                // Plain app settings (display language, light/dark mode,
+                // preferred maps app) -- previously nested inside "Seni
+                // Böyle Görüyoruz"'s personalization tabs, behind its edit
+                // toggle, under a "Dil" tab. Reported live ("Bu sayfa
+                // yanlış," referring to that card): none of these three
+                // describe how the app personalizes to the user, so they
+                // don't belong gated inside a personalization-profile
+                // editor at all -- they're just settings, always visible.
+                languageCard
+                appearanceCard
+                mapsProviderCard
                 if authStore.isSignedIn {
                     friendsCard
                 }
@@ -317,7 +328,6 @@ struct ProfileScreen: View {
 
     private var profileTabsSegment: some View {
         HStack(spacing: 3) {
-            profileTabButton(.language, label: String(localized: "settings.tabs.language"))
             profileTabButton(.profession, label: String(localized: "settings.tabs.profession"))
             profileTabButton(.interests, label: String(localized: "settings.tabs.interests"))
             profileTabButton(.plan, label: String(localized: "settings.tabs.plan"))
@@ -344,10 +354,6 @@ struct ProfileScreen: View {
     @ViewBuilder
     private var profileTabContent: some View {
         switch profileTab {
-        case .language:
-            languageCard
-            appearanceCard
-            mapsProviderCard
         case .profession: professionCard
         case .interests: interestsTabContent
         case .plan: planTabContent

@@ -409,6 +409,8 @@ struct POIExplainSheet: View {
             category: poi.categoryLabel.isEmpty ? nil : poi.categoryLabel,
             address: poi.mapItem.placemark.title,
             website: poi.mapItem.url?.absoluteString,
+            lat: poi.coordinate.latitude,
+            lng: poi.coordinate.longitude,
             locale: Locale.current.language.languageCode?.identifier,
             userProfile: personalizationProfile(),
             cityContext: CityContextSummary(

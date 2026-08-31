@@ -4,11 +4,11 @@ enum RouteProfile: String, Encodable, CaseIterable {
     case footWalking = "foot-walking"
     case drivingCar = "driving-car"
     case cyclingRegular = "cycling-regular"
-    /// Never sent to `/routes/directions` -- ORS has no transit profile at
-    /// all, so this branches client-side to `TransitDirections` instead
-    /// (see `MapScreen+RouteMode.swift`'s `fetchDirectionsResult()`). The
-    /// raw value only needs to be a stable identifier, not a real ORS
-    /// profile name.
+    /// Not an OpenRouteService profile -- when sent to `/routes/directions`,
+    /// the backend routes it to Transitous instead (see `transitous.ts`).
+    /// `TransitDirections.fetchMultiLeg` tries that first and falls back to
+    /// on-device `MKDirections` if it fails (see that type's own doc
+    /// comment for why both exist).
     case transit = "transit"
 
     var icon: String {

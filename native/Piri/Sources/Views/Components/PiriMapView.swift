@@ -61,6 +61,16 @@ struct PiriMapView: UIViewRepresentable {
         mapView.delegate = context.coordinator
         mapView.showsUserLocation = showsUserLocation
         mapView.mapType = mapType
+        mapView.showsCompass = true
+        // MapKit auto-positions its own compass in the top-right safe area —
+        // exactly where MapScreen's SwiftUI search bar + category-chip row
+        // sit on top of the map. Without this, the compass renders directly
+        // underneath that overlay and is never visible (reported live: "Pusula
+        // gözükmüyor"). `layoutMargins` is the Apple-documented way to move
+        // MapKit's own controls (compass, legal link, scale) out from under
+        // custom chrome; 150pt clears the search bar + chip row with a little
+        // headroom. Tune this if that header's height changes.
+        mapView.layoutMargins = UIEdgeInsets(top: 150, left: 0, bottom: 0, right: 0)
         // Makes Apple's own base-map POI icons (grocery stores, restaurants,
         // landmarks — anything rendered by the map tiles rather than one of
         // our own annotations) individually selectable, delivered to the

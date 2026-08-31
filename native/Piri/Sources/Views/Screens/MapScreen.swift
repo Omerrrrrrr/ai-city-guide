@@ -106,11 +106,20 @@ struct MapScreen: View {
     /// serve stale weather. `WeatherQuery` has its own 30-minute cache.
     @State private var mapFeatureWeatherQuery = WeatherQuery()
     /// Resolved alongside the AI explain call so `mapFeatureCard` can show
-    /// its plain phone/website fields and offer the full Place Card sheet.
+    /// its plain phone/website fields.
     @State private var resolvedMapFeatureItem: MKMapItem?
-    @State private var showingMapItemDetail = false
     @State private var showingDirections = false
     @State private var addToCollectionKind: SavedCollectionKind?
+    /// Follow-up chat for `mapFeatureCard` — this card had none at all
+    /// (reported live: "gereksiz ve ai alanı yok altta," referring to this
+    /// card's rating-popover icon and missing chat, next to `POIExplainSheet`
+    /// which already has both a proper reviews section and this same chat).
+    /// Same reset discipline as `poiExplainResult`/`userPhotos` above: keyed
+    /// to whichever POI this card currently shows, cleared in lockstep.
+    @State private var mapFeatureChatHistory: [POIChatTurn] = []
+    @State private var mapFeatureChatInput = ""
+    @State private var mapFeatureChatSending = false
+    @State private var mapFeatureChatError: String?
     @State private var lookAroundScene: MKLookAroundScene?
     @State private var routeCoordinates: [CLLocationCoordinate2D] = []
     @State var initialRegion: MKCoordinateRegion?
@@ -615,9 +624,11 @@ struct MapScreen: View {
         userPhotos = []
         lookAroundScene = nil
         resolvedMapFeatureItem = nil
-        showingMapItemDetail = false
         showingDirections = false
         addToCollectionKind = nil
+        mapFeatureChatHistory = []
+        mapFeatureChatInput = ""
+        mapFeatureChatError = nil
         poiExplainTask?.cancel()
         poiExplainTask = Task { await explainDietaryPin(pin) }
         let coordinate = CLLocationCoordinate2D(latitude: pin.lat, longitude: pin.lng)
@@ -639,9 +650,11 @@ struct MapScreen: View {
         userPhotos = []
         lookAroundScene = nil
         resolvedMapFeatureItem = nil
-        showingMapItemDetail = false
         showingDirections = false
         addToCollectionKind = nil
+        mapFeatureChatHistory = []
+        mapFeatureChatInput = ""
+        mapFeatureChatError = nil
         poiExplainTask?.cancel()
         poiExplainTask = Task { await explainMapFeature(feature) }
         Task { lookAroundScene = try? await MKLookAroundSceneRequest(coordinate: feature.coordinate).scene }
@@ -655,9 +668,11 @@ struct MapScreen: View {
         poiExplainError = nil
         userPhotos = []
         lookAroundScene = nil
-        showingMapItemDetail = false
         showingDirections = false
         addToCollectionKind = nil
+        mapFeatureChatHistory = []
+        mapFeatureChatInput = ""
+        mapFeatureChatError = nil
         poiExplainTask?.cancel()
     }
 
@@ -964,31 +979,6 @@ struct MapScreen: View {
                     .font(.title3)
                     .padding(.trailing, 10)
                 }
-                // Apple's own rating (the "👍 92% (240)" style figure) has
-                // no plain data API — `MKMapItem` genuinely has no rating
-                // property (confirmed against the SDK headers), Apple only
-                // exposes it through this native popover. Previously a
-                // full-width gold "Full Details" button down in the action
-                // row that opened as a full sheet — live-tested 2026-08-30
-                // and found it showed nothing else genuinely new beyond the
-                // rating (address/directions are already on this same card
-                // via `PlaceDetailsCard` below), so it was real navigation
-                // for one small stat. A small icon here, using a *popover*
-                // instead of a sheet, keeps the rating reachable without
-                // ever leaving this card.
-                if let resolvedMapFeatureItem {
-                    Button {
-                        showingMapItemDetail = true
-                    } label: {
-                        Image(systemName: "hand.thumbsup")
-                            .foregroundStyle(.secondary)
-                            .frame(width: 36, height: 36)
-                            .contentShape(Rectangle())
-                    }
-                    .font(.title3)
-                    .padding(.trailing, 10)
-                    .mapItemDetailPopover(isPresented: $showingMapItemDetail, item: resolvedMapFeatureItem)
-                }
                 Button {
                     dismissMapFeature()
                 } label: {
@@ -1103,7 +1093,40 @@ struct MapScreen: View {
                     if let lookAroundScene {
                         LookAroundCard(scene: lookAroundScene, height: 140)
                     }
+
+                    if let poi {
+                        if !mapFeatureChatHistory.isEmpty {
+                            Divider().padding(.vertical, 4)
+                            ForEach(mapFeatureChatHistory) { turn in mapFeatureChatBubble(turn) }
+                        }
+                        if mapFeatureChatSending {
+                            HStack {
+                                ProgressView().tint(Theme.gold)
+                                Spacer()
+                            }
+                        }
+                        if let mapFeatureChatError {
+                            HStack(spacing: 6) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                Text(mapFeatureChatError)
+                            }
+                            .font(.footnote)
+                            .foregroundStyle(Theme.closedRed)
+                            .padding(10)
+                            .background(Theme.closedRed.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+                        }
+                    }
                 }
+            }
+            // Same "ask a follow-up" chat `POIExplainSheet` already has --
+            // this card had none at all (reported live). Pinned below the
+            // scrollable content, like POIExplainSheet's own input bar,
+            // rather than scrolling away with everything else. Only shown
+            // once `poi` resolves -- same gate the bookmark/plan icons above
+            // already use, since the chat request needs the same real data.
+            if let poi {
+                Divider()
+                mapFeatureChatInputBar(for: poi)
             }
         }
         .padding()
@@ -1389,6 +1412,86 @@ struct MapScreen: View {
     private func loadUserPhotos(name: String, coordinate: CLLocationCoordinate2D) async {
         guard let token = authStore.token else { return }
         userPhotos = (try? await PhotosAPI.fetchPhotos(name: name, lat: coordinate.latitude, lng: coordinate.longitude, token: token)) ?? []
+    }
+
+    /// Same request shape and flow as `POIExplainSheet.sendChat()` -- this
+    /// card had no chat at all until now (see the state vars' own comment).
+    /// Takes `poi` as a parameter rather than reading `resolvedMapFeatureItem`
+    /// itself since the caller already resolved it once as a real `POIPlace`.
+    private func sendMapFeatureChat(for poi: POIPlace) async {
+        let message = mapFeatureChatInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !message.isEmpty else { return }
+        mapFeatureChatInput = ""
+
+        let historyForRequest = mapFeatureChatHistory
+        mapFeatureChatHistory.append(POIChatTurn(role: .user, content: message))
+        mapFeatureChatSending = true
+        mapFeatureChatError = nil
+        defer { mapFeatureChatSending = false }
+
+        let profile = userProfileStore.profile
+        let request = POIChatRequest(
+            name: poi.name,
+            category: poi.categoryLabel.isEmpty ? nil : poi.categoryLabel,
+            address: poi.mapItem.placemark.title,
+            website: poi.mapItem.url?.absoluteString,
+            lat: poi.coordinate.latitude,
+            lng: poi.coordinate.longitude,
+            locale: Locale.current.language.languageCode?.identifier,
+            userProfile: PersonalizationProfile(
+                name: profile.name,
+                profession: profile.professionText,
+                interests: profile.interestsText,
+                faith: profile.faith?.rawValue,
+                budget: profile.budget?.rawValue,
+                groupType: profile.groupType?.rawValue,
+                pace: profile.pace?.rawValue
+            ),
+            cityContext: CityContextSummary(
+                countryInfo: cityStore.countryInfo,
+                timezone: cityStore.timezones.first,
+                exchangeRates: cityStore.exchangeRates
+            ),
+            history: historyForRequest,
+            message: message
+        )
+
+        do {
+            let response = try await PlacesAPI.chatAboutPOI(request)
+            mapFeatureChatHistory.append(POIChatTurn(role: .assistant, content: response.reply))
+        } catch {
+            mapFeatureChatError = error.localizedDescription
+        }
+    }
+
+    private func mapFeatureChatBubble(_ turn: POIChatTurn) -> some View {
+        HStack {
+            if turn.role == .user { Spacer(minLength: 40) }
+            Text(turn.content)
+                .font(.footnote)
+                .padding(10)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(turn.role == .user ? Theme.gold.opacity(0.15) : Color(.secondarySystemBackground))
+                )
+            if turn.role == .assistant { Spacer(minLength: 40) }
+        }
+        .id(turn.id)
+    }
+
+    private func mapFeatureChatInputBar(for poi: POIPlace) -> some View {
+        HStack(spacing: 8) {
+            TextField(String(localized: "poiChat.inputPlaceholder"), text: $mapFeatureChatInput)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit { Task { await sendMapFeatureChat(for: poi) } }
+            Button {
+                Task { await sendMapFeatureChat(for: poi) }
+            } label: {
+                Image(systemName: "arrow.up.circle.fill").font(.title2)
+                    .foregroundStyle(Theme.gold)
+            }
+            .disabled(mapFeatureChatInput.trimmingCharacters(in: .whitespaces).isEmpty || mapFeatureChatSending)
+        }
     }
 
     private func dietaryPinCacheKey(_ pin: DietaryPin, profile: UserProfile) -> String {
