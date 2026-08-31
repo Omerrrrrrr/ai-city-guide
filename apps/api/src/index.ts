@@ -4013,6 +4013,40 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
     }
   });
 
+  // ── /me/avatar — profile photo, stored inline like userSubmittedPhotos ──────
+  // Same `data:image/jpeg;base64,...` storage pattern as `/poi/photos` (see
+  // schema.ts's `users.avatarUrl` comment) -- no R2/object-storage upload
+  // flow exists anywhere in this codebase, everything user-submitted is
+  // stored inline. `avatarUrl: null` removes the photo (falls back to the
+  // initial-letter avatar client-side). Capped well under Fastify's default
+  // 1MB body limit -- the client resizes to a small square before encoding,
+  // so a legitimate upload never gets close to this.
+  app.patch<{ Body: { avatarUrl?: string | null } }>('/me/avatar', async (request, reply) => {
+    const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
+    if (!userId) return;
+
+    const parsed = z
+      .object({
+        avatarUrl: z
+          .string()
+          .trim()
+          .regex(/^data:image\/(jpeg|png);base64,/, 'Must be a JPEG or PNG data URI')
+          .max(700_000)
+          .nullable(),
+      })
+      .safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? 'Invalid request' });
+    }
+
+    try {
+      await db.update(users).set({ avatarUrl: parsed.data.avatarUrl }).where(eq(users.id, userId));
+      return reply.send({ avatarUrl: parsed.data.avatarUrl });
+    } catch (e) {
+      return sendServerError(request, reply, e, 'Failed to update avatar');
+    }
+  });
+
   app.get<{ Querystring: { username?: string } }>('/users/lookup', async (request, reply) => {
     const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
     if (!userId) return;

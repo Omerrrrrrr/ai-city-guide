@@ -121,6 +121,17 @@ final class AuthStore {
         setSession(AuthTokenResponse(token: token, user: updatedUser))
     }
 
+    /// `nil` removes the current photo. Awaits the server round trip (unlike
+    /// `updateSharingPreferences`'s optimistic update) since a failed upload
+    /// shouldn't silently look like it succeeded -- the caller sees the throw.
+    func updateAvatar(_ avatarUrl: String?) async throws {
+        guard let token else { return }
+        let response = try await SocialAPI.updateAvatar(avatarUrl, token: token)
+        guard var updatedUser = user else { return }
+        updatedUser.avatarUrl = response.avatarUrl
+        setSession(AuthTokenResponse(token: token, user: updatedUser))
+    }
+
     /// Optimistic local update (instant toggle feedback) + background push
     /// -- a wrong guess here just gets silently corrected on the next
     /// `refreshMe()`, same tolerance `pushSync`'s whole-blob overwrite

@@ -27,6 +27,7 @@ export function toPublicUser(user: UserRow) {
     showRealName: user.showRealName,
     tier: user.tier,
     tierExpiresAt: user.tierExpiresAt,
+    avatarUrl: user.avatarUrl,
   };
 }
 

@@ -27,6 +27,14 @@ struct UsernameResponse: Decodable {
     let username: String?
 }
 
+struct AvatarRequest: Encodable {
+    let avatarUrl: String?
+}
+
+struct AvatarResponse: Decodable {
+    let avatarUrl: String?
+}
+
 struct UsernameLookupResponse: Decodable {
     let id: String
     let username: String?

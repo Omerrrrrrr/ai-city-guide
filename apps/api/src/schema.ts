@@ -215,6 +215,11 @@ export const users = pgTable('users', {
   originalTransactionId: varchar('original_transaction_id', { length: 64 }),
   iapProductId: varchar('iap_product_id', { length: 64 }),
   iapEnvironment: varchar('iap_environment', { length: 16 }),
+  // A `data:image/jpeg;base64,...` URI, same storage pattern as
+  // `userSubmittedPhotos.photoUrl` -- no R2/object-storage upload flow
+  // exists anywhere in this codebase yet, everything user-submitted is
+  // stored inline. `null` means "no photo, show the initial-letter avatar."
+  avatarUrl: text('avatar_url'),
 }, (table) => [
   uniqueIndex('idx_users_email').on(table.email),
   uniqueIndex('idx_users_apple_user_id').on(table.appleUserId),

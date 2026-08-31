@@ -117,6 +117,7 @@
 		A09820EA73906B8317F7ECA7 /* TripRecapData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D39D77604DA21EEA57D1133 /* TripRecapData.swift */; };
 		A2D65D1C6851A7802697F3BE /* TripPhotoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D8F55E9E6F23F30F9323E2F /* TripPhotoStore.swift */; };
 		A785BBB4AFF5DC51F15C29A3 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = E712507F714C68342D7027E7 /* Localizable.xcstrings */; };
+		A85D9821B6A44EE65428E0E3 /* AvatarPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEE6DAFF514FAF0BECEAB13D /* AvatarPickerSheet.swift */; };
 		A9C92E48B29B6A75FF48802E /* TripAdvisorHours.swift in Sources */ = {isa = PBXBuildFile; fileRef = 156E198E679C89FCF3886BE8 /* TripAdvisorHours.swift */; };
 		AA0513F0B8654D68605A9DCE /* LocationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E67959451EFC53E9B89AEE8 /* LocationManager.swift */; };
 		ABC4236A1C18ED878A9206C7 /* TripAdvisorRatingRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 642AE03D91D3B2C9EC654135 /* TripAdvisorRatingRow.swift */; };
@@ -350,6 +351,7 @@
 		F887777DB4455F61F087FC46 /* LivePin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePin.swift; sourceTree = "<group>"; };
 		F88D9297E5E64646338B6975 /* PlaceMiniMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceMiniMap.swift; sourceTree = "<group>"; };
 		FD84E76D896B4B8ABED0C539 /* RecapStatsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecapStatsCard.swift; sourceTree = "<group>"; };
+		FEE6DAFF514FAF0BECEAB13D /* AvatarPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarPickerSheet.swift; sourceTree = "<group>"; };
 		FFE56DF7DF9101D7624A7945 /* POIPlace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POIPlace.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -423,6 +425,7 @@
 			children = (
 				A559EA917EE2CAFE7D251A4B /* AddToCollectionSheet.swift */,
 				075FABAAD9BF8ECA21982D81 /* AdminGateView.swift */,
+				FEE6DAFF514FAF0BECEAB13D /* AvatarPickerSheet.swift */,
 				0235E9B64832A4922FD3451D /* CachedAsyncImage.swift */,
 				B05066D4D6C47F50C5385DE8 /* CameraPreviewView.swift */,
 				D207ADFEE3A017CC4579BF6E /* ChipGrid.swift */,
@@ -751,8 +754,13 @@
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				Base,
+				de,
 				en,
+				es,
+				fr,
+				it,
 				nb,
+				"pt-BR",
 				tr,
 			);
 			mainGroup = 72FD08E96CFF1C79A78A44F2;
@@ -853,6 +861,7 @@
 				1A4535B5C0C30CBBA074EE6A /* AuthAPI.swift in Sources */,
 				11902DAA906C544983E91F21 /* AuthModels.swift in Sources */,
 				BCB29456771D85C06ACF1203 /* AuthStore.swift in Sources */,
+				A85D9821B6A44EE65428E0E3 /* AvatarPickerSheet.swift in Sources */,
 				382E98FD71A9A15914AEA4BA /* CachedAsyncImage.swift in Sources */,
 				B86D99FE1C368872A95297E9 /* CameraController.swift in Sources */,
 				2E9750DCA179C8A76BA71091 /* CameraPreviewView.swift in Sources */,

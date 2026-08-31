@@ -73,6 +73,7 @@ struct ProfileScreen: View {
     @State private var newInterestText = ""
     @State private var showingSignIn = false
     @State private var showingPaywall = false
+    @State private var showingAvatarPicker = false
 
     private var profile: UserProfile { userProfileStore.profile }
     private var displayName: String {
@@ -152,6 +153,7 @@ struct ProfileScreen: View {
         .sheet(item: $showingSaved) { tab in SavedScreen(initialTab: tab) }
         .sheet(isPresented: $showingSignIn) { SignInScreen() }
         .sheet(isPresented: $showingPaywall) { PaywallScreen() }
+        .sheet(isPresented: $showingAvatarPicker) { AvatarPickerSheet() }
         .navigationBarHidden(true)
     }
 
@@ -216,11 +218,20 @@ struct ProfileScreen: View {
 
     private var header: some View {
         HStack(alignment: .top, spacing: 14) {
-            ZStack {
-                Circle().fill(.white.opacity(0.15))
-                Text(displayName.prefix(1).uppercased()).font(.system(size: 24, weight: .bold)).foregroundStyle(Theme.gold)
+            // Only signed-in accounts can actually store a photo server-side
+            // (see `PATCH /me/avatar`) -- a signed-out session keeps the
+            // plain initial-letter circle, not tappable, same as before.
+            if authStore.isSignedIn {
+                Button {
+                    Haptics.light()
+                    showingAvatarPicker = true
+                } label: {
+                    avatarView
+                }
+                .buttonStyle(.plain)
+            } else {
+                avatarView
             }
-            .frame(width: 52, height: 52)
 
             VStack(alignment: .leading, spacing: 2) {
                 if isEditingName {
@@ -265,6 +276,24 @@ struct ProfileScreen: View {
         .piriGlassSurface()
         .padding(.horizontal, -20)
         .padding(.top, -20)
+    }
+
+    /// The real uploaded photo (`AuthUser.avatarUrl`) when signed in and set,
+    /// else the same initial-letter placeholder this always showed before
+    /// (reported live: "Kişinin kendi profil fotoğrafı yok").
+    @ViewBuilder
+    private var avatarView: some View {
+        if let avatarUrl = authStore.user?.avatarUrl {
+            DataURIImage(dataUri: avatarUrl)
+                .frame(width: 52, height: 52)
+                .clipShape(Circle())
+        } else {
+            ZStack {
+                Circle().fill(.white.opacity(0.15))
+                Text(displayName.prefix(1).uppercased()).font(.system(size: 24, weight: .bold)).foregroundStyle(Theme.gold)
+            }
+            .frame(width: 52, height: 52)
+        }
     }
 
     /// Reflects the profile fields already collected (profession, interests,

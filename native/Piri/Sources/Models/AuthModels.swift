@@ -35,12 +35,15 @@ struct AuthUser: Codable, Equatable {
     /// itself is always decided server-side against `users.tier`, not by
     /// the client comparing this against "now".
     var tierExpiresAt: String?
+    /// `data:image/jpeg;base64,...`, or `nil` for the initial-letter avatar.
+    /// See `PATCH /me/avatar` / `schema.ts`'s `users.avatarUrl` comment.
+    var avatarUrl: String?
 
     var isPaidTier: Bool { tier == "basic" || tier == "pro" }
 
     enum CodingKeys: String, CodingKey {
         case id, email, displayName, username, shareXp, shareTripStats, shareTripHistory
-        case xp, completedTripCount, leaderboardVisible, showRealName, tier, tierExpiresAt
+        case xp, completedTripCount, leaderboardVisible, showRealName, tier, tierExpiresAt, avatarUrl
     }
 
     // Custom decode: a non-optional property with a default value is NOT
@@ -68,6 +71,7 @@ struct AuthUser: Codable, Equatable {
         showRealName = try container.decodeIfPresent(Bool.self, forKey: .showRealName) ?? false
         tier = try container.decodeIfPresent(String.self, forKey: .tier) ?? "free"
         tierExpiresAt = try container.decodeIfPresent(String.self, forKey: .tierExpiresAt)
+        avatarUrl = try container.decodeIfPresent(String.self, forKey: .avatarUrl)
     }
 
     init(
@@ -83,7 +87,8 @@ struct AuthUser: Codable, Equatable {
         leaderboardVisible: Bool = true,
         showRealName: Bool = false,
         tier: String = "free",
-        tierExpiresAt: String? = nil
+        tierExpiresAt: String? = nil,
+        avatarUrl: String? = nil
     ) {
         self.id = id
         self.email = email
@@ -98,6 +103,7 @@ struct AuthUser: Codable, Equatable {
         self.showRealName = showRealName
         self.tier = tier
         self.tierExpiresAt = tierExpiresAt
+        self.avatarUrl = avatarUrl
     }
 }
 

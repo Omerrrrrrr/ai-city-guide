@@ -8,6 +8,13 @@ enum SocialAPI {
         try await APIClient.shared.patch("/me/username", body: UsernameRequest(username: username), bearerToken: token)
     }
 
+    /// `nil` removes the current photo. `avatarUrl` (when non-nil) must
+    /// already be a `data:image/jpeg;base64,...` string -- see
+    /// `ProfileScreen`'s avatar picker for the resize+encode step.
+    static func updateAvatar(_ avatarUrl: String?, token: String) async throws -> AvatarResponse {
+        try await APIClient.shared.patch("/me/avatar", body: AvatarRequest(avatarUrl: avatarUrl), bearerToken: token)
+    }
+
     static func lookupUsername(_ username: String, token: String) async throws -> UsernameLookupResponse {
         try await APIClient.shared.get("/users/lookup", query: ["username": username], bearerToken: token)
     }
