@@ -1,14 +1,28 @@
 import MapKit
 import SwiftUI
 
-/// Sheet-presented version of the personalized AI blurb `MapScreen` shows
-/// inline over the map — used by list-based screens (Home) that browse
-/// Apple POIs without a map view to tap into. Same `/places/explain-poi`
-/// backend call, same non-persisted, session-only behavior. A lightweight
-/// follow-up chat (`/places/explain-poi/chat`) lets the user keep asking
-/// about the place instead of the blurb being a dead end.
-struct POIExplainSheet: View {
+/// The personalized AI blurb for one POI — everything: description, photos,
+/// combined rating/reviews, plain contact details, hours access, directions
+/// preview, Look Around, and a follow-up chat. Self-contained (owns all its
+/// own state, fetches its own data via `.task`), so it renders identically
+/// wherever it's embedded.
+///
+/// Two presentations exist because the two contexts genuinely differ: a
+/// full-screen sheet (`POIExplainSheet`, below) for list-based screens with
+/// no map to stay visible behind it, and an inline floating card
+/// (`MapScreen.mapFeatureCard`) that keeps the map visible/pannable behind
+/// it. They used to be two separately-maintained implementations that
+/// silently drifted apart (reported live: "neden farklı sayfalar çıkıyor" —
+/// the inline card was missing chat entirely, still had a since-removed
+/// rating-popover icon) -- this type is the single shared content both now
+/// embed, so a feature added to one is never accidentally missing from the
+/// other again. `onClose` is `nil` for the sheet case (dismiss goes through
+/// the NavigationStack's own toolbar Cancel button, the HIG-correct pattern
+/// for a full-screen modal); non-nil for the inline-card case, which has no
+/// nav bar of its own and needs an in-content close affordance instead.
+struct POIExplainContent: View {
     let poi: POIPlace
+    var onClose: (() -> Void)? = nil
 
     @Environment(UserProfileStore.self) private var userProfileStore
     @Environment(SavedPlacesStore.self) private var savedPlacesStore
@@ -49,225 +63,224 @@ struct POIExplainSheet: View {
     @State private var showingMapItemDetail = false
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack(alignment: .top) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(poi.name).font(.title3.bold())
-                                    if !poi.categoryLabel.isEmpty {
-                                        Text(poi.categoryLabel).font(.subheadline).foregroundStyle(.secondary)
-                                    }
-                                }
-                                Spacer()
-                                // `poi.mapItem.identifier` is nil for some
-                                // POIs (a known Apple gap, not a bug here) —
-                                // `asReference.identifier` is never nil (it
-                                // falls back to a synthetic id), so
-                                // `isSaved`/`isPlanned` checks always work.
-                                let identifier = poi.asReference.identifier
-                                HStack(spacing: 14) {
-                                    Button {
-                                        Haptics.light()
-                                        addToCollectionKind = .saved
-                                    } label: {
-                                        Image(systemName: savedPlacesStore.isSaved(identifier) ? "bookmark.fill" : "bookmark")
-                                            .foregroundStyle(savedPlacesStore.isSaved(identifier) ? Theme.gold : .secondary)
-                                    }
-                                    Button {
-                                        Haptics.light()
-                                        addToCollectionKind = .plan
-                                    } label: {
-                                        // Not "flag" — that's MapScreen's
-                                        // Route Mode toggle icon; kept
-                                        // distinct so the two concepts don't
-                                        // look like the same action there.
-                                        Image(systemName: savedPlacesStore.isPlanned(identifier) ? "suitcase.fill" : "suitcase")
-                                            .foregroundStyle(savedPlacesStore.isPlanned(identifier) ? Theme.gold : .secondary)
-                                    }
-                                }
-                                .font(.title3)
-                            }
-
-                            // AI explanation first — the reason someone opens
-                            // this sheet at all — before any of Apple's own
-                            // place data further down.
-                            if loading {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    SkeletonBox().frame(width: 180, height: 14)
-                                    SkeletonBox().frame(height: 12)
-                                    SkeletonBox().frame(width: 220, height: 12)
-                                }
-                            } else if let result {
-                                Text(result.headline).font(.subheadline.bold()).foregroundStyle(Theme.gold)
-                                HStack(spacing: 12) {
-                                    if let weather = weatherQuery.weather {
-                                        weatherBadge(weather)
-                                    }
-                                    if let goldenHour = result.goldenHour, let window = goldenHourWindow(goldenHour) {
-                                        goldenHourBadge(window)
-                                    }
-                                }
-                                // The real photo (Wikipedia/Tripadvisor, never
-                                // AI-generated) is the most visually engaging
-                                // thing this card has — it used to sit below
-                                // three rows of badges/text, effectively
-                                // buried. See the 2026-08 visual-design
-                                // research report, Phase 1.
-                                // No separate "Google details" card here —
-                                // paid tiers get Google's photos folded
-                                // straight into the gallery above and its
-                                // editorial summary/reviews folded into the
-                                // AI body text itself (both server-side, see
-                                // `/places/explain-poi`), so there's nothing
-                                // left for a redundant second card to show.
-                                POIPhotoGallery(photos: result.photos)
-                                UserPhotoSection(poiName: poi.name, coordinate: poi.coordinate, photos: $userPhotos)
-                                if let rating = result.rating {
-                                    TripAdvisorRatingRow(rating: rating)
-                                    // Only offered when we already know
-                                    // Tripadvisor has a matched location for
-                                    // this place (i.e. `rating` resolved at
-                                    // all) -- avoids a dead-end tap that
-                                    // fetches reviews for a place with none.
-                                    Button {
-                                        Haptics.light()
-                                        showingReviews = true
-                                    } label: {
-                                        Label(L("poiReviews.seeAll", rating.reviewCount), systemImage: "text.bubble")
-                                            .font(.footnote.weight(.semibold))
-                                    }
-                                }
-                                PiriReviewsSection(poi: poi, tripAdvisorRating: result.rating, googleRating: result.googleRating, initialPiriRating: result.piriRating, reviewsSummary: result.reviewsSummary, aspectHighlights: result.aspectHighlights)
-                                if let curatedInfo = result.curatedInfo {
-                                    CuratedInfoRow(info: curatedInfo)
-                                }
-                                if let dietaryTags = result.dietaryTags {
-                                    DietaryTagsRow(tags: dietaryTags)
-                                }
-                                Text(result.body).font(.footnote)
-                                if let source = result.groundingSource {
-                                    // NOT `LocalizationValue("...\(source)")` -- that treats
-                                    // `source` as a substitution argument of the literal string
-                                    // "poiExplain.source.%@" rather than concatenating it into
-                                    // the lookup key, so the catalog lookup always misses and
-                                    // silently falls back to rendering the raw interpolated
-                                    // text (confirmed live: a real card showed literal
-                                    // "poiExplain.source.wikipedia" instead of the translated
-                                    // caption). Build the key as a plain `String` first, same
-                                    // fix `LPlural` already documents for the identical trap.
-                                    let key = "poiExplain.source." + source
-                                    SourceCaption(text: String(localized: String.LocalizationValue(key)))
-                                }
-                                ForEach(result.highlights, id: \.self) { highlight in
-                                    HStack(alignment: .top, spacing: 6) {
-                                        Circle().fill(Theme.gold).frame(width: 5, height: 5).padding(.top, 6)
-                                        Text(highlight).font(.caption)
-                                    }
-                                }
-                            } else if let errorMessage {
-                                HStack(spacing: 8) {
-                                    Text(errorMessage).font(.footnote).foregroundStyle(Theme.closedRed)
-                                    Spacer()
-                                    Button("common.retry") { Task { await explain() } }
-                                        .buttonStyle(.bordered)
-                                        .controlSize(.small)
+        VStack(spacing: 0) {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(alignment: .top) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(poi.name).font(.title3.bold())
+                                if !poi.categoryLabel.isEmpty {
+                                    Text(poi.categoryLabel).font(.subheadline).foregroundStyle(.secondary)
                                 }
                             }
-
-                            // Phone/website/address — real plain values
-                            // from Apple's own MapKit data.
-                            PlaceDetailsCard(mapItem: poi.mapItem)
-
-                            // Hours has no plain-value form to put in the
-                            // section above (see note on `showingMapItemDetail`)
-                            // — this is the only way to see it at all.
-                            HStack(spacing: 10) {
-                                Button {
-                                    showingMapItemDetail = true
-                                } label: {
-                                    Label("poiExplain.fullDetails", systemImage: "info.circle.fill")
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .tint(Theme.gold)
-                                .mapItemDetailSheet(isPresented: $showingMapItemDetail, item: poi.mapItem)
-
-                                Button("common.openInMaps") {
-                                    let opensInApp = PlaceDirections.opensInApp
-                                    PlaceDirections.openInMaps(name: poi.name, coordinate: poi.coordinate, tabSelection: tabSelection)
-                                    if opensInApp { dismiss() }
-                                }
-                                .buttonStyle(.bordered)
-
+                            Spacer()
+                            // `poi.mapItem.identifier` is nil for some
+                            // POIs (a known Apple gap, not a bug here) —
+                            // `asReference.identifier` is never nil (it
+                            // falls back to a synthetic id), so
+                            // `isSaved`/`isPlanned` checks always work.
+                            let identifier = poi.asReference.identifier
+                            HStack(spacing: 14) {
                                 Button {
                                     Haptics.light()
-                                    withAnimation(.easeInOut(duration: 0.2)) { showingDirections.toggle() }
+                                    addToCollectionKind = .saved
                                 } label: {
-                                    Label("directions.preview.button", systemImage: "arrow.triangle.turn.up.right.circle")
+                                    Image(systemName: savedPlacesStore.isSaved(identifier) ? "bookmark.fill" : "bookmark")
+                                        .foregroundStyle(savedPlacesStore.isSaved(identifier) ? Theme.gold : .secondary)
                                 }
-                                .buttonStyle(.bordered)
-                            }
-
-                            if showingDirections {
-                                DirectionsPreview(destination: poi.coordinate)
-                            }
-
-                            // Apple's own street-level imagery — silently
-                            // omitted where Look Around has no coverage
-                            // (common outside a handful of countries) rather
-                            // than showing an empty/broken placeholder.
-                            if let lookAroundScene {
-                                LookAroundCard(scene: lookAroundScene, height: 180)
-                            }
-
-                            if !chatHistory.isEmpty {
-                                Divider().padding(.vertical, 4)
-                                ForEach(chatHistory) { turn in chatBubble(turn) }
-                            }
-
-                            if chatSending {
-                                HStack {
-                                    ProgressView().tint(Theme.gold)
-                                    Spacer()
+                                Button {
+                                    Haptics.light()
+                                    addToCollectionKind = .plan
+                                } label: {
+                                    // Not "flag" — that's MapScreen's
+                                    // Route Mode toggle icon; kept
+                                    // distinct so the two concepts don't
+                                    // look like the same action there.
+                                    Image(systemName: savedPlacesStore.isPlanned(identifier) ? "suitcase.fill" : "suitcase")
+                                        .foregroundStyle(savedPlacesStore.isPlanned(identifier) ? Theme.gold : .secondary)
                                 }
-                                .id("chat-sending")
-                            }
-
-                            if let chatError {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "exclamationmark.triangle.fill")
-                                    Text(chatError)
+                                if let onClose {
+                                    Button {
+                                        onClose()
+                                    } label: {
+                                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                                    }
                                 }
-                                .font(.footnote)
-                                .foregroundStyle(Theme.closedRed)
-                                .padding(10)
-                                .background(Theme.closedRed.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
-                                .id("chat-error")
+                            }
+                            .font(.title3)
+                        }
+
+                        // AI explanation first — the reason someone opens
+                        // this sheet at all — before any of Apple's own
+                        // place data further down.
+                        if loading {
+                            VStack(alignment: .leading, spacing: 8) {
+                                SkeletonBox().frame(width: 180, height: 14)
+                                SkeletonBox().frame(height: 12)
+                                SkeletonBox().frame(width: 220, height: 12)
+                            }
+                        } else if let result {
+                            Text(result.headline).font(.subheadline.bold()).foregroundStyle(Theme.gold)
+                            HStack(spacing: 12) {
+                                if let weather = weatherQuery.weather {
+                                    weatherBadge(weather)
+                                }
+                                if let goldenHour = result.goldenHour, let window = goldenHourWindow(goldenHour) {
+                                    goldenHourBadge(window)
+                                }
+                            }
+                            // The real photo (Wikipedia/Tripadvisor, never
+                            // AI-generated) is the most visually engaging
+                            // thing this card has — it used to sit below
+                            // three rows of badges/text, effectively
+                            // buried. See the 2026-08 visual-design
+                            // research report, Phase 1.
+                            // No separate "Google details" card here —
+                            // paid tiers get Google's photos folded
+                            // straight into the gallery above and its
+                            // editorial summary/reviews folded into the
+                            // AI body text itself (both server-side, see
+                            // `/places/explain-poi`), so there's nothing
+                            // left for a redundant second card to show.
+                            POIPhotoGallery(photos: result.photos)
+                            UserPhotoSection(poiName: poi.name, coordinate: poi.coordinate, photos: $userPhotos)
+                            if let rating = result.rating {
+                                TripAdvisorRatingRow(rating: rating)
+                                // Only offered when we already know
+                                // Tripadvisor has a matched location for
+                                // this place (i.e. `rating` resolved at
+                                // all) -- avoids a dead-end tap that
+                                // fetches reviews for a place with none.
+                                Button {
+                                    Haptics.light()
+                                    showingReviews = true
+                                } label: {
+                                    Label(L("poiReviews.seeAll", rating.reviewCount), systemImage: "text.bubble")
+                                        .font(.footnote.weight(.semibold))
+                                }
+                            }
+                            PiriReviewsSection(poi: poi, tripAdvisorRating: result.rating, googleRating: result.googleRating, initialPiriRating: result.piriRating, reviewsSummary: result.reviewsSummary, aspectHighlights: result.aspectHighlights)
+                            if let curatedInfo = result.curatedInfo {
+                                CuratedInfoRow(info: curatedInfo)
+                            }
+                            if let dietaryTags = result.dietaryTags {
+                                DietaryTagsRow(tags: dietaryTags)
+                            }
+                            Text(result.body).font(.footnote)
+                            if let source = result.groundingSource {
+                                // NOT `LocalizationValue("...\(source)")` -- that treats
+                                // `source` as a substitution argument of the literal string
+                                // "poiExplain.source.%@" rather than concatenating it into
+                                // the lookup key, so the catalog lookup always misses and
+                                // silently falls back to rendering the raw interpolated
+                                // text (confirmed live: a real card showed literal
+                                // "poiExplain.source.wikipedia" instead of the translated
+                                // caption). Build the key as a plain `String` first, same
+                                // fix `LPlural` already documents for the identical trap.
+                                let key = "poiExplain.source." + source
+                                SourceCaption(text: String(localized: String.LocalizationValue(key)))
+                            }
+                            ForEach(result.highlights, id: \.self) { highlight in
+                                HStack(alignment: .top, spacing: 6) {
+                                    Circle().fill(Theme.gold).frame(width: 5, height: 5).padding(.top, 6)
+                                    Text(highlight).font(.caption)
+                                }
+                            }
+                        } else if let errorMessage {
+                            HStack(spacing: 8) {
+                                Text(errorMessage).font(.footnote).foregroundStyle(Theme.closedRed)
+                                Spacer()
+                                Button("common.retry") { Task { await explain() } }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.small)
                             }
                         }
-                        .padding()
-                    }
-                    .onChange(of: chatHistory.count) { _, _ in
-                        guard let last = chatHistory.last else { return }
-                        withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
-                    }
-                    .onChange(of: chatError) { _, newValue in
-                        guard newValue != nil else { return }
-                        withAnimation { proxy.scrollTo("chat-error", anchor: .bottom) }
-                    }
-                }
 
-                Divider()
-                chatInputBar
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("common.cancel") { dismiss() }
+                        // Phone/website/address — real plain values
+                        // from Apple's own MapKit data.
+                        PlaceDetailsCard(mapItem: poi.mapItem)
+
+                        // Hours has no plain-value form to put in the
+                        // section above (see note on `showingMapItemDetail`)
+                        // — this is the only way to see it at all.
+                        HStack(spacing: 10) {
+                            Button {
+                                showingMapItemDetail = true
+                            } label: {
+                                Label("poiExplain.fullDetails", systemImage: "info.circle.fill")
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(Theme.gold)
+                            .mapItemDetailSheet(isPresented: $showingMapItemDetail, item: poi.mapItem)
+
+                            Button("common.openInMaps") {
+                                let opensInApp = PlaceDirections.opensInApp
+                                PlaceDirections.openInMaps(name: poi.name, coordinate: poi.coordinate, tabSelection: tabSelection)
+                                if opensInApp { close() }
+                            }
+                            .buttonStyle(.bordered)
+
+                            Button {
+                                Haptics.light()
+                                withAnimation(.easeInOut(duration: 0.2)) { showingDirections.toggle() }
+                            } label: {
+                                Label("directions.preview.button", systemImage: "arrow.triangle.turn.up.right.circle")
+                            }
+                            .buttonStyle(.bordered)
+                        }
+
+                        if showingDirections {
+                            DirectionsPreview(destination: poi.coordinate)
+                        }
+
+                        // Apple's own street-level imagery — silently
+                        // omitted where Look Around has no coverage
+                        // (common outside a handful of countries) rather
+                        // than showing an empty/broken placeholder.
+                        if let lookAroundScene {
+                            LookAroundCard(scene: lookAroundScene, height: 180)
+                        }
+
+                        if !chatHistory.isEmpty {
+                            Divider().padding(.vertical, 4)
+                            ForEach(chatHistory) { turn in chatBubble(turn) }
+                        }
+
+                        if chatSending {
+                            HStack {
+                                ProgressView().tint(Theme.gold)
+                                Spacer()
+                            }
+                            .id("chat-sending")
+                        }
+
+                        if let chatError {
+                            HStack(spacing: 6) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                Text(chatError)
+                            }
+                            .font(.footnote)
+                            .foregroundStyle(Theme.closedRed)
+                            .padding(10)
+                            .background(Theme.closedRed.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+                            .id("chat-error")
+                        }
+                    }
+                    .padding()
+                }
+                .onChange(of: chatHistory.count) { _, _ in
+                    guard let last = chatHistory.last else { return }
+                    withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
+                }
+                .onChange(of: chatError) { _, newValue in
+                    guard newValue != nil else { return }
+                    withAnimation { proxy.scrollTo("chat-error", anchor: .bottom) }
                 }
             }
+
+            Divider()
+            chatInputBar
         }
         .sheet(item: $addToCollectionKind) { kind in AddToCollectionSheet(poi: poi, kind: kind) }
         .sheet(isPresented: $showingReviews) { TripAdvisorReviewsSheet(poi: poi, totalReviewCount: result?.rating?.reviewCount) }
@@ -275,6 +288,12 @@ struct POIExplainSheet: View {
         .task { await loadLookAroundScene() }
         .task { await weatherQuery.load(lat: poi.coordinate.latitude, lng: poi.coordinate.longitude) }
         .task { await loadUserPhotos() }
+    }
+
+    /// `onClose` when embedded inline (no presentation context to dismiss),
+    /// else the real sheet dismiss.
+    private func close() {
+        if let onClose { onClose() } else { dismiss() }
     }
 
     /// Compact, not a card element — current conditions at this POI, one
@@ -427,6 +446,27 @@ struct POIExplainSheet: View {
             chatHistory.append(POIChatTurn(role: .assistant, content: response.reply))
         } catch {
             chatError = error.localizedDescription
+        }
+    }
+}
+
+/// Full-screen sheet presentation — used by list-based screens (Home) that
+/// browse Apple POIs without a map view to tap into. See
+/// `POIExplainContent`'s own doc comment for why this is now a thin wrapper.
+struct POIExplainSheet: View {
+    let poi: POIPlace
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            POIExplainContent(poi: poi)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("common.cancel") { dismiss() }
+                    }
+                }
         }
     }
 }

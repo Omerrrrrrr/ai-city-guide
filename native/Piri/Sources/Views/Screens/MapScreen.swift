@@ -89,38 +89,16 @@ struct MapScreen: View {
     @State private var selectedPlace: Place?
     @State private var selectedLivePin: LivePin?
     @State private var selectedMapFeature: MKMapFeatureAnnotation?
-    @State private var poiExplainResult: ExplainResult?
-    @State private var poiExplainLoading = false
-    /// Keyed to whichever POI `poiExplainResult` currently describes — reset
-    /// alongside it in every select/dismiss path below rather than left to
-    /// go stale, since a previous POI's photos briefly showing under a new
-    /// one's headline would misattribute them.
-    @State private var userPhotos: [UserSubmittedPhoto] = []
-    /// Separate from the shared `errorMessage` banner (search/directions/live
-    /// pins) so a POI-explain failure shows inline in `mapFeatureCard` with
-    /// its own retry button, instead of a disconnected top-of-screen banner
-    /// that could also linger after the card that caused it is dismissed.
-    @State private var poiExplainError: String?
-    /// Fetched alongside (not blocking) the AI explain call — independent of
-    /// `poiExplainCache`, since a cache hit on the AI text shouldn't also
-    /// serve stale weather. `WeatherQuery` has its own 30-minute cache.
-    @State private var mapFeatureWeatherQuery = WeatherQuery()
-    /// Resolved alongside the AI explain call so `mapFeatureCard` can show
-    /// its plain phone/website fields.
+    /// Resolved by `explainMapFeature`/`explainDietaryPin` so `mapFeatureCard`
+    /// can build a real `POIPlace` to hand to `POIExplainContent` -- that
+    /// type owns everything downstream of having a `POIPlace` (explanation
+    /// fetch/cache, photos, weather, chat, etc.) itself now.
     @State private var resolvedMapFeatureItem: MKMapItem?
-    @State private var showingDirections = false
-    @State private var addToCollectionKind: SavedCollectionKind?
-    /// Follow-up chat for `mapFeatureCard` — this card had none at all
-    /// (reported live: "gereksiz ve ai alanı yok altta," referring to this
-    /// card's rating-popover icon and missing chat, next to `POIExplainSheet`
-    /// which already has both a proper reviews section and this same chat).
-    /// Same reset discipline as `poiExplainResult`/`userPhotos` above: keyed
-    /// to whichever POI this card currently shows, cleared in lockstep.
-    @State private var mapFeatureChatHistory: [POIChatTurn] = []
-    @State private var mapFeatureChatInput = ""
-    @State private var mapFeatureChatSending = false
-    @State private var mapFeatureChatError: String?
-    @State private var lookAroundScene: MKLookAroundScene?
+    /// Set by `explainMapFeature` when `MKMapItemRequest` itself fails (a
+    /// real network request, unlike `explainDietaryPin`'s local synthesis) --
+    /// drives a retry affordance in `mapFeatureCard`'s loading state instead
+    /// of leaving it stuck on a skeleton forever.
+    @State private var resolveFailed = false
     @State private var routeCoordinates: [CLLocationCoordinate2D] = []
     @State var initialRegion: MKCoordinateRegion?
     @State private var recenterTrigger: UUID?
@@ -183,13 +161,6 @@ struct MapScreen: View {
     /// Guards against re-running rehydration/re-starting breadcrumb recording
     /// every time this view re-evaluates its body while a trip is active.
     @State var hydratedTripId: String?
-
-    /// Session-only cache so re-tapping the same POI doesn't re-call the AI
-    /// (and re-spend the LLM call) — not persisted, matches the "doesn't
-    /// need to be saved, just needs to be fast" requirement. Plain `static`
-    /// (not `@State`, which only applies to instance properties) since it's
-    /// a shared, non-observed cache rather than view-identity-bound state.
-    private static var poiExplainCache: [String: ExplainResult] = [:]
 
     /// Matches `LIVE_PINS_MAX_LATITUDE_DELTA` in the RN app — live pins only
     /// make sense at city/district zoom, not zoomed out to country level.
@@ -619,21 +590,10 @@ struct MapScreen: View {
         trailGeometryPoints = []
         trailRouteType = nil
         trailElevationProfile = []
-        poiExplainResult = nil
-        poiExplainError = nil
-        userPhotos = []
-        lookAroundScene = nil
         resolvedMapFeatureItem = nil
-        showingDirections = false
-        addToCollectionKind = nil
-        mapFeatureChatHistory = []
-        mapFeatureChatInput = ""
-        mapFeatureChatError = nil
+        resolveFailed = false
         poiExplainTask?.cancel()
         poiExplainTask = Task { await explainDietaryPin(pin) }
-        let coordinate = CLLocationCoordinate2D(latitude: pin.lat, longitude: pin.lng)
-        Task { lookAroundScene = try? await MKLookAroundSceneRequest(coordinate: coordinate).scene }
-        Task { await loadUserPhotos(name: pin.name, coordinate: coordinate) }
     }
 
     private func selectMapFeature(_ feature: MKMapFeatureAnnotation) {
@@ -645,34 +605,17 @@ struct MapScreen: View {
         trailGeometryPoints = []
         trailRouteType = nil
         trailElevationProfile = []
-        poiExplainResult = nil
-        poiExplainError = nil
-        userPhotos = []
-        lookAroundScene = nil
         resolvedMapFeatureItem = nil
-        showingDirections = false
-        addToCollectionKind = nil
-        mapFeatureChatHistory = []
-        mapFeatureChatInput = ""
-        mapFeatureChatError = nil
+        resolveFailed = false
         poiExplainTask?.cancel()
         poiExplainTask = Task { await explainMapFeature(feature) }
-        Task { lookAroundScene = try? await MKLookAroundSceneRequest(coordinate: feature.coordinate).scene }
-        Task { await loadUserPhotos(name: feature.title ?? "", coordinate: feature.coordinate) }
     }
 
     private func dismissMapFeature() {
         selectedMapFeature = nil
         selectedDietaryPin = nil
-        poiExplainResult = nil
-        poiExplainError = nil
-        userPhotos = []
-        lookAroundScene = nil
-        showingDirections = false
-        addToCollectionKind = nil
-        mapFeatureChatHistory = []
-        mapFeatureChatInput = ""
-        mapFeatureChatError = nil
+        resolvedMapFeatureItem = nil
+        resolveFailed = false
         poiExplainTask?.cancel()
     }
 
@@ -933,115 +876,39 @@ struct MapScreen: View {
         )
     }
 
+    /// Thin wrapper around the shared `POIExplainContent` (see that type's
+    /// own doc comment) -- everything content-wise (description, photos,
+    /// combined reviews, chat, etc.) lives there now, identical to what
+    /// `POIExplainSheet` shows. `resolvedMapFeatureItem` resolves
+    /// asynchronously (`explainMapFeature`/`explainDietaryPin`), so a real
+    /// `POIPlace` isn't available the instant this card appears -- shows a
+    /// brief skeleton in the meantime rather than mounting
+    /// `POIExplainContent` with a placeholder `POIPlace`.
     private func mapFeatureCard(for identity: MapFeatureIdentity) -> some View {
         let poi = resolvedMapFeaturePOI(for: identity)
 
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("◈").foregroundStyle(Theme.gold)
-                Text(identity.title ?? "").font(.headline).lineLimit(1)
-                Spacer()
-                // Same bookmark/flag pair as POIExplainSheet — this card
-                // floats over the map itself so there was nowhere to save
-                // or plan a tapped POI from without leaving the map.
-                // Tap targets are widened past the glyph via `.frame` +
-                // `.contentShape` (default icon-only buttons here were only
-                // as big as the SF Symbol itself, easy to mis-tap on a
-                // floating card), and the close button gets extra leading
-                // space so it isn't sitting flush against the plan button.
-                if let poi {
-                    let identifier = poi.asReference.identifier
-                    HStack(spacing: 12) {
-                        Button {
-                            Haptics.light()
-                            addToCollectionKind = .saved
-                        } label: {
-                            Image(systemName: savedPlacesStore.isSaved(identifier) ? "bookmark.fill" : "bookmark")
-                                .foregroundStyle(savedPlacesStore.isSaved(identifier) ? Theme.gold : .secondary)
-                                .frame(width: 36, height: 36)
-                                .contentShape(Rectangle())
-                        }
-                        Button {
-                            Haptics.light()
-                            addToCollectionKind = .plan
-                        } label: {
-                            // Not "flag" — that's already `routeModeToggleButton`'s
-                            // icon on this same screen, and reusing it here for
-                            // "add to Plan" made the two concepts (start Route
-                            // Mode vs. save this POI into a Plan list) look like
-                            // the same action.
-                            Image(systemName: savedPlacesStore.isPlanned(identifier) ? "suitcase.fill" : "suitcase")
-                                .foregroundStyle(savedPlacesStore.isPlanned(identifier) ? Theme.gold : .secondary)
-                                .frame(width: 36, height: 36)
-                                .contentShape(Rectangle())
-                        }
-                    }
-                    .font(.title3)
-                    .padding(.trailing, 10)
-                }
-                Button {
-                    dismissMapFeature()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                        .frame(width: 36, height: 36)
-                        .contentShape(Rectangle())
-                }
-                .font(.title3)
-            }
-
-            // Scrollable — this card floats over the map with no
-            // surrounding ScrollView (unlike `POIExplainSheet`, a real
-            // sheet), and its content (photo gallery, community photos,
-            // weather, a 5-7 sentence AI body, highlights, address) can
-            // easily be taller than the screen. Un-scrolled, the excess
-            // just extended off the top of the visible area with nothing
-            // to indicate it — live-confirmed 2026-08-30: the AI body text
-            // was cut off mid-sentence with no way to read the rest.
-            ScrollView {
+        return Group {
+            if let poi {
+                POIExplainContent(poi: poi, onClose: dismissMapFeature)
+            } else {
                 VStack(alignment: .leading, spacing: 10) {
-                    // AI explanation first — the reason this card is showing
-                    // at all — before any of Apple's own place data below.
-                    if poiExplainLoading {
-                        VStack(alignment: .leading, spacing: 8) {
-                            SkeletonBox().frame(width: 180, height: 14)
-                            SkeletonBox().frame(height: 12)
-                            SkeletonBox().frame(width: 220, height: 12)
+                    HStack {
+                        Text("◈").foregroundStyle(Theme.gold)
+                        Text(identity.title ?? "").font(.headline).lineLimit(1)
+                        Spacer()
+                        Button {
+                            dismissMapFeature()
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.secondary)
+                                .frame(width: 36, height: 36)
+                                .contentShape(Rectangle())
                         }
-                    } else if let poiExplainResult {
-                        Text(poiExplainResult.headline).font(.subheadline.bold()).foregroundStyle(Theme.gold)
-                        POIPhotoGallery(photos: poiExplainResult.photos)
-                        UserPhotoSection(poiName: identity.title ?? "", coordinate: identity.coordinate, photos: $userPhotos)
-                        if let rating = poiExplainResult.rating {
-                            TripAdvisorRatingRow(rating: rating)
-                        }
-                        if let curatedInfo = poiExplainResult.curatedInfo {
-                            CuratedInfoRow(info: curatedInfo)
-                        }
-                        if let dietaryTags = poiExplainResult.dietaryTags {
-                            DietaryTagsRow(tags: dietaryTags)
-                        }
-                        if let weather = mapFeatureWeatherQuery.weather {
-                            weatherBadge(weather)
-                        }
-                        Text(poiExplainResult.body).font(.footnote)
-                        if let source = poiExplainResult.groundingSource {
-                            // See POIExplainSheet's identical fix -- interpolating
-                            // `source` straight into `LocalizationValue("...")`
-                            // makes it a substitution argument, not part of the
-                            // lookup key, so the catalog lookup always misses.
-                            let key = "poiExplain.source." + source
-                            SourceCaption(text: String(localized: String.LocalizationValue(key)))
-                        }
-                        ForEach(poiExplainResult.highlights, id: \.self) { highlight in
-                            HStack(alignment: .top, spacing: 6) {
-                                Circle().fill(Theme.gold).frame(width: 5, height: 5).padding(.top, 6)
-                                Text(highlight).font(.caption)
-                            }
-                        }
-                    } else if let poiExplainError {
+                        .font(.title3)
+                    }
+                    if resolveFailed {
                         HStack(spacing: 8) {
-                            Text(poiExplainError).font(.footnote).foregroundStyle(.secondary).lineLimit(2)
+                            Text("map.live.error").font(.footnote).foregroundStyle(.secondary)
                             Spacer()
                             Button("common.retry") {
                                 poiExplainTask?.cancel()
@@ -1054,98 +921,19 @@ struct MapScreen: View {
                             .buttonStyle(.bordered)
                             .controlSize(.small)
                         }
-                    }
-
-                    // Phone/website are plain `MKMapItem` properties — shown
-                    // directly on this card rather than behind Apple's own
-                    // Place Card sheet/popover, which would open as a
-                    // second, separate page stacked on top of this one
-                    // (confirmed broken both ways: an embedded mini map for
-                    // the selection-accessory callout rendered as a messy
-                    // duplicate over the real map already behind this card;
-                    // the sheet/popover is a fine surface but always its own
-                    // disconnected screen). Hours/photos still have no plain
-                    // data API (confirmed via research) — "Haritalarda Aç"
-                    // below is how to reach those from here; the rating is
-                    // reachable via the header icon above instead.
-                    if let resolvedMapFeatureItem {
-                        PlaceDetailsCard(mapItem: resolvedMapFeatureItem)
-                        HStack(spacing: 10) {
-                            Button("common.openInMaps") {
-                                PlaceDirections.openInMaps(name: identity.title ?? "", coordinate: identity.coordinate, tabSelection: tabSelection)
-                            }
-                            .buttonStyle(.bordered)
-
-                            Button {
-                                Haptics.light()
-                                withAnimation(.easeInOut(duration: 0.2)) { showingDirections.toggle() }
-                            } label: {
-                                Label("directions.preview.button", systemImage: "arrow.triangle.turn.up.right.circle")
-                            }
-                            .buttonStyle(.bordered)
-                        }
-
-                        if showingDirections {
-                            DirectionsPreview(destination: identity.coordinate)
-                        }
-                    }
-
-                    if let lookAroundScene {
-                        LookAroundCard(scene: lookAroundScene, height: 140)
-                    }
-
-                    if let poi {
-                        if !mapFeatureChatHistory.isEmpty {
-                            Divider().padding(.vertical, 4)
-                            ForEach(mapFeatureChatHistory) { turn in mapFeatureChatBubble(turn) }
-                        }
-                        if mapFeatureChatSending {
-                            HStack {
-                                ProgressView().tint(Theme.gold)
-                                Spacer()
-                            }
-                        }
-                        if let mapFeatureChatError {
-                            HStack(spacing: 6) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                Text(mapFeatureChatError)
-                            }
-                            .font(.footnote)
-                            .foregroundStyle(Theme.closedRed)
-                            .padding(10)
-                            .background(Theme.closedRed.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+                    } else {
+                        VStack(alignment: .leading, spacing: 8) {
+                            SkeletonBox().frame(width: 180, height: 14)
+                            SkeletonBox().frame(height: 12)
+                            SkeletonBox().frame(width: 220, height: 12)
                         }
                     }
                 }
-            }
-            // Same "ask a follow-up" chat `POIExplainSheet` already has --
-            // this card had none at all (reported live). Pinned below the
-            // scrollable content, like POIExplainSheet's own input bar,
-            // rather than scrolling away with everything else. Only shown
-            // once `poi` resolves -- same gate the bookmark/plan icons above
-            // already use, since the chat request needs the same real data.
-            if let poi {
-                Divider()
-                mapFeatureChatInputBar(for: poi)
+                .padding()
             }
         }
-        .padding()
         .piriGlassCard(cornerRadius: 16)
         .frame(maxHeight: UIScreen.main.bounds.height * 0.6)
-        .sheet(item: $addToCollectionKind) { kind in
-            if let poi { AddToCollectionSheet(poi: poi, kind: kind) }
-        }
-    }
-
-    /// Compact, not a card element — current conditions at this POI, one
-    /// line, next to the rating row rather than a section of its own.
-    private func weatherBadge(_ weather: Weather) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: weather.condition.icon)
-            Text("\(Int(weather.temp))°, \(weather.description.capitalized)")
-        }
-        .font(.caption)
-        .foregroundStyle(.secondary)
     }
 
     private func setInitialRegionIfNeeded() async {
@@ -1326,245 +1114,34 @@ struct MapScreen: View {
         }
     }
 
-    /// Includes a fingerprint of the personalization fields actually sent to
-    /// `/places/explain-poi` (below), so editing profile/interests/budget/pace
-    /// mid-session makes previously-cached blurbs simply stop matching
-    /// instead of resurfacing stale, pre-edit personalization.
-    private func poiCacheKey(_ feature: MKMapFeatureAnnotation, profile: UserProfile) -> String {
-        let fingerprint = [
-            profile.name,
-            profile.professionText ?? "",
-            profile.interestsText.joined(separator: ","),
-            profile.faith?.rawValue ?? "",
-            profile.budget?.rawValue ?? "",
-            profile.groupType?.rawValue ?? "",
-            profile.pace?.rawValue ?? "",
-        ].joined(separator: ",")
-        return "\(feature.title ?? "")|\(String(format: "%.5f", feature.coordinate.latitude))|\(String(format: "%.5f", feature.coordinate.longitude))|\(fingerprint)"
-    }
-
+    /// Resolves the real `MKMapItem` behind a tapped base-tile POI -- the
+    /// annotation alone only has a title and coordinate. Once this lands,
+    /// `mapFeatureCard` can build a real `POIPlace` and mount
+    /// `POIExplainContent`, which fetches/caches its own explanation --
+    /// this used to also drive that fetch itself (with its own cache), but
+    /// duplicated everything `POIExplainContent` already does now that the
+    /// two cards share it (see that type's own doc comment).
     private func explainMapFeature(_ feature: MKMapFeatureAnnotation) async {
-        var category: String?
-        var address: String?
-        // Best-effort enrichment — the annotation alone only has a title and
-        // coordinate, `MKMapItemRequest` gets the rest (category, address,
-        // and `resolvedMapFeatureItem` for the phone/website rows and
-        // "Detaylı Bilgi" button). Always resolved, even on an AI-cache hit
-        // below — this used to sit after the cache's early `return`, so
-        // revisiting any previously-explained POI left `resolvedMapFeatureItem`
-        // nil (reset by `selectMapFeature`) and silently hid all of that.
-        if let mapItem = try? await MKMapItemRequest(mapFeatureAnnotation: feature).mapItem {
-            category = mapItem.pointOfInterestCategory?.rawValue.replacingOccurrences(of: "MKPOICategory", with: "")
-            address = mapItem.placemark.title
-            resolvedMapFeatureItem = mapItem
-        }
-
-        guard !Task.isCancelled else { return }
-
-        // Fire-and-forget — weather has no dependency on the AI explain
-        // call or its cache, so it's not awaited here.
-        Task { await mapFeatureWeatherQuery.load(lat: feature.coordinate.latitude, lng: feature.coordinate.longitude) }
-
-        let profile = userProfileStore.profile
-        let cacheKey = poiCacheKey(feature, profile: profile)
-        if let cached = Self.poiExplainCache[cacheKey] {
-            poiExplainResult = cached
-            poiExplainError = nil
-            return
-        }
-
-        poiExplainLoading = true
-        poiExplainError = nil
-        defer { poiExplainLoading = false }
-
-        let request = ExplainPOIRequest(
-            name: feature.title ?? "",
-            category: category,
-            lat: feature.coordinate.latitude,
-            lng: feature.coordinate.longitude,
-            address: address,
-            website: resolvedMapFeatureItem?.url?.absoluteString,
-            locale: Locale.current.language.languageCode?.identifier,
-            userProfile: PersonalizationProfile(
-                name: profile.name,
-                profession: profile.professionText,
-                interests: profile.interestsText,
-                faith: profile.faith?.rawValue,
-                budget: profile.budget?.rawValue,
-                groupType: profile.groupType?.rawValue,
-                pace: profile.pace?.rawValue
-            ),
-            recentlyViewed: recentlyViewedStore.asPersonalizationSummaries,
-            savedPlaces: savedPlacesStore.asPersonalizationSummaries
-        )
-
-        do {
-            let result = try await PlacesAPI.explainPOI(request, token: authStore.token)
-            guard !Task.isCancelled else { return }
-            poiExplainResult = result
-            Self.poiExplainCache[cacheKey] = result
-        } catch {
-            guard !Task.isCancelled else { return }
-            poiExplainError = error.localizedDescription
-        }
-    }
-
-    private func loadUserPhotos(name: String, coordinate: CLLocationCoordinate2D) async {
-        guard let token = authStore.token else { return }
-        userPhotos = (try? await PhotosAPI.fetchPhotos(name: name, lat: coordinate.latitude, lng: coordinate.longitude, token: token)) ?? []
-    }
-
-    /// Same request shape and flow as `POIExplainSheet.sendChat()` -- this
-    /// card had no chat at all until now (see the state vars' own comment).
-    /// Takes `poi` as a parameter rather than reading `resolvedMapFeatureItem`
-    /// itself since the caller already resolved it once as a real `POIPlace`.
-    private func sendMapFeatureChat(for poi: POIPlace) async {
-        let message = mapFeatureChatInput.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !message.isEmpty else { return }
-        mapFeatureChatInput = ""
-
-        let historyForRequest = mapFeatureChatHistory
-        mapFeatureChatHistory.append(POIChatTurn(role: .user, content: message))
-        mapFeatureChatSending = true
-        mapFeatureChatError = nil
-        defer { mapFeatureChatSending = false }
-
-        let profile = userProfileStore.profile
-        let request = POIChatRequest(
-            name: poi.name,
-            category: poi.categoryLabel.isEmpty ? nil : poi.categoryLabel,
-            address: poi.mapItem.placemark.title,
-            website: poi.mapItem.url?.absoluteString,
-            lat: poi.coordinate.latitude,
-            lng: poi.coordinate.longitude,
-            locale: Locale.current.language.languageCode?.identifier,
-            userProfile: PersonalizationProfile(
-                name: profile.name,
-                profession: profile.professionText,
-                interests: profile.interestsText,
-                faith: profile.faith?.rawValue,
-                budget: profile.budget?.rawValue,
-                groupType: profile.groupType?.rawValue,
-                pace: profile.pace?.rawValue
-            ),
-            cityContext: CityContextSummary(
-                countryInfo: cityStore.countryInfo,
-                timezone: cityStore.timezones.first,
-                exchangeRates: cityStore.exchangeRates
-            ),
-            history: historyForRequest,
-            message: message
-        )
-
-        do {
-            let response = try await PlacesAPI.chatAboutPOI(request)
-            mapFeatureChatHistory.append(POIChatTurn(role: .assistant, content: response.reply))
-        } catch {
-            mapFeatureChatError = error.localizedDescription
-        }
-    }
-
-    private func mapFeatureChatBubble(_ turn: POIChatTurn) -> some View {
-        HStack {
-            if turn.role == .user { Spacer(minLength: 40) }
-            Text(turn.content)
-                .font(.footnote)
-                .padding(10)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(turn.role == .user ? Theme.gold.opacity(0.15) : Color(.secondarySystemBackground))
-                )
-            if turn.role == .assistant { Spacer(minLength: 40) }
-        }
-        .id(turn.id)
-    }
-
-    private func mapFeatureChatInputBar(for poi: POIPlace) -> some View {
-        HStack(spacing: 8) {
-            TextField(String(localized: "poiChat.inputPlaceholder"), text: $mapFeatureChatInput)
-                .textFieldStyle(.roundedBorder)
-                .onSubmit { Task { await sendMapFeatureChat(for: poi) } }
-            Button {
-                Task { await sendMapFeatureChat(for: poi) }
-            } label: {
-                Image(systemName: "arrow.up.circle.fill").font(.title2)
-                    .foregroundStyle(Theme.gold)
-            }
-            .disabled(mapFeatureChatInput.trimmingCharacters(in: .whitespaces).isEmpty || mapFeatureChatSending)
-        }
-    }
-
-    private func dietaryPinCacheKey(_ pin: DietaryPin, profile: UserProfile) -> String {
-        let fingerprint = [
-            profile.name,
-            profile.professionText ?? "",
-            profile.interestsText.joined(separator: ","),
-            profile.faith?.rawValue ?? "",
-            profile.budget?.rawValue ?? "",
-            profile.groupType?.rawValue ?? "",
-            profile.pace?.rawValue ?? "",
-        ].joined(separator: ",")
-        return "\(pin.name)|\(String(format: "%.5f", pin.lat))|\(String(format: "%.5f", pin.lng))|\(fingerprint)"
+        let mapItem = try? await MKMapItemRequest(mapFeatureAnnotation: feature).mapItem
+        resolvedMapFeatureItem = mapItem
+        // Unlike `explainDietaryPin` (a local synthesis that can't fail),
+        // this is a real network request -- without tracking a failure here,
+        // a bad connection left the card stuck on its skeleton forever, with
+        // no retry and no fallback (POIExplainContent needs a full POIPlace,
+        // which needs a resolved MKMapItem to exist at all).
+        resolveFailed = mapItem == nil
     }
 
     /// Mirrors `explainMapFeature`, but a `DietaryPin` is an OSM node we
     /// already have full name/coordinate data for — not an Apple feature
     /// annotation — so there's no `MKMapItemRequest` resolution step. The
-    /// synthesized `MKMapItem` below exists only so `resolvedMapFeaturePOI`
-    /// can build a real `POIPlace` for the bookmark/plan buttons, matching
-    /// what a resolved Apple POI gets.
+    /// synthesized `MKMapItem` exists only so `resolvedMapFeaturePOI` can
+    /// build a real `POIPlace`, matching what a resolved Apple POI gets.
     private func explainDietaryPin(_ pin: DietaryPin) async {
         let coordinate = CLLocationCoordinate2D(latitude: pin.lat, longitude: pin.lng)
         let mapItem = MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
         mapItem.name = pin.name
         resolvedMapFeatureItem = mapItem
-
-        guard !Task.isCancelled else { return }
-
-        Task { await mapFeatureWeatherQuery.load(lat: pin.lat, lng: pin.lng) }
-
-        let profile = userProfileStore.profile
-        let cacheKey = dietaryPinCacheKey(pin, profile: profile)
-        if let cached = Self.poiExplainCache[cacheKey] {
-            poiExplainResult = cached
-            poiExplainError = nil
-            return
-        }
-
-        poiExplainLoading = true
-        poiExplainError = nil
-        defer { poiExplainLoading = false }
-
-        let request = ExplainPOIRequest(
-            name: pin.name,
-            category: "Restaurant",
-            lat: pin.lat,
-            lng: pin.lng,
-            address: nil,
-            website: nil,
-            locale: Locale.current.language.languageCode?.identifier,
-            userProfile: PersonalizationProfile(
-                name: profile.name,
-                profession: profile.professionText,
-                interests: profile.interestsText,
-                faith: profile.faith?.rawValue,
-                budget: profile.budget?.rawValue,
-                groupType: profile.groupType?.rawValue,
-                pace: profile.pace?.rawValue
-            ),
-            recentlyViewed: recentlyViewedStore.asPersonalizationSummaries,
-            savedPlaces: savedPlacesStore.asPersonalizationSummaries
-        )
-
-        do {
-            let result = try await PlacesAPI.explainPOI(request, token: authStore.token)
-            guard !Task.isCancelled else { return }
-            poiExplainResult = result
-            Self.poiExplainCache[cacheKey] = result
-        } catch {
-            guard !Task.isCancelled else { return }
-            poiExplainError = error.localizedDescription
-        }
     }
 }
 
