@@ -35,6 +35,14 @@ struct POIExplainContent: View {
 
     @State private var result: ExplainResult?
     @State private var userPhotos: [UserSubmittedPhoto] = []
+    /// Fast preview photo (see the `photosToShow` comment in `body`) --
+    /// deliberately fetched with no bearer token (`PlacesAPI.photosBulk`'s
+    /// `token` param left at its `nil` default) even when signed in, so
+    /// this preview call never triggers the paid Google-photo upgrade
+    /// `/places/explain-poi`'s own `result` fetch already does -- calling
+    /// both with a token would silently double-charge one POI view against
+    /// the same monthly `google_places` quota.
+    @State private var previewPhoto: POIPhoto?
     @State private var loading = true
     @State private var errorMessage: String?
     @State private var chatHistory: [POIChatTurn] = []
@@ -118,9 +126,31 @@ struct POIExplainContent: View {
                             .font(.title3)
                         }
 
-                        // AI explanation first — the reason someone opens
-                        // this sheet at all — before any of Apple's own
-                        // place data further down.
+                        // The real photo (Wikipedia/Tripadvisor, never
+                        // AI-generated) is the most visually engaging thing
+                        // this card has and, unlike the AI text/rating/
+                        // badges below, is available from a fast,
+                        // cache-first, keyless call (`/places/photos-bulk`)
+                        // that doesn't need to wait for `/places/explain-poi`'s
+                        // much heavier Promise.all + AI generation to finish
+                        // server-side. Shown as soon as either arrives:
+                        // `previewPhoto` (near-instant on a cache hit) first,
+                        // then swapped for `result.photos`'s fuller gallery
+                        // (possibly Google-upgraded for a paid account) once
+                        // the full explanation lands. Reported live: "AI
+                        // açıklaması, resimler, Tripadvisor vs aynı anda
+                        // geliyor... hız sıralamasına göre üste koyulabilir."
+                        let photosToShow = result?.photos ?? previewPhoto.map { [$0] } ?? []
+                        if !photosToShow.isEmpty {
+                            POIPhotoGallery(photos: photosToShow)
+                        }
+                        UserPhotoSection(poiName: poi.name, coordinate: poi.coordinate, photos: $userPhotos)
+
+                        // AI explanation — the reason someone opens this
+                        // sheet at all, but the slowest piece (grounding
+                        // fetches + LLM generation, all server-side before
+                        // this endpoint responds at all), so it stays
+                        // skeleton-loading independently of the photo above.
                         if loading {
                             VStack(alignment: .leading, spacing: 8) {
                                 SkeletonBox().frame(width: 180, height: 14)
@@ -137,21 +167,6 @@ struct POIExplainContent: View {
                                     goldenHourBadge(window)
                                 }
                             }
-                            // The real photo (Wikipedia/Tripadvisor, never
-                            // AI-generated) is the most visually engaging
-                            // thing this card has — it used to sit below
-                            // three rows of badges/text, effectively
-                            // buried. See the 2026-08 visual-design
-                            // research report, Phase 1.
-                            // No separate "Google details" card here —
-                            // paid tiers get Google's photos folded
-                            // straight into the gallery above and its
-                            // editorial summary/reviews folded into the
-                            // AI body text itself (both server-side, see
-                            // `/places/explain-poi`), so there's nothing
-                            // left for a redundant second card to show.
-                            POIPhotoGallery(photos: result.photos)
-                            UserPhotoSection(poiName: poi.name, coordinate: poi.coordinate, photos: $userPhotos)
                             if let rating = result.rating {
                                 TripAdvisorRatingRow(rating: rating)
                                 // Only offered when we already know
@@ -292,6 +307,7 @@ struct POIExplainContent: View {
         .sheet(item: $addToCollectionKind) { kind in AddToCollectionSheet(poi: poi, kind: kind) }
         .sheet(isPresented: $showingReviews) { TripAdvisorReviewsSheet(poi: poi, totalReviewCount: result?.rating?.reviewCount) }
         .task { await explain() }
+        .task { await loadPreviewPhoto() }
         .task { await loadLookAroundScene() }
         .task { await weatherQuery.load(lat: poi.coordinate.latitude, lng: poi.coordinate.longitude) }
         .task { await loadUserPhotos() }
@@ -348,6 +364,25 @@ struct POIExplainContent: View {
     private func loadUserPhotos() async {
         guard let token = authStore.token else { return }
         userPhotos = (try? await PhotosAPI.fetchPhotos(name: poi.name, lat: poi.coordinate.latitude, lng: poi.coordinate.longitude, token: token)) ?? []
+    }
+
+    /// See `previewPhoto`'s own doc comment for why `token` is deliberately
+    /// omitted. A no-op once `result` has already landed (the fuller
+    /// gallery from `explain()` wins regardless) -- this can finish after
+    /// `explain()` on a slow cache miss, and `photosToShow` already prefers
+    /// `result?.photos` first, so a late-arriving preview never overwrites it.
+    private func loadPreviewPhoto() async {
+        let request = PhotoBulkRequest(places: [
+            PhotoBulkPlace(name: poi.name, lat: poi.coordinate.latitude, lng: poi.coordinate.longitude, category: poi.categoryLabel.isEmpty ? nil : poi.categoryLabel)
+        ])
+        guard let found = try? await PlacesAPI.photosBulk(request).results.first, let photoUrl = found.photoUrl else { return }
+        previewPhoto = POIPhoto(
+            url: photoUrl,
+            source: found.source.flatMap(POIPhotoSource.init) ?? .unsplash,
+            attributionUrl: found.attributionUrl,
+            photographerName: found.photographerName,
+            photographerUrl: found.photographerUrl
+        )
     }
 
     private func chatBubble(_ turn: POIChatTurn) -> some View {
