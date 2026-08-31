@@ -4377,6 +4377,99 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
     }
   );
 
+  // ── /trails/summary — AI blurb for one trail, grounded in OSM tags + real
+  // Piri reviews ────────────────────────────────────────────────────────────
+  // Same "real fact → AI elaborates" shape as `/holidays/upcoming`'s
+  // `enrichHoliday` (graceful `null` when no AI provider is configured,
+  // never a 503 -- the trail card is still useful without this), extended
+  // with the exact same real-text-only discipline `/places/explain-poi`
+  // applies to `reviewsSummary`/`aspectHighlights`. Reuses `poiReviews` as-is
+  // (see `TrailReviewsSheet` on the client) -- a trail's centroid name+lat/lng
+  // is already the same `poiKey` any other POI review is stored under, so no
+  // trail-specific review table or query was needed.
+  const TRAIL_REVIEW_TEXT_SAMPLE_LIMIT = 5;
+  app.get<{
+    Querystring: {
+      name: string;
+      lat: string;
+      lng: string;
+      difficulty?: string;
+      distanceKm?: string;
+      operatorName?: string;
+      network?: string;
+      surface?: string;
+      dogsAllowed?: string;
+      locale?: string;
+    };
+  }>('/trails/summary', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const { name, locale } = request.query;
+    const lat = parseFloat(request.query.lat ?? '');
+    const lng = parseFloat(request.query.lng ?? '');
+    if (!name?.trim() || isNaN(lat) || isNaN(lng)) {
+      return reply.code(400).send({ error: 'name, lat, and lng query params are required' });
+    }
+
+    const aiProvider = getAiProviderConfig();
+    if (!aiProvider) {
+      return reply.send({ summary: null, aspectHighlights: [] });
+    }
+
+    const nameNormalized = normalizeName(name);
+    const latRounded = Math.round(lat * 1000) / 1000;
+    const lngRounded = Math.round(lng * 1000) / 1000;
+    const poiKey = `${nameNormalized}|${latRounded}|${lngRounded}`;
+    const reviewRows = await db
+      .select({ text: poiReviews.text, createdAt: poiReviews.createdAt })
+      .from(poiReviews)
+      .where(and(eq(poiReviews.poiKey, poiKey), eq(poiReviews.status, 'approved')));
+    const sampleTexts = reviewRows
+      .filter((row): row is typeof row & { text: string } => Boolean(row.text?.trim()))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, TRAIL_REVIEW_TEXT_SAMPLE_LIMIT)
+      .map((row) => row.text.trim());
+    const hasReviewText = sampleTexts.length > 0;
+
+    const facts = [
+      request.query.distanceKm ? `Length: ${request.query.distanceKm} km` : null,
+      request.query.difficulty ? `Difficulty: ${request.query.difficulty}` : null,
+      request.query.surface ? `Surface: ${request.query.surface}` : null,
+      request.query.dogsAllowed === 'true' ? `Dogs allowed` : null,
+      request.query.operatorName ? `Maintained by: ${request.query.operatorName}` : null,
+      request.query.network ? `Network tier: ${request.query.network}` : null,
+    ].filter((line): line is string => Boolean(line));
+
+    const reviewsGuard = hasReviewText
+      ? ` Real hiker reviews are included below (${sampleTexts.length} shown) -- you may draw genuine, honest patterns from them too, synthesized as a real consensus, never a single reviewer's opinion presented as everyone's.`
+      : ` No real hiker reviews exist yet for this trail -- base the summary purely on the structured facts below, and don't invent scenery, views, or trail conditions that aren't stated in them.`;
+    const aspectHighlightsGuard = hasReviewText
+      ? ` For "aspectHighlights": list 0-4 specific things real reviewers actually discussed below, each a short label plus an honest positive/mixed/negative sentiment, strictly grounded in the text given -- never invent one nobody mentioned.`
+      : ` Leave "aspectHighlights" as an empty array -- no real review text exists yet for this trail.`;
+
+    try {
+      const { object } = await generateObject({
+        model: aiProvider.client.chat(aiProvider.model),
+        maxOutputTokens: 220,
+        schema: z.object({
+          summary: z
+            .string()
+            .nullable()
+            .describe('One short factual sentence (max ~25 words) helping a hiker understand what this trail is like, or null if there is genuinely nothing to say beyond its name.'),
+          aspectHighlights: z
+            .array(z.object({ aspect: z.string().describe('A short 1-3 word label, same language as the summary.'), sentiment: z.enum(['positive', 'mixed', 'negative']) }))
+            .max(4)
+            .describe('0-4 specific things real reviewers discussed, each with an honest sentiment -- empty array if no real review text is given.'),
+        }),
+        system: `You are Piri, a knowledgeable local travel guide describing a hiking trail.${reviewsGuard}${aspectHighlightsGuard}${NO_HYPE_GUARD}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
+        prompt: `Trail: ${name}\n${facts.length ? facts.join('\n') + '\n' : ''}${hasReviewText ? `\nReal hiker reviews:\n${sampleTexts.map((t, i) => `${i + 1}. ${t}`).join('\n')}` : ''}`,
+      } as any);
+
+      return reply.send(object);
+    } catch (error) {
+      Sentry.captureException(error);
+      return reply.send({ summary: null, aspectHighlights: [] });
+    }
+  });
+
   // ── /country-info — Offline country metadata (world-countries) ───────────────
   // Accepts either an explicit `code`, or `lat`/`lng` to resolve one via the
   // same Nominatim reverse-geocode `resolveCountryCode` already uses for

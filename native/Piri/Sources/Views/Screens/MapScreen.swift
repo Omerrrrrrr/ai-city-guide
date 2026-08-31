@@ -1,3 +1,4 @@
+import Charts
 import MapKit
 import SwiftUI
 
@@ -73,7 +74,13 @@ struct MapScreen: View {
     @State private var trailFetchTask: Task<Void, Never>?
     @State private var selectedTrail: Trail?
     @State private var trailGeometryPoints: [CLLocationCoordinate2D] = []
+    @State private var trailRouteType: TrailRouteType?
+    @State private var trailElevationProfile: [TrailElevationPoint] = []
     @State private var loadingTrailGeometry = false
+    /// Drives `TrailReviewsSheet` -- separate from `selectedTrail` (which
+    /// keeps driving the compact map card underneath) so dismissing the
+    /// reviews sheet doesn't also lose the selected pin/route.
+    @State private var trailForReviews: Trail?
     /// Updated on every `handleRegionChange` call (unlike `initialRegion`,
     /// which is set once and deliberately not kept in sync with panning) so
     /// toggling `dietaryFilter` can immediately fetch against wherever the
@@ -287,6 +294,13 @@ struct MapScreen: View {
                     trailCard(for: selectedTrail)
                 } else if let selectedMapFeature {
                     mapFeatureCard(for: MapFeatureIdentity(title: selectedMapFeature.title, coordinate: selectedMapFeature.coordinate))
+                } else if trailsEnabled, !trailPins.isEmpty {
+                    // Nearest-first (backend already sorts by
+                    // `approxDistanceFromQueryKm`) so this doubles as "what's
+                    // closest to where I'm looking", not just "what's on
+                    // screen" -- lets someone browse trails without having to
+                    // find and tap each pin individually.
+                    trailListStrip
                 }
             }
             .padding()
@@ -397,12 +411,17 @@ struct MapScreen: View {
                 trailPins = []
                 selectedTrail = nil
                 trailGeometryPoints = []
+                trailRouteType = nil
+                trailElevationProfile = []
             }
         }
         .sheet(isPresented: $showTripPhotoCapture) {
             TripPhotoCaptureSheet { data in
                 Task { await attachTripPhoto(data) }
             }
+        }
+        .sheet(item: $trailForReviews) { trail in
+            TrailReviewsSheet(trail: trail)
         }
         .sheet(item: $pendingTripRecap) { pending in
             TripRecapView(
@@ -565,6 +584,8 @@ struct MapScreen: View {
         selectedDietaryPin = nil
         selectedTrail = nil
         trailGeometryPoints = []
+        trailRouteType = nil
+        trailElevationProfile = []
         poiExplainTask?.cancel()
     }
 
@@ -575,6 +596,8 @@ struct MapScreen: View {
         selectedDietaryPin = nil
         selectedTrail = nil
         trailGeometryPoints = []
+        trailRouteType = nil
+        trailElevationProfile = []
         poiExplainTask?.cancel()
     }
 
@@ -585,6 +608,8 @@ struct MapScreen: View {
         selectedMapFeature = nil
         selectedTrail = nil
         trailGeometryPoints = []
+        trailRouteType = nil
+        trailElevationProfile = []
         poiExplainResult = nil
         poiExplainError = nil
         userPhotos = []
@@ -607,6 +632,8 @@ struct MapScreen: View {
         selectedDietaryPin = nil
         selectedTrail = nil
         trailGeometryPoints = []
+        trailRouteType = nil
+        trailElevationProfile = []
         poiExplainResult = nil
         poiExplainError = nil
         userPhotos = []
@@ -667,6 +694,50 @@ struct MapScreen: View {
         .piriGlassCard(cornerRadius: 16)
     }
 
+    /// Horizontal browse strip shown whenever the trail layer is on and
+    /// nothing else is selected -- discovery without hunting for pins on
+    /// the map, same list backing `trailPins` (map annotations) already has.
+    private var trailListStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ForEach(trailPins) { trail in
+                    Button {
+                        Haptics.light()
+                        selectTrail(trail)
+                    } label: {
+                        trailListItem(trail)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 2)
+        }
+        .scrollClipDisabled()
+    }
+
+    private func trailListItem(_ trail: Trail) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(trail.name)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+            HStack(spacing: 6) {
+                if let distanceKm = trail.distanceKm {
+                    Text(formattedKm(distanceKm))
+                }
+                if let difficulty = trail.difficulty {
+                    Text(difficultyLabel(difficulty))
+                        .foregroundStyle(difficultyColor(difficulty))
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(maxWidth: 180, alignment: .leading)
+        .piriGlassCard(cornerRadius: 14)
+    }
+
     /// No AI-explain call, unlike every other pin card on this screen — a
     /// trail's name/operator/distance already came fully formed from
     /// `/trails/nearby` (real OSM tags, not something to elaborate on), so
@@ -694,6 +765,8 @@ struct MapScreen: View {
                 Button {
                     selectedTrail = nil
                     trailGeometryPoints = []
+                    trailRouteType = nil
+                    trailElevationProfile = []
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
@@ -702,19 +775,115 @@ struct MapScreen: View {
                 }
                 .font(.title3)
             }
+            if trail.difficulty != nil || trail.dogsAllowed == true || trail.surface != nil || trailRouteType != nil {
+                HStack(spacing: 6) {
+                    if let difficulty = trail.difficulty {
+                        trailBadge(difficultyLabel(difficulty), color: difficultyColor(difficulty))
+                    }
+                    // `false`/untagged aren't shown -- OSM's `dog` tag is
+                    // rarely set either way, so silence isn't "not allowed".
+                    if trail.dogsAllowed == true {
+                        trailBadge(String(localized: "map.trails.dogFriendly"), icon: "pawprint.fill")
+                    }
+                    if let surface = trail.surface {
+                        trailBadge(surface.capitalized)
+                    }
+                    // Only known once the route's geometry has loaded (this
+                    // trail's own line, not the nearby-list response) --
+                    // absent while `loadingTrailGeometry` is still running.
+                    if let trailRouteType {
+                        trailBadge(
+                            trailRouteType == .loop
+                                ? String(localized: "map.trails.routeType.loop")
+                                : String(localized: "map.trails.routeType.linear"),
+                            icon: trailRouteType == .loop ? "arrow.trianglehead.2.clockwise" : "arrow.left.and.right"
+                        )
+                    }
+                }
+            }
             if loadingTrailGeometry {
                 HStack(spacing: 8) {
                     ProgressView()
                     Text("map.trails.loadingRoute").font(.footnote).foregroundStyle(.secondary)
                 }
+            } else if !trailElevationProfile.isEmpty {
+                elevationChart(trailElevationProfile)
             }
+            Button {
+                Haptics.light()
+                trailForReviews = trail
+            } label: {
+                Label(String(localized: "map.trails.reviews"), systemImage: "text.bubble")
+                    .font(.footnote.weight(.semibold))
+            }
+            .padding(.top, 2)
         }
         .padding()
         .piriGlassCard(cornerRadius: 16)
     }
 
+    /// `nil` (no chart shown at all) when Open-Elevation timed out server-side
+    /// -- see `TrailGeometry.elevationProfile`'s doc comment. Height kept
+    /// small (56pt): this is a glance-level shape, not a standalone screen.
+    private func elevationChart(_ profile: [TrailElevationPoint]) -> some View {
+        let gainM = zip(profile, profile.dropFirst())
+            .reduce(0.0) { total, pair in total + max(0, pair.1.elevationM - pair.0.elevationM) }
+        return VStack(alignment: .leading, spacing: 4) {
+            Chart(profile, id: \.distanceKm) { point in
+                AreaMark(x: .value("km", point.distanceKm), y: .value("m", point.elevationM))
+                    .foregroundStyle(Theme.gold.opacity(0.18))
+                LineMark(x: .value("km", point.distanceKm), y: .value("m", point.elevationM))
+                    .foregroundStyle(Theme.gold)
+                    .lineStyle(StrokeStyle(lineWidth: 1.5))
+            }
+            .chartXAxis(.hidden)
+            .chartYAxis(.hidden)
+            .frame(height: 56)
+            HStack(spacing: 4) {
+                Image(systemName: "arrow.up.right").font(.caption2)
+                Text("+\(Int(gainM.rounded())) m")
+            }
+            .font(.caption2.weight(.medium))
+            .foregroundStyle(.secondary)
+        }
+    }
+
     private func formattedKm(_ km: Double) -> String {
         "\(km.formatted(.number.precision(.fractionLength(0...1)))) km"
+    }
+
+    private func trailBadge(_ text: String, color: Color = .secondary, icon: String? = nil) -> some View {
+        HStack(spacing: 3) {
+            if let icon {
+                Image(systemName: icon).font(.system(size: 9))
+            }
+            Text(text)
+        }
+        .font(.caption2.weight(.semibold))
+        .foregroundStyle(color)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(Capsule().fill(color.opacity(0.12)))
+    }
+
+    private func difficultyLabel(_ difficulty: TrailDifficulty) -> String {
+        switch difficulty {
+        case .easy: String(localized: "map.trails.difficulty.easy")
+        case .moderate: String(localized: "map.trails.difficulty.moderate")
+        case .hard: String(localized: "map.trails.difficulty.hard")
+        case .extreme: String(localized: "map.trails.difficulty.extreme")
+        }
+    }
+
+    // Mirrors AllTrails' green/yellow/red-ish easy→hard ramp; "extreme" goes
+    // to the same red as "hard" rather than inventing a fifth color for OSM's
+    // rarely-seen top rung.
+    private func difficultyColor(_ difficulty: TrailDifficulty) -> Color {
+        switch difficulty {
+        case .easy: Theme.openGreen
+        case .moderate: Theme.gold
+        case .hard, .extreme: Theme.closedRed
+        }
     }
 
     /// Card for ANY tapped map POI — Piri's own pins have a stable DB record
@@ -1084,6 +1253,8 @@ struct MapScreen: View {
     private func selectTrail(_ trail: Trail) {
         selectedTrail = trail
         trailGeometryPoints = []
+        trailRouteType = nil
+        trailElevationProfile = []
         selectedPlace = nil
         selectedLivePin = nil
         selectedMapFeature = nil
@@ -1104,6 +1275,8 @@ struct MapScreen: View {
         // and stays showing either way.
         guard let geometry = try? await TrailsAPI.geometry(id: trail.id) else { return }
         trailGeometryPoints = geometry.points.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lng) }
+        trailRouteType = geometry.routeType
+        trailElevationProfile = geometry.elevationProfile ?? []
     }
 
     private func fetchDirections(to place: Place) async {
@@ -1286,6 +1459,61 @@ struct MapScreen: View {
         } catch {
             guard !Task.isCancelled else { return }
             poiExplainError = error.localizedDescription
+        }
+    }
+}
+
+/// Reuses `PiriReviewsSection` as-is for a trail -- it only ever reads
+/// `poi.name`/`poi.coordinate` (never `poi.category`/`poi.mapItem`), so a
+/// trail's centroid stands in for a real `POIPlace` without needing a
+/// separate review pipeline. `/poi/reviews` is already keyed by
+/// name+lat/lng (`poiKey` in `apps/api/src/index.ts`), not a POI-source
+/// type, so this needed zero backend changes -- trails, Apple MapKit POIs,
+/// and Piri's own curated places already share the exact same review table.
+private struct TrailReviewsSheet: View {
+    let trail: Trail
+    @Environment(\.dismiss) private var dismiss
+    @Environment(LanguageStore.self) private var languageStore
+    /// `nil` while loading/on failure -- `PiriReviewsSection` already treats
+    /// a `nil` summary / empty highlights as "nothing grounded to say", the
+    /// same state a fresh trail with no reviews yet is genuinely in, so no
+    /// separate loading placeholder is needed here.
+    @State private var summary: TrailSummaryResponse?
+
+    private var poiPlace: POIPlace {
+        let coordinate = CLLocationCoordinate2D(latitude: trail.centerLat, longitude: trail.centerLng)
+        return POIPlace(
+            name: trail.name,
+            category: nil,
+            coordinate: coordinate,
+            mapItem: MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
+        )
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                PiriReviewsSection(
+                    poi: poiPlace,
+                    tripAdvisorRating: nil,
+                    googleRating: nil,
+                    initialPiriRating: nil,
+                    reviewsSummary: summary?.summary,
+                    aspectHighlights: summary?.aspectHighlights ?? []
+                )
+                .padding()
+            }
+            .navigationTitle(trail.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("common.done") { dismiss() }
+                }
+            }
+        }
+        .task {
+            let locale = languageStore.code ?? Locale.current.language.languageCode?.identifier
+            summary = try? await TrailsAPI.summary(for: trail, locale: locale)
         }
     }
 }

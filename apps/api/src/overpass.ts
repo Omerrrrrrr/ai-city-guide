@@ -7,6 +7,7 @@
 // rather than substituting for anything already in the app.
 
 import { haversineKm } from './geo';
+import { fetchElevations } from './elevation';
 
 interface OverpassElement {
   type: string;
@@ -41,6 +42,8 @@ async function runOverpassQuery(ql: string, timeoutMs: number): Promise<Overpass
   }
 }
 
+export type TrailDifficulty = 'easy' | 'moderate' | 'hard' | 'extreme';
+
 export interface NearbyTrail {
   id: number;
   name: string;
@@ -50,10 +53,43 @@ export interface NearbyTrail {
   operator: string | null;
   /** OSM network tier: "iwn"=international, "nwn"=national, "rwn"=regional, "lwn"=local, or `null` if untagged. */
   network: string | null;
+  /** Normalized from the OSM `sac_scale` tag (see `mapSacScaleToDifficulty`) -- `null` when untagged, which is common for lwn/local trails. */
+  difficulty: TrailDifficulty | null;
+  /** Raw OSM `surface` tag, e.g. "unpaved", "asphalt", "gravel" -- untranslated, shown as-is. */
+  surface: string | null;
+  /** From the OSM `dog` tag: `true` for "yes"/"leashed"/"designated", `false` for "no", `null` if untagged (most trails) -- untagged is deliberately not shown as "unknown" in the UI, since silence on this tag is the norm, not a real signal either way. */
+  dogsAllowed: boolean | null;
   centerLat: number;
   centerLng: number;
   /** km from the query point to this trail's rough centroid, not its nearest point -- for sorting/display only. */
   approxDistanceFromQueryKm: number;
+}
+
+// AllTrails-style three tiers (plus "extreme" for OSM's own top rung) from
+// OSM's six-step `sac_scale` -- https://wiki.openstreetmap.org/wiki/Key:sac_scale.
+// Anything unrecognized (untagged, or a typo'd value) falls through to `null`
+// rather than guessing -- a missing badge reads better than a wrong one.
+function mapSacScaleToDifficulty(sacScale: string | undefined): TrailDifficulty | null {
+  switch (sacScale) {
+    case 'hiking':
+      return 'easy';
+    case 'mountain_hiking':
+      return 'moderate';
+    case 'demanding_mountain_hiking':
+    case 'alpine_hiking':
+      return 'hard';
+    case 'demanding_alpine_hiking':
+    case 'difficult_alpine_hiking':
+      return 'extreme';
+    default:
+      return null;
+  }
+}
+
+function mapDogTag(dog: string | undefined): boolean | null {
+  if (dog === 'yes' || dog === 'leashed' || dog === 'designated') return true;
+  if (dog === 'no') return false;
+  return null;
 }
 
 const MAX_TRAIL_SEARCH_RADIUS_M = 30000;
@@ -74,6 +110,9 @@ export async function fetchNearbyTrails(lat: number, lng: number, radiusMeters: 
       distanceKm: e.tags.distance ? parseFloat(e.tags.distance) || null : null,
       operator: e.tags.operator ?? null,
       network: e.tags.network ?? null,
+      difficulty: mapSacScaleToDifficulty(e.tags.sac_scale),
+      surface: e.tags.surface ?? null,
+      dogsAllowed: mapDogTag(e.tags.dog),
       centerLat: e.center.lat,
       centerLng: e.center.lon,
       approxDistanceFromQueryKm: haversineKm(lat, lng, e.center.lat, e.center.lon),
@@ -81,10 +120,43 @@ export async function fetchNearbyTrails(lat: number, lng: number, radiusMeters: 
     .sort((a, b) => a.approxDistanceFromQueryKm - b.approxDistanceFromQueryKm);
 }
 
+export type TrailRouteType = 'loop' | 'linear';
+
+export interface TrailElevationPoint {
+  /** Cumulative distance walked from the trail's start, in km. */
+  distanceKm: number;
+  elevationM: number;
+}
+
 export interface TrailGeometry {
   id: number;
   name: string | null;
   points: { lat: number; lng: number }[];
+  /** Loop when the walked line's start and end are within ~150m of each
+   *  other, linear otherwise. Deliberately doesn't attempt AllTrails' finer
+   *  "out-and-back" vs "point-to-point" distinction -- both are linear paths
+   *  in OSM's own data model, and guessing which one a given trail is would
+   *  be exactly the kind of unreliable claim this app avoids making. */
+  routeType: TrailRouteType;
+  /** `null` when Open-Elevation is unreachable/times out -- best-effort,
+   *  same contract as everything else this endpoint calls out to. Sampled
+   *  independently of `points` (see `ELEVATION_SAMPLE_COUNT`), since a
+   *  smooth chart needs far fewer samples than a map line does vertices. */
+  elevationProfile: TrailElevationPoint[] | null;
+}
+
+const ELEVATION_SAMPLE_COUNT = 60;
+
+// ~150m -- generous enough that a loop trail's start/end nodes, which rarely
+// sit at the literal same coordinate (a trailhead loop back to a parking lot
+// entrance, say), still register as a loop, while staying far below the
+// length of any real point-to-point or out-and-back trail.
+const LOOP_ENDPOINT_THRESHOLD_KM = 0.15;
+
+function classifyRouteType(points: LatLng[]): TrailRouteType {
+  const start = points[0];
+  const end = points[points.length - 1];
+  return haversineKm(start.lat, start.lng, end.lat, end.lng) <= LOOP_ENDPOINT_THRESHOLD_KM ? 'loop' : 'linear';
 }
 
 // Some relations (long-distance national/pilgrimage trails) return 10k+
@@ -184,6 +256,27 @@ export async function fetchTrailGeometry(relationId: number): Promise<TrailGeome
   return {
     id: relation.id,
     name: relation.tags?.name ?? null,
+    // Classified on the full stitched line, not the decimated one --
+    // `decimate` samples at an even stride and isn't guaranteed to keep the
+    // exact last point, which would make a loop's start/end look linear.
+    routeType: classifyRouteType(points),
     points: decimate(points, MAX_GEOMETRY_POINTS),
+    elevationProfile: await buildElevationProfile(points),
   };
+}
+
+/** A chart needs far fewer samples than the map polyline does vertices, so
+ *  this decimates independently (down to `ELEVATION_SAMPLE_COUNT`) rather
+ *  than reusing the already-decimated map points -- keeps the Open-Elevation
+ *  request small regardless of how detailed `MAX_GEOMETRY_POINTS` is. */
+async function buildElevationProfile(fullPoints: LatLng[]): Promise<TrailElevationPoint[] | null> {
+  const sample = decimate(fullPoints, ELEVATION_SAMPLE_COUNT);
+  const elevations = await fetchElevations(sample);
+  if (!elevations) return null;
+
+  let cumulativeKm = 0;
+  return sample.map((point, i) => {
+    if (i > 0) cumulativeKm += haversineKm(sample[i - 1].lat, sample[i - 1].lng, point.lat, point.lng);
+    return { distanceKm: cumulativeKm, elevationM: elevations[i] };
+  });
 }

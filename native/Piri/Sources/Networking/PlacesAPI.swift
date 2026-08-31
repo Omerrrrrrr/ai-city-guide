@@ -99,6 +99,25 @@ enum TrailsAPI {
     static func geometry(id: Int) async throws -> TrailGeometry {
         try await APIClient.shared.get("/trails/geometry", query: ["id": String(id)])
     }
+
+    /// AI blurb grounded in this trail's own OSM tags plus, once any exist,
+    /// real Piri reviews for it (same `poiKey` reviews already use) — see
+    /// backend `/trails/summary`. Locale drives which language the model
+    /// answers in, same as every other AI endpoint in this app.
+    static func summary(for trail: Trail, locale: String?) async throws -> TrailSummaryResponse {
+        try await APIClient.shared.get("/trails/summary", query: [
+            "name": trail.name,
+            "lat": String(trail.centerLat),
+            "lng": String(trail.centerLng),
+            "difficulty": trail.difficulty?.rawValue,
+            "distanceKm": trail.distanceKm.map { String($0) },
+            "operatorName": trail.operatorName,
+            "network": trail.network,
+            "surface": trail.surface,
+            "dogsAllowed": trail.dogsAllowed.map { $0 ? "true" : "false" },
+            "locale": locale,
+        ])
+    }
 }
 
 /// Backs `CityStore`'s per-city context cache -- all three are constant for
