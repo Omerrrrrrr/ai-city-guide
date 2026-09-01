@@ -1336,9 +1336,19 @@ async function buildServer() {
       // 'google' preferred here specifically -- see getAiProviderConfig's
       // own comment. Falls back to the app-wide default when no Google key
       // is configured, so this endpoint still works either way.
-      const aiProvider = getAiProviderConfig('google');
+      //
+      // Also tried in order at call time below (`identifyProviders`), not
+      // just at config time: a configured-but-exhausted Google key (real
+      // TestFlight incident 2026-09-01 -- Sentry: AI_RetryError, "Your
+      // prepaid credit has expired" from Google AI Studio billing) used to
+      // fail every single scan with a 500 until someone noticed and topped
+      // up billing, even though a perfectly good OpenAI/OpenRouter key was
+      // sitting right there configured and unused as a fallback.
+      const identifyProviders = [getAiProviderConfig('google'), getAiProviderConfig('openai'), getAiProviderConfig('openrouter')].filter(
+        (p, index, all): p is NonNullable<typeof p> => p !== null && all.findIndex((other) => other?.provider === p.provider) === index
+      );
 
-      if (!aiProvider) {
+      if (identifyProviders.length === 0) {
         return reply.code(500).send({ error: 'AI is not configured in the backend' });
       }
 
@@ -1416,27 +1426,45 @@ async function buildServer() {
             .max(4)
             .describe('2-4 specific highlights relevant to this user. Short, punchy sentences.'),
         });
-        const { object } = (await generateObject({
-          model: aiProvider.client.chat(aiProvider.model),
-          schema: identifySchema,
-          messages: [
-            {
-              role: 'user',
-              content: [
+        // Try each configured provider in order (google, then openai, then
+        // openrouter -- see `identifyProviders` above) rather than the
+        // usual single-attempt call every other endpoint makes: a vision
+        // request failing outright (bad key, exhausted billing, a
+        // provider-side outage) shouldn't take the whole scan feature down
+        // when another configured provider could have served it.
+        let object: z.infer<typeof identifySchema> | undefined;
+        let lastError: unknown;
+        for (const provider of identifyProviders) {
+          try {
+            const result = (await generateObject({
+              model: provider.client.chat(provider.model),
+              schema: identifySchema,
+              messages: [
                 {
-                  type: 'image',
-                  image: imageBase64,
-                  mimeType: mimeType as 'image/jpeg' | 'image/png' | 'image/webp',
-                },
-                {
-                  type: 'text',
-                  text: `What is this place? ${locationHint}`,
+                  role: 'user',
+                  content: [
+                    {
+                      type: 'image',
+                      image: imageBase64,
+                      mimeType: mimeType as 'image/jpeg' | 'image/png' | 'image/webp',
+                    },
+                    {
+                      type: 'text',
+                      text: `What is this place? ${locationHint}`,
+                    },
+                  ],
                 },
               ],
-            },
-          ],
-          system: `You are Piri, a deeply knowledgeable personal travel guide. You identify places from photos and explain them in a way that speaks directly to who the user is.${identifyFactualGuard}${identifyConfidenceGuard}${profileContext}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
-        } as any)) as { object: z.infer<typeof identifySchema> };
+              system: `You are Piri, a deeply knowledgeable personal travel guide. You identify places from photos and explain them in a way that speaks directly to who the user is.${identifyFactualGuard}${identifyConfidenceGuard}${profileContext}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
+            } as any)) as { object: z.infer<typeof identifySchema> };
+            object = result.object;
+            break;
+          } catch (providerError) {
+            lastError = providerError;
+            Sentry.captureException(providerError, { tags: { identifyProviderFailed: provider.provider } });
+          }
+        }
+        if (!object) throw lastError;
 
         // Fuzzy-match the identified title against DB places. Nearby places are
         // checked first (more reliable when GPS is available and multiple places
@@ -3058,6 +3086,19 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
         return reply.code(503).send({ error: 'AI not configured' });
       }
 
+      // Same daily Ask Piri quota as /places/recommend-poi -- this is a
+      // real back-and-forth chat too (unlike /places/explain-poi's one-shot
+      // automatic blurb on every POI tap, which stays unmetered since it's
+      // core browsing, not "asking Piri" repeatedly). Unmetered for guests,
+      // same reasoning as that route's own comment.
+      const chatUserId = await optionalUserId(request, AUTH_JWT_SECRET);
+      if (chatUserId) {
+        const allowed = await checkAndIncrementUsage(chatUserId, 'ask_piri_chat', 'day');
+        if (!allowed) {
+          return reply.code(429).send({ error: 'Daily Ask Piri limit reached. Try again tomorrow, or upgrade for more.' });
+        }
+      }
+
       // A specific answer (ticket prices, opening hours, a phone number) is
       // less likely to land in the first few hundred characters than the
       // general "about this place" framing /places/explain-poi's own
@@ -3588,8 +3629,24 @@ ${placeContext.length > 0 ? `Available shortlist:\n${JSON.stringify(placeContext
 
     // Not required -- guest browsing is allowed here, same as
     // /places/explain-poi. Only used to pull this account's own written
-    // reviews into context; every other branch behaves the same regardless.
+    // reviews into context and (below) enforce the daily Ask Piri quota;
+    // every other branch behaves the same regardless.
     const userId = await optionalUserId(request, AUTH_JWT_SECRET);
+
+    // Signed-in accounts only -- an anonymous guest has no `usageCounters`
+    // row to track against (no userId to key it on), so this stays
+    // unmetered for guests rather than inventing IP-based rate limiting.
+    // free/basic/pro all get *some* real daily allowance (see
+    // entitlements.ts's own comment on why free isn't 0 here the way
+    // google_places is) -- this is the app's core discovery loop, not an
+    // upsell-only extra.
+    if (userId) {
+      const allowed = await checkAndIncrementUsage(userId, 'ask_piri_chat', 'day');
+      if (!allowed) {
+        return reply.code(429).send({ error: 'Daily Ask Piri limit reached. Try again tomorrow, or upgrade for more.' });
+      }
+    }
+
     const ownReviews = await fetchOwnReviewSummaries(userId);
     const { text: userContext } = buildUserContext(userProfile, recentlyViewed, savedPlaces, pastTrips, ownReviews);
     const profileContext = userContext ? `${userContext}\nPersonalize your answer to this person.` : '';
