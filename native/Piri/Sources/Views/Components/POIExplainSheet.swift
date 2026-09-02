@@ -332,8 +332,17 @@ struct POIExplainContent: View {
                 }
             }
 
-            Divider()
-            chatInputBar
+            // Gated behind `showingChat` too, not just the message bubbles
+            // above -- confirmed live: leaving this always visible while
+            // the "Ask about this place" row lived collapsed further up
+            // put two separate invitations to chat on screen at once
+            // (the collapsed row, easy to miss below the fold, *and* this
+            // input bar sitting permanently docked at the bottom), which
+            // reads as redundant rather than as one clear affordance.
+            if showingChat {
+                Divider()
+                chatInputBar
+            }
         }
         .sheet(item: $addToCollectionKind) { kind in AddToCollectionSheet(poi: poi, kind: kind) }
         .sheet(isPresented: $showingReviews) { TripAdvisorReviewsSheet(poi: poi, totalReviewCount: result?.rating?.reviewCount) }

@@ -592,6 +592,14 @@ struct HomeScreen: View {
                     showingHolidayDetail = holiday
                 }
             }
+            // Without this, a single pill (the common case: golden hour
+            // only ever applies for part of the day, and most days have no
+            // holiday within a week) stretched to the full row width via
+            // its own `maxWidth: .infinity` -- confirmed live, an
+            // odd-looking full-width "18° Rainy" slab instead of a compact
+            // tile. Capping each tile's width and absorbing the rest here
+            // keeps 1-3 pills all reading as the same small tile size.
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, 20)
     }
@@ -622,7 +630,7 @@ struct HomeScreen: View {
                 .foregroundStyle(.white.opacity(0.6))
                 .lineLimit(1)
         }
-        .frame(maxWidth: .infinity)
+        .frame(width: 100)
         .padding(.vertical, 12)
         .background(RoundedRectangle(cornerRadius: 14).fill(Theme.navy.opacity(0.7)))
     }
