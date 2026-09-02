@@ -216,43 +216,53 @@ export interface TripAdvisorInfo {
 
 const emptyInfo: TripAdvisorInfo = { rating: null, description: null, photoUrls: [], locationId: null };
 
-/** Everything about a matched location except `isOpenNow` -- that's
- *  computed fresh per-call against the caller's own `referenceDate` (see
+/** Everything about a matched location except its opening hours and
+ *  `isOpenNow` -- kept separate because it's cached on a longer TTL (see
+ *  `CORE_TTL_MS`/`HOURS_TTL_MS` below). `isOpenNow` itself is computed
+ *  fresh per-call against the caller's own `referenceDate` (see
  *  `fetchTripAdvisorInfo`), never baked into the cached value, so a
  *  Plan's "will this be open on this future date" lookup can never read
  *  back another caller's "is it open right now" result by mistake. */
-interface CachedMatch {
-  ratingBase: { score: number; reviewCount: number; url: string; iconUrl: string; hoursFormatted?: string[] } | null;
-  hours: OpeningHoursPayload | undefined;
+interface CachedCore {
+  ratingCore: { score: number; reviewCount: number; url: string; iconUrl: string } | null;
   description: string | null;
   photoUrls: string[];
   locationId: number | null;
 }
 
-const emptyMatch: CachedMatch = { ratingBase: null, hours: undefined, description: null, photoUrls: [], locationId: null };
+interface CachedHours {
+  raw: OpeningHoursPayload | undefined;
+  formatted: string[] | undefined;
+}
+
+interface CacheEntry {
+  core: CachedCore;
+  coreFetchedAt: number;
+  hours: CachedHours;
+  hoursFetchedAt: number;
+}
+
+const emptyCore: CachedCore = { ratingCore: null, description: null, photoUrls: [], locationId: null };
+const emptyHours: CachedHours = { raw: undefined, formatted: undefined };
 
 // Confirmed live: this had no caching at all, and `fetchTripAdvisorInfo` is
 // called from `/places/explain-poi` -- fired on essentially every POI tap
 // across Home/Map/Explore/Scan -- so every repeat look at the same place
 // (by the same tester re-checking it, or several testers looking at the
-// same popular spot) paid for its own live Tripadvisor call. A real
-// nearby-search + photos round trip for the same coordinate+name doesn't
-// need to be that fresh -- ratings/descriptions/photos don't meaningfully
-// change within a week for the vast majority of real businesses -- so this
-// caches the *match*, not just the final shaped response, letting every
-// caller (including ones needing a different `referenceDate` or
-// `includePhotos`) still get correct, per-call-shaped results from one
-// shared lookup.
+// same popular spot) paid for its own live Tripadvisor call.
 //
-// One week, not longer: Tripadvisor's API has no endpoint that returns
-// opening hours on their own -- `hours` only ever comes bundled inside this
-// same nearby-search response alongside rating/description/photos, so
-// there's no way to refresh just the hours more often than the rest of the
-// record. A week keeps a place's weekly hours from drifting stale for too
-// long (the one field here that can genuinely change) while still cutting
-// the vast majority of same-place-repeat-lookup cost this cache exists for.
-const MATCH_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const matchCache = new Map<string, { data: CachedMatch; fetchedAt: number }>();
+// Two TTLs, not one: rating/description/photos genuinely don't change
+// within a month for the vast majority of real businesses, but opening
+// hours are the one field here that can, so they're refreshed weekly
+// instead. Tripadvisor's API has no endpoint that returns hours on their
+// own though -- `opening_hours` only ever comes bundled inside the same
+// nearby-search response as everything else -- so there's no cheaper way
+// to get fresher hours than a full live re-fetch; `fetchMatch` below just
+// discards that re-fetch's core fields and keeps the still-fresh cached
+// ones whenever only the hours actually needed refreshing.
+const CORE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const HOURS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const matchCache = new Map<string, CacheEntry>();
 
 function matchCacheKey(name: string, lat: number, lng: number): string {
   // 3 decimal degrees (~111m) -- tight enough that two genuinely different
@@ -262,17 +272,25 @@ function matchCacheKey(name: string, lat: number, lng: number): string {
   return `${normalizeName(name)}|${lat.toFixed(3)}|${lng.toFixed(3)}`;
 }
 
-async function fetchMatch(name: string, lat: number, lng: number): Promise<CachedMatch> {
+async function fetchMatch(name: string, lat: number, lng: number): Promise<CacheEntry> {
   const key = matchCacheKey(name, lat, lng);
+  const now = Date.now();
   const cached = matchCache.get(key);
-  if (cached && Date.now() - cached.fetchedAt < MATCH_CACHE_TTL_MS) return cached.data;
+  const coreStale = !cached || now - cached.coreFetchedAt >= CORE_TTL_MS;
+  const hoursStale = !cached || now - cached.hoursFetchedAt >= HOURS_TTL_MS;
 
-  const data = await fetchMatchLive(name, lat, lng);
-  matchCache.set(key, { data, fetchedAt: Date.now() });
-  return data;
+  if (cached && !coreStale && !hoursStale) return cached;
+
+  const live = await fetchMatchLive(name, lat, lng);
+  const entry: CacheEntry = coreStale
+    ? { core: live.core, coreFetchedAt: now, hours: live.hours, hoursFetchedAt: now }
+    : { core: cached!.core, coreFetchedAt: cached!.coreFetchedAt, hours: live.hours, hoursFetchedAt: now };
+
+  matchCache.set(key, entry);
+  return entry;
 }
 
-async function fetchMatchLive(name: string, lat: number, lng: number): Promise<CachedMatch> {
+async function fetchMatchLive(name: string, lat: number, lng: number): Promise<{ core: CachedCore; hours: CachedHours }> {
   try {
     const url = new URL('https://terra.tripadvisor.com/api/locations/nearby');
     url.searchParams.set('lat', String(lat));
@@ -293,7 +311,7 @@ async function fetchMatchLive(name: string, lat: number, lng: number): Promise<C
       headers: { 'X-API-Key': TRIPADVISOR_API_KEY! },
       signal: AbortSignal.timeout(4000),
     });
-    if (!res.ok) return emptyMatch;
+    if (!res.ok) return { core: emptyCore, hours: emptyHours };
 
     const data = (await res.json()) as {
       data?: {
@@ -323,25 +341,28 @@ async function fetchMatchLive(name: string, lat: number, lng: number): Promise<C
 
     const overall = match?.location?.traveler_ratings?.overall;
     const hours = match?.location?.opening_hours;
+    const hoursResult: CachedHours = { raw: hours, formatted: hours?.formatted };
+
     if (!overall?.rating || !overall?.count) {
-      return { ratingBase: null, hours, description, photoUrls, locationId: locationId ?? null };
+      return { core: { ratingCore: null, description, photoUrls, locationId: locationId ?? null }, hours: hoursResult };
     }
 
     return {
-      ratingBase: {
-        score: overall.rating,
-        reviewCount: overall.count,
-        url: match?.location?.urls?.tripadvisor?.main ?? '',
-        iconUrl: overall.icon_url ?? '',
-        hoursFormatted: hours?.formatted,
+      core: {
+        ratingCore: {
+          score: overall.rating,
+          reviewCount: overall.count,
+          url: match?.location?.urls?.tripadvisor?.main ?? '',
+          iconUrl: overall.icon_url ?? '',
+        },
+        description,
+        photoUrls,
+        locationId: locationId ?? null,
       },
-      hours,
-      description,
-      photoUrls,
-      locationId: locationId ?? null,
+      hours: hoursResult,
     };
   } catch {
-    return emptyMatch;
+    return { core: emptyCore, hours: emptyHours };
   }
 }
 
@@ -369,17 +390,21 @@ export async function fetchTripAdvisorInfo(
 ): Promise<TripAdvisorInfo> {
   if (!TRIPADVISOR_API_KEY) return emptyInfo;
 
-  const match = await fetchMatch(name, lat, lng);
-  const photoUrls = includePhotos ? match.photoUrls : [];
+  const entry = await fetchMatch(name, lat, lng);
+  const photoUrls = includePhotos ? entry.core.photoUrls : [];
 
-  if (!match.ratingBase) {
-    return { rating: null, description: match.description, photoUrls, locationId: match.locationId };
+  if (!entry.core.ratingCore) {
+    return { rating: null, description: entry.core.description, photoUrls, locationId: entry.core.locationId };
   }
 
   return {
-    rating: { ...match.ratingBase, isOpenNow: computeOpenNow(match.hours, referenceDate) },
-    description: match.description,
+    rating: {
+      ...entry.core.ratingCore,
+      hoursFormatted: entry.hours.formatted,
+      isOpenNow: computeOpenNow(entry.hours.raw, referenceDate),
+    },
+    description: entry.core.description,
     photoUrls,
-    locationId: match.locationId,
+    locationId: entry.core.locationId,
   };
 }
