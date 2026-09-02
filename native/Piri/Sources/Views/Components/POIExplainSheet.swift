@@ -60,6 +60,12 @@ struct POIExplainContent: View {
     @State private var addToCollectionKind: SavedCollectionKind?
     @State private var showingReviews = false
     @State private var showingDirections = false
+    /// Chat starts collapsed behind an "Ask about this place" row instead
+    /// of always rendering at the bottom of the scroll — most opens of this
+    /// card never lead to a follow-up question, so showing the input bar
+    /// unconditionally cost every single POI tap a chunk of scroll length
+    /// for a feature most people never touch.
+    @State private var showingChat = false
     /// Drives Apple's own full Place Card via `mapItemDetailSheet` — the
     /// only place hours show up. `MKMapItem` has no `hours`/`openingHours`
     /// property at all (confirmed against the SDK header directly, not just
@@ -158,17 +164,101 @@ struct POIExplainContent: View {
                                 SkeletonBox().frame(width: 220, height: 12)
                             }
                         } else if let result {
+                            // "Why Piri recommends this" -- headline/body/
+                            // highlights exactly as before, just gathered
+                            // under an explicit label instead of running
+                            // straight into the badges/ratings/reviews
+                            // below with nothing marking where the AI's
+                            // own voice ends. Deliberately plain text, no
+                            // colored box -- a bordered callout here read
+                            // as louder than the content warranted.
+                            sectionLabel("poiExplain.whyRecommends")
                             Text(result.headline).font(.subheadline.bold()).foregroundStyle(Theme.gold)
-                            HStack(spacing: 12) {
-                                if let weather = weatherQuery.weather {
-                                    weatherBadge(weather)
-                                }
-                                if let goldenHour = result.goldenHour, let window = goldenHourWindow(goldenHour) {
-                                    goldenHourBadge(window)
+                            Text(result.body).font(.footnote)
+                            ForEach(result.highlights, id: \.self) { highlight in
+                                HStack(alignment: .top, spacing: 6) {
+                                    Circle().fill(Theme.gold).frame(width: 5, height: 5).padding(.top, 6)
+                                    Text(highlight).font(.caption)
                                 }
                             }
+
+                            if weatherQuery.weather != nil || goldenHourBadgeWindow(result) != nil {
+                                HStack(spacing: 8) {
+                                    if let weather = weatherQuery.weather {
+                                        weatherBadge(weather)
+                                    }
+                                    if let window = goldenHourBadgeWindow(result) {
+                                        goldenHourBadge(window)
+                                    }
+                                }
+                            }
+
+                            verifiedFactsRow(result)
+
+                            // "Good to know" -- hours (Tripadvisor's real
+                            // formatted schedule, the only source of it
+                            // besides Apple's own native sheet below),
+                            // phone/website/address, and whatever curated/
+                            // dietary tags apply, grouped under one label
+                            // instead of stacked as separate unlabeled
+                            // cards.
+                            sectionLabel("poiExplain.goodToKnow")
                             if let rating = result.rating {
-                                TripAdvisorRatingRow(rating: rating)
+                                hoursRow(rating)
+                            }
+                            PlaceDetailsCard(mapItem: poi.mapItem)
+                            if let curatedInfo = result.curatedInfo {
+                                CuratedInfoRow(info: curatedInfo)
+                            }
+                            if let dietaryTags = result.dietaryTags {
+                                DietaryTagsRow(tags: dietaryTags)
+                            }
+
+                            HStack(spacing: 10) {
+                                Button {
+                                    showingMapItemDetail = true
+                                } label: {
+                                    Label("poiExplain.fullDetails", systemImage: "info.circle.fill")
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(Theme.gold)
+                                .mapItemDetailSheet(isPresented: $showingMapItemDetail, item: poi.mapItem)
+
+                                Button("common.openInMaps") {
+                                    let opensInApp = PlaceDirections.opensInApp
+                                    PlaceDirections.openInMaps(name: poi.name, coordinate: poi.coordinate, tabSelection: tabSelection)
+                                    if opensInApp { close() }
+                                }
+                                .buttonStyle(.bordered)
+
+                                Button {
+                                    Haptics.light()
+                                    withAnimation(.easeInOut(duration: 0.2)) { showingDirections.toggle() }
+                                } label: {
+                                    Label("directions.preview.button", systemImage: "arrow.triangle.turn.up.right.circle")
+                                }
+                                .buttonStyle(.bordered)
+                            }
+
+                            if showingDirections {
+                                DirectionsPreview(destination: poi.coordinate)
+                            }
+
+                            // Apple's own street-level imagery — silently
+                            // omitted where Look Around has no coverage
+                            // (common outside a handful of countries)
+                            // rather than showing an empty/broken
+                            // placeholder.
+                            if let lookAroundScene {
+                                LookAroundCard(scene: lookAroundScene, height: 180)
+                            }
+
+                            // "Reviews" -- Tripadvisor's own bubble/score
+                            // (hours already shown above, not repeated
+                            // here) plus Piri's own combined section.
+                            sectionLabel("poiExplain.reviewsSection")
+                            if let rating = result.rating {
+                                TripAdvisorRatingRow(rating: rating, showHours: false)
                                 // Only offered when we already know
                                 // Tripadvisor has a matched location for
                                 // this place (i.e. `rating` resolved at
@@ -183,30 +273,41 @@ struct POIExplainContent: View {
                                 }
                             }
                             PiriReviewsSection(poi: poi, tripAdvisorRating: result.rating, googleRating: result.googleRating, initialPiriRating: result.piriRating, reviewsSummary: result.reviewsSummary, aspectHighlights: result.aspectHighlights)
-                            if let curatedInfo = result.curatedInfo {
-                                CuratedInfoRow(info: curatedInfo)
+
+                            // Chat starts collapsed -- see `showingChat`'s
+                            // own doc comment.
+                            Divider().padding(.vertical, 4)
+                            Button {
+                                Haptics.light()
+                                withAnimation { showingChat.toggle() }
+                            } label: {
+                                Label("poiExplain.askAboutPlace", systemImage: "bubble.left.and.bubble.right")
+                                    .font(.footnote.weight(.semibold))
                             }
-                            if let dietaryTags = result.dietaryTags {
-                                DietaryTagsRow(tags: dietaryTags)
-                            }
-                            Text(result.body).font(.footnote)
-                            if let source = result.groundingSource {
-                                // NOT `LocalizationValue("...\(source)")` -- that treats
-                                // `source` as a substitution argument of the literal string
-                                // "poiExplain.source.%@" rather than concatenating it into
-                                // the lookup key, so the catalog lookup always misses and
-                                // silently falls back to rendering the raw interpolated
-                                // text (confirmed live: a real card showed literal
-                                // "poiExplain.source.wikipedia" instead of the translated
-                                // caption). Build the key as a plain `String` first, same
-                                // fix `LPlural` already documents for the identical trap.
-                                let key = "poiExplain.source." + source
-                                SourceCaption(text: String(localized: String.LocalizationValue(key)))
-                            }
-                            ForEach(result.highlights, id: \.self) { highlight in
-                                HStack(alignment: .top, spacing: 6) {
-                                    Circle().fill(Theme.gold).frame(width: 5, height: 5).padding(.top, 6)
-                                    Text(highlight).font(.caption)
+
+                            if showingChat {
+                                if !chatHistory.isEmpty {
+                                    ForEach(chatHistory) { turn in chatBubble(turn) }
+                                }
+
+                                if chatSending {
+                                    HStack {
+                                        ProgressView().tint(Theme.gold)
+                                        Spacer()
+                                    }
+                                    .id("chat-sending")
+                                }
+
+                                if let chatError {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "exclamationmark.triangle.fill")
+                                        Text(chatError)
+                                    }
+                                    .font(.footnote)
+                                    .foregroundStyle(Theme.closedRed)
+                                    .padding(10)
+                                    .background(Theme.closedRed.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+                                    .id("chat-error")
                                 }
                             }
                         } else if let errorMessage {
@@ -217,76 +318,6 @@ struct POIExplainContent: View {
                                     .buttonStyle(.bordered)
                                     .controlSize(.small)
                             }
-                        }
-
-                        // Phone/website/address — real plain values
-                        // from Apple's own MapKit data.
-                        PlaceDetailsCard(mapItem: poi.mapItem)
-
-                        // Hours has no plain-value form to put in the
-                        // section above (see note on `showingMapItemDetail`)
-                        // — this is the only way to see it at all.
-                        HStack(spacing: 10) {
-                            Button {
-                                showingMapItemDetail = true
-                            } label: {
-                                Label("poiExplain.fullDetails", systemImage: "info.circle.fill")
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .tint(Theme.gold)
-                            .mapItemDetailSheet(isPresented: $showingMapItemDetail, item: poi.mapItem)
-
-                            Button("common.openInMaps") {
-                                let opensInApp = PlaceDirections.opensInApp
-                                PlaceDirections.openInMaps(name: poi.name, coordinate: poi.coordinate, tabSelection: tabSelection)
-                                if opensInApp { close() }
-                            }
-                            .buttonStyle(.bordered)
-
-                            Button {
-                                Haptics.light()
-                                withAnimation(.easeInOut(duration: 0.2)) { showingDirections.toggle() }
-                            } label: {
-                                Label("directions.preview.button", systemImage: "arrow.triangle.turn.up.right.circle")
-                            }
-                            .buttonStyle(.bordered)
-                        }
-
-                        if showingDirections {
-                            DirectionsPreview(destination: poi.coordinate)
-                        }
-
-                        // Apple's own street-level imagery — silently
-                        // omitted where Look Around has no coverage
-                        // (common outside a handful of countries) rather
-                        // than showing an empty/broken placeholder.
-                        if let lookAroundScene {
-                            LookAroundCard(scene: lookAroundScene, height: 180)
-                        }
-
-                        if !chatHistory.isEmpty {
-                            Divider().padding(.vertical, 4)
-                            ForEach(chatHistory) { turn in chatBubble(turn) }
-                        }
-
-                        if chatSending {
-                            HStack {
-                                ProgressView().tint(Theme.gold)
-                                Spacer()
-                            }
-                            .id("chat-sending")
-                        }
-
-                        if let chatError {
-                            HStack(spacing: 6) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                Text(chatError)
-                            }
-                            .font(.footnote)
-                            .foregroundStyle(Theme.closedRed)
-                            .padding(10)
-                            .background(Theme.closedRed.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
-                            .id("chat-error")
                         }
                     }
                     .padding()
@@ -354,6 +385,81 @@ struct POIExplainContent: View {
         }
         .font(.caption)
         .foregroundStyle(Theme.gold)
+    }
+
+    /// Small caps section header used to group "Good to know"/"Reviews"/
+    /// etc. — a plain label, not a card or colored box, matching the
+    /// synthesis of both mockups' Place Detail structure (see the plan's
+    /// "Divergences" section on why a box was deliberately rejected here).
+    private func sectionLabel(_ key: String) -> some View {
+        Text(String(localized: String.LocalizationValue(key)))
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .textCase(.uppercase)
+    }
+
+    private func goldenHourBadgeWindow(_ result: ExplainResult) -> (start: Date, end: Date)? {
+        guard let goldenHour = result.goldenHour else { return nil }
+        return goldenHourWindow(goldenHour)
+    }
+
+    /// Which real sources back this card, shown as a trust row rather than
+    /// the single inline caption this replaced — `groundingSource` is
+    /// mutually exclusive (Wikipedia or Tripadvisor, whichever grounded the
+    /// AI explanation), Google is independent of that and only present when
+    /// a Google rating was actually fetched.
+    private func verifiedSourceNames(_ result: ExplainResult) -> [String] {
+        var names: [String] = []
+        if let source = result.groundingSource {
+            names.append(source == "wikipedia" ? "Wikipedia" : "Tripadvisor")
+        }
+        if result.googleRating != nil { names.append("Google") }
+        return names
+    }
+
+    @ViewBuilder
+    private func verifiedFactsRow(_ result: ExplainResult) -> some View {
+        let sources = verifiedSourceNames(result)
+        if !sources.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                sectionLabel("poiExplain.verifiedFacts")
+                HStack(spacing: 14) {
+                    ForEach(sources, id: \.self) { SourceCaption(text: $0) }
+                }
+            }
+        }
+    }
+
+    /// Hours pulled up into "Good to know" on their own — `MKMapItem` has
+    /// no hours property at all, so Tripadvisor's `hoursFormatted` (only
+    /// present once a Tripadvisor match resolved) is the only structured
+    /// source for this. `TripAdvisorRatingRow` below (in the Reviews
+    /// section) shows the bubble/score/open-now tag but not these lines,
+    /// via its own `showHours: false` — avoids showing the same schedule
+    /// twice on one card.
+    @ViewBuilder
+    private func hoursRow(_ rating: TripAdvisorRating) -> some View {
+        if let hoursFormatted = rating.hoursFormatted, !hoursFormatted.isEmpty {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Image(systemName: "clock.fill")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.gold)
+                        .frame(width: 18)
+                    if let isOpenNow = rating.isOpenNow {
+                        Text(isOpenNow ? "tripadvisor.openNow" : "tripadvisor.closedNow")
+                            .font(.footnote.bold())
+                            .foregroundStyle(isOpenNow ? Theme.openGreen : Theme.closedRed)
+                    }
+                }
+                ForEach(hoursFormatted, id: \.self) { line in
+                    Text(TripAdvisorHours.humanize(line))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 28)
+                }
+            }
+        }
     }
 
     private func loadLookAroundScene() async {

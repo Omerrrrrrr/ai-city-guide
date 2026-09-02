@@ -6,6 +6,11 @@ import SwiftUI
 /// review page on tripadvisor.com.
 struct TripAdvisorRatingRow: View {
     let rating: TripAdvisorRating
+    /// `false` when the caller shows the formatted hours lines itself
+    /// elsewhere (e.g. grouped into a "Good to know" section instead of
+    /// living here next to the bubble/score) -- avoids showing the same
+    /// hours text twice on one card.
+    var showHours: Bool = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -34,7 +39,7 @@ struct TripAdvisorRatingRow: View {
                 }
             }
 
-            if let hoursFormatted = rating.hoursFormatted {
+            if showHours, let hoursFormatted = rating.hoursFormatted {
                 ForEach(hoursFormatted, id: \.self) { line in
                     Text(TripAdvisorHours.humanize(line)).font(.caption).foregroundStyle(.secondary)
                 }
