@@ -18,6 +18,7 @@ struct HomeScreen: View {
 
     @State private var weatherQuery = WeatherQuery()
     @State private var holidayQuery = HolidayQuery()
+    @State private var goldenHour: GoldenHour?
     @State private var showingHolidayDetail: UpcomingHoliday?
     @State private var locationManager = LocationManager()
     @State private var nearbyUser: [PlaceWithDistance] = []
@@ -137,6 +138,7 @@ struct HomeScreen: View {
                let lng = cityStore.lng ?? locationManager.currentLocation?.longitude {
                 await weatherQuery.load(lat: lat, lng: lng, cityName: cityStore.cityName)
                 await holidayQuery.load(lat: lat, lng: lng, locale: Locale.current.language.languageCode?.identifier)
+                goldenHour = try? await SunTimesAPI.fetch(lat: lat, lng: lng)
             }
             if let location = locationManager.currentLocation {
                 nearbyUser = placesQuery.nearbyUser(lat: location.latitude, lng: location.longitude)
@@ -555,25 +557,87 @@ struct HomeScreen: View {
         .padding(.horizontal, 20)
     }
 
-    /// Single priority slot replacing three banners that used to stack on
-    /// top of each other (profile nudge, weather, "Ask Piri") whenever more
-    /// than one applied at once — up to three "please engage with me" cards
-    /// competing for attention on the very first screen. Picks the single
-    /// most relevant one instead: filling out a profile (unlocks
-    /// personalization) outranks a contextual weather tip, which outranks
-    /// the evergreen AI-chat fallback. See the 2026-08 visual-design
-    /// research report, Phase 1.
+    /// Priority slot: a profile nudge (unlocks personalization) still
+    /// outranks everything else and still takes the full-banner treatment
+    /// alone, same reasoning as before. Below that, weather/golden-hour/
+    /// holiday no longer fight over one slot — collapsed into small
+    /// side-by-side tiles (`infoPillsRow`) light enough to show together
+    /// without recreating the original "three competing banners" problem
+    /// these were once consolidated to avoid; the evergreen AI-chat banner
+    /// keeps its own separate, lowest-priority fallback slot for when none
+    /// of the contextual tiles apply at all.
     @ViewBuilder
     private var suggestionCard: some View {
         if !hasProfile, !poiLoading {
             profileNudge
-        } else if let holiday = soonHoliday {
-            holidayBanner(holiday)
-        } else if let weather = weatherQuery.weather {
-            weatherBanner(weather)
+        } else if soonHoliday != nil || weatherQuery.weather != nil || goldenHour?.activeWindow != nil {
+            infoPillsRow
         } else {
             aiBanner
         }
+    }
+
+    private var infoPillsRow: some View {
+        HStack(spacing: 10) {
+            if let weather = weatherQuery.weather {
+                infoPill(icon: weather.condition.icon, title: "\(Int(weather.temp))°", subtitle: weather.description.capitalized) {
+                    showingWeatherForecast = true
+                }
+            }
+            if let window = goldenHour?.activeWindow {
+                infoPill(icon: "sun.horizon.fill", title: String(localized: "home.goldenHourPill.title"), subtitle: goldenHourRangeText(window))
+            }
+            if let holiday = soonHoliday {
+                infoPill(icon: "flag.fill", title: holiday.name, subtitle: holidayWhenText(holiday)) {
+                    showingHolidayDetail = holiday
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+    }
+
+    private func infoPill(icon: String, title: String, subtitle: String, action: (() -> Void)? = nil) -> some View {
+        Group {
+            if let action {
+                Button {
+                    Haptics.light()
+                    action()
+                } label: { infoPillLabel(icon: icon, title: title, subtitle: subtitle) }
+                .buttonStyle(.plain)
+            } else {
+                infoPillLabel(icon: icon, title: title, subtitle: subtitle)
+            }
+        }
+    }
+
+    private func infoPillLabel(icon: String, title: String, subtitle: String) -> some View {
+        VStack(spacing: 4) {
+            Image(systemName: icon).font(.system(size: 17)).foregroundStyle(Theme.gold)
+            Text(title)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+            Text(subtitle)
+                .font(.system(size: 11))
+                .foregroundStyle(.white.opacity(0.6))
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .background(RoundedRectangle(cornerRadius: 14).fill(Theme.navy.opacity(0.7)))
+    }
+
+    private func goldenHourRangeText(_ window: (start: Date, end: Date)) -> String {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return "\(formatter.string(from: window.start))–\(formatter.string(from: window.end))"
+    }
+
+    private func holidayWhenText(_ holiday: UpcomingHoliday) -> String {
+        let daysUntil = holiday.dateValue.map { Calendar.current.dateComponents([.day], from: .now, to: $0).day ?? 0 } ?? 0
+        return daysUntil <= 0
+            ? String(localized: "home.holidayBanner.today")
+            : LPlural("home.holidayBanner.inDays", count: daysUntil)
     }
 
     /// Within a week — close enough to be genuinely useful travel context
@@ -586,34 +650,6 @@ struct HomeScreen: View {
             guard let days = $0.dateValue.map({ Calendar.current.dateComponents([.day], from: .now, to: $0).day ?? 999 }) else { return false }
             return days >= 0 && days <= 7
         }
-    }
-
-    private func holidayBanner(_ holiday: UpcomingHoliday) -> some View {
-        Button {
-            Haptics.light()
-            showingHolidayDetail = holiday
-        } label: {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "flag.fill").font(.system(size: 24)).foregroundStyle(Theme.gold)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(holidayBannerTitle(holiday)).font(.system(size: 14, weight: .medium)).foregroundStyle(.white)
-                    Text("home.holidayBanner.cta").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.gold)
-                }
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 18).fill(Theme.navy.opacity(0.85)))
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 20)
-    }
-
-    private func holidayBannerTitle(_ holiday: UpcomingHoliday) -> String {
-        let daysUntil = holiday.dateValue.map { Calendar.current.dateComponents([.day], from: .now, to: $0).day ?? 0 } ?? 0
-        let when = daysUntil <= 0
-            ? String(localized: "home.holidayBanner.today")
-            : LPlural("home.holidayBanner.inDays", count: daysUntil)
-        return L("home.holidayBanner.title", holiday.name, when)
     }
 
     private var profileNudge: some View {
@@ -631,36 +667,6 @@ struct HomeScreen: View {
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 20)
-    }
-
-    private func weatherBanner(_ weather: Weather) -> some View {
-        Button {
-            tabSelection.selection = 3
-        } label: {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: weather.condition.icon).font(.system(size: 28)).foregroundStyle(Theme.gold)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(weatherBannerMessage(weather)).font(.system(size: 14, weight: .medium)).foregroundStyle(.white)
-                    Text("home.weatherBanner.cta").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.gold)
-                }
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 18).fill(Theme.navy.opacity(0.85)))
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 20)
-    }
-
-    private func weatherBannerMessage(_ weather: Weather) -> String {
-        switch weather.condition {
-        case .rainy, .stormy: return String(localized: "home.weatherBanner.rainy")
-        case .snowy: return String(localized: "home.weatherBanner.snowy")
-        case .sunny where weather.temp > 22: return String(localized: "home.weatherBanner.sunnyHot")
-        case .sunny where weather.temp > 16: return String(localized: "home.weatherBanner.sunnyMild")
-        case .foggy: return String(localized: "home.weatherBanner.foggy")
-        default: return L("home.weatherBanner.fallback", weather.description, weather.city)
-        }
     }
 
     @ViewBuilder

@@ -224,6 +224,23 @@ struct GoldenHour: Codable, Hashable {
     var sunset: String
     var morningEndsAt: String
     var eveningStartsAt: String
+
+    /// Whichever window (this morning's, already past, or this evening's,
+    /// still ahead) hasn't happened yet today -- `nil` once both have
+    /// passed, since showing a window that already closed isn't useful.
+    /// Shared by every screen that renders a golden-hour badge/pill so the
+    /// "which window is still relevant" logic lives in exactly one place.
+    var activeWindow: (start: Date, end: Date)? {
+        let formatter = ISO8601DateFormatter()
+        guard let sunrise = formatter.date(from: sunrise),
+              let sunset = formatter.date(from: sunset),
+              let morningEnd = formatter.date(from: morningEndsAt),
+              let eveningStart = formatter.date(from: eveningStartsAt) else { return nil }
+        let now = Date()
+        if now < morningEnd { return (sunrise, morningEnd) }
+        if now < sunset { return (eveningStart, sunset) }
+        return nil
+    }
 }
 
 /// A third-party source's rating, reduced to just what a combined-average
