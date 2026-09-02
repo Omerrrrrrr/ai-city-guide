@@ -216,29 +216,54 @@ export interface TripAdvisorInfo {
 
 const emptyInfo: TripAdvisorInfo = { rating: null, description: null, photoUrls: [], locationId: null };
 
-/**
- * Looks up the nearest Tripadvisor location within 300m whose name overlaps
- * the given POI name, and returns its aggregate rating and description.
- * Returns `{ rating: null, description: null }` on any failure (missing
- * key, no match, network error, malformed response) — this is a nice-to-
- * have addition to the AI blurb, never something the POI explain flow
- * should fail over.
- *
- * `referenceDate` controls what instant `rating.isOpenNow` is computed
- * against — defaults to the actual current time, but a Plan's target date
- * can be passed to ask "will this be open *then*" instead. `includePhotos`
- * skips the extra photos network call entirely for callers (like a bulk
- * hours check across a whole plan) that only need the rating/hours.
- */
-export async function fetchTripAdvisorInfo(
-  name: string,
-  lat: number,
-  lng: number,
-  referenceDate: Date = new Date(),
-  includePhotos: boolean = true
-): Promise<TripAdvisorInfo> {
-  if (!TRIPADVISOR_API_KEY) return emptyInfo;
+/** Everything about a matched location except `isOpenNow` -- that's
+ *  computed fresh per-call against the caller's own `referenceDate` (see
+ *  `fetchTripAdvisorInfo`), never baked into the cached value, so a
+ *  Plan's "will this be open on this future date" lookup can never read
+ *  back another caller's "is it open right now" result by mistake. */
+interface CachedMatch {
+  ratingBase: { score: number; reviewCount: number; url: string; iconUrl: string; hoursFormatted?: string[] } | null;
+  hours: OpeningHoursPayload | undefined;
+  description: string | null;
+  photoUrls: string[];
+  locationId: number | null;
+}
 
+const emptyMatch: CachedMatch = { ratingBase: null, hours: undefined, description: null, photoUrls: [], locationId: null };
+
+// Confirmed live: this had no caching at all, and `fetchTripAdvisorInfo` is
+// called from `/places/explain-poi` -- fired on essentially every POI tap
+// across Home/Map/Explore/Scan -- so every repeat look at the same place
+// (by the same tester re-checking it, or several testers looking at the
+// same popular spot) paid for its own live Tripadvisor call. A real
+// nearby-search + photos round trip for the same coordinate+name doesn't
+// need to be that fresh -- ratings/descriptions/photos don't meaningfully
+// change within a day -- so this caches the *match*, not just the final
+// shaped response, letting every caller (including ones needing a
+// different `referenceDate` or `includePhotos`) still get correct,
+// per-call-shaped results from one shared lookup.
+const MATCH_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const matchCache = new Map<string, { data: CachedMatch; fetchedAt: number }>();
+
+function matchCacheKey(name: string, lat: number, lng: number): string {
+  // 3 decimal degrees (~111m) -- tight enough that two genuinely different
+  // nearby businesses with different names never collide (name is also
+  // part of the key), loose enough that the same POI tapped from two
+  // slightly different callers' coordinates still hits the same entry.
+  return `${normalizeName(name)}|${lat.toFixed(3)}|${lng.toFixed(3)}`;
+}
+
+async function fetchMatch(name: string, lat: number, lng: number): Promise<CachedMatch> {
+  const key = matchCacheKey(name, lat, lng);
+  const cached = matchCache.get(key);
+  if (cached && Date.now() - cached.fetchedAt < MATCH_CACHE_TTL_MS) return cached.data;
+
+  const data = await fetchMatchLive(name, lat, lng);
+  matchCache.set(key, { data, fetchedAt: Date.now() });
+  return data;
+}
+
+async function fetchMatchLive(name: string, lat: number, lng: number): Promise<CachedMatch> {
   try {
     const url = new URL('https://terra.tripadvisor.com/api/locations/nearby');
     url.searchParams.set('lat', String(lat));
@@ -256,10 +281,10 @@ export async function fetchTripAdvisorInfo(
     url.searchParams.set('size', '15');
 
     const res = await fetch(url, {
-      headers: { 'X-API-Key': TRIPADVISOR_API_KEY },
+      headers: { 'X-API-Key': TRIPADVISOR_API_KEY! },
       signal: AbortSignal.timeout(4000),
     });
-    if (!res.ok) return emptyInfo;
+    if (!res.ok) return emptyMatch;
 
     const data = (await res.json()) as {
       data?: {
@@ -282,27 +307,70 @@ export async function fetchTripAdvisorInfo(
 
     const description = match?.location?.descriptions?.[0]?.value ?? null;
     const locationId = match?.location?.id;
-    const photoUrls = includePhotos && locationId ? await fetchTripAdvisorPhotos(locationId) : [];
+    // Always fetched together with the match (not gated on the caller's
+    // own `includePhotos`) so both photo-needing and photo-skipping
+    // callers for the same place share one cache entry instead of two.
+    const photoUrls = locationId ? await fetchTripAdvisorPhotos(locationId) : [];
 
     const overall = match?.location?.traveler_ratings?.overall;
-    if (!overall?.rating || !overall?.count) return { rating: null, description, photoUrls, locationId: locationId ?? null };
-
     const hours = match?.location?.opening_hours;
+    if (!overall?.rating || !overall?.count) {
+      return { ratingBase: null, hours, description, photoUrls, locationId: locationId ?? null };
+    }
 
     return {
-      rating: {
+      ratingBase: {
         score: overall.rating,
         reviewCount: overall.count,
         url: match?.location?.urls?.tripadvisor?.main ?? '',
         iconUrl: overall.icon_url ?? '',
         hoursFormatted: hours?.formatted,
-        isOpenNow: computeOpenNow(hours, referenceDate),
       },
+      hours,
       description,
       photoUrls,
       locationId: locationId ?? null,
     };
   } catch {
-    return emptyInfo;
+    return emptyMatch;
   }
+}
+
+/**
+ * Looks up the nearest Tripadvisor location within 300m whose name overlaps
+ * the given POI name, and returns its aggregate rating and description.
+ * Returns `{ rating: null, description: null }` on any failure (missing
+ * key, no match, network error, malformed response) — this is a nice-to-
+ * have addition to the AI blurb, never something the POI explain flow
+ * should fail over.
+ *
+ * `referenceDate` controls what instant `rating.isOpenNow` is computed
+ * against — defaults to the actual current time, but a Plan's target date
+ * can be passed to ask "will this be open *then*" instead. `includePhotos`
+ * skips returning the (still internally-fetched-and-cached) photos for
+ * callers (like a bulk hours check across a whole plan) that only need the
+ * rating/hours.
+ */
+export async function fetchTripAdvisorInfo(
+  name: string,
+  lat: number,
+  lng: number,
+  referenceDate: Date = new Date(),
+  includePhotos: boolean = true
+): Promise<TripAdvisorInfo> {
+  if (!TRIPADVISOR_API_KEY) return emptyInfo;
+
+  const match = await fetchMatch(name, lat, lng);
+  const photoUrls = includePhotos ? match.photoUrls : [];
+
+  if (!match.ratingBase) {
+    return { rating: null, description: match.description, photoUrls, locationId: match.locationId };
+  }
+
+  return {
+    rating: { ...match.ratingBase, isOpenNow: computeOpenNow(match.hours, referenceDate) },
+    description: match.description,
+    photoUrls,
+    locationId: match.locationId,
+  };
 }
