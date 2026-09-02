@@ -28,9 +28,7 @@ struct PiriReviewsSection: View {
     @Environment(LanguageStore.self) private var languageStore
     @State private var piriReviews: POIReviewsResponse?
     @State private var showingWriteReview = false
-    @State private var translations: [String: TranslationResult] = [:]
-    @State private var translatingIds: Set<String> = []
-    @State private var showingTranslated: Set<String> = []
+    @State private var showingAllReviews = false
 
     /// `LanguageStore.code` is `nil` for "follow system" -- falls back to
     /// the device's own language, then plain English.
@@ -113,18 +111,37 @@ struct PiriReviewsSection: View {
             }
 
             if let piriReviews, !piriReviews.reviews.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(piriReviews.reviews) { review in
-                        reviewRow(review)
-                    }
+                // Capped at 3 inline -- `GET /poi/reviews` itself has no
+                // limit beyond a defense-in-depth 200 server-side, so an
+                // unbounded `ForEach` here would render every approved
+                // review a popular place ever accumulates, every time its
+                // card opens. A "see all" drill-in (below) is where the
+                // rest live.
+                PiriReviewList(reviews: Array(piriReviews.reviews.prefix(3))) { id, helpful in
+                    castVote(reviewId: id, helpful: helpful)
                 }
                 .padding(.top, 4)
+
+                if piriReviews.reviews.count > 3 {
+                    Button {
+                        Haptics.light()
+                        showingAllReviews = true
+                    } label: {
+                        Label(L("poiReviews.seeAll", piriReviews.reviews.count), systemImage: "chevron.right")
+                            .font(.footnote.weight(.semibold))
+                    }
+                }
             }
         }
         .task { await loadReviews() }
         .sheet(isPresented: $showingWriteReview) {
             WriteReviewSheet(poi: poi, existing: piriReviews?.reviews.first { $0.userId == authStore.user?.id }) {
                 Task { await loadReviews() }
+            }
+        }
+        .sheet(isPresented: $showingAllReviews) {
+            PiriFullReviewsSheet(reviews: piriReviews?.reviews ?? []) { id, helpful in
+                castVote(reviewId: id, helpful: helpful)
             }
         }
     }
@@ -146,6 +163,54 @@ struct PiriReviewsSection: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .background(Capsule().fill(color.opacity(0.1)))
+    }
+
+    private func castVote(reviewId: String, helpful: Bool) {
+        guard let token = authStore.token else { return }
+        Haptics.light()
+        Task {
+            try? await PiriReviewsAPI.vote(reviewId: reviewId, helpful: helpful, token: token)
+            await loadReviews()
+        }
+    }
+
+    private func loadReviews() async {
+        piriReviews = try? await PiriReviewsAPI.fetchReviews(
+            name: poi.name,
+            lat: poi.coordinate.latitude,
+            lng: poi.coordinate.longitude,
+            token: authStore.token
+        )
+    }
+}
+
+/// The actual list of review rows (stars, verified-visit badge, text +
+/// on-demand translation, helpful/not-helpful votes) — split out from
+/// `PiriReviewsSection` so the same rendering serves both its own capped
+/// inline preview and `PiriFullReviewsSheet`'s complete list, without two
+/// copies of the translate/vote interaction logic. Owns its own
+/// translation state (each presentation gets its own independent
+/// expand/collapse), but votes are reported upward via `onVote` since
+/// refreshing the vote tallies means re-fetching the whole review list,
+/// which only whichever parent already holds `piriReviews` can do.
+struct PiriReviewList: View {
+    let reviews: [POIReview]
+    let onVote: (String, Bool) -> Void
+
+    @Environment(AuthStore.self) private var authStore
+    @Environment(LanguageStore.self) private var languageStore
+    @State private var translations: [String: TranslationResult] = [:]
+    @State private var translatingIds: Set<String> = []
+    @State private var showingTranslated: Set<String> = []
+
+    private var targetLangCode: String {
+        languageStore.code ?? Locale.current.language.languageCode?.identifier ?? "en"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(reviews) { review in reviewRow(review) }
+        }
     }
 
     private func reviewRow(_ review: POIReview) -> some View {
@@ -190,7 +255,7 @@ struct PiriReviewsSection: View {
     private func voteButton(review: POIReview, helpful: Bool, icon: String, count: Int) -> some View {
         let active = review.myVote == helpful
         return Button {
-            castVote(reviewId: review.id, helpful: helpful)
+            onVote(review.id, helpful)
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: active ? "\(icon).fill" : icon)
@@ -204,15 +269,6 @@ struct PiriReviewsSection: View {
         .buttonStyle(.plain)
         .disabled(authStore.token == nil)
         .opacity(authStore.token == nil ? 0.5 : 1)
-    }
-
-    private func castVote(reviewId: String, helpful: Bool) {
-        guard let token = authStore.token else { return }
-        Haptics.light()
-        Task {
-            try? await PiriReviewsAPI.vote(reviewId: reviewId, helpful: helpful, token: token)
-            await loadReviews()
-        }
     }
 
     private func translateButton(review: POIReview, text: String) -> some View {
@@ -252,14 +308,30 @@ struct PiriReviewsSection: View {
             showingTranslated.insert(review.id)
         }
     }
+}
 
-    private func loadReviews() async {
-        piriReviews = try? await PiriReviewsAPI.fetchReviews(
-            name: poi.name,
-            lat: poi.coordinate.latitude,
-            lng: poi.coordinate.longitude,
-            token: authStore.token
-        )
+/// The "see all N reviews" drill-in `PiriReviewsSection` opens once there
+/// are more than fit in its own capped inline preview.
+struct PiriFullReviewsSheet: View {
+    let reviews: [POIReview]
+    let onVote: (String, Bool) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                PiriReviewList(reviews: reviews, onVote: onVote)
+                    .padding()
+            }
+            .navigationTitle(L("poiReviews.seeAll", reviews.count))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("common.done") { dismiss() }
+                }
+            }
+        }
     }
 }
 

@@ -236,8 +236,10 @@ struct HomeScreen: View {
                 HStack(spacing: 10) {
                     ForEach(POICategoryGroups.all) { group in
                         let active = selectedCategoryGroup?.id == group.id
-                        Button(String(localized: String.LocalizationValue(group.labelKey))) {
+                        Button {
                             selectedCategoryGroup = active ? nil : group
+                        } label: {
+                            Label(String(localized: String.LocalizationValue(group.labelKey)), systemImage: group.icon)
                         }
                         .font(.system(size: 14, weight: .medium))
                         .padding(.horizontal, 16)

@@ -1,9 +1,9 @@
 import SwiftUI
 
 /// XP earned this trip, with a level-up moment when it crosses a
-/// threshold. Reuses `LevelBadge`'s exact gold-circle visual (same
-/// component `ProfileScreen`'s own XP card uses) so this doesn't invent a
-/// second version of that badge.
+/// threshold. Reuses `LevelBadge` for the actual gold circle + number (the
+/// dashed outer ring below is this card's own celebratory flourish on top
+/// of it, not part of the shared badge).
 struct RecapXPCard: View {
     let data: TripRecapData
 
@@ -21,11 +21,8 @@ struct RecapXPCard: View {
                 .foregroundStyle(Color(red: 0.5, green: 0.85, blue: 0.6))
 
                 ZStack {
-                    Circle().fill(Theme.gold.opacity(0.14)).frame(width: 148, height: 148)
                     Circle().strokeBorder(Theme.gold.opacity(0.4), style: StrokeStyle(lineWidth: 1.4, dash: [1, 5])).frame(width: 156, height: 156)
-                    Text("\(data.levelAfter)")
-                        .font(.system(size: 54, weight: .heavy))
-                        .foregroundStyle(Theme.gold)
+                    LevelBadge(level: data.levelAfter, size: 148)
                 }
 
                 Text(data.leveledUp ? L("tripRecap.xp.leveledUp", data.levelAfter) : L("tripRecap.xp.progress", data.levelAfter))

@@ -349,10 +349,7 @@ struct ProfileScreen: View {
                 Text(String(localized: "settings.xp.title"))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.85))
-                ZStack {
-                    Circle().fill(Theme.gold.opacity(0.18)).frame(width: 28, height: 28)
-                    Text("\(level)").font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.gold)
-                }
+                LevelBadge(level: level, size: 28)
             }
             ProgressView(value: Gamification.progressIntoCurrentLevel(xp))
                 .tint(Theme.gold)

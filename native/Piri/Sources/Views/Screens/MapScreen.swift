@@ -66,10 +66,6 @@ struct MapScreen: View {
     @State private var dietaryPins: [DietaryPin] = []
     @State private var dietaryFetchTask: Task<Void, Never>?
     @State private var selectedDietaryPin: DietaryPin?
-    /// Session-only (unlike `dietaryFilter`) — this is a Map-only layer
-    /// with no other screen to share state with, so a plain toggle is
-    /// enough; no need for `@AppStorage`.
-    @State private var trailsEnabled = false
     @State private var trailPins: [Trail] = []
     @State private var trailFetchTask: Task<Void, Never>?
     @State private var selectedTrail: Trail?
@@ -165,6 +161,15 @@ struct MapScreen: View {
     /// Matches `LIVE_PINS_MAX_LATITUDE_DELTA` in the RN app — live pins only
     /// make sense at city/district zoom, not zoomed out to country level.
     private let maxLiveFetchLatitudeDelta = 0.04
+
+    /// Selecting the "Yürüyüş" category chip drives both Apple's own
+    /// `.hiking` POI filter (`pointOfInterestCategories` below, unrelated
+    /// code) AND the Overpass trail layer (`fetchTrailsIfNeeded` etc.) —
+    /// one control instead of two separate "hiking" toggles a real person
+    /// can't tell apart. See `POICategoryGroups.hikingLabelKey`'s comment.
+    private var hikingLayerActive: Bool {
+        selectedCategoryGroup?.labelKey == POICategoryGroups.hikingLabelKey
+    }
 
     var filteredPlaces: [Place] {
         guard Self.useCuratedMapData else { return [] }
@@ -274,7 +279,7 @@ struct MapScreen: View {
                     trailCard(for: selectedTrail)
                 } else if let selectedMapFeature {
                     mapFeatureCard(for: MapFeatureIdentity(title: selectedMapFeature.title, coordinate: selectedMapFeature.coordinate))
-                } else if trailsEnabled, !trailPins.isEmpty {
+                } else if hikingLayerActive, !trailPins.isEmpty {
                     // Nearest-first (backend already sorts by
                     // `approxDistanceFromQueryKm`) so this doubles as "what's
                     // closest to where I'm looking", not just "what's on
@@ -289,7 +294,6 @@ struct MapScreen: View {
             VStack(spacing: 12) {
                 locationButton
                 mapTypeButton
-                trailsToggleButton
                 routeModeToggleButton
             }
             .padding(20)
@@ -377,15 +381,15 @@ struct MapScreen: View {
                 dietaryPins = []
             }
         }
-        .onChange(of: trailsEnabled) { _, enabled in
+        .onChange(of: hikingLayerActive) { _, active in
             // `currentRegion` only gets set once MapKit's own
             // `regionDidChangeAnimated` delegate has fired at least once
             // (see `handleRegionChange`) -- falling back to `initialRegion`
-            // covers the edge case of tapping this toggle before that first
+            // covers the edge case of picking this chip before that first
             // callback lands, which otherwise silently did nothing at all
             // (the `if let` failed, so this fell straight to the `else`
             // branch and never fetched anything).
-            if enabled, let region = currentRegion ?? initialRegion {
+            if active, let region = currentRegion ?? initialRegion {
                 fetchTrailsIfNeeded(for: region)
             } else {
                 trailPins = []
@@ -464,19 +468,6 @@ struct MapScreen: View {
         }
     }
 
-    private var trailsToggleButton: some View {
-        Button {
-            trailsEnabled.toggle()
-        } label: {
-            Image(systemName: "figure.hiking")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(trailsEnabled ? Color.accentColor : .primary)
-                .frame(width: 48, height: 48)
-                .background(Circle().fill(.thinMaterial))
-                .shadow(radius: 3)
-        }
-    }
-
     private var mapTypeIconName: String {
         switch mapType {
         case .satellite, .satelliteFlyover: return "globe.americas.fill"
@@ -539,8 +530,10 @@ struct MapScreen: View {
                 HStack(spacing: 8) {
                     ForEach(POICategoryGroups.all) { group in
                         let active = selectedCategoryGroup?.id == group.id
-                        Button(String(localized: String.LocalizationValue(group.labelKey))) {
+                        Button {
                             selectedCategoryGroup = active ? nil : group
+                        } label: {
+                            Label(String(localized: String.LocalizationValue(group.labelKey)), systemImage: group.icon)
                         }
                         .font(.footnote.weight(.medium))
                         .padding(.horizontal, 12)
@@ -1045,7 +1038,7 @@ struct MapScreen: View {
     /// is converted to an equivalent radius instead.
     private func fetchTrailsIfNeeded(for region: MKCoordinateRegion) {
         trailFetchTask?.cancel()
-        guard trailsEnabled else {
+        guard hikingLayerActive else {
             trailPins = []
             return
         }

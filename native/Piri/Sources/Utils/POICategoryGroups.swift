@@ -28,6 +28,11 @@ struct POICategoryGroup: Identifiable {
 }
 
 enum POICategoryGroups {
+    /// `POICategoryGroup.labelKey` of the "Yürüyüş"/hiking chip — `MapScreen`
+    /// compares against this to also drive the Overpass trail layer (see its
+    /// own comment) rather than duplicating the raw string in two files.
+    static let hikingLabelKey = "mapPoiCategories.hiking"
+
     static let all: [POICategoryGroup] = [
         POICategoryGroup(labelKey: "mapPoiCategories.all", categories: nil, icon: "mappin.circle.fill"),
         POICategoryGroup(labelKey: "mapPoiCategories.museums", categories: [.museum], icon: "building.columns.fill"),
@@ -50,7 +55,15 @@ enum POICategoryGroups {
         // lumped into a general "Nature & Parks" chip, `.hiking` had no chip
         // of its own to find it by (reported live: "Hiking çıkmıyor" while
         // scanning the chip row for one).
-        POICategoryGroup(labelKey: "mapPoiCategories.hiking", categories: [.hiking], icon: "figure.hiking"),
+        // Selecting this chip also turns on `MapScreen`'s Overpass trail
+        // layer (see its `hikingLayerActive`) -- Apple's own `.hiking` POI
+        // tagging is sparse enough that a real spot can have zero results
+        // from *both* sources independently (confirmed live 2026-09-02,
+        // Kristiansand), so folding them into one control was the fix: a
+        // second, separately-discovered "hiking" toggle elsewhere on the
+        // same screen just read as two broken features instead of one
+        // combined, better-covered one.
+        POICategoryGroup(labelKey: POICategoryGroups.hikingLabelKey, categories: [.hiking], icon: "figure.hiking"),
         POICategoryGroup(labelKey: "mapPoiCategories.culture", categories: [.theater, .movieTheater, .musicVenue, .planetarium, .aquarium], icon: "theatermasks.fill"),
         POICategoryGroup(labelKey: "mapPoiCategories.beaches", categories: [.beach, .marina, .surfing, .kayaking], icon: "beach.umbrella.fill"),
         POICategoryGroup(labelKey: "mapPoiCategories.cafes", categories: [.cafe, .bakery], icon: "cup.and.saucer.fill"),

@@ -144,6 +144,39 @@ private struct TimezoneResponse: Decodable {
     var timezones: [String]
 }
 
+/// Backs Home's city-wide golden-hour pill -- `/places/explain-poi` already
+/// computes this same thing per-POI, but only as a side effect of its own
+/// much heavier request. This is the plain standalone `/sun-times` lookup
+/// for a bare coordinate.
+enum SunTimesAPI {
+    /// `/sun-times`'s raw field names (`goldenHourMorningEnd`/
+    /// `goldenHourEveningStart`) don't match `GoldenHour`'s
+    /// (`morningEndsAt`/`eveningStartsAt`) -- that renaming currently only
+    /// happens inline inside `/places/explain-poi`'s handler server-side.
+    /// Mirrored here so callers get the same ready-to-use `GoldenHour`
+    /// shape regardless of which endpoint produced it.
+    private struct RawSunTimes: Decodable {
+        var sunrise: String
+        var sunset: String
+        var goldenHourMorningEnd: String
+        var goldenHourEveningStart: String
+    }
+
+    static func fetch(lat: Double, lng: Double, date: Date = Date()) async throws -> GoldenHour {
+        let raw: RawSunTimes = try await APIClient.shared.get("/sun-times", query: [
+            "lat": String(lat),
+            "lng": String(lng),
+            "date": ISO8601DateFormatter().string(from: date),
+        ])
+        return GoldenHour(
+            sunrise: raw.sunrise,
+            sunset: raw.sunset,
+            morningEndsAt: raw.goldenHourMorningEnd,
+            eveningStartsAt: raw.goldenHourEveningStart
+        )
+    }
+}
+
 enum RoutesAPI {
     static func directions(coordinates: [PlaceCoordinate], profile: RouteProfile = .footWalking) async throws -> DirectionsResult {
         try await APIClient.shared.post("/routes/directions", body: DirectionsRequest(coordinates: coordinates, profile: profile))

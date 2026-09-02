@@ -2738,10 +2738,19 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
         blockedRows.forEach((row) => blockedIds.add(row.blockedId));
       }
 
+      // Defense-in-depth cap -- the client only ever shows a handful inline
+      // (see `PiriReviewsSection`'s own cap) plus a "see all" drill-in, so
+      // there's no legitimate reason for this response to ever need more
+      // than a couple hundred rows. Ordered here (not just in the JS
+      // `.sort()` below) so a genuinely popular place's truncation is
+      // deterministic -- the 200 most recent, not 200 arbitrary rows the
+      // blocked-user filter then thins out further.
       const rows = await db
         .select()
         .from(poiReviews)
-        .where(and(eq(poiReviews.poiKey, poiKey), eq(poiReviews.status, 'approved')));
+        .where(and(eq(poiReviews.poiKey, poiKey), eq(poiReviews.status, 'approved')))
+        .orderBy(desc(poiReviews.createdAt))
+        .limit(200);
 
       const visible = rows.filter((row) => !blockedIds.has(row.userId)).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
       const average = visible.length ? visible.reduce((sum, row) => sum + row.rating, 0) / visible.length : null;
