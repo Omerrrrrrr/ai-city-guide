@@ -16,6 +16,7 @@ struct SavedScreen: View {
     @Environment(SavedPlacesStore.self) private var savedPlacesStore
     @Environment(RecentlyViewedStore.self) private var recentlyViewedStore
     @Environment(TabSelection.self) private var tabSelection
+    @Environment(AuthStore.self) private var authStore
     @Environment(\.dismiss) private var dismiss
 
     @State private var tab: SavedTab
@@ -25,6 +26,12 @@ struct SavedScreen: View {
     @State private var showingNewCollectionField = false
     @State private var newCollectionName = ""
     @State private var showingPlanBuilder = false
+    /// Cover photos for each collection's grid tile, keyed by the name of
+    /// its first saved place — same cache-first bulk endpoint and same
+    /// name-keyed dictionary pattern `HomeScreen.poiPhotos` already uses.
+    @State private var coverPhotos: [String: PhotoBulkResult] = [:]
+
+    private let gridColumns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
 
     init(initialTab: SavedTab = .saved) {
         _tab = State(initialValue: initialTab)
@@ -119,42 +126,18 @@ struct SavedScreen: View {
                 .padding(14)
                 .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemBackground)))
             } else {
-                Button {
-                    newCollectionName = ""
-                    showingNewCollectionField = true
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "plus.circle.fill").foregroundStyle(Theme.gold)
-                        Text(kind == .plan ? "saved.plan.new" : "saved.collections.new")
-                            .font(.system(size: 15, weight: .semibold)).foregroundStyle(.primary)
-                        Spacer()
+                LazyVGrid(columns: gridColumns, spacing: 12) {
+                    newCollectionTile(kind: kind)
+                    if kind == .plan {
+                        aiPlanTile
                     }
-                    .padding(14)
-                    .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemBackground)))
+                    ForEach(currentCollections) { collection in
+                        collectionTile(collection)
+                    }
                 }
-                .buttonStyle(.plain)
             }
 
-            if kind == .plan, !showingNewCollectionField {
-                Button {
-                    Haptics.light()
-                    showingPlanBuilder = true
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "suitcase.fill").foregroundStyle(Theme.gold)
-                        Text("saved.plan.aiBuild")
-                            .font(.system(size: 15, weight: .semibold)).foregroundStyle(.primary)
-                        Spacer()
-                        Image(systemName: "sparkles").foregroundStyle(Theme.gold).font(.system(size: 13))
-                    }
-                    .padding(14)
-                    .background(RoundedRectangle(cornerRadius: 14).fill(Theme.gold.opacity(0.1)))
-                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.gold.opacity(0.3)))
-                }
-                .buttonStyle(.plain)
-            }
-
-            if currentCollections.isEmpty {
+            if currentCollections.isEmpty, !showingNewCollectionField {
                 VStack(spacing: 12) {
                     Text("◈").font(.system(size: 48)).opacity(0.25)
                     Text(kind == .plan ? "saved.plan.noPlansTitle" : "saved.collections.noListsTitle")
@@ -165,33 +148,105 @@ struct SavedScreen: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 40)
                 .frame(maxWidth: .infinity)
-            } else {
-                ForEach(currentCollections) { collection in
-                    Button {
-                        selectedCollection = collection
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: kind == .plan ? "point.topleft.down.curvedto.point.bottomright.up" : "list.bullet")
-                                .font(.system(size: 18))
-                                .foregroundStyle(Theme.gold)
-                                .frame(width: 36, height: 36)
-                                .background(Circle().fill(Theme.gold.opacity(0.12)))
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(collection.name).font(.system(size: 16, weight: .semibold)).foregroundStyle(.primary)
-                                Text(LPlural("saved.collections.placesCount", count: collection.places.count))
-                                    .font(.system(size: 13)).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Text("›").font(.system(size: 20)).foregroundStyle(.secondary)
-                        }
-                        .padding(14)
-                        .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemBackground)))
-                    }
-                    .buttonStyle(.plain)
-                }
             }
         }
         .padding(.horizontal, 16)
+        .task(id: currentCollections.map(\.id)) { await loadCoverPhotos() }
+    }
+
+    private func newCollectionTile(kind: SavedCollectionKind) -> some View {
+        Button {
+            newCollectionName = ""
+            showingNewCollectionField = true
+        } label: {
+            VStack(spacing: 8) {
+                Image(systemName: "plus.circle.fill").font(.system(size: 26)).foregroundStyle(Theme.gold)
+                Text(kind == .plan ? "saved.plan.new" : "saved.collections.new")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 130)
+            .background(RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemBackground)))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var aiPlanTile: some View {
+        Button {
+            Haptics.light()
+            showingPlanBuilder = true
+        } label: {
+            VStack(spacing: 8) {
+                Image(systemName: "sparkles").font(.system(size: 24)).foregroundStyle(Theme.gold)
+                Text("saved.plan.aiBuild")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 130)
+            .background(RoundedRectangle(cornerRadius: 16).fill(Theme.gold.opacity(0.1)))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.gold.opacity(0.3)))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func collectionTile(_ collection: SavedCollection) -> some View {
+        Button {
+            selectedCollection = collection
+        } label: {
+            ZStack(alignment: .bottomLeading) {
+                Group {
+                    if let url = coverPhotoURL(for: collection) {
+                        CachedAsyncImage(url: url, maxPixelSize: 500) { image in
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            Theme.navy.opacity(0.4)
+                        }
+                    } else {
+                        Theme.navy.opacity(0.4).overlay(
+                            Image(systemName: collection.kind == .plan ? "point.topleft.down.curvedto.point.bottomright.up" : "list.bullet")
+                                .font(.system(size: 26))
+                                .foregroundStyle(Theme.gold.opacity(0.5))
+                        )
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+
+                LinearGradient(colors: [.clear, .black.opacity(0.8)], startPoint: .top, endPoint: .bottom)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(collection.name).font(.system(size: 14, weight: .bold)).foregroundStyle(.white).lineLimit(1)
+                    Text(LPlural("saved.collections.placesCount", count: collection.places.count))
+                        .font(.system(size: 11)).foregroundStyle(.white.opacity(0.75))
+                }
+                .padding(10)
+            }
+            .frame(height: 130)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func coverPhotoURL(for collection: SavedCollection) -> URL? {
+        guard let firstPlace = collection.places.first,
+              let urlString = coverPhotos[firstPlace.name]?.photoUrl else { return nil }
+        return URL(string: urlString)
+    }
+
+    private func loadCoverPhotos() async {
+        let missing = currentCollections.compactMap(\.places.first).filter { coverPhotos[$0.name] == nil }
+        guard !missing.isEmpty else { return }
+        let request = PhotoBulkRequest(places: missing.map {
+            PhotoBulkPlace(name: $0.name, lat: $0.lat, lng: $0.lng, category: $0.categoryLabel)
+        })
+        guard let response = try? await PlacesAPI.photosBulk(request, token: authStore.token) else { return }
+        for result in response.results {
+            coverPhotos[result.name] = result
+        }
     }
 
     private func createCollection(kind: SavedCollectionKind) {
