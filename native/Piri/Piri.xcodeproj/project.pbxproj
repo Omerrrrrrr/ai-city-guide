@@ -115,6 +115,7 @@
 		9CEA2601DD279A5F0E8A8BB3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DD664E9C3165D45C042C8BD0 /* Assets.xcassets */; };
 		9DBB1505F2DC9C2E7A9B406F /* GeoDistance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 919CD348C1A4DAC8457484D8 /* GeoDistance.swift */; };
 		9DDC6A7D2595EB487B32DFA3 /* SavedCollection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C808B025C8E9ED7515733584 /* SavedCollection.swift */; };
+		9E0AA2EA4BE28C7C062A4F16 /* GamificationScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2CC653BA115B85598BC63DB /* GamificationScreen.swift */; };
 		9F1604A9F0894E4862BD1BF2 /* PiriReviewsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C685AE76A5254718EC426C /* PiriReviewsAPI.swift */; };
 		A09820EA73906B8317F7ECA7 /* TripRecapData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D39D77604DA21EEA57D1133 /* TripRecapData.swift */; };
 		A2D65D1C6851A7802697F3BE /* TripPhotoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D8F55E9E6F23F30F9323E2F /* TripPhotoStore.swift */; };
@@ -292,6 +293,7 @@
 		A17B0F507C6E18A7B9522F96 /* AuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthStore.swift; sourceTree = "<group>"; };
 		A22B5F3A18A73BF19316CC62 /* TranslateAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslateAPI.swift; sourceTree = "<group>"; };
 		A24DA0F5384457944827F2EA /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		A2CC653BA115B85598BC63DB /* GamificationScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GamificationScreen.swift; sourceTree = "<group>"; };
 		A3652D871ED8EF7E7997CC36 /* OnboardingScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingScreen.swift; sourceTree = "<group>"; };
 		A38B8B967050DA7D5EAE0DF7 /* PlaceFiltersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceFiltersTests.swift; sourceTree = "<group>"; };
 		A434588E21EEFBF99EDD0A1B /* TripsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripsStoreTests.swift; sourceTree = "<group>"; };
@@ -384,6 +386,7 @@
 				5D0AAD7772B7FF41780137D3 /* ExploreScreen.swift */,
 				CFBF63B0A5DD7B0744A87938 /* FriendProfileScreen.swift */,
 				A68702D28EE9D44DB8D6FFB9 /* FriendsScreen.swift */,
+				A2CC653BA115B85598BC63DB /* GamificationScreen.swift */,
 				92330389545E4A09616C146D /* HomeScreen.swift */,
 				2177E510EB38A2C4A4A47977 /* LeaderboardScreen.swift */,
 				CCBB2212BE6B65176747BC8F /* MapScreen.swift */,
@@ -892,6 +895,7 @@
 				88E58F75BBBC14AB7651F18C /* FriendsScreen.swift in Sources */,
 				B10056FAA9B05465DF3E83D4 /* FriendsStore.swift in Sources */,
 				C228396FFD8B91F612F56EB3 /* Gamification.swift in Sources */,
+				9E0AA2EA4BE28C7C062A4F16 /* GamificationScreen.swift in Sources */,
 				9DBB1505F2DC9C2E7A9B406F /* GeoDistance.swift in Sources */,
 				C53BE70E44C11E08750768A9 /* Haptics.swift in Sources */,
 				B2B584378F5D247B1E51752A /* Holiday.swift in Sources */,

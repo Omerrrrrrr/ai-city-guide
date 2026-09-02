@@ -267,7 +267,9 @@ struct ProfileScreen: View {
             }
 
             Spacer(minLength: 8)
-            levelIndicator
+            NavigationLink(destination: GamificationScreen()) {
+                levelIndicator
+            }
         }
         .padding(.horizontal, 20)
         .padding(.top, 12)
@@ -329,9 +331,10 @@ struct ProfileScreen: View {
     /// A score derived fresh from data already tracked elsewhere (profile
     /// completeness, saved places, completed trips, recently-viewed count)
     /// rather than a separately persisted counter -- see `Gamification`.
-    /// Personal-only: no leaderboard, no public profile, nothing shared.
-    /// Lives in the header, to the right of the name, rather than its own
-    /// scrolled-past card.
+    /// Lives in the header, to the right of the name, as a compact badge;
+    /// tapping it drills into `GamificationScreen` for the full XP
+    /// breakdown and the Leaderboard link, rather than this header chip
+    /// growing into its own scrolled-past card.
     private var levelIndicator: some View {
         let completedTrips = tripsStore.trips.filter { $0.endedAt != nil }.count
         let savedPlaceCount = savedPlacesStore.collections.reduce(0) { $0 + $1.places.count }

@@ -5,10 +5,9 @@ import Foundation
 /// viewed count) rather than a separately persisted XP counter or event
 /// log — there's nothing to keep in sync, migrate, or lose: the level
 /// shown always matches exactly what the current state says the user has
-/// done. Still no leaderboard and no public profile (see the
-/// gamification/social idea memory this was scoped down from), but as of
-/// Faz 1 this score IS shared with mutual-follow friends who opt in via
-/// `shareXp` — see `RootView`'s stats push and `FriendProfileScreen`.
+/// done. Shared with mutual-follow friends who opt in via `shareXp` — see
+/// `RootView`'s stats push, `FriendProfileScreen`, and the opt-in
+/// `LeaderboardScreen` ranked by this same score.
 enum Gamification {
     static let xpPerLevel = 100
 
