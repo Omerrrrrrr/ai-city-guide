@@ -99,18 +99,3 @@ struct AvatarPickerSheet: View {
         }
     }
 }
-
-private extension UIImage {
-    /// Downscales so the longer side is at most `maxDimension`, preserving
-    /// aspect ratio -- a no-op (returns `self`) if already smaller. Cropping
-    /// to a square happens visually via `.clipShape(Circle())` at display
-    /// time, not here, so the upload keeps whatever the user actually framed.
-    func resized(maxDimension: CGFloat) -> UIImage {
-        let longerSide = max(size.width, size.height)
-        guard longerSide > maxDimension else { return self }
-        let scale = maxDimension / longerSide
-        let newSize = CGSize(width: size.width * scale, height: size.height * scale)
-        let renderer = UIGraphicsImageRenderer(size: newSize)
-        return renderer.image { _ in draw(in: CGRect(origin: .zero, size: newSize)) }
-    }
-}

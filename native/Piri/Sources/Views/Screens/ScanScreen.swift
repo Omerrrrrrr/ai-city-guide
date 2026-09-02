@@ -344,7 +344,13 @@ struct ScanScreen: View {
     private func process(image: UIImage) async {
         state = .loading(image)
         let location = await locationManager.currentLocationOnce()
-        guard let jpeg = image.jpegData(compressionQuality: 0.6) else {
+        // A real device's full-resolution capture (or an unresized gallery
+        // pick) JPEG-compresses to well over Fastify's 1MB body limit even
+        // at reduced quality -- confirmed live, every real camera scan
+        // failing with "Request body is too large". 1280px is plenty of
+        // detail for vision identification, well below any sensor's own
+        // resolution.
+        guard let jpeg = image.resized(maxDimension: 1280).jpegData(compressionQuality: 0.6) else {
             state = .error(String(localized: "scan.errorIdentify"), image)
             return
         }
