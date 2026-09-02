@@ -43,6 +43,23 @@ async function fetchSummary(title: string): Promise<WikivoyageGuide | null> {
   };
 }
 
+// A city/region's Wikivoyage intro paragraph doesn't change month to
+// month -- and unlike a single POI lookup, this one's genuinely high-value
+// to cache: every POI tapped within the same city hits this with the same
+// `cityName`, so one cache entry covers every explain-poi call for that
+// entire city, not just repeat looks at the same place. Same speed/
+// reliability rationale as wiki-photo.ts's cache, not a paid-quota one.
+const GUIDE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const guideCache = new Map<string, { data: WikivoyageGuide | null; fetchedAt: number }>();
+
+function guideCacheKey(cityName: string, lat?: number, lng?: number): string {
+  // City-scale rounding (~1.1km at 2 decimal degrees) -- this is a
+  // city/region-level lookup, not a precise-point one, so two POIs a few
+  // hundred meters apart in the same city should share one cache entry.
+  const coord = lat != null && lng != null ? `${lat.toFixed(2)}|${lng.toFixed(2)}` : 'nocoord';
+  return `${cityName.trim().toLowerCase()}|${coord}`;
+}
+
 /**
  * Looks up a Wikivoyage guide by city name first (the common case -- most
  * cities' articles are titled exactly that), then falls back to a
@@ -51,6 +68,16 @@ async function fetchSummary(title: string): Promise<WikivoyageGuide | null> {
  * Returns `null` on any failure or if no article exists.
  */
 export async function fetchWikivoyageGuide(cityName: string, lat?: number, lng?: number): Promise<WikivoyageGuide | null> {
+  const key = guideCacheKey(cityName, lat, lng);
+  const cached = guideCache.get(key);
+  if (cached && Date.now() - cached.fetchedAt < GUIDE_CACHE_TTL_MS) return cached.data;
+
+  const data = await fetchWikivoyageGuideLive(cityName, lat, lng);
+  guideCache.set(key, { data, fetchedAt: Date.now() });
+  return data;
+}
+
+async function fetchWikivoyageGuideLive(cityName: string, lat?: number, lng?: number): Promise<WikivoyageGuide | null> {
   try {
     const direct = await fetchSummary(cityName);
     if (direct) return direct;

@@ -61,7 +61,23 @@ async function fetchWikidataLabels(qids: string[]): Promise<Record<string, strin
   }
 }
 
+// A Wikidata item's founding-year/architect/style claims essentially never
+// change month to month -- keyed by QID alone (no coordinate involved, so
+// nothing to round). Same speed/reliability rationale as wiki-photo.ts's
+// cache, not a paid-quota one -- Wikidata's API is free/keyless.
+const FACTS_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const factsCache = new Map<string, { data: WikidataFacts | null; fetchedAt: number }>();
+
 export async function fetchWikidataFacts(qid: string): Promise<WikidataFacts | null> {
+  const cached = factsCache.get(qid);
+  if (cached && Date.now() - cached.fetchedAt < FACTS_CACHE_TTL_MS) return cached.data;
+
+  const data = await fetchWikidataFactsLive(qid);
+  factsCache.set(qid, { data, fetchedAt: Date.now() });
+  return data;
+}
+
+async function fetchWikidataFactsLive(qid: string): Promise<WikidataFacts | null> {
   try {
     const res = await fetch(`https://www.wikidata.org/wiki/Special:EntityData/${qid}.json`, {
       signal: AbortSignal.timeout(4000),

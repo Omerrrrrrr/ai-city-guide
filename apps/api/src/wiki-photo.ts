@@ -84,7 +84,31 @@ async function fetchWithRetry(url: string, signal: AbortSignal): Promise<Respons
   return fetch(url, { signal, headers: { 'User-Agent': WIKIMEDIA_USER_AGENT } });
 }
 
+// Wikipedia's main-image-for-a-landmark doesn't change within a month for
+// the vast majority of real articles -- caching this cuts both latency
+// (skips a live round trip on a repeat lookup) and, more importantly, the
+// risk of the 429 throttling noted above, which gets more likely the more
+// concurrent live calls this makes, not less. Unlike tripadvisor.ts this
+// isn't about a paid quota (Wikimedia's API is free/keyless) -- purely a
+// speed/reliability win.
+const PHOTO_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const photoCache = new Map<string, { data: WikiPhoto | null; fetchedAt: number }>();
+
+function photoCacheKey(name: string, lat: number, lng: number): string {
+  return `${normalizeName(name)}|${lat.toFixed(3)}|${lng.toFixed(3)}`;
+}
+
 export async function fetchWikipediaPhoto(name: string, lat: number, lng: number, category?: string): Promise<WikiPhoto | null> {
+  const key = photoCacheKey(name, lat, lng);
+  const cached = photoCache.get(key);
+  if (cached && Date.now() - cached.fetchedAt < PHOTO_CACHE_TTL_MS) return cached.data;
+
+  const data = await fetchWikipediaPhotoLive(name, lat, lng, category);
+  photoCache.set(key, { data, fetchedAt: Date.now() });
+  return data;
+}
+
+async function fetchWikipediaPhotoLive(name: string, lat: number, lng: number, category?: string): Promise<WikiPhoto | null> {
   try {
     const geoUrl = new URL('https://en.wikipedia.org/w/api.php');
     geoUrl.searchParams.set('action', 'query');
