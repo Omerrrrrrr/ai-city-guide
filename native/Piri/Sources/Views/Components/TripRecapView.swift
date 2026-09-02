@@ -57,15 +57,24 @@ struct TripRecapView: View {
     }
 
     private func pages(for data: TripRecapData) -> [AnyView] {
-        [
+        var result: [AnyView] = [
             AnyView(RecapCoverCard(trip: trip)),
             AnyView(RecapRouteCard(trip: trip)),
             AnyView(RecapStatsCard(trip: trip)),
             AnyView(RecapHighlightCard(trip: trip)),
+        ]
+        // Only when there's enough to actually collage — with 0 or 1
+        // photos this would just repeat `RecapHighlightCard`'s single hero
+        // photo with nothing new to show.
+        if trip.photos.count > 1 {
+            result.append(AnyView(RecapCollageCard(trip: trip)))
+        }
+        result += [
             AnyView(RecapXPCard(data: data)),
             AnyView(RecapSocialCard(data: data)),
             AnyView(RecapShareCard(trip: trip, data: data, onShare: { exportAndShare(data: data) })),
         ]
+        return result
     }
 
     private func exportAndShare(data: TripRecapData) {

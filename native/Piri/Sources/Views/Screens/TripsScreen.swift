@@ -61,36 +61,49 @@ private struct TripRowView: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
+        ZStack(alignment: .bottomLeading) {
+            // Real trip photo takes priority when one exists — a much more
+            // premium, editorial treatment than the schematic mini-map ever
+            // was. The mini-map (real recorded route/stops) is still a
+            // meaningful fallback for a trip with no photos at all, ahead
+            // of a plain generic icon.
             Group {
-                if points.count > 1 {
+                if let cover = trip.photos.first {
+                    CachedAsyncImage(url: URL(string: cover.uri), maxPixelSize: 800) { image in
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Theme.navy
+                    }
+                } else if points.count > 1 {
                     TripMiniMap(points: points)
                 } else {
                     ZStack {
-                        Color(.secondarySystemBackground)
-                        Text("◈").font(.system(size: 24)).foregroundStyle(Theme.gold)
+                        Theme.navy
+                        Text("◈").font(.system(size: 32)).foregroundStyle(Theme.gold)
                     }
                 }
             }
-            .frame(width: 84, height: 84)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipped()
 
-            VStack(alignment: .leading, spacing: 5) {
-                Text(dateLabel).font(.system(size: 15, weight: .bold)).lineLimit(1)
-                Text(metaText).font(.system(size: 13)).foregroundStyle(.secondary)
+            LinearGradient(colors: [.clear, .black.opacity(0.85)], startPoint: .top, endPoint: .bottom)
+
+            VStack(alignment: .leading, spacing: 4) {
                 if trip.endedAt == nil {
                     Text("trips.inProgress")
                         .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(Theme.closedRed)
+                        .foregroundStyle(.white)
                         .padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(Capsule().fill(Theme.closedRed.opacity(0.08)))
+                        .background(Capsule().fill(Theme.closedRed.opacity(0.9)))
                 }
+                Text(dateLabel).font(.system(size: 17, weight: .bold)).foregroundStyle(.white).lineLimit(1)
+                Text(metaText).font(.system(size: 13)).foregroundStyle(.white.opacity(0.75))
             }
-            .padding(12)
-            Spacer()
-            Text("›").font(.system(size: 22)).foregroundStyle(.secondary.opacity(0.5)).padding(.trailing, 14)
+            .padding(14)
         }
-        .background(RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemGroupedBackground)))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .frame(height: 160)
+        .background(Theme.navy)
+        .clipShape(RoundedRectangle(cornerRadius: 18))
     }
 
     private var metaText: String {

@@ -20,6 +20,7 @@
 		100F6128B1DA42E96537D83B /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24DA0F5384457944827F2EA /* Theme.swift */; };
 		117784DE26E3A0CEFAFC7D6C /* PiriReviewsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33D012FA9EDA42951CDFFC55 /* PiriReviewsSection.swift */; };
 		11902DAA906C544983E91F21 /* AuthModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A544BF4AD464B79EB03452C /* AuthModels.swift */; };
+		11B76874911CA2861552009D /* UIImage+Resize.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7978003D4CAD0718174A839F /* UIImage+Resize.swift */; };
 		11C521953FC9803C13AA77E8 /* AdminReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2DA9A8B32180A8AD8E953C1 /* AdminReview.swift */; };
 		13D0A453750CBC43093708EE /* POIExplainSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A564A59EA1164A5FCB99DDF9 /* POIExplainSheet.swift */; };
 		143884C22161F00A193C7395 /* PlacesAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39DBEA8E24D31A30E61F6671 /* PlacesAPI.swift */; };
@@ -64,6 +65,7 @@
 		47374E794B9091972E789B41 /* MapsProviderStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94761900BBBF0C38ECAAFDDA /* MapsProviderStore.swift */; };
 		475E18A765EBE2CB149976B6 /* PlanThemes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 627629055B808FB73F268A0F /* PlanThemes.swift */; };
 		47AB0C4FD2F7C0A3F1D3ED47 /* PlaceFiltersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A38B8B967050DA7D5EAE0DF7 /* PlaceFiltersTests.swift */; };
+		4829029B35762FEEA678BEB4 /* RecapCollageCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17A277DFFA28E95DFD9DC445 /* RecapCollageCard.swift */; };
 		48790D92967906C9FC6A3E14 /* AdminModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A62E305A14B628DFA79318E3 /* AdminModels.swift */; };
 		49823D07A514652B4127373E /* WeatherCitiesStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC960D69956AD5FE23CCD474 /* WeatherCitiesStore.swift */; };
 		4D0DAE9B0118190EC38B5780 /* SourceCaption.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4E1D5C6C2393EFD66129BD2 /* SourceCaption.swift */; };
@@ -204,6 +206,7 @@
 		135A602CC00ED4B1E83016AB /* MapAnnotations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapAnnotations.swift; sourceTree = "<group>"; };
 		1530083D374F1577F01CCC2A /* PhotosAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotosAPI.swift; sourceTree = "<group>"; };
 		156E198E679C89FCF3886BE8 /* TripAdvisorHours.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripAdvisorHours.swift; sourceTree = "<group>"; };
+		17A277DFFA28E95DFD9DC445 /* RecapCollageCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecapCollageCard.swift; sourceTree = "<group>"; };
 		1D39D77604DA21EEA57D1133 /* TripRecapData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripRecapData.swift; sourceTree = "<group>"; };
 		1DCFDD9F1851FFE86FE769D0 /* MapRegion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapRegion.swift; sourceTree = "<group>"; };
 		1E67959451EFC53E9B89AEE8 /* LocationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationManager.swift; sourceTree = "<group>"; };
@@ -261,6 +264,7 @@
 		70E1DF84B9EB0D5E98A9BA27 /* StatusBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBadge.swift; sourceTree = "<group>"; };
 		70F5AFBFBB5E4BADED23CEA9 /* AccountUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountUITests.swift; sourceTree = "<group>"; };
 		717A345206E0678E81ADF461 /* PlaceHours.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceHours.swift; sourceTree = "<group>"; };
+		7978003D4CAD0718174A839F /* UIImage+Resize.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UIImage+Resize.swift"; sourceTree = "<group>"; };
 		7D94810B3041C6319D82ADC9 /* LanguageStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanguageStore.swift; sourceTree = "<group>"; };
 		7DBAC07C896E4A79299A7872 /* SavedPlacesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedPlacesStore.swift; sourceTree = "<group>"; };
 		7E07D1E03C83B3FD300DC4C5 /* PiriApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PiriApp.swift; sourceTree = "<group>"; };
@@ -416,6 +420,7 @@
 				BC8F163C06D3A8442906C142 /* TransitDirections.swift */,
 				156E198E679C89FCF3886BE8 /* TripAdvisorHours.swift */,
 				1D39D77604DA21EEA57D1133 /* TripRecapData.swift */,
+				7978003D4CAD0718174A839F /* UIImage+Resize.swift */,
 			);
 			path = Utils;
 			sourceTree = "<group>";
@@ -475,6 +480,7 @@
 		58C5167400A06D696A47EBA5 /* TripRecap */ = {
 			isa = PBXGroup;
 			children = (
+				17A277DFFA28E95DFD9DC445 /* RecapCollageCard.swift */,
 				55E2881822E0F8E6BB0A82B6 /* RecapCoverCard.swift */,
 				68905E98C7E1C1A318D4AAFF /* RecapHighlightCard.swift */,
 				E662EA09149D4176A44400FB /* RecapRouteCard.swift */,
@@ -941,6 +947,7 @@
 				9558015CF2CE4C6AC4AEE174 /* ProfileScreen.swift in Sources */,
 				8440CB7A4770E44A2C34D66D /* PurchaseStore.swift in Sources */,
 				C4571C5476BB6CECDD2B4F47 /* PushNotificationManager.swift in Sources */,
+				4829029B35762FEEA678BEB4 /* RecapCollageCard.swift in Sources */,
 				FB086F6DA3E18DCB1C8B92CA /* RecapCoverCard.swift in Sources */,
 				2BFD74B5E4B77E868A6F8FD7 /* RecapHighlightCard.swift in Sources */,
 				38BD334B6D9672C81A758265 /* RecapRouteCard.swift in Sources */,
@@ -983,6 +990,7 @@
 				35707013756F5B160304F9AB /* TripsScreen.swift in Sources */,
 				8C641DB8EDA02A613A484622 /* TripsStore.swift in Sources */,
 				74EC746834BB0E2FA0A8CF45 /* UGCModels.swift in Sources */,
+				11B76874911CA2861552009D /* UIImage+Resize.swift in Sources */,
 				F182CDE70C48E7D2EFF150DF /* UserDefaultsStore.swift in Sources */,
 				9CB5696D4212C71E930A80BD /* UserPhotoSection.swift in Sources */,
 				83A34611A8A0EB78E6C9B2AC /* UserProfile.swift in Sources */,
