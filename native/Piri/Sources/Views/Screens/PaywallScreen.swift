@@ -14,7 +14,20 @@ struct PaywallScreen: View {
         case monthly, yearly
     }
 
+    private enum Tier: String, CaseIterable {
+        case basic, pro
+    }
+
+    // UI copy only -- doesn't enforce anything itself. Must stay in sync
+    // with `apps/api/src/entitlements.ts`'s `TIER_LIMITS`, the actual
+    // source of truth: the two paid tiers unlock the exact same feature
+    // set (Google-sourced premium place data), differing only in how much
+    // of it each period allows.
+    private static let placeUnlocksPerMonth: [Tier: Int] = [.basic: 50, .pro: 300]
+    private static let chatQuestionsPerDay: [Tier: Int] = [.basic: 40, .pro: 100]
+
     @State private var period: Period = .monthly
+    @State private var tier: Tier = .pro
     @State private var purchasingProductID: String?
 
     var body: some View {
@@ -23,14 +36,31 @@ struct PaywallScreen: View {
                 VStack(spacing: 20) {
                     header
 
+                    VStack(spacing: 8) {
+                        Picker("", selection: $tier) {
+                            Text("paywall.basic.title").tag(Tier.basic)
+                            Text("paywall.pro.title").tag(Tier.pro)
+                        }
+                        .pickerStyle(.segmented)
+
+                        if tier == .pro {
+                            Text("paywall.mostPopular")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(Theme.navy)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                                .background(Capsule().fill(Theme.gold))
+                        }
+                    }
+
                     Picker("", selection: $period) {
                         Text("paywall.monthly").tag(Period.monthly)
                         Text("paywall.yearly").tag(Period.yearly)
                     }
                     .pickerStyle(.segmented)
 
-                    tierCard(id: "basic", titleKey: "paywall.basic.title", featureKey: "paywall.basic.feature")
-                    tierCard(id: "pro", titleKey: "paywall.pro.title", featureKey: "paywall.pro.feature")
+                    featureChecklist
+                    purchaseButton
 
                     if let loadError = purchaseStore.loadError {
                         Text(loadError)
@@ -76,50 +106,62 @@ struct PaywallScreen: View {
         purchaseStore.products.first { $0.id == "com.piriapp.piri.\(id).\(period.rawValue)" }
     }
 
-    private func tierCard(id: String, titleKey: String, featureKey: String) -> some View {
-        let matchingProduct = product(id: id)
-        // `purchasingProductID == matchingProduct?.id` alone is true when
-        // BOTH are nil (no purchase in flight, and the product hasn't
-        // loaded yet) -- confirmed live: every card showed a permanent
-        // spinner instead of the "—" placeholder while products were
-        // still loading. Require a real, non-nil id match instead.
-        let isPurchasing = purchasingProductID != nil && purchasingProductID == matchingProduct?.id
-
-        return VStack(alignment: .leading, spacing: 10) {
-            Text(String(localized: String.LocalizationValue(titleKey)))
-                .font(.system(size: 17, weight: .bold))
-            Text(String(localized: String.LocalizationValue(featureKey)))
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-
-            Button {
-                guard let matchingProduct else { return }
-                Task {
-                    purchasingProductID = matchingProduct.id
-                    let success = await purchaseStore.purchase(matchingProduct, authStore: authStore)
-                    purchasingProductID = nil
-                    if success { dismiss() }
-                }
-            } label: {
-                Group {
-                    if isPurchasing {
-                        ProgressView().tint(.white)
-                    } else {
-                        Text(matchingProduct?.displayPrice ?? "—")
-                    }
-                }
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(RoundedRectangle(cornerRadius: 14).fill(Theme.navy))
-            }
-            .buttonStyle(.plain)
-            .disabled(matchingProduct == nil || purchasingProductID != nil)
+    /// One checklist shared by both tiers, since they unlock the exact same
+    /// features (see `placeUnlocksPerMonth`'s doc comment) -- only the two
+    /// quota-bearing rows change their number when `tier` toggles.
+    private var featureChecklist: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            checklistRow(String(localized: "paywall.feature.richerDescriptions"))
+            checklistRow(String(localized: "paywall.feature.morePhotos"))
+            checklistRow(String(localized: "paywall.feature.realReviews"))
+            checklistRow(L("paywall.feature.placeUnlocksCount", Self.placeUnlocksPerMonth[tier] ?? 0))
+            checklistRow(L("paywall.feature.chatQuestionsCount", Self.chatQuestionsPerDay[tier] ?? 0))
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(.secondary.opacity(0.18)))
+    }
+
+    private func checklistRow(_ text: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.gold)
+            Text(text).font(.system(size: 15))
+        }
+    }
+
+    private var purchaseButton: some View {
+        let matchingProduct = product(id: tier.rawValue)
+        // `purchasingProductID == matchingProduct?.id` alone is true when
+        // BOTH are nil (no purchase in flight, and the product hasn't
+        // loaded yet) -- confirmed live: the button showed a permanent
+        // spinner instead of the "—" placeholder while products were
+        // still loading. Require a real, non-nil id match instead.
+        let isPurchasing = purchasingProductID != nil && purchasingProductID == matchingProduct?.id
+
+        return Button {
+            guard let matchingProduct else { return }
+            Task {
+                purchasingProductID = matchingProduct.id
+                let success = await purchaseStore.purchase(matchingProduct, authStore: authStore)
+                purchasingProductID = nil
+                if success { dismiss() }
+            }
+        } label: {
+            Group {
+                if isPurchasing {
+                    ProgressView().tint(.white)
+                } else {
+                    Text(matchingProduct?.displayPrice ?? "—")
+                }
+            }
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(RoundedRectangle(cornerRadius: 14).fill(Theme.navy))
+        }
+        .buttonStyle(.plain)
+        .disabled(matchingProduct == nil || purchasingProductID != nil)
     }
 
     private var restoreButton: some View {
