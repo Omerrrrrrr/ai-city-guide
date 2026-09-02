@@ -42,4 +42,28 @@ extension View {
             self.background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
         }
     }
+
+    /// Replaces the plain `.overlay(RoundedRectangle().stroke(...))` outline
+    /// most of Profile/Gamification/Paywall's info cards used -- a flat
+    /// stroke with no fill or shadow reads as a wireframe, not a real card.
+    /// Gives every one of them the same subtle elevation (soft shadow +
+    /// faint tinted fill) in one place instead of restyling each by hand.
+    func piriElevatedCard(cornerRadius: CGFloat = 18) -> some View {
+        self
+            .background(RoundedRectangle(cornerRadius: cornerRadius).fill(Color(.secondarySystemGroupedBackground)))
+            .shadow(color: .black.opacity(0.06), radius: 10, x: 0, y: 4)
+    }
+}
+
+extension LinearGradient {
+    /// The gold-to-navy diagonal used behind Profile's header band and
+    /// Gamification's hero -- the one premium touch every mockup screen had
+    /// in some form (a colored glow behind the "important" content) that
+    /// this app's screens, all flat `Theme.navy`, never actually reused
+    /// anywhere themselves.
+    static let piriHero = LinearGradient(
+        colors: [Theme.gold.opacity(0.55), Theme.navy],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
 }

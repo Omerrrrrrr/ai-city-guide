@@ -46,23 +46,14 @@ struct GamificationScreen: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                VStack(spacing: 14) {
-                    LevelBadge(level: level, size: 100)
-                    Text(L("settings.xp.level", level)).font(.system(size: 20, weight: .bold))
-                    ProgressView(value: Gamification.progressIntoCurrentLevel(xp))
-                        .tint(Theme.gold)
-                        .frame(maxWidth: 220)
-                    Text(L("settings.xp.remaining", Gamification.xpRemainingToNextLevel(xp)))
-                        .font(.system(size: 14)).foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.top, 24)
+                heroCard
 
                 VStack(alignment: .leading, spacing: 12) {
                     Text(String(localized: "gamification.breakdown.title"))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.secondary)
                         .textCase(.uppercase)
+                        .tracking(0.5)
                     VStack(spacing: 10) {
                         ForEach(breakdown, id: \.labelKey) { item in
                             HStack(spacing: 12) {
@@ -81,7 +72,7 @@ struct GamificationScreen: View {
                         }
                     }
                     .padding(14)
-                    .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemGroupedBackground)))
+                    .piriElevatedCard(cornerRadius: 14)
                 }
                 .padding(.horizontal, 16)
 
@@ -93,7 +84,7 @@ struct GamificationScreen: View {
                         Text("›").font(.system(size: 20)).foregroundStyle(.secondary.opacity(0.5))
                     }
                     .padding(14)
-                    .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemGroupedBackground)))
+                    .piriElevatedCard(cornerRadius: 14)
                 }
                 .buttonStyle(.plain)
                 .padding(.horizontal, 16)
@@ -102,5 +93,24 @@ struct GamificationScreen: View {
         }
         .navigationTitle(String(localized: "gamification.title"))
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    /// A gradient glow band behind the level badge instead of it sitting on
+    /// plain scroll background -- the one hero moment on this screen,
+    /// matching the same gold-glow treatment `Theme.piriHero` gives
+    /// Profile's own header.
+    private var heroCard: some View {
+        VStack(spacing: 14) {
+            LevelBadge(level: level, size: 100)
+            Text(L("settings.xp.level", level)).font(.system(size: 20, weight: .bold)).foregroundStyle(.white)
+            ProgressView(value: Gamification.progressIntoCurrentLevel(xp))
+                .tint(Theme.gold)
+                .frame(maxWidth: 220)
+            Text(L("settings.xp.remaining", Gamification.xpRemainingToNextLevel(xp)))
+                .font(.system(size: 14)).foregroundStyle(.white.opacity(0.7))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 32)
+        .background(LinearGradient.piriHero)
     }
 }

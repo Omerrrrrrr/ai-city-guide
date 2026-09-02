@@ -275,7 +275,11 @@ struct ProfileScreen: View {
         .padding(.top, 12)
         .padding(.bottom, 16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .piriGlassSurface()
+        // A gradient hero band, not the flat glass fill every other
+        // screen's header uses -- this is the one place in Profile that
+        // should read as the premium, "important" moment, matching the
+        // gold-to-navy header band every mockup gave the Profile screen.
+        .background(LinearGradient.piriHero)
         .padding(.horizontal, -20)
         .padding(.top, -20)
     }
@@ -893,7 +897,7 @@ struct ProfileScreen: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(.secondary.opacity(0.18)))
+        .piriElevatedCard()
     }
 
     @ViewBuilder
@@ -911,7 +915,7 @@ struct ProfileScreen: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(.secondary.opacity(0.18)))
+        .piriElevatedCard()
     }
 }
 

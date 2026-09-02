@@ -227,6 +227,7 @@ struct SavedScreen: View {
             }
             .frame(height: 130)
             .clipShape(RoundedRectangle(cornerRadius: 16))
+            .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 3)
         }
         .buttonStyle(.plain)
     }

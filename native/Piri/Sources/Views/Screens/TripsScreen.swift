@@ -104,6 +104,7 @@ private struct TripRowView: View {
         .frame(height: 160)
         .background(Theme.navy)
         .clipShape(RoundedRectangle(cornerRadius: 18))
+        .shadow(color: .black.opacity(0.15), radius: 10, x: 0, y: 4)
     }
 
     private var metaText: String {

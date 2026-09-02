@@ -383,19 +383,28 @@ struct HomeScreen: View {
                             Button {
                                 selectedPOI = poi
                             } label: {
-                                VStack(alignment: .leading, spacing: 5) {
+                                // Photo fills the whole card with name/
+                                // category overlaid on a gradient, matching
+                                // the same premium photo-first treatment
+                                // Saved's collection tiles and Trips' cards
+                                // already use, instead of the photo sitting
+                                // as a separate strip above a plain-white
+                                // text block.
+                                ZStack(alignment: .bottomLeading) {
                                     nearbyTileImage(for: poi)
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(poi.name).font(.system(size: 15, weight: .bold)).lineLimit(2)
+                                    LinearGradient(colors: [.clear, .black.opacity(0.85)], startPoint: .top, endPoint: .bottom)
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(poi.name).font(.system(size: 15, weight: .bold)).foregroundStyle(.white).lineLimit(2)
                                         if !poi.categoryLabel.isEmpty {
-                                            Text(poi.categoryLabel).font(.system(size: 12)).foregroundStyle(.secondary)
+                                            Text(poi.categoryLabel).font(.system(size: 12)).foregroundStyle(.white.opacity(0.75))
                                         }
                                         personalizedBadge(for: poi)
                                     }
                                     .padding(12)
                                 }
-                                .background(RoundedRectangle(cornerRadius: 18).fill(Color(.secondarySystemGroupedBackground)))
+                                .frame(height: 170)
                                 .clipShape(RoundedRectangle(cornerRadius: 18))
+                                .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 3)
                             }
                             .buttonStyle(.plain)
 
@@ -455,7 +464,7 @@ struct HomeScreen: View {
         let urlString = poiPhotos[poi.name]?.photoUrl
         GeometryReader { geo in
             if let urlString, !urlString.isEmpty, let url = URL(string: urlString) {
-                CachedAsyncImage(url: url, maxPixelSize: 300) { image in
+                CachedAsyncImage(url: url, maxPixelSize: 400) { image in
                     image.resizable().aspectRatio(contentMode: .fill)
                 } placeholder: {
                     nearbyIconFallback(for: poi)
@@ -466,7 +475,6 @@ struct HomeScreen: View {
                 nearbyIconFallback(for: poi)
             }
         }
-        .frame(height: 100)
     }
 
     private func nearbyIconFallback(for poi: POIPlace) -> some View {

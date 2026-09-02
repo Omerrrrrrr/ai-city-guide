@@ -119,7 +119,7 @@ struct PaywallScreen: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(.secondary.opacity(0.18)))
+        .piriElevatedCard()
     }
 
     private func checklistRow(_ text: String) -> some View {
@@ -158,7 +158,8 @@ struct PaywallScreen: View {
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .background(RoundedRectangle(cornerRadius: 14).fill(Theme.navy))
+            .background(RoundedRectangle(cornerRadius: 14).fill(LinearGradient.piriHero))
+            .shadow(color: Theme.gold.opacity(0.35), radius: 12, x: 0, y: 6)
         }
         .buttonStyle(.plain)
         .disabled(matchingProduct == nil || purchasingProductID != nil)
