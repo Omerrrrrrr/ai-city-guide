@@ -237,15 +237,21 @@ const emptyMatch: CachedMatch = { ratingBase: null, hours: undefined, descriptio
 // (by the same tester re-checking it, or several testers looking at the
 // same popular spot) paid for its own live Tripadvisor call. A real
 // nearby-search + photos round trip for the same coordinate+name doesn't
-// need to be that fresh -- ratings/descriptions/photos/weekly hours don't
-// meaningfully change within a month for the vast majority of real
-// businesses -- so this caches the *match*, not just the final shaped
-// response, letting every caller (including ones needing a different
-// `referenceDate` or `includePhotos`) still get correct, per-call-shaped
-// results from one shared lookup. 30 days, not indefinitely: a place that
-// closes down, gets a new listing, or genuinely changes its hours still
-// self-corrects within a month rather than staying wrong forever.
-const MATCH_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+// need to be that fresh -- ratings/descriptions/photos don't meaningfully
+// change within a week for the vast majority of real businesses -- so this
+// caches the *match*, not just the final shaped response, letting every
+// caller (including ones needing a different `referenceDate` or
+// `includePhotos`) still get correct, per-call-shaped results from one
+// shared lookup.
+//
+// One week, not longer: Tripadvisor's API has no endpoint that returns
+// opening hours on their own -- `hours` only ever comes bundled inside this
+// same nearby-search response alongside rating/description/photos, so
+// there's no way to refresh just the hours more often than the rest of the
+// record. A week keeps a place's weekly hours from drifting stale for too
+// long (the one field here that can genuinely change) while still cutting
+// the vast majority of same-place-repeat-lookup cost this cache exists for.
+const MATCH_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const matchCache = new Map<string, { data: CachedMatch; fetchedAt: number }>();
 
 function matchCacheKey(name: string, lat: number, lng: number): string {
