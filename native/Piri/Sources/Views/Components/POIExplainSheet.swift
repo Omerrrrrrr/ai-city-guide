@@ -350,8 +350,6 @@ struct POIExplainContent: View {
                 chatInputBar
             }
         }
-        .background(Theme.screenBackground.ignoresSafeArea())
-        .environment(\.colorScheme, .dark)
         .sheet(item: $addToCollectionKind) { kind in AddToCollectionSheet(poi: poi, kind: kind) }
         .sheet(isPresented: $showingReviews) { TripAdvisorReviewsSheet(poi: poi, totalReviewCount: result?.rating?.reviewCount) }
         .task { await explain() }
@@ -630,6 +628,8 @@ struct POIExplainSheet: View {
     var body: some View {
         NavigationStack {
             POIExplainContent(poi: poi)
+                .background(Theme.screenBackground.ignoresSafeArea())
+                .environment(\.colorScheme, .dark)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
