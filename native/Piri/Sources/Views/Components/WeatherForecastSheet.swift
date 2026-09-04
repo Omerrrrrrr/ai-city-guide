@@ -67,6 +67,8 @@ struct WeatherForecastSheet: View {
                 selection = .saved(saved.id)
             }
         }
+        .background(Theme.screenBackground.ignoresSafeArea())
+        .environment(\.colorScheme, .dark)
     }
 
     private var pageTitle: String {
@@ -112,7 +114,7 @@ private struct WeatherForecastPageView: View {
                             .controlSize(.small)
                     }
                     .padding(14)
-                    .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemBackground)))
+                    .background(RoundedRectangle(cornerRadius: 14).fill(Theme.cardFill))
                 } else {
                     VStack(spacing: 0) {
                         ForEach(daily) { day in
