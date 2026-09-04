@@ -55,7 +55,13 @@ struct UserPhotoSection: View {
             }
             .frame(width: 90, height: 90)
             .foregroundStyle(Theme.gold)
-            .background(Theme.cardFill, in: RoundedRectangle(cornerRadius: 12))
+            // System-adaptive, not `Theme.cardFill` -- this is shared by
+            // `POIExplainSheet` (forced dark, where this already resolves
+            // dark) *and* `MapScreen.mapFeatureCard`'s translucent inline
+            // card, which deliberately stays on the system's own Light/Dark
+            // rendering. A hardcoded navy fill here looked like a stray
+            // dark box floating in that still-light glass card.
+            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
     }

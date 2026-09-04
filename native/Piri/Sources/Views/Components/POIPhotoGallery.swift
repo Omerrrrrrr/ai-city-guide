@@ -42,10 +42,16 @@ struct POIPhotoGallery: View {
             viewerIndex = PhotoIndex(value: index)
         } label: {
             ZStack(alignment: .bottomLeading) {
+                // System-adaptive, not `Theme.cardFill`/`Theme.navyLight` --
+                // this gallery is shared by `POIExplainSheet` (forced dark)
+                // and `MapScreen.mapFeatureCard`'s translucent inline card,
+                // which stays on the system's own Light/Dark rendering. A
+                // hardcoded navy placeholder here looked like a stray dark
+                // box floating in that still-light glass card.
                 CachedAsyncImage(url: URL(string: photo.url), maxPixelSize: 800) { image in
                     image.resizable().aspectRatio(contentMode: .fill)
                 } placeholder: {
-                    Theme.navyLight
+                    Color(.secondarySystemBackground)
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 240)
@@ -65,7 +71,7 @@ struct POIPhotoGallery: View {
                 CachedAsyncImage(url: URL(string: photo.url), maxPixelSize: 400) { image in
                     image.resizable().aspectRatio(contentMode: .fill)
                 } placeholder: {
-                    Theme.cardFill
+                    Color(.secondarySystemBackground)
                 }
                 .frame(width: 110, height: 110)
                 .clipShape(RoundedRectangle(cornerRadius: 12))

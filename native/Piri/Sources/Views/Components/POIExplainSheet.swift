@@ -498,7 +498,11 @@ struct POIExplainContent: View {
                 .padding(10)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(turn.role == .user ? Theme.gold.opacity(0.15) : Theme.cardFill)
+                        // System-adaptive on the assistant side, not
+                        // `Theme.cardFill` -- this bubble is shared by the
+                        // forced-dark full sheet and the still-light Map
+                        // inline card (see `POIPhotoGallery`'s identical note).
+                        .fill(turn.role == .user ? Theme.gold.opacity(0.15) : Color(.secondarySystemBackground))
                 )
             if turn.role == .assistant { Spacer(minLength: 40) }
         }
