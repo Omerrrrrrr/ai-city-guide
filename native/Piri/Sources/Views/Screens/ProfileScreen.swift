@@ -61,6 +61,7 @@ struct ProfileScreen: View {
 
     @State private var isEditingName = false
     @State private var isEditingProfileDetails = false
+    @State private var isEditingAppSettings = false
     @State private var nameInput = ""
     @State private var showingCityPicker = false
     @State private var pickingCurrencySide: CurrencySide?
@@ -108,9 +109,7 @@ struct ProfileScreen: View {
                 // ("configure how the app treats me") rather than the
                 // profile's own substantive content (Friends/Trips/Saved/
                 // Premium), which now leads the screen instead.
-                languageCard
-                appearanceCard
-                mapsProviderCard
+                appSettingsCard
                 accountCard
 
                 Text(L("settings.version", (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.0.0"))
@@ -538,6 +537,58 @@ struct ProfileScreen: View {
                 userProfileStore.update { $0.groupType = value }
             }
         }
+    }
+
+    /// Collapses Language/Appearance/Preferred Maps App behind one tappable
+    /// summary row instead of three always-visible cards -- reported live
+    /// as visual clutter now that each renders as its own full elevated
+    /// card. Tapping reveals the exact same three cards, unchanged,
+    /// directly below.
+    private var appSettingsCard: some View {
+        VStack(spacing: 12) {
+            Button {
+                Haptics.light()
+                withAnimation { isEditingAppSettings.toggle() }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "gearshape.fill")
+                        .foregroundStyle(Theme.gold)
+                        .frame(width: 28, height: 28)
+                        .background(Circle().fill(Theme.gold.opacity(0.12)))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(String(localized: "settings.appSettings.title"))
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.primary)
+                        if !isEditingAppSettings {
+                            Text(appSettingsSummary).font(.system(size: 13)).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(isEditingAppSettings ? 180 : 0))
+                }
+                .padding(14)
+                .piriElevatedCard(cornerRadius: 14)
+            }
+            .buttonStyle(.plain)
+
+            if isEditingAppSettings {
+                languageCard
+                appearanceCard
+                mapsProviderCard
+            }
+        }
+    }
+
+    private var appSettingsSummary: String {
+        let language = languageOptions.first { $0.code == languageStore.code }
+            .map { String(localized: String.LocalizationValue($0.labelKey)) } ?? ""
+        let appearance = appearanceOptions.first { $0.scheme == appearanceStore.scheme }
+            .map { String(localized: String.LocalizationValue($0.labelKey)) } ?? ""
+        let maps = String(localized: String.LocalizationValue(mapsProviderStore.provider.labelKey))
+        return [language, appearance, maps].joined(separator: " · ")
     }
 
     private var languageCard: some View {

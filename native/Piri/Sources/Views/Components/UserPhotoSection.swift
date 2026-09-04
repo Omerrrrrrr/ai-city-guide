@@ -2,10 +2,14 @@ import CoreLocation
 import PhotosUI
 import SwiftUI
 
-/// User-submitted photos for a POI (Apple Guideline 1.2 UGC) -- separate
-/// from `POIPhotoGallery`'s Wikipedia/Tripadvisor/Unsplash strip since
-/// these carry a different identity (an uploader, a caption, report/block
-/// actions) rather than just a licensed-source attribution.
+/// User-submitted photos for a POI (Apple Guideline 1.2 UGC) -- rendered as
+/// extra tiles appended to `POIPhotoGallery`'s own filmstrip (its `trailing`
+/// slot) rather than a second, separately-labeled strip underneath it, so
+/// every photo -- licensed source or user-submitted -- and the "add a
+/// photo" affordance all live in one continuous row. Still a logically
+/// distinct type from `POIPhotoGallery`'s own thumbnails (an uploader, a
+/// caption, report/block actions, not just a licensed-source attribution),
+/// just not visually separated anymore.
 struct UserPhotoSection: View {
     let poiName: String
     let coordinate: CLLocationCoordinate2D
@@ -16,23 +20,18 @@ struct UserPhotoSection: View {
     @State private var showingAdd = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("poiPhotos.userSubmitted.title").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(Array(photos.enumerated()), id: \.element.id) { index, photo in
-                        Button {
-                            viewerIndex = PhotoIndexWrap(value: index)
-                        } label: {
-                            DataURIImage(dataUri: photo.photoUrl)
-                                .frame(width: 90, height: 90)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    addButton
+        Group {
+            ForEach(Array(photos.enumerated()), id: \.element.id) { index, photo in
+                Button {
+                    viewerIndex = PhotoIndexWrap(value: index)
+                } label: {
+                    DataURIImage(dataUri: photo.photoUrl)
+                        .frame(width: 90, height: 90)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
+                .buttonStyle(.plain)
             }
+            addButton
         }
         .fullScreenCover(item: $viewerIndex) { wrapped in
             UserPhotoViewer(photos: $photos, index: wrapped.value)

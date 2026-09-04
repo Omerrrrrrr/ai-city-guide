@@ -50,8 +50,6 @@ struct DirectionsPreview: View {
 
     private func modeButton(_ candidate: RouteProfile) -> some View {
         let isSelected = profile == candidate
-        let fg: Color = isSelected ? .white : .secondary
-        let bg: Color = isSelected ? Theme.navy : Color(.secondarySystemBackground)
         return Button {
             guard !isSelected else { return }
             profile = candidate
@@ -61,8 +59,18 @@ struct DirectionsPreview: View {
             Image(systemName: candidate.icon)
                 .font(.footnote.weight(.semibold))
                 .frame(width: 34, height: 34)
-                .foregroundStyle(fg)
-                .background(Circle().fill(bg))
+                // Reversed from the original (every mode circled the same
+                // way, selected or not, reading as no distinction at all
+                // once both fills ended up equally dark) -- only the
+                // selected mode gets a circle now, in gold (this component
+                // is shared between the navy sheet and Map's still-light
+                // inline card, so it needs a fill that reads on both).
+                .foregroundStyle(isSelected ? Theme.navy : .secondary)
+                .background {
+                    if isSelected {
+                        Circle().fill(Theme.gold)
+                    }
+                }
         }
     }
 

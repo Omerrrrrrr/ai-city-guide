@@ -9,31 +9,42 @@ import SwiftUI
 /// from both providers at once. Only ever embedded by `POIExplainSheet`
 /// (verified — no other call site), so the hero's full-bleed sizing doesn't
 /// need to guard against some other, more constrained context.
-struct POIPhotoGallery: View {
+struct POIPhotoGallery<Trailing: View>: View {
     let photos: [POIPhoto]
+    /// `true` only for `POIExplainSheet`'s real full-screen presentation --
+    /// see `POIExplainContent.extendsPhotoUnderStatusBar`'s own doc comment.
+    var extendsHeroUnderStatusBar: Bool = false
+    /// Appended as extra tiles at the end of the same filmstrip row as the
+    /// Tripadvisor/Wikipedia thumbnails -- lets `POIExplainContent` fold its
+    /// user-submitted-photos strip and "add a photo" button into this one
+    /// strip instead of a second, separately-labeled row underneath it.
+    @ViewBuilder let trailing: () -> Trailing
 
     @Environment(AuthStore.self) private var authStore
     @State private var viewerIndex: PhotoIndex?
 
     var body: some View {
-        if !photos.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                heroPhoto(photos[0], index: 0)
-
-                if photos.count > 1 {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(Array(photos.enumerated().dropFirst()), id: \.element.id) { index, photo in
-                                thumbnail(photo, index: index)
-                            }
-                        }
-                        .padding(.horizontal, 20)
+        VStack(alignment: .leading, spacing: 8) {
+            if let hero = photos.first {
+                heroPhoto(hero, index: 0)
+                    .ignoresSafeArea(edges: extendsHeroUnderStatusBar ? .top : [])
+            }
+            // Always shown, even with zero official photos -- `trailing`
+            // (the user-submitted strip + add-photo button) needs to stay
+            // reachable regardless, so a place with no Tripadvisor/Wikipedia
+            // photo at all doesn't lose its only way to contribute one.
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(Array(photos.enumerated().dropFirst()), id: \.element.id) { index, photo in
+                        thumbnail(photo, index: index)
                     }
+                    trailing()
                 }
+                .padding(.horizontal, 20)
             }
-            .fullScreenCover(item: $viewerIndex) { wrapped in
-                POIPhotoViewer(photos: photos, index: wrapped.value)
-            }
+        }
+        .fullScreenCover(item: $viewerIndex) { wrapped in
+            POIPhotoViewer(photos: photos, index: wrapped.value)
         }
     }
 
@@ -92,6 +103,14 @@ struct POIPhotoGallery: View {
                 lockBadge
             }
         }
+    }
+}
+
+extension POIPhotoGallery where Trailing == EmptyView {
+    init(photos: [POIPhoto], extendsHeroUnderStatusBar: Bool = false) {
+        self.photos = photos
+        self.extendsHeroUnderStatusBar = extendsHeroUnderStatusBar
+        self.trailing = { EmptyView() }
     }
 }
 

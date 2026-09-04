@@ -197,7 +197,7 @@ struct HomeScreen: View {
                         showingWeatherForecast = true
                     } label: {
                         HStack(spacing: 4) {
-                            Image(systemName: weather.condition.icon).foregroundStyle(.white.opacity(0.9))
+                            Image(systemName: weather.condition.icon).foregroundStyle(Theme.gold)
                             Text("\(Int(weather.temp))°").font(.system(size: 15, weight: .bold)).foregroundStyle(.white.opacity(0.9))
                             Text(weather.city).font(.system(size: 13)).foregroundStyle(.white.opacity(0.55))
                         }
@@ -221,7 +221,13 @@ struct HomeScreen: View {
         .padding(.horizontal, 20)
         .padding(.top, 12)
         .padding(.bottom, 16)
-        .piriGlassSurface()
+        // Plain fill, not `piriGlassSurface()` -- that material's own edge
+        // highlight read as an unwanted rectangular border once the body
+        // below went navy too (see `Theme.screenBackground`): with nothing
+        // behind it left to blur/tint differently, the glass shape's own
+        // bounds became the only visible thing about it. A flat fill reads
+        // seamlessly with the (now identically navy) scroll content below.
+        .background(Theme.navy)
     }
 
     private var greeting: String {
@@ -580,20 +586,20 @@ struct HomeScreen: View {
     private var suggestionCard: some View {
         if !hasProfile, !poiLoading {
             profileNudge
-        } else if soonHoliday != nil || weatherQuery.weather != nil || goldenHour?.activeWindow != nil {
+        } else if soonHoliday != nil || goldenHour?.activeWindow != nil {
             infoPillsRow
         } else {
             aiBanner
         }
     }
 
+    // Weather itself doesn't get a pill here anymore -- the header's own
+    // weather capsule (top-right, always visible whenever `weatherQuery.weather`
+    // exists) already shows it, and showing it again here read as a plain
+    // duplicate with no new information. Golden-hour/holiday still don't
+    // have a header-level slot of their own, so they keep theirs.
     private var infoPillsRow: some View {
         HStack(spacing: 10) {
-            if let weather = weatherQuery.weather {
-                infoPill(icon: weather.condition.icon, title: "\(Int(weather.temp))°", subtitle: weather.description.capitalized) {
-                    showingWeatherForecast = true
-                }
-            }
             if let window = goldenHour?.activeWindow {
                 infoPill(icon: "sun.horizon.fill", title: String(localized: "home.goldenHourPill.title"), subtitle: goldenHourRangeText(window))
             }
