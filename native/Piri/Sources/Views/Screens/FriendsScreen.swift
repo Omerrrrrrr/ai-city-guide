@@ -40,6 +40,8 @@ struct FriendsScreen: View {
                 await friendsStore.fetchFollows(token: token)
             }
         }
+        .background(Theme.screenBackground.ignoresSafeArea())
+        .environment(\.colorScheme, .dark)
     }
 
     private var usernameSection: some View {

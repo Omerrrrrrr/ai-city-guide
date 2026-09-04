@@ -33,7 +33,7 @@ struct LeaderboardScreen: View {
                             }
                         }
                         .padding(12)
-                        .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemGroupedBackground)))
+                        .background(RoundedRectangle(cornerRadius: 14).fill(Theme.cardFill))
                     }
                 }
                 .padding(16)
@@ -47,5 +47,7 @@ struct LeaderboardScreen: View {
             }
             isLoading = false
         }
+        .background(Theme.screenBackground.ignoresSafeArea())
+        .environment(\.colorScheme, .dark)
     }
 }

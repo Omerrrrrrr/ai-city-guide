@@ -73,6 +73,8 @@ struct PlanBuilderScreen: View {
         .sheet(item: $selectedPOI) { poi in POIExplainSheet(poi: poi) }
         .task { await loadLandmark() }
         .onChange(of: selectedThemes) { _, _ in scheduleSearch() }
+        .background(Theme.screenBackground.ignoresSafeArea())
+        .environment(\.colorScheme, .dark)
     }
 
     private var header: some View {
@@ -254,7 +256,7 @@ struct PlanBuilderScreen: View {
             .buttonStyle(.borderless)
         }
         .padding(12)
-        .background(RoundedRectangle(cornerRadius: 12).fill(added ? Theme.gold.opacity(0.08) : Color(.secondarySystemBackground)))
+        .background(RoundedRectangle(cornerRadius: 12).fill(added ? Theme.gold.opacity(0.08) : Theme.cardFill))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(added ? Theme.gold.opacity(0.35) : .clear, lineWidth: 1.5))
     }
 

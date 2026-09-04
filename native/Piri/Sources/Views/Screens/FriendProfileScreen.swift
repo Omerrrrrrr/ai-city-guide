@@ -56,6 +56,8 @@ struct FriendProfileScreen: View {
             }
             isLoading = false
         }
+        .background(Theme.screenBackground.ignoresSafeArea())
+        .environment(\.colorScheme, .dark)
     }
 
     private func levelCard(xp: Int, level: Int) -> some View {
@@ -70,7 +72,7 @@ struct FriendProfileScreen: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(.secondary.opacity(0.18)))
+        .piriElevatedCard()
     }
 
     private func tripStatsCard(count: Int) -> some View {
@@ -78,7 +80,7 @@ struct FriendProfileScreen: View {
             .font(.system(size: 15, weight: .medium))
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .overlay(RoundedRectangle(cornerRadius: 18).stroke(.secondary.opacity(0.18)))
+            .piriElevatedCard()
     }
 
     private func tripHistoryCard(_ history: [TripHistoryEntry]) -> some View {
@@ -101,7 +103,7 @@ struct FriendProfileScreen: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(.secondary.opacity(0.18)))
+        .piriElevatedCard()
     }
 
     private func notSharedRow(_ categoryKey: String) -> some View {
@@ -112,6 +114,6 @@ struct FriendProfileScreen: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemGroupedBackground)))
+        .background(RoundedRectangle(cornerRadius: 14).fill(Theme.cardFill))
     }
 }

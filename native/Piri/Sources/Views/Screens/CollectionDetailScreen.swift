@@ -239,6 +239,8 @@ struct CollectionDetailScreen: View {
             _ = await (weatherTask, hoursTask, holidaysTask)
         }
         .onChange(of: searchQuery) { _, newValue in scheduleSearch(newValue) }
+        .background(Theme.screenBackground.ignoresSafeArea())
+        .environment(\.colorScheme, .dark)
     }
 
     private var searchField: some View {
@@ -260,7 +262,7 @@ struct CollectionDetailScreen: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemBackground)))
+            .background(RoundedRectangle(cornerRadius: 12).fill(Theme.cardFill))
 
             // A place search anchored on the wrong city just returns
             // nothing useful — surfaced directly (not buried in a
@@ -355,7 +357,7 @@ struct CollectionDetailScreen: View {
             .buttonStyle(.borderless)
         }
         .padding(12)
-        .background(RoundedRectangle(cornerRadius: 12).fill(added ? Theme.gold.opacity(0.08) : Color(.secondarySystemBackground)))
+        .background(RoundedRectangle(cornerRadius: 12).fill(added ? Theme.gold.opacity(0.08) : Theme.cardFill))
     }
 
     private func scheduleSearch(_ query: String) {
@@ -408,7 +410,7 @@ struct CollectionDetailScreen: View {
                 Text("common.change").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.gold)
             }
             .padding(14)
-            .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemBackground)))
+            .background(RoundedRectangle(cornerRadius: 14).fill(Theme.cardFill))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -440,7 +442,7 @@ struct CollectionDetailScreen: View {
                 .controlSize(.small)
             }
             .padding(14)
-            .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemBackground)))
+            .background(RoundedRectangle(cornerRadius: 14).fill(Theme.cardFill))
         }
     }
 
@@ -457,7 +459,7 @@ struct CollectionDetailScreen: View {
                 .controlSize(.small)
             }
             .padding(14)
-            .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemBackground)))
+            .background(RoundedRectangle(cornerRadius: 14).fill(Theme.cardFill))
         }
     }
 
@@ -557,7 +559,7 @@ struct CollectionDetailScreen: View {
             }
             .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 18).fill(Theme.navy))
+            .background(RoundedRectangle(cornerRadius: 18).fill(Theme.cardFill))
         }
         .buttonStyle(.plain)
     }
@@ -581,7 +583,7 @@ struct CollectionDetailScreen: View {
             }
             .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 18).fill(Color(.secondarySystemBackground)))
+            .background(RoundedRectangle(cornerRadius: 18).fill(Theme.cardFill))
             .overlay(RoundedRectangle(cornerRadius: 18).stroke(Theme.gold.opacity(0.3), lineWidth: 1.5))
         }
         .buttonStyle(.plain)
@@ -729,7 +731,7 @@ struct CollectionDetailScreen: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemBackground)))
+        .background(RoundedRectangle(cornerRadius: 14).fill(Theme.cardFill))
     }
 
     private func open(_ reference: SavedPOIReference) async {

@@ -49,6 +49,8 @@ struct TripDetailScreen: View {
             }
         }
         .navigationBarHidden(true)
+        .background(Theme.screenBackground.ignoresSafeArea())
+        .environment(\.colorScheme, .dark)
         .onDisappear { playbackTask?.cancel() }
     }
 
@@ -112,7 +114,7 @@ struct TripDetailScreen: View {
                                     Button {
                                         viewerIndex = index
                                     } label: {
-                                        CachedAsyncImage(url: URL(string: photo.uri), maxPixelSize: 300) { $0.resizable().aspectRatio(contentMode: .fill) } placeholder: { Color(.secondarySystemBackground) }
+                                        CachedAsyncImage(url: URL(string: photo.uri), maxPixelSize: 300) { $0.resizable().aspectRatio(contentMode: .fill) } placeholder: { Theme.cardFill }
                                             .frame(width: 90, height: 90)
                                             .clipShape(RoundedRectangle(cornerRadius: 12))
                                     }
@@ -152,7 +154,7 @@ struct TripDetailScreen: View {
             statItem(value: "\(trip.stops.count)", label: String(localized: "trips.stat.stops"))
         }
         .padding(.vertical, 14)
-        .background(RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemGroupedBackground)))
+        .background(RoundedRectangle(cornerRadius: 16).fill(Theme.cardFill))
     }
 
     private func statItem(value: String, label: String) -> some View {
