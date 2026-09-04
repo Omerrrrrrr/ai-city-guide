@@ -27,6 +27,8 @@ struct TripsScreen: View {
                 .padding(16)
             }
         }
+        .background(Theme.screenBackground.ignoresSafeArea())
+        .environment(\.colorScheme, .dark)
         .navigationTitle("trips.title")
     }
 }

@@ -91,6 +91,8 @@ struct GamificationScreen: View {
             }
             .padding(.bottom, 40)
         }
+        .background(Theme.screenBackground.ignoresSafeArea())
+        .environment(\.colorScheme, .dark)
         .navigationTitle(String(localized: "gamification.title"))
         .navigationBarTitleDisplayMode(.inline)
     }

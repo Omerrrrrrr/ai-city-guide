@@ -55,7 +55,7 @@ struct UserPhotoSection: View {
             }
             .frame(width: 90, height: 90)
             .foregroundStyle(Theme.gold)
-            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+            .background(Theme.cardFill, in: RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
     }

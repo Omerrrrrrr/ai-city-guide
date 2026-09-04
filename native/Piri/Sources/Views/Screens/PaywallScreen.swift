@@ -81,6 +81,8 @@ struct PaywallScreen: View {
                 }
                 .padding(24)
             }
+            .background(Theme.screenBackground.ignoresSafeArea())
+            .environment(\.colorScheme, .dark)
             .navigationTitle(String(localized: String.LocalizationValue("paywall.title")))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -171,7 +173,7 @@ struct PaywallScreen: View {
         } label: {
             Text(String(localized: String.LocalizationValue("paywall.restore")))
                 .font(.footnote)
-                .foregroundStyle(Theme.navy)
+                .foregroundStyle(Theme.gold)
         }
         .buttonStyle(.plain)
     }

@@ -190,6 +190,8 @@ struct AIScreen: View {
             tabSelection.pendingAIQuery = nil
         }
         .sheet(item: $selectedPOI) { poi in POIExplainSheet(poi: poi) }
+        .background(Theme.screenBackground.ignoresSafeArea())
+        .environment(\.colorScheme, .dark)
     }
 
     private var header: some View {
@@ -250,8 +252,7 @@ struct AIScreen: View {
                             .font(.system(size: 14, weight: .medium))
                             .padding(.horizontal, 14)
                             .padding(.vertical, 10)
-                            .background(RoundedRectangle(cornerRadius: 14).fill(Theme.navy.opacity(0.05)))
-                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.navy.opacity(0.15)))
+                            .background(RoundedRectangle(cornerRadius: 14).fill(Theme.cardFill))
                     }
                 }
             }
@@ -278,8 +279,9 @@ struct AIScreen: View {
         case .assistant(let id, let content, let recommendations, let isItinerary):
             VStack(alignment: .leading, spacing: 12) {
                 Text(content)
+                    .foregroundStyle(Theme.navy)
                     .padding(.horizontal, 14).padding(.vertical, 12)
-                    .background(RoundedRectangle(cornerRadius: 18).fill(Color(.secondarySystemBackground)))
+                    .background(RoundedRectangle(cornerRadius: 18).fill(Theme.gold))
 
                 if recommendations.isEmpty {
                     Text("ai.noMatches").foregroundStyle(.secondary).padding(.horizontal, 4)
@@ -345,7 +347,7 @@ struct AIScreen: View {
             .foregroundStyle(saved ? .secondary : Theme.gold)
             .padding(.horizontal, 14).padding(.vertical, 10)
             .frame(maxWidth: .infinity)
-            .background(RoundedRectangle(cornerRadius: 12).fill(saved ? Color(.secondarySystemBackground) : Theme.gold.opacity(0.12)))
+            .background(RoundedRectangle(cornerRadius: 12).fill(saved ? Theme.cardFill : Theme.gold.opacity(0.12)))
         }
         .buttonStyle(.plain)
         .disabled(saved)
@@ -385,7 +387,7 @@ struct AIScreen: View {
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 8).padding(.vertical, 3)
-                            .background(Capsule().fill(Color(.secondarySystemBackground)))
+                            .background(Capsule().fill(Theme.cardFill))
                             .overlay(Capsule().stroke(Color(.separator), lineWidth: 1))
                     }
                 }
@@ -399,7 +401,7 @@ struct AIScreen: View {
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.gold.opacity(0.25)))
         }
         .padding(16)
-        .background(RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemGroupedBackground)))
+        .background(RoundedRectangle(cornerRadius: 16).fill(Theme.cardFill))
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
@@ -432,7 +434,7 @@ struct AIScreen: View {
                 TextField(String(localized: "ai.inputPlaceholder"), text: $query)
                     .padding(.horizontal, 16)
                     .frame(height: 48)
-                    .background(RoundedRectangle(cornerRadius: 24).fill(Color(.secondarySystemBackground)))
+                    .background(RoundedRectangle(cornerRadius: 24).fill(Theme.cardFill))
                     .disabled(loading)
                     .onSubmit { searchTask = Task { await search() } }
 
@@ -441,10 +443,10 @@ struct AIScreen: View {
                 } label: {
                     Text("ai.ask")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Theme.navy)
                         .padding(.horizontal, 20)
                         .frame(height: 48)
-                        .background(RoundedRectangle(cornerRadius: 24).fill(Theme.navy))
+                        .background(RoundedRectangle(cornerRadius: 24).fill(Theme.gold))
                 }
                 .disabled(loading || query.trimmingCharacters(in: .whitespaces).isEmpty)
                 .opacity(loading || query.trimmingCharacters(in: .whitespaces).isEmpty ? 0.5 : 1)

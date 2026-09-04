@@ -77,6 +77,8 @@ struct SavedScreen: View {
             }
             .padding(.bottom, 40)
         }
+        .background(Theme.screenBackground.ignoresSafeArea())
+        .environment(\.colorScheme, .dark)
         .navigationBarHidden(true)
         .sheet(item: $selectedPOI) { poi in POIExplainSheet(poi: poi) }
         .sheet(item: $selectedCollection) { collection in CollectionDetailScreen(collectionId: collection.id) }
@@ -124,7 +126,7 @@ struct SavedScreen: View {
                         .foregroundStyle(Theme.gold)
                 }
                 .padding(14)
-                .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemBackground)))
+                .background(RoundedRectangle(cornerRadius: 14).fill(Theme.cardFill))
             } else {
                 LazyVGrid(columns: gridColumns, spacing: 12) {
                     newCollectionTile(kind: kind)
@@ -168,7 +170,7 @@ struct SavedScreen: View {
             }
             .frame(maxWidth: .infinity)
             .frame(height: 130)
-            .background(RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemBackground)))
+            .background(RoundedRectangle(cornerRadius: 16).fill(Theme.cardFill))
         }
         .buttonStyle(.plain)
     }
@@ -283,7 +285,7 @@ struct SavedScreen: View {
                 }
             }
             .padding(14)
-            .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemBackground)))
+            .background(RoundedRectangle(cornerRadius: 14).fill(Theme.cardFill))
         }
         .buttonStyle(.plain)
         .disabled(resolvingIdentifier != nil)

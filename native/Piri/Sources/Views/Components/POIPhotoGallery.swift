@@ -1,11 +1,14 @@
 import SwiftUI
 
-/// Horizontal strip of every real photo available for a place — Wikipedia's
-/// photo (if any) first per the user's explicit priority, then Tripadvisor's.
-/// Never AI-generated or sourced elsewhere. Tapping one opens a full-screen
-/// pager. Each thumbnail carries its own source label rather than one
-/// blanket attribution, since a place can have photos from both providers
-/// at once.
+/// The first real photo available for a place — Wikipedia's (if any) per the
+/// user's explicit priority, then Tripadvisor's, never AI-generated — shown
+/// full-bleed as a hero, with any remaining photos as a filmstrip of small
+/// thumbnails below it. Tapping either opens the same full-screen pager at
+/// the right index. Each thumbnail (and the hero) carries its own source
+/// label rather than one blanket attribution, since a place can have photos
+/// from both providers at once. Only ever embedded by `POIExplainSheet`
+/// (verified — no other call site), so the hero's full-bleed sizing doesn't
+/// need to guard against some other, more constrained context.
 struct POIPhotoGallery: View {
     let photos: [POIPhoto]
 
@@ -14,41 +17,73 @@ struct POIPhotoGallery: View {
 
     var body: some View {
         if !photos.isEmpty {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(Array(photos.enumerated()), id: \.element.id) { index, photo in
-                        Button {
-                            viewerIndex = PhotoIndex(value: index)
-                        } label: {
-                            ZStack(alignment: .bottomLeading) {
-                                CachedAsyncImage(url: URL(string: photo.url), maxPixelSize: 400) { image in
-                                    image.resizable().aspectRatio(contentMode: .fill)
-                                } placeholder: {
-                                    Color(.secondarySystemBackground)
-                                }
-                                .frame(width: 110, height: 110)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
+            VStack(alignment: .leading, spacing: 8) {
+                heroPhoto(photos[0], index: 0)
 
-                                HStack(spacing: 4) {
-                                    sourceLabel(photo.source)
-                                    // Never for a paid account — it's
-                                    // already getting Google's own photos
-                                    // elsewhere in this same gallery
-                                    // whenever Google has any; an "upgrade"
-                                    // hint would be wrong, not just moot.
-                                    if photo.source == .unsplash, authStore.user?.isPaidTier != true {
-                                        lockBadge
-                                    }
-                                }
-                                .padding(5)
+                if photos.count > 1 {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(Array(photos.enumerated().dropFirst()), id: \.element.id) { index, photo in
+                                thumbnail(photo, index: index)
                             }
                         }
-                        .buttonStyle(.plain)
+                        .padding(.horizontal, 20)
                     }
                 }
             }
             .fullScreenCover(item: $viewerIndex) { wrapped in
                 POIPhotoViewer(photos: photos, index: wrapped.value)
+            }
+        }
+    }
+
+    private func heroPhoto(_ photo: POIPhoto, index: Int) -> some View {
+        Button {
+            viewerIndex = PhotoIndex(value: index)
+        } label: {
+            ZStack(alignment: .bottomLeading) {
+                CachedAsyncImage(url: URL(string: photo.url), maxPixelSize: 800) { image in
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Theme.navyLight
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 240)
+                .clipped()
+
+                photoBadges(photo).padding(10)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func thumbnail(_ photo: POIPhoto, index: Int) -> some View {
+        Button {
+            viewerIndex = PhotoIndex(value: index)
+        } label: {
+            ZStack(alignment: .bottomLeading) {
+                CachedAsyncImage(url: URL(string: photo.url), maxPixelSize: 400) { image in
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Theme.cardFill
+                }
+                .frame(width: 110, height: 110)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                photoBadges(photo).padding(5)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func photoBadges(_ photo: POIPhoto) -> some View {
+        HStack(spacing: 4) {
+            sourceLabel(photo.source)
+            // Never for a paid account — it's already getting Google's own
+            // photos elsewhere in this same gallery whenever Google has
+            // any; an "upgrade" hint would be wrong, not just moot.
+            if photo.source == .unsplash, authStore.user?.isPaidTier != true {
+                lockBadge
             }
         }
     }

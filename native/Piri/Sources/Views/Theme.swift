@@ -7,6 +7,31 @@ enum Theme {
     static let gold = Color(red: 0xD4 / 255, green: 0xA8 / 255, blue: 0x43 / 255)
     static let openGreen = Color(red: 0x06 / 255, green: 0x76 / 255, blue: 0x47 / 255)
     static let closedRed = Color(red: 0xB4 / 255, green: 0x23 / 255, blue: 0x18 / 255)
+    /// A lighter tint of `navy` -- card elevation in Dark mode comes from
+    /// this (a lighter navy on a navy background), not a light/white card
+    /// on a dark background the way `.secondarySystemGroupedBackground`
+    /// alone would render.
+    static let navyLight = Color(red: 0x35 / 255, green: 0x43 / 255, blue: 0x66 / 255)
+
+    /// Every AI-generated concept mockup for this app showed one thing in
+    /// common that the real app never actually built: the *entire* screen
+    /// staying navy top-to-bottom (not just the header), with cards reading
+    /// as a lighter navy floating on that background rather than a white/
+    /// gray system card. Confirmed live: with only the header hardcoded to
+    /// navy, every screen's actual scrollable body fell back to the
+    /// system's plain light/dark background, reading as a mismatched
+    /// "premium header, generic settings-list body" split.
+    ///
+    /// Unconditionally navy in both Light and Dark -- per the user's
+    /// explicit call after seeing both side by side (an initial Dark-only
+    /// version was tried first; Light still looked like the mismatched
+    /// split next to it). Settings > Appearance's Light/Dark/System choice
+    /// still governs system chrome and any screen that doesn't opt into
+    /// this token, same as always.
+    static let screenBackground = navy
+
+    /// Card counterpart to `screenBackground` -- see its doc comment.
+    static let cardFill = navyLight
 }
 
 extension View {
@@ -50,7 +75,7 @@ extension View {
     /// faint tinted fill) in one place instead of restyling each by hand.
     func piriElevatedCard(cornerRadius: CGFloat = 18) -> some View {
         self
-            .background(RoundedRectangle(cornerRadius: cornerRadius).fill(Color(.secondarySystemGroupedBackground)))
+            .background(RoundedRectangle(cornerRadius: cornerRadius).fill(Theme.cardFill))
             .shadow(color: .black.opacity(0.06), radius: 10, x: 0, y: 4)
     }
 }

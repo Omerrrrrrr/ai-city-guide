@@ -222,7 +222,7 @@ struct ScanScreen: View {
                 }
                 .padding(24)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 20).fill(Color(.secondarySystemGroupedBackground)))
+                .background(RoundedRectangle(cornerRadius: 20).fill(Theme.cardFill))
 
                 HStack(spacing: 12) {
                     ShareLink(item: L("scan.shareMessage", result.title, result.subtitle, result.explanation)) {
@@ -235,10 +235,10 @@ struct ScanScreen: View {
                     NavigationLink(destination: AIScreen(initialQuery: L("scan.askMoreQuery", result.title))) {
                         Text("scan.askMore")
                             .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Theme.navy)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
-                            .background(RoundedRectangle(cornerRadius: 14).fill(Theme.navy))
+                            .background(RoundedRectangle(cornerRadius: 14).fill(Theme.gold))
                     }
                 }
 
@@ -285,6 +285,8 @@ struct ScanScreen: View {
                 matchedPlace = try? await PlacesAPI.fetchPlace(id: matchedPlaceId)
             }
         }
+        .background(Theme.screenBackground.ignoresSafeArea())
+        .environment(\.colorScheme, .dark)
     }
 
     private func matchedPlaceCard(_ place: Place) -> some View {

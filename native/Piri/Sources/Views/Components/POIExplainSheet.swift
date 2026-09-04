@@ -87,8 +87,31 @@ struct POIExplainContent: View {
         VStack(spacing: 0) {
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        // The real photo (Wikipedia/Tripadvisor, never
+                        // AI-generated) is the most visually engaging thing
+                        // this card has and, unlike the AI text/rating/
+                        // badges below, is available from a fast,
+                        // cache-first, keyless call (`/places/photos-bulk`)
+                        // that doesn't need to wait for `/places/explain-poi`'s
+                        // much heavier Promise.all + AI generation to finish
+                        // server-side. Shown as soon as either arrives:
+                        // `previewPhoto` (near-instant on a cache hit) first,
+                        // then swapped for `result.photos`'s fuller gallery
+                        // (possibly Google-upgraded for a paid account) once
+                        // the full explanation lands.
+                        //
+                        // Pulled out of the padded content below it (full-
+                        // bleed, edge-to-edge) so this reads as a real photo
+                        // header, matching every mockup this pass drew from,
+                        // instead of just another inset element on the card.
+                        let photosToShow = result?.photos ?? previewPhoto.map { [$0] } ?? []
+                        if !photosToShow.isEmpty {
+                            POIPhotoGallery(photos: photosToShow)
+                        }
+
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack(alignment: .top) {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(poi.name).font(.title3.bold())
                                 if !poi.categoryLabel.isEmpty {
@@ -132,24 +155,6 @@ struct POIExplainContent: View {
                             .font(.title3)
                         }
 
-                        // The real photo (Wikipedia/Tripadvisor, never
-                        // AI-generated) is the most visually engaging thing
-                        // this card has and, unlike the AI text/rating/
-                        // badges below, is available from a fast,
-                        // cache-first, keyless call (`/places/photos-bulk`)
-                        // that doesn't need to wait for `/places/explain-poi`'s
-                        // much heavier Promise.all + AI generation to finish
-                        // server-side. Shown as soon as either arrives:
-                        // `previewPhoto` (near-instant on a cache hit) first,
-                        // then swapped for `result.photos`'s fuller gallery
-                        // (possibly Google-upgraded for a paid account) once
-                        // the full explanation lands. Reported live: "AI
-                        // açıklaması, resimler, Tripadvisor vs aynı anda
-                        // geliyor... hız sıralamasına göre üste koyulabilir."
-                        let photosToShow = result?.photos ?? previewPhoto.map { [$0] } ?? []
-                        if !photosToShow.isEmpty {
-                            POIPhotoGallery(photos: photosToShow)
-                        }
                         UserPhotoSection(poiName: poi.name, coordinate: poi.coordinate, photos: $userPhotos)
 
                         // AI explanation — the reason someone opens this
@@ -319,8 +324,9 @@ struct POIExplainContent: View {
                                     .controlSize(.small)
                             }
                         }
+                        }
+                        .padding()
                     }
-                    .padding()
                 }
                 .onChange(of: chatHistory.count) { _, _ in
                     guard let last = chatHistory.last else { return }
@@ -344,6 +350,8 @@ struct POIExplainContent: View {
                 chatInputBar
             }
         }
+        .background(Theme.screenBackground.ignoresSafeArea())
+        .environment(\.colorScheme, .dark)
         .sheet(item: $addToCollectionKind) { kind in AddToCollectionSheet(poi: poi, kind: kind) }
         .sheet(isPresented: $showingReviews) { TripAdvisorReviewsSheet(poi: poi, totalReviewCount: result?.rating?.reviewCount) }
         .task { await explain() }
@@ -492,7 +500,7 @@ struct POIExplainContent: View {
                 .padding(10)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(turn.role == .user ? Theme.gold.opacity(0.15) : Color(.secondarySystemBackground))
+                        .fill(turn.role == .user ? Theme.gold.opacity(0.15) : Theme.cardFill)
                 )
             if turn.role == .assistant { Spacer(minLength: 40) }
         }

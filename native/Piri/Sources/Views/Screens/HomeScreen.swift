@@ -168,6 +168,8 @@ struct HomeScreen: View {
                 WeatherForecastSheet(lat: lat, lng: lng, current: weather)
             }
         }
+        .background(Theme.screenBackground.ignoresSafeArea())
+        .environment(\.colorScheme, .dark)
         .navigationBarHidden(true)
     }
 
@@ -304,7 +306,7 @@ struct HomeScreen: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(12)
-                        .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemBackground)))
+                        .background(RoundedRectangle(cornerRadius: 14).fill(Theme.cardFill))
                     }
                 }
                 .padding(.horizontal, 20)

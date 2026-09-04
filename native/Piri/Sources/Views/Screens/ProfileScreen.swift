@@ -154,6 +154,8 @@ struct ProfileScreen: View {
         .sheet(isPresented: $showingSignIn) { SignInScreen() }
         .sheet(isPresented: $showingPaywall) { PaywallScreen() }
         .sheet(isPresented: $showingAvatarPicker) { AvatarPickerSheet() }
+        .background(Theme.screenBackground.ignoresSafeArea())
+        .environment(\.colorScheme, .dark)
         .navigationBarHidden(true)
     }
 
@@ -183,7 +185,7 @@ struct ProfileScreen: View {
                         Link(destination: url) {
                             Text(String(localized: String.LocalizationValue("settings.premium.manage")))
                                 .font(.footnote.weight(.semibold))
-                                .foregroundStyle(Theme.navy)
+                                .foregroundStyle(Theme.gold)
                         }
                     }
                 }
@@ -208,7 +210,7 @@ struct ProfileScreen: View {
                     } label: {
                         Text(String(localized: String.LocalizationValue("paywall.restore")))
                             .font(.footnote)
-                            .foregroundStyle(Theme.navy)
+                            .foregroundStyle(Theme.gold)
                     }
                     .buttonStyle(.plain)
                 }
@@ -371,7 +373,7 @@ struct ProfileScreen: View {
             profileTabButton(.plan, label: String(localized: "settings.tabs.plan"))
         }
         .padding(3)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemBackground)))
+        .background(RoundedRectangle(cornerRadius: 12).fill(Theme.cardFill))
     }
 
     private func profileTabButton(_ value: ProfileTab, label: String) -> some View {
@@ -442,7 +444,7 @@ struct ProfileScreen: View {
                     .textInputAutocapitalization(.never)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 11)
-                    .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemBackground)))
+                    .background(RoundedRectangle(cornerRadius: 12).fill(Theme.cardFill))
                     .onSubmit(addCustomInterest)
 
                 Button(action: addCustomInterest) {
@@ -479,7 +481,7 @@ struct ProfileScreen: View {
         .textInputAutocapitalization(.words)
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemBackground)))
+        .background(RoundedRectangle(cornerRadius: 12).fill(Theme.cardFill))
         .padding(.top, 10)
     }
 
@@ -550,7 +552,7 @@ struct ProfileScreen: View {
                         }
                         .font(.system(size: 14, weight: .medium))
                         .padding(.horizontal, 14).padding(.vertical, 8)
-                        .background(Capsule().fill(active ? Theme.navy : Color(.secondarySystemBackground)))
+                        .background(Capsule().fill(active ? Theme.navy : Theme.cardFill))
                         .foregroundStyle(active ? .white : .primary)
                         .overlay(Capsule().stroke(active ? Theme.navy : Color(.separator), lineWidth: 1.5))
                     }
@@ -586,7 +588,7 @@ struct ProfileScreen: View {
                         .font(.system(size: 14, weight: .medium))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
-                        .background(Capsule().fill(active ? Theme.navy : Color(.secondarySystemBackground)))
+                        .background(Capsule().fill(active ? Theme.navy : Theme.cardFill))
                         .foregroundStyle(active ? .white : .primary)
                         .overlay(Capsule().stroke(active ? Theme.navy : Color(.separator), lineWidth: 1.5))
                     }
@@ -616,7 +618,7 @@ struct ProfileScreen: View {
                         .font(.system(size: 14, weight: .medium))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
-                        .background(Capsule().fill(active ? Theme.navy : Color(.secondarySystemBackground)))
+                        .background(Capsule().fill(active ? Theme.navy : Theme.cardFill))
                         .foregroundStyle(active ? .white : .primary)
                         .overlay(Capsule().stroke(active ? Theme.navy : Color(.separator), lineWidth: 1.5))
                     }
