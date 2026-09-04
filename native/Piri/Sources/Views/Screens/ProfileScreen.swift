@@ -85,18 +85,6 @@ struct ProfileScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 header
-                profileSummaryCard
-                // Plain app settings (display language, light/dark mode,
-                // preferred maps app) -- previously nested inside "Seni
-                // Böyle Görüyoruz"'s personalization tabs, behind its edit
-                // toggle, under a "Dil" tab. Reported live ("Bu sayfa
-                // yanlış," referring to that card): none of these three
-                // describe how the app personalizes to the user, so they
-                // don't belong gated inside a personalization-profile
-                // editor at all -- they're just settings, always visible.
-                languageCard
-                appearanceCard
-                mapsProviderCard
                 if authStore.isSignedIn {
                     friendsCard
                 }
@@ -106,6 +94,23 @@ struct ProfileScreen: View {
                 if authStore.isSignedIn {
                     premiumCard
                 }
+                profileSummaryCard
+                // Plain app settings (display language, light/dark mode,
+                // preferred maps app) -- previously nested inside "Seni
+                // Böyle Görüyoruz"'s personalization tabs, behind its edit
+                // toggle, under a "Dil" tab. Reported live ("Bu sayfa
+                // yanlış," referring to that card): none of these three
+                // describe how the app personalizes to the user, so they
+                // don't belong gated inside a personalization-profile
+                // editor at all -- they're just settings, always visible.
+                // Grouped with "How we see you" just above Account, at the
+                // bottom of the scroll -- both are settings-adjacent
+                // ("configure how the app treats me") rather than the
+                // profile's own substantive content (Friends/Trips/Saved/
+                // Premium), which now leads the screen instead.
+                languageCard
+                appearanceCard
+                mapsProviderCard
                 accountCard
 
                 Text(L("settings.version", (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.0.0"))
