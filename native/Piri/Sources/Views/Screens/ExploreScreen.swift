@@ -101,6 +101,8 @@ struct ExploreScreen: View {
         }
         .sheet(item: $selectedPOI) { poi in POIExplainSheet(poi: poi) }
         .navigationBarHidden(true)
+        .background(Theme.screenBackground.ignoresSafeArea())
+        .environment(\.colorScheme, .dark)
     }
 
     private var header: some View {
@@ -137,7 +139,7 @@ struct ExploreScreen: View {
                             .font(.system(size: 14, weight: .medium))
                             .padding(.horizontal, 14)
                             .padding(.vertical, 8)
-                            .background(Capsule().fill(active ? Theme.navy : Color(.secondarySystemBackground)))
+                            .background(Capsule().fill(active ? Theme.navy : Theme.cardFill))
                             .foregroundStyle(active ? .white : .primary)
                     }
                 }
@@ -167,7 +169,7 @@ struct ExploreScreen: View {
                             .font(.system(size: 14, weight: .medium))
                             .padding(.horizontal, 14)
                             .padding(.vertical, 8)
-                            .background(Capsule().fill(active ? Theme.navy : Color(.secondarySystemBackground)))
+                            .background(Capsule().fill(active ? Theme.navy : Theme.cardFill))
                             .foregroundStyle(active ? .white : .primary)
                     }
                 }
@@ -211,7 +213,7 @@ struct ExploreScreen: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(12)
-                        .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemGroupedBackground)))
+                        .background(RoundedRectangle(cornerRadius: 14).fill(Theme.cardFill))
                     }
                 }
                 .padding(.horizontal, 20)
@@ -273,7 +275,7 @@ struct ExploreScreen: View {
                                 }
                                 .padding(12)
                             }
-                            .background(RoundedRectangle(cornerRadius: 18).fill(Color(.secondarySystemGroupedBackground)))
+                            .background(RoundedRectangle(cornerRadius: 18).fill(Theme.cardFill))
                             .clipShape(RoundedRectangle(cornerRadius: 18))
                         }
                         .buttonStyle(.plain)

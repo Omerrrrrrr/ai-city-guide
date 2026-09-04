@@ -55,5 +55,7 @@ struct HolidayDetailSheet: View {
                 }
             }
         }
+        .background(Theme.screenBackground.ignoresSafeArea())
+        .environment(\.colorScheme, .dark)
     }
 }
