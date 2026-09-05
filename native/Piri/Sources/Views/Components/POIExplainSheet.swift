@@ -441,13 +441,19 @@ struct POIExplainContent: View {
     /// Which real sources back this card, shown as a trust row rather than
     /// the single inline caption this replaced — `groundingSource` is
     /// mutually exclusive (Wikipedia or Tripadvisor, whichever grounded the
-    /// AI explanation), Google is independent of that and only present when
-    /// a Google rating was actually fetched.
+    /// AI explanation); Wikivoyage/Google/UNESCO are each independent of
+    /// that and independent of each other, only present when that specific
+    /// source actually had real data for this place. More sources here
+    /// than before is deliberate — the point of this row is to make the
+    /// full extent of real, verified grounding visible, not just the one
+    /// primary source.
     private func verifiedSourceNames(_ result: ExplainResult) -> [String] {
         var names: [String] = []
         if let source = result.groundingSource {
             names.append(source == "wikipedia" ? "Wikipedia" : "Tripadvisor")
         }
+        if result.wikivoyageUsed { names.append("Wikivoyage") }
+        if result.unescoBadge != nil { names.append("UNESCO") }
         if result.googleRating != nil { names.append("Google") }
         return names
     }

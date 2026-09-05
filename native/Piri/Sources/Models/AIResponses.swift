@@ -206,6 +206,11 @@ struct ExplainResult: Codable {
     /// Present only when this exact place is a real, verified UNESCO
     /// World Heritage Site / Global Geopark / Biosphere Reserve.
     var unescoBadge: UnescoBadge?
+    /// Whether a real Wikivoyage travel-guide excerpt for the surrounding
+    /// area backed this card -- surfaced for the "Verified Facts" trust
+    /// row alongside Wikipedia/Tripadvisor/Google/UNESCO, even though it
+    /// isn't the primary `groundingSource` for the body text itself.
+    var wikivoyageUsed: Bool = false
 }
 
 /// One aspect real reviewers discussed, e.g. `{aspect: "Coffee quality",

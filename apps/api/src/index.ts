@@ -2207,6 +2207,12 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
           goldenHour,
           piriRating: piriReview ? { rating: piriReview.rating, count: piriReview.count } : null,
           unescoBadge: unescoSite ? { designation: unescoSite.designation, name: unescoSite.name } : null,
+          // Wikivoyage grounds general area color (see `wikivoyagePromise`'s
+          // own comment) rather than the primary `groundingSource` text, but
+          // it's still real, verified data behind this card -- surfaced
+          // here so the "Verified Facts" trust row can show it too, not
+          // just Wikipedia/Tripadvisor/Google.
+          wikivoyageUsed: wikivoyageGuide != null,
         });
       } catch (e: any) {
         return sendServerError(request, reply, e, 'Failed to explain place');
