@@ -23,14 +23,6 @@ import SwiftUI
 struct POIExplainContent: View {
     let poi: POIPlace
     var onClose: (() -> Void)? = nil
-    /// `true` only for `POIExplainSheet`'s real full-screen presentation --
-    /// lets the hero photo bleed all the way to the very top, under the
-    /// (transparently-backed) nav bar, with "Cancel" floating over it
-    /// rather than sitting in its own separate navy band above the photo.
-    /// Left `false` for `MapScreen.mapFeatureCard`'s inline card, which has
-    /// no nav bar of its own to bleed under and isn't anchored to the
-    /// device's actual top edge in the first place.
-    var extendsPhotoUnderStatusBar: Bool = false
 
     @Environment(UserProfileStore.self) private var userProfileStore
     @Environment(SavedPlacesStore.self) private var savedPlacesStore
@@ -114,7 +106,7 @@ struct POIExplainContent: View {
                         // header, matching every mockup this pass drew from,
                         // instead of just another inset element on the card.
                         let photosToShow = result?.photos ?? previewPhoto.map { [$0] } ?? []
-                        POIPhotoGallery(photos: photosToShow, extendsHeroUnderStatusBar: extendsPhotoUnderStatusBar) {
+                        POIPhotoGallery(photos: photosToShow) {
                             UserPhotoSection(poiName: poi.name, coordinate: poi.coordinate, photos: $userPhotos)
                         }
 
@@ -637,15 +629,10 @@ struct POIExplainSheet: View {
 
     var body: some View {
         NavigationStack {
-            POIExplainContent(poi: poi, extendsPhotoUnderStatusBar: true)
+            POIExplainContent(poi: poi)
                 .background(Theme.screenBackground.ignoresSafeArea())
                 .environment(\.colorScheme, .dark)
                 .navigationBarTitleDisplayMode(.inline)
-                // Transparent, not the default opaque bar -- otherwise it'd
-                // paint over the hero photo now bleeding up underneath it
-                // with a solid navy strip, undoing the point of extending
-                // the photo that far in the first place.
-                .toolbarBackground(.hidden, for: .navigationBar)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("common.cancel") { dismiss() }

@@ -2,18 +2,20 @@ import SwiftUI
 
 /// The first real photo available for a place — Wikipedia's (if any) per the
 /// user's explicit priority, then Tripadvisor's, never AI-generated — shown
-/// full-bleed as a hero, with any remaining photos as a filmstrip of small
-/// thumbnails below it. Tapping either opens the same full-screen pager at
-/// the right index. Each thumbnail (and the hero) carries its own source
-/// label rather than one blanket attribution, since a place can have photos
-/// from both providers at once. Only ever embedded by `POIExplainSheet`
-/// (verified — no other call site), so the hero's full-bleed sizing doesn't
-/// need to guard against some other, more constrained context.
+/// full-bleed as a hero preview, with *every* photo (including that same
+/// first one) as a filmstrip of small thumbnails below it -- confirmed live
+/// that trying to make the hero bleed under the status bar/nav bar instead
+/// (an earlier version of this component) didn't actually work, so the hero
+/// stays a plain preview and the filmstrip is the real, complete, swipeable
+/// set starting from photo 1. Tapping either opens the same full-screen
+/// pager at the right index. Each thumbnail (and the hero) carries its own
+/// source label rather than one blanket attribution, since a place can have
+/// photos from both providers at once. Only ever embedded by
+/// `POIExplainSheet` (verified — no other call site), so the hero's
+/// full-bleed sizing doesn't need to guard against some other, more
+/// constrained context.
 struct POIPhotoGallery<Trailing: View>: View {
     let photos: [POIPhoto]
-    /// `true` only for `POIExplainSheet`'s real full-screen presentation --
-    /// see `POIExplainContent.extendsPhotoUnderStatusBar`'s own doc comment.
-    var extendsHeroUnderStatusBar: Bool = false
     /// Appended as extra tiles at the end of the same filmstrip row as the
     /// Tripadvisor/Wikipedia thumbnails -- lets `POIExplainContent` fold its
     /// user-submitted-photos strip and "add a photo" button into this one
@@ -27,7 +29,6 @@ struct POIPhotoGallery<Trailing: View>: View {
         VStack(alignment: .leading, spacing: 8) {
             if let hero = photos.first {
                 heroPhoto(hero, index: 0)
-                    .ignoresSafeArea(edges: extendsHeroUnderStatusBar ? .top : [])
             }
             // Always shown, even with zero official photos -- `trailing`
             // (the user-submitted strip + add-photo button) needs to stay
@@ -35,7 +36,7 @@ struct POIPhotoGallery<Trailing: View>: View {
             // photo at all doesn't lose its only way to contribute one.
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    ForEach(Array(photos.enumerated().dropFirst()), id: \.element.id) { index, photo in
+                    ForEach(Array(photos.enumerated()), id: \.element.id) { index, photo in
                         thumbnail(photo, index: index)
                     }
                     trailing()
@@ -107,9 +108,8 @@ struct POIPhotoGallery<Trailing: View>: View {
 }
 
 extension POIPhotoGallery where Trailing == EmptyView {
-    init(photos: [POIPhoto], extendsHeroUnderStatusBar: Bool = false) {
+    init(photos: [POIPhoto]) {
         self.photos = photos
-        self.extendsHeroUnderStatusBar = extendsHeroUnderStatusBar
         self.trailing = { EmptyView() }
     }
 }
