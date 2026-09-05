@@ -98,6 +98,7 @@ import { fetchWikipediaPhoto, WIKIPEDIA_PLAUSIBLE_CATEGORIES, GOLDEN_HOUR_CATEGO
 import { fetchWikidataFacts } from './wikidata';
 import { fetchTransitousLeg } from './transitous';
 import { findLocalResource } from './local-resources';
+import { fetchUnescoSite } from './unesco';
 import { fetchDietaryPlaces, fetchDietaryTagsForPlace } from './dietary';
 import { fetchUnsplashPhoto } from './unsplash';
 import { verifyTransaction } from './storekit';
@@ -1748,6 +1749,14 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
       const wikivoyagePromise =
         lat !== undefined && lng !== undefined ? fetchWikivoyageGuide(name, lat, lng) : Promise.resolve(null);
 
+      // Unlike Wikivoyage (area-level color), a UNESCO World Heritage Site
+      // match is a real, verified fact about this exact place -- checked
+      // by proximity to the ~1,223 sites on the List (see unesco.ts).
+      // `null` for the overwhelming majority of POIs, same "not an error"
+      // contract as the Wikivoyage lookup above.
+      const unescoPromise =
+        lat !== undefined && lng !== undefined ? fetchUnescoSite(name, lat, lng) : Promise.resolve(null);
+
       // Piri's own UGC rating -- folded in here instead of the second
       // `GET /poi/reviews` round trip the client previously needed before
       // it could render the 3-source combined average (`PiriReviewsSection`),
@@ -1821,6 +1830,7 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         appleWebsiteExcerpt,
         sunTimes,
         wikivoyageGuide,
+        unescoSite,
         piriReview,
       ] = await Promise.all([
         lat !== undefined && lng !== undefined
@@ -1834,6 +1844,7 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         appleWebsitePromise,
         goldenHourPromise,
         wikivoyagePromise,
+        unescoPromise,
         piriReviewPromise,
       ]);
 
@@ -1924,6 +1935,9 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         websiteExcerpt ? `Text from the business's own official website: "${websiteExcerpt}"` : null,
         wikivoyageGuide
           ? `Wikivoyage travel-guide excerpt about the surrounding area/city ("${wikivoyageGuide.title}"), NOT about this specific place: "${wikivoyageGuide.extract.slice(0, 500)}"`
+          : null,
+        unescoSite
+          ? `This place is a UNESCO World Heritage Site — "${unescoSite.name}" (${unescoSite.category}, ${unescoSite.countries.join('/')}). Official UNESCO description: "${unescoSite.description}"`
           : null,
         curatedPlace?.shortStory ? `Story: ${curatedPlace.shortStory}` : null,
         curatedPlace?.localVibeMood ? `Vibe: ${curatedPlace.localVibeMood}` : null,
@@ -2035,6 +2049,15 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         ? ` A Wikivoyage excerpt about the surrounding area is included below — you may draw on it for general local color or historical atmosphere about the city/district, but never attribute anything from it specifically to this place unless the excerpt is unmistakably describing this exact place.`
         : '';
 
+      // Unlike Wikivoyage's soft area color, a real UNESCO match is a
+      // specific, verified fact about this exact place worth surfacing —
+      // this is the ONLY place you have real UNESCO data for; never claim
+      // World Heritage status for a place not given this exact context,
+      // even if you think you recall it from general knowledge.
+      const unescoGuard = unescoSite
+        ? ` This place is a real, verified UNESCO World Heritage Site (see the official description below) — mention that plainly and draw on the real reason it was inscribed, rather than treating it as just another interesting fact to skip.`
+        : '';
+
       const faithMismatchGuard =
         userProfile?.faith && userProfile.faith !== 'secular' && userProfile.faith !== 'prefer_not_to_say'
           ? ` If this place belongs to a different faith tradition than the user's, don't invent or overstate religious or architectural connections that aren't real. Only mention a genuine interfaith link if you're actually confident of it.`
@@ -2102,7 +2125,7 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
                   '0-4 specific things real reviewers actually discussed (from the review text given below), each with an honest sentiment — empty array if there is no real review text to draw from. Never force a fixed category (food/service/price) that was not genuinely discussed just to fill the list.'
                 ),
             }),
-            system: `You are Piri, a deeply knowledgeable personal travel guide. Your job is to explain a place in a way that speaks directly to who the user is — their profession, interests, and worldview.${holidayGuard} ${factualGuard}${googleReviewGuard}${reviewsSummaryGuard}${aspectHighlightsGuard}${websiteGuard}${wikivoyageGuard}${NO_HYPE_GUARD}${profileContext}
+            system: `You are Piri, a deeply knowledgeable personal travel guide. Your job is to explain a place in a way that speaks directly to who the user is — their profession, interests, and worldview.${holidayGuard} ${factualGuard}${googleReviewGuard}${reviewsSummaryGuard}${aspectHighlightsGuard}${websiteGuard}${wikivoyageGuard}${unescoGuard}${NO_HYPE_GUARD}${profileContext}
 
 ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
             prompt: `Explain this place:\n\n${placeContext}`,
@@ -3117,9 +3140,10 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
       // Wikivoyage runs alongside it, same best-effort/never-throws contract
       // -- a real travel-guide-editor intro for the area, when one exists
       // (see wikivoyage.ts's own comment on coverage being uneven).
-      const [websiteExcerpt, wikivoyageGuide] = await Promise.all([
+      const [websiteExcerpt, wikivoyageGuide, unescoSite] = await Promise.all([
         website ? fetchWebsiteExcerpt(website, 2500) : Promise.resolve(null),
         lat != null && lng != null ? fetchWikivoyageGuide(name, lat, lng) : Promise.resolve(null),
+        lat != null && lng != null ? fetchUnescoSite(name, lat, lng) : Promise.resolve(null),
       ]);
 
       // Only attempted when the message actually looks like a transit
@@ -3199,6 +3223,9 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
         cityContextLine,
         websiteExcerpt ? `Text scraped from the business's own official website: "${websiteExcerpt}"` : null,
         wikivoyageGuide ? `Wikivoyage travel-guide excerpt for this area (written by real travel-guide editors, not AI): "${wikivoyageGuide.extract}"` : null,
+        unescoSite
+          ? `This place is a UNESCO World Heritage Site — "${unescoSite.name}" (${unescoSite.category}, ${unescoSite.countries.join('/')}). Official UNESCO description: "${unescoSite.description}"`
+          : null,
         transitLine,
         localResourceLine,
       ]
@@ -3221,6 +3248,11 @@ ${
 ${
   wikivoyageGuide
     ? `\nWIKIVOYAGE RULE: the travel-guide excerpt above is real text written by Wikivoyage's volunteer editors, not generated by you — you may draw on it for general area context (what the neighborhood/region is like, what it's known for), but it's an excerpt of a larger article and may not cover a specific detail asked about. Don't present it as if you wrote it yourself, and don't invent additional "facts" in the same voice to fill gaps it doesn't cover.\n`
+    : ''
+}
+${
+  unescoSite
+    ? `\nUNESCO RULE: this place is a real, verified UNESCO World Heritage Site — the official description above is real UNESCO text, not generated by you. Mention its World Heritage status plainly when relevant and draw on the real reason it was inscribed. This is the ONLY place you have real UNESCO data for — never claim World Heritage status for anywhere else, even if you think you recall it from general knowledge.\n`
     : ''
 }
 ${
