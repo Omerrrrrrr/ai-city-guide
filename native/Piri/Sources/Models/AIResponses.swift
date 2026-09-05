@@ -206,6 +206,10 @@ struct ExplainResult: Codable {
     /// Present only when this exact place is a real, verified UNESCO
     /// World Heritage Site / Global Geopark / Biosphere Reserve.
     var unescoBadge: UnescoBadge?
+    /// Present only when this exact place has a real, verified national/
+    /// regional heritage designation (independent of and additional to
+    /// `unescoBadge` -- a place can genuinely have both).
+    var heritageDesignation: HeritageDesignation?
     /// Whether a real Wikivoyage travel-guide excerpt for the surrounding
     /// area backed this card -- surfaced for the "Verified Facts" trust
     /// row alongside Wikipedia/Tripadvisor/Google/UNESCO, even though it
@@ -265,6 +269,17 @@ struct SourceRating: Codable {
 struct UnescoBadge: Codable, Hashable {
     var designation: String
     var name: String
+}
+
+/// A real, official national/regional heritage designation for this exact
+/// place (e.g. "Grade II listed building", "National Register of Historic
+/// Places", "monument historique inscrit") -- sourced server-side from
+/// Wikidata's own P1435 property, one query covering many countries'
+/// registries at once (see apps/api/src/heritage-designation.ts). Unlike
+/// `UnescoBadge`, this has no backing descriptive prose -- badge only.
+struct HeritageDesignation: Codable, Hashable {
+    var name: String
+    var designation: String
 }
 
 enum POIPhotoSource: String, Codable {

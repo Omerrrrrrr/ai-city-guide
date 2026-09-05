@@ -120,6 +120,9 @@ struct POIExplainContent: View {
                                 if let badge = result?.unescoBadge {
                                     unescoBadgeView(badge)
                                 }
+                                if let heritage = result?.heritageDesignation {
+                                    heritageDesignationBadgeView(heritage)
+                                }
                             }
                             Spacer()
                             // `poi.mapItem.identifier` is nil for some
@@ -410,6 +413,23 @@ struct POIExplainContent: View {
         .padding(.vertical, 4)
         .background(Color(.systemBlue).opacity(0.18), in: Capsule())
         .foregroundStyle(Color(.systemBlue))
+    }
+
+    /// `designation` is an open-ended, server-supplied real official term
+    /// (e.g. "Grade II listed building", "monument historique inscrit") --
+    /// unlike `UnescoBadge`'s fixed 3 designations, this isn't localized
+    /// into a translated label, it's shown as the real term as-is (see
+    /// heritage-designation.ts's own comment on the Wikidata source).
+    private func heritageDesignationBadgeView(_ heritage: HeritageDesignation) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: "checkmark.seal.fill")
+            Text(heritage.designation)
+        }
+        .font(.caption.weight(.medium))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Theme.gold.opacity(0.18), in: Capsule())
+        .foregroundStyle(Theme.gold)
     }
 
     private func goldenHourBadge(_ window: (start: Date, end: Date)) -> some View {

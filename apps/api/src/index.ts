@@ -100,6 +100,7 @@ import { fetchTransitousLeg } from './transitous';
 import { findLocalResource } from './local-resources';
 import { fetchUnescoSite, fetchIntangibleHeritage, fetchCreativeCity } from './unesco';
 import { fetchAcademicFinding } from './academic';
+import { fetchHeritageDesignation } from './heritage-designation';
 import { fetchDietaryPlaces, fetchDietaryTagsForPlace } from './dietary';
 import { fetchUnsplashPhoto } from './unsplash';
 import { verifyTransaction } from './storekit';
@@ -1758,6 +1759,14 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
       const unescoPromise =
         lat !== undefined && lng !== undefined ? fetchUnescoSite(name, lat, lng) : Promise.resolve(null);
 
+      // Badge-only, no prose (see heritage-designation.ts's own comment on
+      // why) -- a universal Wikidata-sourced heritage designation
+      // (Historic England Grade/US NRHP/France's monuments historiques/
+      // etc., all under one query), independent of and additional to any
+      // UNESCO match above (a place can genuinely be both).
+      const heritageDesignationPromise =
+        lat !== undefined && lng !== undefined ? fetchHeritageDesignation(name, lat, lng) : Promise.resolve(null);
+
       // Piri's own UGC rating -- folded in here instead of the second
       // `GET /poi/reviews` round trip the client previously needed before
       // it could render the 3-source combined average (`PiriReviewsSection`),
@@ -1832,6 +1841,7 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         sunTimes,
         wikivoyageGuide,
         unescoSite,
+        heritageDesignation,
         piriReview,
       ] = await Promise.all([
         lat !== undefined && lng !== undefined
@@ -1846,6 +1856,7 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         goldenHourPromise,
         wikivoyagePromise,
         unescoPromise,
+        heritageDesignationPromise,
         piriReviewPromise,
       ]);
 
@@ -2207,6 +2218,7 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
           goldenHour,
           piriRating: piriReview ? { rating: piriReview.rating, count: piriReview.count } : null,
           unescoBadge: unescoSite ? { designation: unescoSite.designation, name: unescoSite.name } : null,
+          heritageDesignation,
           // Wikivoyage grounds general area color (see `wikivoyagePromise`'s
           // own comment) rather than the primary `groundingSource` text, but
           // it's still real, verified data behind this card -- surfaced
