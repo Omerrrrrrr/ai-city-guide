@@ -98,7 +98,7 @@ import { fetchWikipediaPhoto, WIKIPEDIA_PLAUSIBLE_CATEGORIES, GOLDEN_HOUR_CATEGO
 import { fetchWikidataFacts } from './wikidata';
 import { fetchTransitousLeg } from './transitous';
 import { findLocalResource } from './local-resources';
-import { fetchUnescoSite } from './unesco';
+import { fetchUnescoSite, fetchIntangibleHeritage } from './unesco';
 import { fetchDietaryPlaces, fetchDietaryTagsForPlace } from './dietary';
 import { fetchUnsplashPhoto } from './unsplash';
 import { verifyTransaction } from './storekit';
@@ -1937,7 +1937,7 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
           ? `Wikivoyage travel-guide excerpt about the surrounding area/city ("${wikivoyageGuide.title}"), NOT about this specific place: "${wikivoyageGuide.extract.slice(0, 500)}"`
           : null,
         unescoSite
-          ? `This place is a UNESCO World Heritage Site — "${unescoSite.name}" (${unescoSite.category}, ${unescoSite.countries.join('/')}). Official UNESCO description: "${unescoSite.description}"`
+          ? `This place is a UNESCO ${unescoSite.designation}${unescoSite.category ? ` (${unescoSite.category})` : ''} — "${unescoSite.name}" (${unescoSite.countries.join('/')}). Official UNESCO description: "${unescoSite.description}"`
           : null,
         curatedPlace?.shortStory ? `Story: ${curatedPlace.shortStory}` : null,
         curatedPlace?.localVibeMood ? `Vibe: ${curatedPlace.localVibeMood}` : null,
@@ -2052,10 +2052,10 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
       // Unlike Wikivoyage's soft area color, a real UNESCO match is a
       // specific, verified fact about this exact place worth surfacing —
       // this is the ONLY place you have real UNESCO data for; never claim
-      // World Heritage status for a place not given this exact context,
+      // a UNESCO designation for a place not given this exact context,
       // even if you think you recall it from general knowledge.
       const unescoGuard = unescoSite
-        ? ` This place is a real, verified UNESCO World Heritage Site (see the official description below) — mention that plainly and draw on the real reason it was inscribed, rather than treating it as just another interesting fact to skip.`
+        ? ` This place is a real, verified UNESCO ${unescoSite.designation} (see the official description below) — mention that plainly and draw on the real reason it was recognized, rather than treating it as just another interesting fact to skip.`
         : '';
 
       const faithMismatchGuard =
@@ -3172,6 +3172,18 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
         );
       const localResource = looksLikeEquipmentQuestion ? findLocalResource(cityContext?.countryName) : null;
 
+      // "Other ways, not just location" -- a country's UNESCO-recognized
+      // traditions/crafts/foods aren't tied to this POI's coordinates at
+      // all, only its country (see unesco.ts's own comment on why this
+      // returns a short real list to pick from, not one fixed item like
+      // local-resources.ts, since a country can have dozens of entries).
+      const looksLikeCultureQuestion =
+        /tradition|craft(sman)?|festival|folklore|handicraft|local food|local dish|local cuisine|celebrat|geleneksel|el sanat[ıi]|yerel yemek|yöresel|tradisjon|håndverk/i.test(
+          message
+        );
+      const intangibleHeritage =
+        looksLikeCultureQuestion && cityContext?.countryName ? await fetchIntangibleHeritage(cityContext.countryName, 5) : [];
+
       const { text: profileContext } = buildUserContext(userProfile);
       // The client's `CityStore` already cached the whole exchange-rate
       // table (open.er-api.com covers ~160 currencies), so there's no
@@ -3215,6 +3227,11 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
             localResource.website ? ` (${localResource.website})` : ''
           } -- lends ${localResource.lends}${localResource.free ? ', free of charge' : ' for a fee'}.`
         : null;
+      const intangibleHeritageLine = intangibleHeritage.length
+        ? `Real UNESCO-recognized intangible cultural heritage from ${cityContext?.countryName} (a country-level list -- not necessarily specific to this place): ${intangibleHeritage
+            .map((entry) => `"${entry.name}" — ${entry.description.slice(0, 200)}`)
+            .join(' | ')}`
+        : null;
       const placeContext = [
         `Name: ${name}`,
         category ? `Category: ${category}` : null,
@@ -3224,10 +3241,11 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
         websiteExcerpt ? `Text scraped from the business's own official website: "${websiteExcerpt}"` : null,
         wikivoyageGuide ? `Wikivoyage travel-guide excerpt for this area (written by real travel-guide editors, not AI): "${wikivoyageGuide.extract}"` : null,
         unescoSite
-          ? `This place is a UNESCO World Heritage Site — "${unescoSite.name}" (${unescoSite.category}, ${unescoSite.countries.join('/')}). Official UNESCO description: "${unescoSite.description}"`
+          ? `This place is a UNESCO ${unescoSite.designation}${unescoSite.category ? ` (${unescoSite.category})` : ''} — "${unescoSite.name}" (${unescoSite.countries.join('/')}). Official UNESCO description: "${unescoSite.description}"`
           : null,
         transitLine,
         localResourceLine,
+        intangibleHeritageLine,
       ]
         .filter(Boolean)
         .join('\n');
@@ -3252,12 +3270,17 @@ ${
 }
 ${
   unescoSite
-    ? `\nUNESCO RULE: this place is a real, verified UNESCO World Heritage Site — the official description above is real UNESCO text, not generated by you. Mention its World Heritage status plainly when relevant and draw on the real reason it was inscribed. This is the ONLY place you have real UNESCO data for — never claim World Heritage status for anywhere else, even if you think you recall it from general knowledge.\n`
+    ? `\nUNESCO RULE: this place is a real, verified UNESCO ${unescoSite.designation} — the official description above is real UNESCO text, not generated by you. Mention its status plainly when relevant and draw on the real reason it was recognized. This is the ONLY place you have real UNESCO data for — never claim this or any other UNESCO designation for anywhere else, even if you think you recall one from general knowledge.\n`
     : ''
 }
 ${
   localResourceLine
     ? `\nLOCAL RESOURCE RULE: the equipment-lending resource given above is a real, human-verified organization for this specific country -- mention it plainly when it answers the user's question. This is the ONLY country you have real data like this for (most countries have no verified equivalent) -- never invent a similar-sounding organization for a country not given this exact context, even if you think you recall one from general knowledge.\n`
+    : ''
+}
+${
+  intangibleHeritageLine
+    ? `\nINTANGIBLE HERITAGE RULE: the items listed above are real UNESCO-recognized cultural traditions for this country, not generated by you, but they're a country-level list — most are NOT specifically about this place. Only bring one up if it's genuinely relevant to what the user actually asked (a food, craft, or festival question); never force one in, and never invent an item not listed here.\n`
     : ''
 }
 ${
