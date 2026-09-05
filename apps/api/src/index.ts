@@ -2205,6 +2205,7 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
           groundingSource,
           goldenHour,
           piriRating: piriReview ? { rating: piriReview.rating, count: piriReview.count } : null,
+          unescoBadge: unescoSite ? { designation: unescoSite.designation, name: unescoSite.name } : null,
         });
       } catch (e: any) {
         return sendServerError(request, reply, e, 'Failed to explain place');

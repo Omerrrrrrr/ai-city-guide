@@ -43882,6 +43882,168 @@
         }
       }
     },
+    "unesco.biosphere": {
+      "comment": "Badge shown on a POI card that is a real, verified UNESCO Biosphere Reserve.",
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "UNESCO-Biosphärenreservat"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "UNESCO Biosphere Reserve"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reserva de la Biosfera de la UNESCO"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réserve de biosphère de l'UNESCO"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riserva della biosfera dell'UNESCO"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "UNESCO biosfæreområde"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reserva da Biosfera da UNESCO"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "UNESCO Biyosfer Rezervi"
+          }
+        }
+      }
+    },
+    "unesco.geopark": {
+      "comment": "Badge shown on a POI card that is a real, verified UNESCO Global Geopark.",
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "UNESCO Global Geopark"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "UNESCO Global Geopark"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geoparque Mundial de la UNESCO"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Géoparc mondial de l'UNESCO"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geoparco mondiale dell'UNESCO"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "UNESCO global geopark"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Geoparque Mundial da UNESCO"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "UNESCO Küresel Jeoparkı"
+          }
+        }
+      }
+    },
+    "unesco.worldHeritage": {
+      "comment": "Badge shown on a POI card that is a real, verified UNESCO World Heritage Site.",
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "UNESCO-Weltkulturerbe"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "UNESCO World Heritage Site"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Patrimonio de la Humanidad de la UNESCO"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Site du patrimoine mondial de l'UNESCO"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Patrimonio dell'umanità dell'UNESCO"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "UNESCOs verdensarv"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Patrimônio Mundial da UNESCO"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "UNESCO Dünya Mirası"
+          }
+        }
+      }
+    },
     "weather.airQuality.fair": {
       "extractionState": "stale",
       "localizations": {

@@ -117,6 +117,9 @@ struct POIExplainContent: View {
                                 if !poi.categoryLabel.isEmpty {
                                     Text(poi.categoryLabel).font(.subheadline).foregroundStyle(.secondary)
                                 }
+                                if let badge = result?.unescoBadge {
+                                    unescoBadgeView(badge)
+                                }
                             }
                             Spacer()
                             // `poi.mapItem.identifier` is nil for some
@@ -372,6 +375,41 @@ struct POIExplainContent: View {
         }
         .font(.caption)
         .foregroundStyle(.secondary)
+    }
+
+    /// A verified UNESCO designation (World Heritage Site / Global Geopark
+    /// / Biosphere Reserve), server-matched by proximity — never guessed
+    /// client-side, so this badge only ever appears for a real match (see
+    /// apps/api/src/unesco.ts). Switched on the raw designation string the
+    /// server sends rather than interpolating it into a localization key
+    /// (`"unesco.\(designation)"` would silently render the raw key
+    /// instead of translated text).
+    private func unescoBadgeIcon(_ designation: String) -> String {
+        switch designation {
+        case "Global Geopark": return "mountain.2.fill"
+        case "Biosphere Reserve": return "leaf.fill"
+        default: return "building.columns.fill"
+        }
+    }
+
+    private func unescoBadgeLabel(_ designation: String) -> String {
+        switch designation {
+        case "Global Geopark": return String(localized: "unesco.geopark")
+        case "Biosphere Reserve": return String(localized: "unesco.biosphere")
+        default: return String(localized: "unesco.worldHeritage")
+        }
+    }
+
+    private func unescoBadgeView(_ badge: UnescoBadge) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: unescoBadgeIcon(badge.designation))
+            Text(unescoBadgeLabel(badge.designation))
+        }
+        .font(.caption.weight(.medium))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color(.systemBlue).opacity(0.18), in: Capsule())
+        .foregroundStyle(Color(.systemBlue))
     }
 
     private func goldenHourBadge(_ window: (start: Date, end: Date)) -> some View {

@@ -203,6 +203,9 @@ struct ExplainResult: Codable {
     /// every place, only what the actual sample supports. Always present
     /// (possibly empty), not optional -- the server always includes it.
     var aspectHighlights: [AspectHighlight]
+    /// Present only when this exact place is a real, verified UNESCO
+    /// World Heritage Site / Global Geopark / Biosphere Reserve.
+    var unescoBadge: UnescoBadge?
 }
 
 /// One aspect real reviewers discussed, e.g. `{aspect: "Coffee quality",
@@ -248,6 +251,15 @@ struct GoldenHour: Codable, Hashable {
 struct SourceRating: Codable {
     var rating: Double
     var count: Int
+}
+
+/// Present only when this exact place matched a real UNESCO designation
+/// (World Heritage Site, Global Geopark, or Biosphere Reserve) by
+/// proximity server-side (see apps/api/src/unesco.ts) — never inferred
+/// client-side, so a badge here is always a verified fact, not a guess.
+struct UnescoBadge: Codable, Hashable {
+    var designation: String
+    var name: String
 }
 
 enum POIPhotoSource: String, Codable {
