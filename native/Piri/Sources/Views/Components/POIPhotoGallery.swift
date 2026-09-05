@@ -1,19 +1,18 @@
 import SwiftUI
 
-/// The first real photo available for a place — Wikipedia's (if any) per the
-/// user's explicit priority, then Tripadvisor's, never AI-generated — shown
-/// full-bleed as a hero preview, with *every* photo (including that same
-/// first one) as a filmstrip of small thumbnails below it -- confirmed live
-/// that trying to make the hero bleed under the status bar/nav bar instead
-/// (an earlier version of this component) didn't actually work, so the hero
-/// stays a plain preview and the filmstrip is the real, complete, swipeable
-/// set starting from photo 1. Tapping either opens the same full-screen
-/// pager at the right index. Each thumbnail (and the hero) carries its own
-/// source label rather than one blanket attribution, since a place can have
-/// photos from both providers at once. Only ever embedded by
-/// `POIExplainSheet` (verified — no other call site), so the hero's
-/// full-bleed sizing doesn't need to guard against some other, more
-/// constrained context.
+/// A hero preview above a filmstrip of every photo (including whichever one
+/// the hero is currently showing) -- tapping a thumbnail swaps the hero to
+/// that photo, matching live feedback that treated the thumbnail row as a
+/// selector for the preview above it rather than each thumbnail being its
+/// own independent full-screen trigger. Tapping the hero itself still opens
+/// the full-screen pager, at whichever photo is currently selected. Rounded
+/// corners on the hero now, not full-bleed -- an earlier full-bleed version
+/// (and a since-abandoned attempt at bleeding it under the status bar) both
+/// read as a harder edge than intended once every corner around it
+/// (thumbnails, the card itself) was already rounded. Each thumbnail (and
+/// the hero) carries its own source label rather than one blanket
+/// attribution, since a place can have photos from both providers at once.
+/// Only ever embedded by `POIExplainSheet` (verified — no other call site).
 struct POIPhotoGallery<Trailing: View>: View {
     let photos: [POIPhoto]
     /// Appended as extra tiles at the end of the same filmstrip row as the
@@ -24,11 +23,12 @@ struct POIPhotoGallery<Trailing: View>: View {
 
     @Environment(AuthStore.self) private var authStore
     @State private var viewerIndex: PhotoIndex?
+    @State private var selectedIndex = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if let hero = photos.first {
-                heroPhoto(hero, index: 0)
+            if photos.indices.contains(selectedIndex) {
+                heroPhoto(photos[selectedIndex], index: selectedIndex)
             }
             // Always shown, even with zero official photos -- `trailing`
             // (the user-submitted strip + add-photo button) needs to stay
@@ -71,13 +71,16 @@ struct POIPhotoGallery<Trailing: View>: View {
 
                 photoBadges(photo).padding(10)
             }
+            .clipShape(RoundedRectangle(cornerRadius: 18))
         }
         .buttonStyle(.plain)
+        .padding(.horizontal, 20)
     }
 
     private func thumbnail(_ photo: POIPhoto, index: Int) -> some View {
         Button {
-            viewerIndex = PhotoIndex(value: index)
+            Haptics.light()
+            selectedIndex = index
         } label: {
             ZStack(alignment: .bottomLeading) {
                 CachedAsyncImage(url: URL(string: photo.url), maxPixelSize: 400) { image in
@@ -87,6 +90,14 @@ struct POIPhotoGallery<Trailing: View>: View {
                 }
                 .frame(width: 110, height: 110)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(
+                    // Marks which photo the hero above is currently
+                    // showing -- without this, tapping a thumbnail changed
+                    // the preview with no visible trace of which one was
+                    // picked.
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Theme.gold, lineWidth: index == selectedIndex ? 3 : 0)
+                )
 
                 photoBadges(photo).padding(5)
             }
