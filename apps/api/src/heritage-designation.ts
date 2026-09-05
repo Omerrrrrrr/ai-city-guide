@@ -15,6 +15,15 @@
 // listed building"), no descriptive prose -- never spliced into the AI
 // prompt as grounding text. See unesco.ts for the prose-grounded
 // designations.
+//
+// Global coverage checked live across 7 countries: excellent down to
+// ordinary, non-famous buildings in Spain/Germany; real but famous-sites-
+// only in Japan/India (an ordinary residential block returned nothing in
+// either); present but sometimes needing a wider search radius in China/
+// Brazil, where a large complex's own Wikidata coordinate can sit hundreds
+// of meters from the actual site (the Forbidden City resolved 545m from
+// its own gates) -- `fetchHeritageDesignationLive`'s 100m->1km fallback
+// exists specifically for that case.
 
 import { computeNameSimilarity, normalizeText } from './wiki-enrichment';
 
@@ -94,32 +103,50 @@ export async function fetchHeritageDesignation(name: string, lat: number, lng: n
   return data;
 }
 
+function bestCandidate(
+  bindings: SparqlBinding[],
+  normalizedName: string
+): { name: string; designation: string; nameScore: number } | null {
+  const candidates = bindings
+    .filter((b): b is SparqlBinding & { itemLabel: { value: string }; designationLabel: { value: string } } =>
+      Boolean(b.itemLabel?.value && b.designationLabel?.value)
+    )
+    .map((b) => ({
+      name: b.itemLabel.value,
+      designation: b.designationLabel.value,
+      nameScore: computeNameSimilarity(normalizedName, normalizeText(b.itemLabel.value)),
+    }));
+
+  const nameMatch = candidates.filter((c) => c.nameScore >= 0.6).sort((a, b) => b.nameScore - a.nameScore)[0];
+  // Results already arrive nearest-first (query is `ORDER BY ?dist`), so
+  // plain `[0]` is the closest -- re-sorting isn't needed for this branch.
+  return nameMatch ?? candidates[0] ?? null;
+}
+
 async function fetchHeritageDesignationLive(name: string, lat: number, lng: number): Promise<HeritageDesignation | null> {
   try {
+    const normalizedName = normalizeText(name);
+
     // 0.1km (100m) -- tight enough to stay building/site-specific in a
     // dense area, matching this app's other point-level grounding radii
     // (much narrower than UNESCO's 15km, since those designate whole
     // sites/regions rather than individual buildings).
-    const bindings = await queryWikidataHeritage(lat, lng, 0.1);
-    if (bindings.length === 0) return null;
+    const nearBindings = await queryWikidataHeritage(lat, lng, 0.1);
+    const nearBest = bestCandidate(nearBindings, normalizedName);
+    if (nearBest) return { name: nearBest.name, designation: nearBest.designation };
 
-    const normalizedName = normalizeText(name);
-    const candidates = bindings
-      .filter((b): b is SparqlBinding & { itemLabel: { value: string }; designationLabel: { value: string } } =>
-        Boolean(b.itemLabel?.value && b.designationLabel?.value)
-      )
-      .map((b) => {
-        const distanceKm = b.dist?.value ? Number(b.dist.value) : Infinity;
-        const nameScore = computeNameSimilarity(normalizedName, normalizeText(b.itemLabel.value));
-        return { name: b.itemLabel.value, designation: b.designationLabel.value, distanceKm, nameScore };
-      });
-
-    // Results already arrive nearest-first (query is `ORDER BY ?dist`), so
-    // plain `[0]` is the closest -- re-sorting isn't needed for the
-    // proximity fallback, just for the name-match branch.
-    const nameMatch = candidates.filter((c) => c.nameScore >= 0.6).sort((a, b) => b.nameScore - a.nameScore)[0];
-    const best = nameMatch ?? candidates[0];
-    return best ? { name: best.name, designation: best.designation } : null;
+    // Fallback to a much wider radius, but ONLY accept a confident name
+    // match here (never "closest of many") -- confirmed live that a large,
+    // complex site (a palace, a big temple complex) can have its Wikidata
+    // coordinate displaced hundreds of meters from the actual POI point a
+    // client sends (e.g. the Forbidden City resolved 545m away), while an
+    // ordinary building genuinely has nothing within 100m and shouldn't
+    // start matching an unrelated site a kilometer off just because one
+    // happens to exist.
+    if (normalizedName.length < 4) return null;
+    const farBindings = await queryWikidataHeritage(lat, lng, 1);
+    const farBest = bestCandidate(farBindings, normalizedName);
+    return farBest && farBest.nameScore >= 0.6 ? { name: farBest.name, designation: farBest.designation } : null;
   } catch {
     return null;
   }
