@@ -86,12 +86,8 @@ struct ProfileScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 header
-                if authStore.isSignedIn {
-                    friendsCard
-                }
+                quickStatsRow
                 cityCard
-                savedDataCard
-                tripsCard
                 if authStore.isSignedIn {
                     premiumCard
                 }
@@ -223,56 +219,65 @@ struct ProfileScreen: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: 14) {
-            // Only signed-in accounts can actually store a photo server-side
-            // (see `PATCH /me/avatar`) -- a signed-out session keeps the
-            // plain initial-letter circle, not tappable, same as before.
-            if authStore.isSignedIn {
-                Button {
-                    Haptics.light()
-                    showingAvatarPicker = true
-                } label: {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 14) {
+                // Only signed-in accounts can actually store a photo
+                // server-side (see `PATCH /me/avatar`) -- a signed-out
+                // session keeps the plain initial-letter circle, not
+                // tappable, same as before.
+                if authStore.isSignedIn {
+                    Button {
+                        Haptics.light()
+                        showingAvatarPicker = true
+                    } label: {
+                        avatarView
+                    }
+                    .buttonStyle(.plain)
+                } else {
                     avatarView
                 }
-                .buttonStyle(.plain)
-            } else {
-                avatarView
-            }
 
-            VStack(alignment: .leading, spacing: 2) {
-                if isEditingName {
-                    TextField(String(localized: "onboarding.name.placeholder"), text: $nameInput)
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(.white)
-                        .onSubmit {
-                            userProfileStore.update { $0.name = nameInput.trimmingCharacters(in: .whitespaces) }
-                            isEditingName = false
+                VStack(alignment: .leading, spacing: 2) {
+                    if isEditingName {
+                        TextField(String(localized: "onboarding.name.placeholder"), text: $nameInput)
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundStyle(.white)
+                            .onSubmit {
+                                userProfileStore.update { $0.name = nameInput.trimmingCharacters(in: .whitespaces) }
+                                isEditingName = false
+                            }
+                    } else {
+                        Button {
+                            nameInput = profile.name
+                            isEditingName = true
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(displayName).font(.system(size: 20, weight: .bold)).foregroundStyle(.white)
+                                Image(systemName: "pencil").font(.system(size: 16)).foregroundStyle(.white.opacity(0.35))
+                            }
                         }
-                } else {
-                    Button {
-                        nameInput = profile.name
-                        isEditingName = true
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(displayName).font(.system(size: 20, weight: .bold)).foregroundStyle(.white)
-                            Image(systemName: "pencil").font(.system(size: 16)).foregroundStyle(.white.opacity(0.35))
-                        }
+                    }
+
+                    let professionLabel = profile.profession.map { profession in
+                        ProfileOptions.professions.first { $0.value == profession }.map { String(localized: String.LocalizationValue($0.labelKey)) }
+                    } ?? nil
+                    let faithLabel = (profile.faith != nil && profile.faith != .preferNotToSay)
+                        ? ProfileOptions.faiths.first { $0.value == profile.faith }.map { String(localized: String.LocalizationValue($0.labelKey)) }
+                        : nil
+                    let subline = [professionLabel ?? nil, faithLabel ?? nil].compactMap { $0 }.joined(separator: " · ")
+                    if !subline.isEmpty {
+                        Text(subline).font(.system(size: 14)).foregroundStyle(.white.opacity(0.6))
                     }
                 }
 
-                let professionLabel = profile.profession.map { profession in
-                    ProfileOptions.professions.first { $0.value == profession }.map { String(localized: String.LocalizationValue($0.labelKey)) }
-                } ?? nil
-                let faithLabel = (profile.faith != nil && profile.faith != .preferNotToSay)
-                    ? ProfileOptions.faiths.first { $0.value == profile.faith }.map { String(localized: String.LocalizationValue($0.labelKey)) }
-                    : nil
-                let subline = [professionLabel ?? nil, faithLabel ?? nil].compactMap { $0 }.joined(separator: " · ")
-                if !subline.isEmpty {
-                    Text(subline).font(.system(size: 14)).foregroundStyle(.white.opacity(0.6))
-                }
+                Spacer(minLength: 8)
             }
 
-            Spacer(minLength: 8)
+            // A full-width headline, not a small badge tucked in the
+            // corner -- every mockup this pass drew from gave level/XP its
+            // own prominent row right under the avatar, not a detail easy
+            // to miss beside the name. Still just a tap-through to the
+            // exact same `GamificationScreen` breakdown as before.
             NavigationLink(destination: GamificationScreen()) {
                 levelIndicator
             }
@@ -357,17 +362,27 @@ struct ProfileScreen: View {
         )
         let level = Gamification.level(forXP: xp)
 
-        return VStack(alignment: .trailing, spacing: 4) {
-            HStack(spacing: 6) {
-                Text(String(localized: "settings.xp.title"))
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.85))
-                LevelBadge(level: level, size: 28)
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                HStack(spacing: 8) {
+                    Text(Gamification.rankName(forLevel: level))
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(.white)
+                    Text(L("settings.xp.level", level))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.navy)
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(Capsule().fill(Theme.gold))
+                }
+                Spacer()
+                Text(L("settings.xp.progressFraction", xp, (level) * Gamification.xpPerLevel))
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.7))
             }
             ProgressView(value: Gamification.progressIntoCurrentLevel(xp))
                 .tint(Theme.gold)
-                .frame(width: 90)
         }
+        .frame(maxWidth: .infinity)
     }
 
     private var profileTabsSegment: some View {
@@ -860,85 +875,71 @@ struct ProfileScreen: View {
     /// reasoning `RootView`'s sync gating already uses). Loads its own
     /// count on appear rather than depending on `FriendsScreen` having
     /// been opened first, since this card renders whenever Profile does.
-    private var friendsCard: some View {
-        card(titleKey: "friends.title", trailing: {
-            NavigationLink(destination: FriendsScreen()) {
-                Text("settings.viewAll").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.gold)
+    /// Three equal-weight tiles in one row, matching every mockup this pass
+    /// drew from -- replaces what used to be three separate full-width
+    /// cards (Friends/Saved Places/Trips), each with its own "View all"
+    /// link, header label, and (for Saved Places) a further Lists/Plans/
+    /// Visited breakdown + a Clear History button. That breakdown and the
+    /// clear action are still one tap away inside `SavedScreen` itself
+    /// (its own Visited tab has the identical Clear button already) --
+    /// nothing here is actually lost, just no longer duplicated at the top
+    /// level for content dense enough to warrant a whole card each.
+    private var quickStatsRow: some View {
+        HStack(spacing: 10) {
+            Button {
+                Haptics.light()
+                showingSaved = .saved
+            } label: {
+                quickStatTile(
+                    icon: "bookmark.fill",
+                    value: savedPlacesStore.savedLists.count + savedPlacesStore.plans.count,
+                    labelKey: "settings.savedPlaces"
+                )
             }
-        }) {
-            HStack(spacing: 8) {
-                Text(LPlural("friends.count", count: friendsStore.friends.count))
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-                if !friendsStore.incomingRequests.isEmpty {
-                    Text("\(friendsStore.incomingRequests.count)")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 7).padding(.vertical, 3)
-                        .background(Capsule().fill(Theme.gold))
+            .buttonStyle(.plain)
+
+            NavigationLink(destination: TripsScreen()) {
+                quickStatTile(icon: "suitcase.fill", value: tripsStore.trips.count, labelKey: "trips.title")
+            }
+            .buttonStyle(.plain)
+
+            if authStore.isSignedIn {
+                NavigationLink(destination: FriendsScreen()) {
+                    quickStatTile(icon: "person.2.fill", value: friendsStore.friends.count, labelKey: "friends.title")
+                        .overlay(alignment: .topTrailing) {
+                            if !friendsStore.incomingRequests.isEmpty {
+                                Text("\(friendsStore.incomingRequests.count)")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 6).padding(.vertical, 2)
+                                    .background(Capsule().fill(Theme.gold))
+                                    .offset(x: -6, y: 6)
+                            }
+                        }
+                }
+                .buttonStyle(.plain)
+                .task {
+                    if let token = authStore.token {
+                        await friendsStore.fetchFollows(token: token)
+                    }
                 }
             }
         }
-        .task {
-            if let token = authStore.token {
-                await friendsStore.fetchFollows(token: token)
-            }
-        }
     }
 
-    private var savedDataCard: some View {
-        let savedListsCount = savedPlacesStore.savedLists.count
-        let plansCount = savedPlacesStore.plans.count
-        let recentCount = recentlyViewedStore.viewed.count
-
-        return card(titleKey: "settings.savedPlaces", trailing: {
-            Button("settings.viewAll") { showingSaved = .saved }
-                .font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.gold)
-        }) {
-            HStack(spacing: 12) {
-                statButton(count: savedListsCount, labelKey: "settings.stats.lists") { showingSaved = .saved }
-                statButton(count: plansCount, labelKey: "settings.stats.plans") { showingSaved = .plan }
-                statButton(count: recentCount, labelKey: "settings.stats.visited") { showingSaved = .visited }
-            }
-            clearButton(titleKey: "settings.clearHistory", disabled: recentCount == 0) { recentlyViewedStore.clearHistory() }
+    private func quickStatTile(icon: String, value: Int, labelKey: String) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon).font(.system(size: 19)).foregroundStyle(Theme.gold)
+            Text("\(value)").font(.system(size: 18, weight: .bold)).foregroundStyle(.primary)
+            Text(String(localized: String.LocalizationValue(labelKey)))
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
-    }
-
-    private var tripsCard: some View {
-        card(titleKey: "trips.title", trailing: {
-            NavigationLink(destination: TripsScreen()) {
-                Text("settings.viewAll").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.gold)
-            }
-        }) {
-            Text(LPlural("trips.count", count: tripsStore.trips.count)).font(.system(size: 14)).foregroundStyle(.secondary)
-        }
-    }
-
-    private func statButton(count: Int, labelKey: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(spacing: 2) {
-                Text("\(count)").font(.system(size: 22, weight: .bold))
-                Text(String(localized: String.LocalizationValue(labelKey))).font(.system(size: 12)).foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
-            .background(RoundedRectangle(cornerRadius: 12).fill(Theme.navy.opacity(0.05)))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(.secondary.opacity(0.12)))
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func clearButton(titleKey: String, disabled: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(String(localized: String.LocalizationValue(titleKey)))
-                .font(.system(size: 14))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 11)
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(.secondary.opacity(0.24)))
-        }
-        .buttonStyle(.plain)
-        .disabled(disabled)
-        .opacity(disabled ? 0.35 : 1)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+        .piriElevatedCard(cornerRadius: 14)
     }
 
     @ViewBuilder

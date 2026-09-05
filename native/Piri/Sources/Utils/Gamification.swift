@@ -41,4 +41,19 @@ enum Gamification {
     static func progressIntoCurrentLevel(_ xp: Int) -> Double {
         Double(xp % xpPerLevel) / Double(xpPerLevel)
     }
+
+    /// A flavor title alongside the raw level number -- every mockup this
+    /// app's visual-design pass drew from gave the level a name ("Explorer"),
+    /// not just a number, so this reuses that exact framing without adding
+    /// any new tracked data (still purely a function of the same `level`
+    /// value everything else here already computes).
+    static func rankName(forLevel level: Int) -> String {
+        switch level {
+        case ..<3: return String(localized: "settings.rank.newcomer")
+        case 3..<7: return String(localized: "settings.rank.explorer")
+        case 7..<12: return String(localized: "settings.rank.wanderer")
+        case 12..<20: return String(localized: "settings.rank.adventurer")
+        default: return String(localized: "settings.rank.globetrotter")
+        }
+    }
 }
