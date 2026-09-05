@@ -631,6 +631,7 @@ struct POIExplainContent: View {
             userProfile: personalizationProfile(),
             cityContext: CityContextSummary(
                 countryInfo: cityStore.countryInfo,
+                cityName: cityStore.cityName,
                 timezone: cityStore.timezones.first,
                 exchangeRates: cityStore.exchangeRates
             ),

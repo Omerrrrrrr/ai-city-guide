@@ -23,6 +23,17 @@
 // unlike local-resources.ts's one-org-per-country list, since a country
 // can have dozens of real entries) for the chat prompt to cite from when
 // the user's actual question is about local culture/food/craft.
+//
+// A fifth, Creative Cities (cce001, ~407 cities designated for Gastronomy/
+// Design/Music/Crafts/Film/Literature/Media Arts), is city-name matched --
+// the dataset has no coordinates and no clean country field at all (only
+// an inconsistently-populated free-text `contact_en` blob), so an exact
+// (normalized) match against the client's own resolved city name is the
+// only practical approach, same trust model as Wikivoyage's direct-title
+// lookup. `description_en` is real UNESCO prose but written as HTML
+// (`<p>`/`<ul>` markup) in a promotional-brief tone, not encyclopedic --
+// stripped and truncated to the first real paragraph via
+// `fetchCreativeCity(cityName)`.
 
 import countries from 'world-countries';
 
@@ -258,5 +269,70 @@ async function fetchIntangibleHeritageLive(alpha2: string, limit: number): Promi
       .map((r) => ({ name: r.title_en, listType: r.type_of_element_en ?? 'Representative List', description: r.description_en }));
   } catch {
     return [];
+  }
+}
+
+// ── Creative Cities (city-name matched, not location or country) ────────
+
+export interface CreativeCity {
+  name: string;
+  /** e.g. "Gastronomy", "Design", "Music". */
+  field: string;
+  description: string;
+}
+
+interface CceRecord {
+  title_en?: string;
+  terms?: string;
+  description_en?: string;
+}
+
+function stripHtml(html: string): string {
+  return html
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&[lr]squo;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const CCE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const cceCache = new Map<string, { data: CreativeCity | null; fetchedAt: number }>();
+
+/**
+ * Real UNESCO Creative City designation for a city (Gastronomy/Design/
+ * Music/Crafts/Film/Literature/Media Arts), matched by exact (normalized)
+ * city name -- the dataset has no coordinates or reliable country field,
+ * so this is the only practical match, same trust model as Wikivoyage's
+ * direct-title lookup. Returns `null` for the overwhelming majority of
+ * cities (~407 designated worldwide) -- not an error, just no match.
+ */
+export async function fetchCreativeCity(cityName: string): Promise<CreativeCity | null> {
+  const key = normalizeText(cityName);
+  if (key.length < 2) return null;
+
+  const cached = cceCache.get(key);
+  if (cached && Date.now() - cached.fetchedAt < CCE_CACHE_TTL_MS) return cached.data;
+
+  const data = await fetchCreativeCityLive(cityName);
+  cceCache.set(key, { data, fetchedAt: Date.now() });
+  return data;
+}
+
+async function fetchCreativeCityLive(cityName: string): Promise<CreativeCity | null> {
+  try {
+    const records = await queryRecords<CceRecord>(
+      'cce001',
+      `title_en="${cityName.trim().replace(/"/g, '')}"`,
+      1,
+      'title_en,terms,description_en'
+    );
+    const record = records[0];
+    if (!record?.title_en || !record.description_en) return null;
+    const description = stripHtml(record.description_en).slice(0, 500);
+    return { name: record.title_en, field: record.terms ?? 'Creative City', description };
+  } catch {
+    return null;
   }
 }

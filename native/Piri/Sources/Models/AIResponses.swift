@@ -380,6 +380,10 @@ struct POIChatTurn: Codable, Identifiable, Equatable {
 /// schema in `/places/explain-poi/chat`.
 struct CityContextSummary: Encodable {
     var countryName: String
+    /// From `CityStore.cityName` -- the user's currently-selected city
+    /// (not resolved from this POI's own coordinates). Only used
+    /// server-side to check for a real UNESCO Creative City match.
+    var cityName: String?
     var callingCode: String?
     var currencyCode: String?
     var currencyName: String?
@@ -395,9 +399,10 @@ struct CityContextSummary: Encodable {
     /// codes a fixed shortlist happened to guess.
     var referenceRates: [String: Double]?
 
-    init?(countryInfo: CountryInfo?, timezone: String?, exchangeRates: ExchangeRates?) {
+    init?(countryInfo: CountryInfo?, cityName: String?, timezone: String?, exchangeRates: ExchangeRates?) {
         guard let countryInfo else { return nil }
         self.countryName = countryInfo.name
+        self.cityName = cityName
         self.callingCode = countryInfo.callingCode
         self.currencyCode = countryInfo.currencies.first?.code
         self.currencyName = countryInfo.currencies.first?.name
