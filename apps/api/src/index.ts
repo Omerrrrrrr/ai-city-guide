@@ -101,6 +101,7 @@ import { findLocalResource } from './local-resources';
 import { fetchUnescoSite, fetchIntangibleHeritage, fetchCreativeCity } from './unesco';
 import { fetchAcademicFinding } from './academic';
 import { fetchHeritageDesignation } from './heritage-designation';
+import { fetchMichelinRestaurant } from './michelin';
 import { fetchDietaryPlaces, fetchDietaryTagsForPlace } from './dietary';
 import { fetchUnsplashPhoto } from './unsplash';
 import { verifyTransaction } from './storekit';
@@ -1767,6 +1768,18 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
       const heritageDesignationPromise =
         lat !== undefined && lng !== undefined ? fetchHeritageDesignation(name, lat, lng) : Promise.resolve(null);
 
+      // Only attempted for food/drink venues (michelin.ts's in-memory
+      // dataset is only restaurants, so this is a cheap in-process filter
+      // scan either way -- gated purely to skip the wasted scan on the
+      // vast majority of non-food POI taps).
+      const isFoodVenueCategory = /restaurant|cafe|café|bakery|bar|pub|brewery|winery|foodmarket|nightlife|bistro|diner/i.test(
+        category ?? ''
+      );
+      const michelinPromise =
+        isFoodVenueCategory && lat !== undefined && lng !== undefined
+          ? fetchMichelinRestaurant(name, lat, lng)
+          : Promise.resolve(null);
+
       // Piri's own UGC rating -- folded in here instead of the second
       // `GET /poi/reviews` round trip the client previously needed before
       // it could render the 3-source combined average (`PiriReviewsSection`),
@@ -1842,6 +1855,7 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         wikivoyageGuide,
         unescoSite,
         heritageDesignation,
+        michelinRestaurant,
         piriReview,
       ] = await Promise.all([
         lat !== undefined && lng !== undefined
@@ -1857,6 +1871,7 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         wikivoyagePromise,
         unescoPromise,
         heritageDesignationPromise,
+        michelinPromise,
         piriReviewPromise,
       ]);
 
@@ -1950,6 +1965,9 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
           : null,
         unescoSite
           ? `This place is a UNESCO ${unescoSite.designation}${unescoSite.category ? ` (${unescoSite.category})` : ''} — "${unescoSite.name}" (${unescoSite.countries.join('/')}). Official UNESCO description: "${unescoSite.description}"`
+          : null,
+        michelinRestaurant
+          ? `This restaurant has a Michelin Guide listing (${michelinRestaurant.award}, ${michelinRestaurant.cuisine} cuisine) -- compiled by a community project from Michelin's official guide, NOT an official Michelin API. Real description text: "${michelinRestaurant.description}"`
           : null,
         curatedPlace?.shortStory ? `Story: ${curatedPlace.shortStory}` : null,
         curatedPlace?.localVibeMood ? `Vibe: ${curatedPlace.localVibeMood}` : null,
@@ -2070,6 +2088,16 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         ? ` This place is a real, verified UNESCO ${unescoSite.designation} (see the official description below) — mention that plainly and draw on the real reason it was recognized, rather than treating it as just another interesting fact to skip.`
         : '';
 
+      // Unlike UNESCO's official-source authority, this is an UNOFFICIAL
+      // community compilation of Michelin's own copyrighted text (see
+      // michelin.ts's own comment) -- mention the real award tier plainly,
+      // but paraphrase the description in your own words rather than
+      // reproducing Michelin's copyrighted writing verbatim, and don't
+      // present it as an official Michelin API result.
+      const michelinGuard = michelinRestaurant
+        ? ` This restaurant has a real Michelin Guide listing (${michelinRestaurant.award}) — mention that plainly, but paraphrase the description below in your own words rather than quoting it directly.`
+        : '';
+
       const faithMismatchGuard =
         userProfile?.faith && userProfile.faith !== 'secular' && userProfile.faith !== 'prefer_not_to_say'
           ? ` If this place belongs to a different faith tradition than the user's, don't invent or overstate religious or architectural connections that aren't real. Only mention a genuine interfaith link if you're actually confident of it.`
@@ -2137,7 +2165,7 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
                   '0-4 specific things real reviewers actually discussed (from the review text given below), each with an honest sentiment — empty array if there is no real review text to draw from. Never force a fixed category (food/service/price) that was not genuinely discussed just to fill the list.'
                 ),
             }),
-            system: `You are Piri, a deeply knowledgeable personal travel guide. Your job is to explain a place in a way that speaks directly to who the user is — their profession, interests, and worldview.${holidayGuard} ${factualGuard}${googleReviewGuard}${reviewsSummaryGuard}${aspectHighlightsGuard}${websiteGuard}${wikivoyageGuard}${unescoGuard}${NO_HYPE_GUARD}${profileContext}
+            system: `You are Piri, a deeply knowledgeable personal travel guide. Your job is to explain a place in a way that speaks directly to who the user is — their profession, interests, and worldview.${holidayGuard} ${factualGuard}${googleReviewGuard}${reviewsSummaryGuard}${aspectHighlightsGuard}${websiteGuard}${wikivoyageGuard}${unescoGuard}${michelinGuard}${NO_HYPE_GUARD}${profileContext}
 
 ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
             prompt: `Explain this place:\n\n${placeContext}`,
@@ -2219,6 +2247,7 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
           piriRating: piriReview ? { rating: piriReview.rating, count: piriReview.count } : null,
           unescoBadge: unescoSite ? { designation: unescoSite.designation, name: unescoSite.name } : null,
           heritageDesignation,
+          michelinBadge: michelinRestaurant ? { award: michelinRestaurant.award, cuisine: michelinRestaurant.cuisine } : null,
           // Wikivoyage grounds general area color (see `wikivoyagePromise`'s
           // own comment) rather than the primary `groundingSource` text, but
           // it's still real, verified data behind this card -- surfaced
@@ -3166,10 +3195,14 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
       // Wikivoyage runs alongside it, same best-effort/never-throws contract
       // -- a real travel-guide-editor intro for the area, when one exists
       // (see wikivoyage.ts's own comment on coverage being uneven).
-      const [websiteExcerpt, wikivoyageGuide, unescoSite, creativeCity] = await Promise.all([
+      const isFoodVenueCategoryChat = /restaurant|cafe|café|bakery|bar|pub|brewery|winery|foodmarket|nightlife|bistro|diner/i.test(
+        category ?? ''
+      );
+      const [websiteExcerpt, wikivoyageGuide, unescoSite, michelinRestaurant, creativeCity] = await Promise.all([
         website ? fetchWebsiteExcerpt(website, 2500) : Promise.resolve(null),
         lat != null && lng != null ? fetchWikivoyageGuide(name, lat, lng) : Promise.resolve(null),
         lat != null && lng != null ? fetchUnescoSite(name, lat, lng) : Promise.resolve(null),
+        isFoodVenueCategoryChat && lat != null && lng != null ? fetchMichelinRestaurant(name, lat, lng) : Promise.resolve(null),
         // City-level, like Wikivoyage above -- fetched unconditionally
         // (cached 30 days) rather than gated on a question regex, since
         // "what's this city known for" is too broad a question shape to
@@ -3292,6 +3325,9 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
         unescoSite
           ? `This place is a UNESCO ${unescoSite.designation}${unescoSite.category ? ` (${unescoSite.category})` : ''} — "${unescoSite.name}" (${unescoSite.countries.join('/')}). Official UNESCO description: "${unescoSite.description}"`
           : null,
+        michelinRestaurant
+          ? `This restaurant has a Michelin Guide listing (${michelinRestaurant.award}, ${michelinRestaurant.cuisine} cuisine) -- compiled by a community project from Michelin's official guide, NOT an official Michelin API. Real description text: "${michelinRestaurant.description}"`
+          : null,
         creativeCityLine,
         transitLine,
         localResourceLine,
@@ -3322,6 +3358,11 @@ ${
 ${
   unescoSite
     ? `\nUNESCO RULE: this place is a real, verified UNESCO ${unescoSite.designation} — the official description above is real UNESCO text, not generated by you. Mention its status plainly when relevant and draw on the real reason it was recognized. This is the ONLY place you have real UNESCO data for — never claim this or any other UNESCO designation for anywhere else, even if you think you recall one from general knowledge.\n`
+    : ''
+}
+${
+  michelinRestaurant
+    ? `\nMICHELIN RULE: this restaurant has a real Michelin Guide listing (${michelinRestaurant.award}) -- but the description above is from an UNOFFICIAL community compilation of Michelin's own copyrighted text, not an official Michelin API. Mention the real award plainly, but paraphrase the description in your own words rather than quoting it directly, and never present this as coming from an official Michelin source.\n`
     : ''
 }
 ${
