@@ -429,6 +429,38 @@ function getAiProviderConfig(preferred?: AiProviderName):
   return null;
 }
 
+// The only cost visibility this service had before this: none -- no
+// request anywhere logged how many tokens an AI call actually used, so
+// pricing/quota assumptions (see the 2026-09 cost review) had no real
+// production data to check themselves against. One line per AI call,
+// structured so it's grep/aggregate-able from Fly's log stream
+// (`fly logs | grep ai_usage`) -- deliberately not a new metrics/DB
+// pipeline, since a log line is enough to answer "were our assumptions
+// right" without building infrastructure nothing has asked for yet.
+function logAiUsage(
+  // A plain `{ log }` shape (both `FastifyRequest` and the `app` instance
+  // itself satisfy this) rather than `FastifyRequest` specifically --
+  // `enrichHoliday` below is a shared helper with no request of its own
+  // in scope, only the enclosing `app`.
+  logger: { log: FastifyRequest['log'] },
+  endpoint: string,
+  provider: { provider: string; model: string },
+  usage: { inputTokens?: number; outputTokens?: number; totalTokens?: number }
+) {
+  logger.log.info(
+    {
+      ai_usage: true,
+      endpoint,
+      provider: provider.provider,
+      model: provider.model,
+      inputTokens: usage.inputTokens ?? null,
+      outputTokens: usage.outputTokens ?? null,
+      totalTokens: usage.totalTokens ?? null,
+    },
+    'ai_usage'
+  );
+}
+
 // Piri's on-demand AI responses (place explanations, scan identification,
 // chat) are generated fresh per request, so they can honor the user's
 // current app language directly in the prompt — unlike the place data
@@ -1462,8 +1494,12 @@ async function buildServer() {
                 },
               ],
               system: `You are Piri, a deeply knowledgeable personal travel guide. You identify places from photos and explain them in a way that speaks directly to who the user is.${identifyFactualGuard}${identifyConfidenceGuard}${profileContext}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
-            } as any)) as { object: z.infer<typeof identifySchema> };
+            } as any)) as {
+              object: z.infer<typeof identifySchema>;
+              usage: { inputTokens?: number; outputTokens?: number; totalTokens?: number };
+            };
             object = result.object;
+            logAiUsage(request, 'places/identify', provider, result.usage);
             break;
           } catch (providerError) {
             lastError = providerError;
@@ -1582,7 +1618,7 @@ async function buildServer() {
       const factualGuard = ` Ground your response in the facts given below and don't contradict them, but don't invent additional unverifiable specifics (exact founding dates, named owners, awards) beyond what's given — if the description/story below doesn't mention it, rely on general knowledge about places of this type instead of guessing a specific detail.`;
 
       try {
-        const { object } = await generateObject({
+        const generation = await generateObject({
           model: aiProvider.client.chat(aiProvider.model),
           maxOutputTokens: 500,
           schema: z.object({
@@ -1605,8 +1641,9 @@ async function buildServer() {
 ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
           prompt: `Explain this place:\n\n${placeContext}`,
         } as any);
+        logAiUsage(request, 'places/explain', aiProvider, generation.usage);
 
-        return reply.send(object);
+        return reply.send(generation.object);
       } catch (e: any) {
         return sendServerError(request, reply, e, 'Failed to explain place');
       }
@@ -2137,7 +2174,7 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         // prompt (unlike the Tripadvisor description above), so both run
         // concurrently with the generateObject call instead of adding to the
         // sequential wait.
-        const [{ object }, wikiPhoto, tripAdvisorPhotoUrls] = await Promise.all([
+        const [generation, wikiPhoto, tripAdvisorPhotoUrls] = await Promise.all([
           generateObject({
             model: aiProvider.client.chat(aiProvider.model),
             maxOutputTokens: 500,
@@ -2193,6 +2230,8 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
           lat !== undefined && lng !== undefined ? fetchWikipediaPhoto(name, lat, lng, category) : Promise.resolve(null),
           tripAdvisorInfo.locationId ? fetchTripAdvisorPhotos(tripAdvisorInfo.locationId) : Promise.resolve([]),
         ]);
+        logAiUsage(request, 'places/explain-poi', aiProvider, generation.usage);
+        const { object } = generation;
 
         // Wikipedia first — the user's explicit priority — then Tripadvisor.
         // Each photo carries its own source so the client can attribute it
@@ -3180,7 +3219,12 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
             .array(
               z.object({
                 role: z.enum(['user', 'assistant']),
-                content: z.string().trim().min(1).max(2000),
+                // 1000, not 2000 -- halves the worst-case input-token cost
+                // of a long conversation (12 turns * max length is the
+                // dominant cost driver in this endpoint, bigger than any
+                // single grounding source) for a length a real chat turn
+                // essentially never needs anyway.
+                content: z.string().trim().min(1).max(1000),
               })
             )
             .max(200),
@@ -3371,7 +3415,7 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
         .join('\n');
 
       try {
-        const { text } = await generateText({
+        const generation = await generateText({
           model: aiProvider.client.chat(aiProvider.model),
           maxOutputTokens: 220,
           messages: [
@@ -3441,8 +3485,9 @@ Keep replies short and conversational (1-4 sentences) — this is a chat, not an
             { role: 'user' as const, content: message },
           ],
         });
+        logAiUsage(request, 'places/explain-poi/chat', aiProvider, generation.usage);
 
-        return reply.send({ reply: text });
+        return reply.send({ reply: generation.text });
       } catch (e: any) {
         return sendServerError(request, reply, e, 'Failed to reply');
       }
@@ -3614,7 +3659,7 @@ Keep replies short and conversational (1-4 sentences) — this is a chat, not an
           }
         : { role: 'user' as const, content: query };
 
-      const { object } = await generateObject({
+      const { object, usage } = await generateObject({
         model: aiProvider.client.chat(aiProvider.model),
         maxOutputTokens: 420,
         schema: z.object({
@@ -3646,6 +3691,7 @@ DIRECTIONS RULE (same failure class as the rating one, for a different fact type
 ${placeContext.length > 0 ? `Available shortlist:\n${JSON.stringify(placeContext, null, 2)}` : ''}${PROMPT_INJECTION_GUARD}`,
         messages: [...priorTurnMessages, finalUserMessage],
       } as any);
+      logAiUsage(request, 'places/recommend', aiProvider, usage);
 
       const rawRecommendations = (object as any).recommendations ?? [];
       const enrichedRecommendations = rawRecommendations
@@ -3966,7 +4012,7 @@ ${placeContext.length > 0 ? `Available shortlist:\n${JSON.stringify(placeContext
           }
         : { role: 'user' as const, content: query };
 
-      const { object } = await generateObject({
+      const { object, usage } = await generateObject({
         model: aiProvider.client.chat(aiProvider.model),
         maxOutputTokens: 420,
         schema: z.object({
@@ -4033,6 +4079,7 @@ ${profileContext}${weatherContext}${imageInstructions}
 ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidateList}` : ''}`,
         messages: [...priorTurnMessages, finalUserMessage],
       } as any);
+      logAiUsage(request, 'places/recommend-poi', aiProvider, usage);
 
       const rawRecommendations = (object as any).recommendations ?? [];
       const seenIndices = new Set<number>();
@@ -4666,7 +4713,7 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
     if (!aiProvider) return null;
 
     try {
-      const { object } = await generateObject({
+      const { object, usage } = await generateObject({
         model: aiProvider.client.chat(aiProvider.model),
         maxOutputTokens: 200,
         schema: z.object({
@@ -4680,6 +4727,7 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
         system: `You are Piri, a knowledgeable local travel guide. Describe a real public holiday factually and specifically — ground everything in genuine, well-known traditions for this holiday in this country; if you're not confident of a specific tradition, describe it in general terms instead of inventing a specific ceremony or event that may not be real.${NO_HYPE_GUARD}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         prompt: `Holiday: ${holiday.name} (locally: ${holiday.localName})\nDate: ${holiday.date}\nCountry code: ${holiday.countryCode}`,
       } as any);
+      logAiUsage(app, 'holidays/enrich', aiProvider, usage);
 
       const result = object as { summary: string; activities: string[] };
       holidayEnrichmentCache.set(cacheKey, result);
@@ -4828,7 +4876,7 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
       : ` Leave "aspectHighlights" as an empty array -- no real review text exists yet for this trail.`;
 
     try {
-      const { object } = await generateObject({
+      const { object, usage } = await generateObject({
         model: aiProvider.client.chat(aiProvider.model),
         maxOutputTokens: 220,
         schema: z.object({
@@ -4844,6 +4892,7 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
         system: `You are Piri, a knowledgeable local travel guide describing a hiking trail.${reviewsGuard}${aspectHighlightsGuard}${NO_HYPE_GUARD}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         prompt: `Trail: ${name}\n${facts.length ? facts.join('\n') + '\n' : ''}${hasReviewText ? `\nReal hiker reviews:\n${sampleTexts.map((t, i) => `${i + 1}. ${t}`).join('\n')}` : ''}`,
       } as any);
+      logAiUsage(request, 'trails/summary', aiProvider, usage);
 
       return reply.send(object);
     } catch (error) {
