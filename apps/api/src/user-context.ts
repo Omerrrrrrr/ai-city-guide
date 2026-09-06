@@ -16,6 +16,10 @@ export const userProfileSchema = z.object({
   budget: z.string().trim().max(60).optional(),
   groupType: z.string().trim().max(60).optional(),
   pace: z.string().trim().max(60).optional(),
+  // Trip-scoped, not a stable trait (see the client's `Occasion` enum) --
+  // the user is expected to set this before a specific trip and clear it
+  // afterward, unlike every other field here.
+  occasion: z.string().trim().max(60).optional(),
 });
 export type UserProfileInput = z.infer<typeof userProfileSchema>;
 
@@ -89,6 +93,12 @@ export function buildUserContext(
   if (userProfile?.budget) lines.push(`Budget preference: ${userProfile.budget}`);
   if (userProfile?.groupType) lines.push(`Traveling as: ${userProfile.groupType}`);
   if (userProfile?.pace) lines.push(`Preferred pace: ${userProfile.pace}`);
+  // Genuinely changes the right tone, not just word choice -- a "couple"
+  // on a honeymoon vs. a routine weekend reads completely differently, and
+  // `groupType` alone can't tell those apart. Phrased as a real occasion
+  // (not a personality trait) so the model treats it as current context,
+  // not something to mention every single time.
+  if (userProfile?.occasion) lines.push(`This trip is for a special occasion: ${userProfile.occasion}.`);
 
   const parts: string[] = [];
   if (lines.length > 0) parts.push(`User profile:\n${lines.join('\n')}`);

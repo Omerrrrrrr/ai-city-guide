@@ -1562,8 +1562,17 @@ async function buildServer() {
         userProfile?.faith && userProfile.faith !== 'secular' && userProfile.faith !== 'prefer_not_to_say'
           ? ` If this place belongs to a different faith tradition than the user's, don't invent or overstate religious or architectural connections that aren't real (e.g. don't claim "Islamic architectural elements" in a Christian building just because the user is Muslim) — frame it respectfully as cultural, historical, or architectural significance instead. Only mention a genuine interfaith link — a building that changed religious use over its history, for instance — if the facts given below actually support it.`
           : '';
+      // Unlike profession/interests (subtle word-choice color), an occasion
+      // genuinely changes the right TONE -- a honeymoon reads romantic, a
+      // business trip reads efficient and practical, and getting this
+      // wrong (romantic tone for a work trip) is more jarring than never
+      // mentioning a profession. Still a real place, not an excuse to
+      // manufacture romance/hype that isn't there.
+      const occasionGuard = userProfile?.occasion
+        ? ` This trip is for a special occasion (${userProfile.occasion}) — let that genuinely shape your tone (warmer and more romantic for a honeymoon/anniversary, more efficient and practical for a business trip), but don't force occasion-themed language into a place that doesn't call for it.`
+        : '';
       const personalization = hasProfile
-        ? `Let this person's profession, interests, and worldview subtly color your angle and word choice, but don't name-check them (avoid phrases like "as an architect" or "from an engineer's perspective") and don't force a themed detail into every sentence. At most one specific detail should reflect who they are — the rest should just be a genuinely interesting, natural description of the place.${faithMismatchGuard}`
+        ? `Let this person's profession, interests, and worldview subtly color your angle and word choice — reflect their likely genuine interest, not a stereotype of their profession, faith, or background (an architect isn't only interested in structure, a Muslim isn't only interested in religious sites) — but don't name-check them (avoid phrases like "as an architect" or "from an engineer's perspective") and don't force a themed detail into every sentence. At most one specific detail should reflect who they are — the rest should just be a genuinely interesting, natural description of the place.${faithMismatchGuard}${occasionGuard}`
         : `Give a warm, engaging overview that a curious traveler would enjoy.`;
       // Mirrors /places/explain-poi's factualGuard — this endpoint's
       // grounding (`placeContext` above) is real curated-DB content, which
@@ -2114,7 +2123,7 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
           ? ` If this place belongs to a different faith tradition than the user's, don't invent or overstate religious or architectural connections that aren't real. Only mention a genuine interfaith link if you're actually confident of it.`
           : '';
       const personalization = hasProfile
-        ? `Let this person's profession, interests, and worldview subtly color your angle and word choice, but don't name-check them (avoid phrases like "as an architect" or "from an engineer's perspective") and don't force a themed detail into every sentence. At most one specific detail should reflect who they are — the rest should just be a genuinely interesting, natural description of the place.${faithMismatchGuard}`
+        ? `Let this person's profession, interests, and worldview subtly color your angle and word choice — reflect their likely genuine interest, not a stereotype of their profession, faith, or background (an architect isn't only interested in structure, a Muslim isn't only interested in religious sites) — but don't name-check them (avoid phrases like "as an architect" or "from an engineer's perspective") and don't force a themed detail into every sentence. At most one specific detail should reflect who they are — the rest should just be a genuinely interesting, natural description of the place.${faithMismatchGuard}`
         : `Give a warm, engaging overview that a curious traveler would enjoy.`;
       const isFoodVenue = /restaurant|cafe|café|bakery|bar|pub|brewery|winery|foodmarket|nightlife|bistro|diner/i.test(
         category ?? ''

@@ -316,8 +316,9 @@ struct ProfileScreen: View {
     /// Reflects the profile fields already collected (profession, interests,
     /// budget, group, pace) back in plain language, with editing one tap
     /// away — the same fields already silently shape every AI blurb via
-    /// `buildProfileContext`, but until now the user never saw evidence of
-    /// that. Deliberately excludes `faith`: the research behind this card
+    /// `buildUserContext` server-side (apps/api/src/user-context.ts), but
+    /// until now the user never saw evidence of that. Deliberately excludes
+    /// `faith`: the research behind this card
     /// (see the 2026-08 visual-design report) found users are fine with a
     /// sensitive field driving something they themselves triggered (the
     /// halal filter, already built that way) but not with it appearing as
@@ -550,6 +551,20 @@ struct ProfileScreen: View {
             ChipGrid(options: ProfileOptions.groupTypes, isSelected: { profile.groupType == $0 }) { value in
                 Haptics.light()
                 userProfileStore.update { $0.groupType = value }
+            }
+        }
+        // Tapping the already-selected chip clears it back to "no special
+        // occasion" -- unlike the fields above, this one is meant to be
+        // unset again once the trip it describes is over (see `Occasion`'s
+        // own doc comment), so a plain always-picks-one ChipGrid callback
+        // would leave no way back to nil.
+        card(titleKey: "settings.occasion.title") {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("settings.occasion.subtitle").font(.caption).foregroundStyle(.secondary)
+                ChipGrid(options: ProfileOptions.occasions, isSelected: { profile.occasion == $0 }) { value in
+                    Haptics.light()
+                    userProfileStore.update { $0.occasion = ($0.occasion == value) ? nil : value }
+                }
             }
         }
     }

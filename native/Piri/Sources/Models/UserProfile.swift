@@ -25,6 +25,21 @@ enum Pace: String, Codable, CaseIterable {
     case relaxed, balanced, packed
 }
 
+/// The reason for THIS trip specifically -- unlike every other field on
+/// `UserProfile`, this isn't a stable personal trait, it's a temporary
+/// status the user is expected to set before a specific trip and clear
+/// afterward (same "edit anytime" affordance as the rest of the profile,
+/// just meant to be revisited more often). Confirmed via research: trip
+/// purpose/occasion is a real, evidenced personalization dimension
+/// distinct from `groupType` -- a "couple" trip reads very differently to
+/// the AI depending on whether it's a honeymoon or a routine weekend, and
+/// `groupType` alone can't distinguish those. `nil` means "no special
+/// occasion" (the common case), deliberately not an explicit case of its
+/// own so the chip grid can toggle a selection off by tapping it again.
+enum Occasion: String, Codable, CaseIterable {
+    case honeymoon, anniversary, business, celebration
+}
+
 struct UserProfile: Codable, Equatable {
     var name: String = ""
     var profession: Profession?
@@ -43,6 +58,7 @@ struct UserProfile: Codable, Equatable {
     var budget: Budget?
     var groupType: GroupType?
     var pace: Pace?
+    var occasion: Occasion?
     var onboardingCompleted: Bool = false
 
     /// What actually reaches the AI prompt for profession — the preset's
@@ -64,33 +80,4 @@ struct UserProfile: Codable, Equatable {
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
     }
-}
-
-/// Port of `buildProfileContext` in `mobile/src/store/user-profile.ts` —
-/// turns the local profile into free text the AI prompt is conditioned on.
-func buildProfileContext(_ profile: UserProfile) -> String {
-    var parts: [String] = []
-
-    if !profile.name.isEmpty {
-        parts.append("The user's name is \(profile.name).")
-    }
-    if let profession = profile.professionText {
-        parts.append("They work as a \(profession).")
-    }
-    let interestsText = profile.interestsText
-    if !interestsText.isEmpty {
-        parts.append("Their interests include: \(interestsText.joined(separator: ", ")).")
-    }
-    if let faith = profile.faith, faith != .preferNotToSay {
-        if faith == .secular {
-            parts.append("They have a secular/non-religious worldview.")
-        } else {
-            parts.append("They identify as \(faith.rawValue).")
-        }
-    }
-
-    guard !parts.isEmpty else { return "" }
-
-    return "About this user:\n" + parts.joined(separator: " ")
-        + "\n\nTailor your response to their perspective. An architect should hear about structural and design details. A historian should hear about historical context and timeline. A Muslim visiting a mosque should hear about religious significance. A photographer should hear about light, composition, and visual opportunities. And so on."
 }

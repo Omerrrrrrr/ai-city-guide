@@ -63,6 +63,13 @@ enum ProfileOptions {
         .init(value: .packed, labelKey: "profileOptions.paces.packed", icon: "bolt.fill"),
     ]
 
+    static let occasions: [ProfileOption<Occasion>] = [
+        .init(value: .honeymoon, labelKey: "profileOptions.occasions.honeymoon", icon: "heart.fill"),
+        .init(value: .anniversary, labelKey: "profileOptions.occasions.anniversary", icon: "gift.fill"),
+        .init(value: .celebration, labelKey: "profileOptions.occasions.celebration", icon: "party.popper.fill"),
+        .init(value: .business, labelKey: "profileOptions.occasions.business", icon: "briefcase.fill"),
+    ]
+
     /// Reflects the profile fields already collected back in plain
     /// language — shared by `ProfileScreen`'s "Seni Böyle Görüyoruz" card
     /// and `OnboardingScreen`'s end-of-wizard reward screen, rather than
@@ -99,6 +106,14 @@ enum ProfileOptions {
             parts.append(String(localized: String.LocalizationValue(option.labelKey)))
         }
         if let pace = profile.pace, let option = paces.first(where: { $0.value == pace }) {
+            parts.append(String(localized: String.LocalizationValue(option.labelKey)))
+        }
+        // Shown here deliberately (unlike `faith`'s exclusion above) --
+        // this one benefits from staying visible: it's meant to be cleared
+        // again once the trip is over, and a passive reminder in the
+        // summary card is what prompts that, not a hidden setting nobody
+        // remembers to go change.
+        if let occasion = profile.occasion, let option = occasions.first(where: { $0.value == occasion }) {
             parts.append(String(localized: String.LocalizationValue(option.labelKey)))
         }
 

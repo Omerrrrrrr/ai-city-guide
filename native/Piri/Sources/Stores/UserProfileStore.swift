@@ -39,8 +39,4 @@ final class UserProfileStore {
         profile = newProfile
         persistence.save(profile)
     }
-
-    var profileContext: String {
-        buildProfileContext(profile)
-    }
 }
