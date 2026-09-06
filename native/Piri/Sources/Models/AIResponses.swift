@@ -215,6 +215,12 @@ struct ExplainResult: Codable {
     /// row alongside Wikipedia/Tripadvisor/Google/UNESCO, even though it
     /// isn't the primary `groundingSource` for the body text itself.
     var wikivoyageUsed: Bool = false
+    /// Whether a real university exists near this place (Wikidata-sourced,
+    /// see apps/api/src/city-university.ts) -- only a "local academic
+    /// sources exist to check" signal, NOT a guarantee a specific paper
+    /// about this place was found (that's a separate, on-demand chat-only
+    /// search). Lets the UI honestly invite asking, without promising.
+    var hasLocalAcademicSources: Bool = false
 }
 
 /// One aspect real reviewers discussed, e.g. `{aspect: "Coffee quality",

@@ -293,6 +293,18 @@ struct POIExplainContent: View {
                                 Label("poiExplain.askAboutPlace", systemImage: "bubble.left.and.bubble.right")
                                     .font(.footnote.weight(.semibold))
                             }
+                            // A real nearby university exists (Wikidata-
+                            // sourced) -- an honest invitation, not a
+                            // promise: asking might still come back empty
+                            // if that university never wrote about this
+                            // specific place (see `hasLocalAcademicSources`'s
+                            // own doc comment). Hidden once chat is open --
+                            // at that point they can just ask directly.
+                            if !showingChat, result.hasLocalAcademicSources {
+                                Text("poiExplain.localAcademicHint")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
 
                             if showingChat {
                                 if !chatHistory.isEmpty {

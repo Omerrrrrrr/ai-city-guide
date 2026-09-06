@@ -99,7 +99,8 @@ import { fetchWikidataFacts } from './wikidata';
 import { fetchTransitousLeg } from './transitous';
 import { findLocalResource } from './local-resources';
 import { fetchUnescoSite, fetchIntangibleHeritage, fetchCreativeCity } from './unesco';
-import { fetchAcademicFinding } from './academic';
+import { fetchAcademicFinding, fetchAcademicFindingWithLocalFallback } from './academic';
+import { fetchNearbyUniversityOpenAlexIds } from './city-university';
 import { fetchHeritageDesignation } from './heritage-designation';
 import { fetchMichelinRestaurant } from './michelin';
 import { fetchDietaryPlaces, fetchDietaryTagsForPlace } from './dietary';
@@ -1780,6 +1781,14 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
           ? fetchMichelinRestaurant(name, lat, lng)
           : Promise.resolve(null);
 
+      // Cheap "hop 1" only (see city-university.ts/academic.ts's own
+      // comments) -- just whether a real local university exists at all,
+      // never the expensive actual-paper search. Safe to run on every tap:
+      // city-scale cached (90 days), and runs in parallel here rather than
+      // adding to this wait sequentially.
+      const nearbyUniversitiesPromise =
+        lat !== undefined && lng !== undefined ? fetchNearbyUniversityOpenAlexIds(lat, lng) : Promise.resolve([]);
+
       // Piri's own UGC rating -- folded in here instead of the second
       // `GET /poi/reviews` round trip the client previously needed before
       // it could render the 3-source combined average (`PiriReviewsSection`),
@@ -1856,6 +1865,7 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         unescoSite,
         heritageDesignation,
         michelinRestaurant,
+        nearbyUniversityIds,
         piriReview,
       ] = await Promise.all([
         lat !== undefined && lng !== undefined
@@ -1872,6 +1882,7 @@ ${personalization}${languageInstruction(locale)}${PROMPT_INJECTION_GUARD}`,
         unescoPromise,
         heritageDesignationPromise,
         michelinPromise,
+        nearbyUniversitiesPromise,
         piriReviewPromise,
       ]);
 
@@ -2248,6 +2259,11 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
           unescoBadge: unescoSite ? { designation: unescoSite.designation, name: unescoSite.name } : null,
           heritageDesignation,
           michelinBadge: michelinRestaurant ? { award: michelinRestaurant.award, cuisine: michelinRestaurant.cuisine } : null,
+          // Cheap "does a local university exist" signal only (see
+          // city-university.ts) -- lets the client honestly invite "I can
+          // check local university archives" without promising a specific
+          // paper exists (that's only checked on-demand in chat).
+          hasLocalAcademicSources: nearbyUniversityIds.length > 0,
           // Wikivoyage grounds general area color (see `wikivoyagePromise`'s
           // own comment) rather than the primary `groundingSource` text, but
           // it's still real, verified data behind this card -- surfaced
@@ -3258,7 +3274,15 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
         /histor(y|ical)|research|\bstud(y|ies)\b|archaeolog|scholar|academic|excavat|when was.*built|who (built|designed)|architect(ure)?|origin(s)?\b|tarih[çc]e|arke?olojik|ara[şs]t[ıi]rma|kim (in[şs]a|tasarla)|k[üu][şs]atma|mimar/i.test(
           message
         );
-      const academicFinding = looksLikeDeepHistoryQuestion ? await fetchAcademicFinding(name) : null;
+      // Falls back to nearby-university-filtered search (see academic.ts's
+      // own comment) when a direct name search finds nothing and
+      // coordinates are known -- only the fallback branch pays the extra
+      // network hop, and only when this gate already fired.
+      const academicFinding = looksLikeDeepHistoryQuestion
+        ? lat != null && lng != null
+          ? await fetchAcademicFindingWithLocalFallback(name, lat, lng)
+          : await fetchAcademicFinding(name)
+        : null;
 
       const { text: profileContext } = buildUserContext(userProfile);
       // The client's `CityStore` already cached the whole exchange-rate

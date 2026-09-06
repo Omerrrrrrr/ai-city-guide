@@ -28596,6 +28596,60 @@
         }
       }
     },
+    "poiExplain.localAcademicHint" : {
+      "comment" : "Shown under the 'Ask about this place' button when a real university exists nearby (Wikidata-sourced) -- an invitation to ask, not a guarantee a specific paper about this place exists.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ich kann in den Archiven örtlicher Universitäten nachsehen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I can check local university archives for more."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Puedo consultar los archivos de universidades locales."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je peux consulter les archives d'universités locales."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Posso controllare gli archivi delle università locali."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jeg kan sjekke arkivene til lokale universiteter."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Posso verificar arquivos de universidades locais."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yerel üniversite kaynaklarını inceleyebilirim."
+          }
+        }
+      }
+    },
     "poiExplain.fullDetails" : {
       "extractionState" : "stale",
       "localizations" : {
