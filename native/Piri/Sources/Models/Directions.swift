@@ -41,4 +41,13 @@ struct DirectionsResult: Decodable {
 struct RouteStep: Decodable, Hashable {
     var instruction: String
     var distanceMeters: Double
+    /// `nil` for ORS's walking/driving/cycling steps (that data isn't
+    /// available per-step there) and for the on-device MKDirections transit
+    /// fallback (`TransitDirections.swift`'s own `RouteStep(...)` never sets
+    /// it) -- only ever populated by the backend's own Transitous integration.
+    var durationSeconds: Double?
+    /// Real stop names from just after boarding through alighting, only on a
+    /// transit leg's real vehicle ride (see `TransitousStep` on the backend)
+    /// -- `nil` for a WALK step or any non-transit profile.
+    var stopNames: [String]?
 }

@@ -96,7 +96,7 @@ import { haversineKm } from './geo';
 import { fetchTripAdvisorInfo, fetchTripAdvisorPhotos, fetchTripAdvisorReviews, normalizeName, type TripAdvisorInfo } from './tripadvisor';
 import { fetchWikipediaPhoto, WIKIPEDIA_PLAUSIBLE_CATEGORIES, GOLDEN_HOUR_CATEGORIES } from './wiki-photo';
 import { fetchWikidataFacts } from './wikidata';
-import { fetchTransitousLeg } from './transitous';
+import { fetchTransitousLeg, type TransitousStep } from './transitous';
 import { findLocalResource } from './local-resources';
 import { fetchUnescoSite, fetchIntangibleHeritage, fetchCreativeCity } from './unesco';
 import { fetchAcademicFinding, fetchAcademicFindingWithLocalFallback } from './academic';
@@ -5190,7 +5190,7 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
         const route: [number, number][] = [];
         let distanceMeters = 0;
         let durationSeconds = 0;
-        const steps: { instruction: string; distanceMeters: number }[] = [];
+        const steps: TransitousStep[] = [];
 
         for (let i = 0; i < coordinates.length - 1; i++) {
           const leg = await fetchTransitousLeg(coordinates[i], coordinates[i + 1]);

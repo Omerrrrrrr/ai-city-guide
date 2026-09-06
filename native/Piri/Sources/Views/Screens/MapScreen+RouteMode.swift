@@ -510,8 +510,25 @@ extension MapScreen {
                                 Image(systemName: "arrow.turn.up.right").font(.footnote).foregroundStyle(Theme.gold).padding(.top, 2)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(step.instruction).font(.footnote)
-                                    if step.distanceMeters > 0 {
-                                        Text(L("map.route.distanceKm", String(format: "%.2f", step.distanceMeters / 1000)))
+                                    if step.distanceMeters > 0 || step.durationSeconds != nil {
+                                        Text(stepMetaText(step))
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    // Only a real transit leg (bus/train) has
+                                    // stops to ride through -- see
+                                    // `RouteStep.stopNames`'s own doc comment.
+                                    if let stopNames = step.stopNames, !stopNames.isEmpty {
+                                        // Deliberately its own key, not
+                                        // `map.route.stopsCount` -- that one
+                                        // already means "planned waypoints in
+                                        // this trip" (see above), a different
+                                        // concept from "vehicle stops along
+                                        // this one transit leg."
+                                        Text(LPlural("map.route.transitStopsCount", count: stopNames.count))
+                                            .font(.caption2.weight(.semibold))
+                                            .foregroundStyle(Theme.gold)
+                                        Text(stopNames.joined(separator: ", "))
                                             .font(.caption2)
                                             .foregroundStyle(.secondary)
                                     }
@@ -668,6 +685,17 @@ extension MapScreen {
         let km = String(format: "%.1f", distanceMeters / 1000)
         let minutes = String(Int((durationSeconds / 60).rounded()))
         return "\(L("map.route.distanceKm", km)) · \(L("map.route.durationMinutes", minutes))"
+    }
+
+    /// "%1$@ km" alone for a step with no known duration (every ORS
+    /// walking/driving/cycling step, and the on-device MKDirections transit
+    /// fallback), "%1$@ km · %2$@ min" once Transitous supplies a real
+    /// per-step duration -- same `map.route.durationMinutes` key
+    /// `routeSummaryText` already uses for the overall trip.
+    private func stepMetaText(_ step: RouteStep) -> String {
+        let distancePart = step.distanceMeters > 0 ? L("map.route.distanceKm", String(format: "%.2f", step.distanceMeters / 1000)) : nil
+        let durationPart = step.durationSeconds.map { L("map.route.durationMinutes", String(Int(($0 / 60).rounded(.up)))) }
+        return [distancePart, durationPart].compactMap { $0 }.joined(separator: " · ")
     }
 
     private func stopRow(index: Int, stop: SavedPOIReference) -> some View {

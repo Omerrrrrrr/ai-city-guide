@@ -28,6 +28,14 @@ interface MotisLeg {
   legGeometry?: { points?: string };
   from?: { name?: string };
   to?: { name?: string };
+  /** Line/route number or name (e.g. "M3") -- present on transit legs, absent on WALK. Confirmed live: without this, a step read as "BUS: Rådhuset → Vige" with no way to tell a rider which physical bus to actually board. */
+  routeShortName?: string;
+  /** Every stop the vehicle passes between boarding and alighting, boarding
+   *  stop excluded -- absent on WALK. Real example confirmed live: an M3 bus
+   *  leg from "Rådhuset" to "Vige" carries 8 of these (Kvadraturen
+   *  videregående skole, Lund Torv, ...), which is what lets a rider know
+   *  "get off after 8 stops" instead of just the two endpoint names. */
+  intermediateStops?: { name?: string }[];
 }
 
 interface MotisItinerary {
@@ -45,11 +53,24 @@ export interface TransitousLeg {
   mode: string;
 }
 
+export interface TransitousStep {
+  instruction: string;
+  distanceMeters: number;
+  durationSeconds: number;
+  /** Stop names from just after boarding through alighting (inclusive of the
+   *  alighting stop) -- `stopNames.length` is how many stops to ride before
+   *  getting off. `undefined` on a WALK step (there are no "stops" to walk
+   *  between). Real name, not a generic "next stop" placeholder, since a
+   *  rider needs to recognize the actual alighting stop on the vehicle's
+   *  own announcements/display. */
+  stopNames?: string[];
+}
+
 export interface TransitousResult {
   route: [number, number][];
   distanceMeters: number;
   durationSeconds: number;
-  steps: { instruction: string; distanceMeters: number }[];
+  steps: TransitousStep[];
 }
 
 /**
@@ -124,16 +145,29 @@ export async function fetchTransitousLeg(
 
     const route: [number, number][] = [];
     let distanceMeters = 0;
-    const steps: { instruction: string; distanceMeters: number }[] = [];
+    const steps: TransitousStep[] = [];
 
     for (const leg of itinerary.legs) {
       const points = leg.legGeometry?.points;
       if (points) route.push(...decodeGooglePolyline(points));
       distanceMeters += leg.distance ?? 0;
       if (leg.mode && leg.from?.name && leg.to?.name) {
+        // The route number/name (e.g. "M3") is what actually tells someone
+        // which physical vehicle to board -- "BUS: Rådhuset → Vige" alone
+        // doesn't. Appended only for real transit legs (`routeShortName` is
+        // absent on WALK), so a walking step still reads as plain "WALK:
+        // A → B" rather than "WALK undefined: A → B".
+        const modeLabel = leg.routeShortName ? `${leg.mode} ${leg.routeShortName}` : leg.mode;
+        const intermediateNames = (leg.intermediateStops ?? [])
+          .map((s) => s.name)
+          .filter((name): name is string => Boolean(name));
         steps.push({
-          instruction: `${leg.mode}: ${leg.from.name} → ${leg.to.name}`,
+          instruction: `${modeLabel}: ${leg.from.name} → ${leg.to.name}`,
           distanceMeters: leg.distance ?? 0,
+          durationSeconds: leg.duration ?? 0,
+          // Only a real transit leg has stops to ride through -- `intermediateStops`
+          // is always absent/empty on WALK, so this correctly stays `undefined` there.
+          stopNames: leg.intermediateStops ? [...intermediateNames, leg.to.name] : undefined,
         });
       }
     }
