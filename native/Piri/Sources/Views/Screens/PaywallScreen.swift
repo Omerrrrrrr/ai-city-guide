@@ -125,7 +125,6 @@ struct PaywallScreen: View {
         VStack(alignment: .leading, spacing: 12) {
             checklistRow(String(localized: "paywall.feature.richerDescriptions"))
             checklistRow(String(localized: "paywall.feature.morePhotos"))
-            checklistRow(String(localized: "paywall.feature.realReviews"))
             checklistRow(L("paywall.feature.placeUnlocksCount", Self.placeUnlocksPerMonth[tier] ?? 0))
             if let chatCount = Self.chatQuestionsPerDay[tier] {
                 checklistRow(L("paywall.feature.chatQuestionsCount", chatCount))
