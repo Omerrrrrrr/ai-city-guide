@@ -17,6 +17,8 @@ COPY --from=build /app/dist ./dist
 # ensureSchema() runs drizzle migrations on every boot (idempotent) from a
 # path resolved relative to dist/ -- see src/ensure-schema.ts.
 COPY drizzle ./drizzle
+# Apple's root CA for StoreKit 2 transaction verification -- see src/storekit.ts.
+COPY certs ./certs
 
 EXPOSE 4000
 CMD ["node", "dist/index.js"]
