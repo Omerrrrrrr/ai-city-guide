@@ -37,6 +37,21 @@ export function tierForProductId(productId: string): Tier | null {
   return PRODUCT_TIER_MAP[productId] ?? null;
 }
 
+// One-time, repurchasable (StoreKit consumable) product: 7 days of full
+// Pro-tier access, activated on demand -- for a user who wants one trip's
+// worth of access without committing to a subscription. Handled entirely
+// outside `buildVerifiedTransaction`'s subscription shape in the
+// `/iap/verify-transaction` route (see `isTripPassProductId`): a
+// consumable's decoded transaction has no `expiresDate` the way a
+// subscription's does, and, unlike a subscription, the same account can
+// legitimately buy it more than once.
+export const TRIP_PASS_PRODUCT_ID = 'com.piriapp.piri.trippass';
+export const TRIP_PASS_DURATION_DAYS = 7;
+
+export function isTripPassProductId(productId: string): boolean {
+  return productId === TRIP_PASS_PRODUCT_ID;
+}
+
 const BUNDLE_ID = process.env.APPLE_BUNDLE_ID?.trim() || 'com.piriapp.piri';
 // App Store Connect's numeric "Apple ID" for this app (App Information ->
 // General Information -> Apple ID; also the number in the ASC URL) -- not
@@ -107,7 +122,10 @@ export interface VerifiedTransaction {
  * unit-testable without needing a real signed JWS or Apple's verifier. */
 export interface DecodedTransactionFields {
   productId?: string | null;
+  /** Stable across renewals for one subscription -- the Trip Pass anti-replay check uses `transactionId` instead, since a consumable purchase doesn't reuse this the way a renewal does. */
   originalTransactionId?: string | null;
+  /** Unique per purchase *event*, unlike `originalTransactionId` -- what actually identifies one Trip Pass purchase. */
+  transactionId?: string | null;
   expiresDate?: number | null;
   environment?: string | null;
   revocationDate?: number | null;
@@ -142,20 +160,22 @@ export function buildVerifiedTransaction(decoded: DecodedTransactionFields): Ver
 
 /**
  * Decodes and (outside local Xcode/LocalTesting environments) cryptographically
- * verifies a StoreKit 2 transaction JWS. Throws on a config/verification
- * failure, an unparseable payload, or a `productId` that isn't one of this
- * app's 4 known products -- never trust the client's own claim of what it
- * bought.
+ * verifies a StoreKit 2 transaction JWS, trying every configured real
+ * environment (Sandbox, Production) in turn -- see the module comment on
+ * `realVerifiers`. Throws on a config/verification failure or an
+ * unparseable payload. Deliberately doesn't validate `productId` itself
+ * (unlike `buildVerifiedTransaction`): the caller needs the raw decoded
+ * productId first to decide whether this is a subscription or the Trip
+ * Pass consumable, which are verified/handled differently from here on.
  */
-export async function verifyTransaction(signedTransactionInfo: string): Promise<VerifiedTransaction> {
+export async function verifyAndDecodeTransaction(signedTransactionInfo: string): Promise<DecodedTransactionFields> {
   const verifiers = realVerifiers.length > 0 ? realVerifiers : xcodeVerifier ? [xcodeVerifier] : [];
   if (verifiers.length === 0) throw new Error('StoreKit verification is not configured');
 
   let environmentMismatch: unknown;
   for (const verifier of verifiers) {
     try {
-      const decoded = await verifier.verifyAndDecodeTransaction(signedTransactionInfo);
-      return buildVerifiedTransaction(decoded);
+      return await verifier.verifyAndDecodeTransaction(signedTransactionInfo);
     } catch (error) {
       if (error instanceof VerificationException && error.status === VerificationStatus.INVALID_ENVIRONMENT) {
         environmentMismatch = error;
@@ -165,4 +185,16 @@ export async function verifyTransaction(signedTransactionInfo: string): Promise<
     }
   }
   throw environmentMismatch;
+}
+
+/**
+ * Decodes, verifies, and maps a StoreKit 2 transaction JWS for one of this
+ * app's 4 subscription products. Throws on a config/verification failure,
+ * an unparseable payload, or a `productId` that isn't a known subscription
+ * -- including the Trip Pass, which callers must check for (via
+ * `isTripPassProductId`) before calling this, not after.
+ */
+export async function verifyTransaction(signedTransactionInfo: string): Promise<VerifiedTransaction> {
+  const decoded = await verifyAndDecodeTransaction(signedTransactionInfo);
+  return buildVerifiedTransaction(decoded);
 }

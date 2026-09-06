@@ -60,7 +60,7 @@ import {
 } from './image-candidate-service';
 import { previewGoogleHoursForPlace } from './google-places-hours';
 import { fetchPremiumPlaceDetails, type PremiumPlaceDetails } from './google-places-poi';
-import { checkAndIncrementUsage, refundUsage } from './entitlements';
+import { checkAndIncrementUsage, effectiveTier, refundUsage } from './entitlements';
 import { moderatePhotoSubmission, moderateTextSubmission } from './moderation';
 import { decideReviewModerationStatus, REVIEW_TRUST_BONUS_CAP } from './review-moderation';
 import { uploadDataUriToR2 } from './r2';
@@ -105,7 +105,7 @@ import { fetchHeritageDesignation } from './heritage-designation';
 import { fetchMichelinRestaurant } from './michelin';
 import { fetchDietaryPlaces, fetchDietaryTagsForPlace } from './dietary';
 import { fetchUnsplashPhoto } from './unsplash';
-import { verifyTransaction } from './storekit';
+import { buildVerifiedTransaction, isTripPassProductId, TRIP_PASS_DURATION_DAYS, verifyAndDecodeTransaction } from './storekit';
 import { resolveCountryCode, fetchUpcomingHolidays, fetchSoonHoliday, type PublicHoliday } from './holidays';
 import { fetchExchangeRates } from './currency';
 import { fetchSunTimes } from './sun-times';
@@ -115,7 +115,7 @@ import { findTimezone } from './timezone';
 import { fetchNearbyTrails, fetchTrailGeometry } from './overpass';
 import { translateText } from './translate';
 import { fetchWebsiteExcerpt } from './website-content';
-import { places, cities, liveGridCellStatus, livePlaceCache, poiPhotoCache, users, userSubmittedPhotos, contentReports, blocks, poiReviews, reviewReports, reviewVotes } from './schema';
+import { places, cities, liveGridCellStatus, livePlaceCache, poiPhotoCache, users, userSubmittedPhotos, contentReports, blocks, poiReviews, reviewReports, reviewVotes, iapConsumedTransactions } from './schema';
 
 const PORT = Number(process.env.PORT ?? 4000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY?.trim();
@@ -2404,16 +2404,17 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
   app.post<{
     Body: { places: { name: string; lat: number; lng: number; category?: string }[] };
   }>('/places/photos-bulk', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (request, reply) => {
-    // Optional — this grid is shown to signed-out/free accounts too, and
-    // the cached result written below is always the free-tier-eligible
-    // one (Wikipedia/Tripadvisor/Unsplash) regardless of who asked, so it
-    // stays correct and shareable for every subsequent caller. A paid
-    // caller gets a live, uncached Google upgrade layered on top per
-    // request below — never written back to this shared cache (Google's
-    // Places ToS forbids persisting its photo data beyond place_id/lat/lng,
-    // same constraint `google-places-poi.ts` already documents).
-    const userId = await optionalUserId(request, AUTH_JWT_SECRET);
-
+    // Tier-agnostic on purpose, even for a paid account -- this route used
+    // to spend a live `google_places` unit per place here whenever the free
+    // sources came up short (up to 20 at once, one request), invisibly and
+    // with zero user-facing signal that it happened. A paid account could
+    // burn most or all of a month's quota just from scrolling a map in an
+    // area with weak Wikipedia/Tripadvisor coverage, with no way to
+    // attribute the drained quota to anything they did on purpose. Removed
+    // 2026-09 -- the paid, explicit `google_places` upgrade now only ever
+    // happens where the user took a deliberate action to see it
+    // (`/places/explain-poi`'s own richer grounding), never for a
+    // background grid thumbnail nobody asked to spend quota on.
     const parsedBody = z
       .object({
         places: z
@@ -2468,7 +2469,7 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
           const cacheAgeDays = cached ? (Date.now() - new Date(cached.fetchedAt).getTime()) / (1000 * 60 * 60 * 24) : Infinity;
 
           let photoUrl: string | null;
-          let source: 'wikipedia' | 'tripadvisor' | 'unsplash' | 'google' | null;
+          let source: 'wikipedia' | 'tripadvisor' | 'unsplash' | null;
           let attributionUrl: string | null;
           let photographerName: string | null;
           let photographerUrl: string | null;
@@ -2525,32 +2526,6 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
                 target: poiPhotoCache.id,
                 set: { photoUrl, source, attributionUrl, photographerName, photographerUrl, fetchedAt },
               });
-          }
-
-          // Paid-tier live upgrade, layered on top of the shared cache
-          // result above rather than replacing it there — see the route's
-          // own comment for why this never gets written to `poiPhotoCache`.
-          // Only attempted when the free-eligible result above has nothing
-          // better than the generic Unsplash fallback (or nothing at all).
-          if (userId && (!photoUrl || source === 'unsplash')) {
-            const allowed = await checkAndIncrementUsage(userId, 'google_places');
-            if (allowed) {
-              try {
-                const premium = await fetchPremiumPlaceDetails({ name: place.name, lat: place.lat, lng: place.lng });
-                if (premium?.photoUrls[0]) {
-                  photoUrl = premium.photoUrls[0];
-                  source = 'google';
-                  attributionUrl = premium.googleMapsUri ?? null;
-                  photographerName = null;
-                  photographerUrl = null;
-                } else {
-                  await refundUsage(userId, 'google_places');
-                }
-              } catch (error) {
-                request.log.error(error);
-                await refundUsage(userId, 'google_places');
-              }
-            }
           }
 
           return { name: place.name, photoUrl, source, attributionUrl, photographerName, photographerUrl };
@@ -2627,8 +2602,12 @@ ${personalization}${foodGuidance}${languageInstruction(locale)}${PROMPT_INJECTIO
         return reply.code(400).send({ error: 'Invalid request' });
       }
 
-      const [user] = await db.select({ tier: users.tier }).from(users).where(eq(users.id, userId)).limit(1);
-      if (!user || user.tier === 'free') {
+      const [user] = await db
+        .select({ tier: users.tier, tierExpiresAt: users.tierExpiresAt, tripPassExpiresAt: users.tripPassExpiresAt })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+      if (!user || effectiveTier(user) === 'free') {
         return reply.code(403).send({ error: 'Premium details require a paid plan.', code: 'upgrade_required' });
       }
 
@@ -4287,7 +4266,54 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
       }
 
       try {
-        const verified = await verifyTransaction(parsed.data.signedTransactionInfo);
+        // Decode/verify once, then branch -- the Trip Pass (a consumable)
+        // and the 4 subscriptions are different products with different
+        // grant logic, but both start from the same signed payload.
+        const decoded = await verifyAndDecodeTransaction(parsed.data.signedTransactionInfo);
+
+        if (isTripPassProductId(decoded.productId ?? '')) {
+          if (decoded.revocationDate != null) {
+            return reply.code(400).send({ error: 'Transaction has been revoked' });
+          }
+          if (!decoded.transactionId) {
+            return reply.code(400).send({ error: 'Transaction is missing transactionId' });
+          }
+
+          // Each Trip Pass purchase is a distinct event that must grant
+          // exactly once -- insert-first-then-check (not a pre-check) so
+          // two concurrent/replayed requests for the same transaction
+          // can't both pass a check before either writes.
+          const [consumed] = await db
+            .insert(iapConsumedTransactions)
+            .values({
+              transactionId: decoded.transactionId,
+              userId,
+              productId: decoded.productId!,
+              consumedAt: new Date().toISOString(),
+            })
+            .onConflictDoNothing({ target: iapConsumedTransactions.transactionId })
+            .returning();
+          if (!consumed) {
+            return reply.code(409).send({ error: 'This purchase has already been redeemed.' });
+          }
+
+          const [existingUser] = await db.select({ tripPassExpiresAt: users.tripPassExpiresAt }).from(users).where(eq(users.id, userId)).limit(1);
+          if (!existingUser) return reply.code(401).send({ error: 'Unauthorized' });
+
+          // Stacks onto remaining time from an already-active pass instead
+          // of resetting to a flat +7 days -- buying a second pass while
+          // the first hasn't expired shouldn't waste the time already paid
+          // for.
+          const currentExpiry = existingUser.tripPassExpiresAt ? new Date(existingUser.tripPassExpiresAt).getTime() : 0;
+          const base = Math.max(currentExpiry, Date.now());
+          const tripPassExpiresAt = new Date(base + TRIP_PASS_DURATION_DAYS * 24 * 60 * 60 * 1000).toISOString();
+
+          const [updated] = await db.update(users).set({ tripPassExpiresAt }).where(eq(users.id, userId)).returning();
+          if (!updated) return reply.code(401).send({ error: 'Unauthorized' });
+          return reply.send(toPublicUser(updated));
+        }
+
+        const verified = buildVerifiedTransaction(decoded);
         if (verified.revoked) {
           return reply.code(400).send({ error: 'Transaction has been revoked' });
         }

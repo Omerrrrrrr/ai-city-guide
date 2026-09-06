@@ -2,7 +2,8 @@ import StoreKit
 import SwiftUI
 
 /// Premium tier (Adım 4) purchase screen -- 2 tiers (Basic/Pro) × 2 periods
-/// (monthly/yearly) = the 4 products `PurchaseStore` loads. Entry points:
+/// (monthly/yearly) = the 4 subscription products, plus the one-time Trip
+/// Pass (`tripPassSection`) as a secondary option below them. Entry points:
 /// `ProfileScreen`'s account card (signed-in, free tier) and
 /// `POIExplainSheet`'s `upgrade_required` premium-details error.
 struct PaywallScreen: View {
@@ -21,10 +22,17 @@ struct PaywallScreen: View {
     // UI copy only -- doesn't enforce anything itself. Must stay in sync
     // with `apps/api/src/entitlements.ts`'s `TIER_LIMITS`, the actual
     // source of truth: the two paid tiers unlock the exact same feature
-    // set (Google-sourced premium place data), differing only in how much
-    // of it each period allows.
-    private static let placeUnlocksPerMonth: [Tier: Int] = [.basic: 50, .pro: 300]
-    private static let chatQuestionsPerDay: [Tier: Int] = [.basic: 40, .pro: 100]
+    // set (richer, verified premium place data), differing only in how much
+    // of it each period allows. Pro's count dropped from 300 to 120 in the
+    // 2026-09 pricing review -- 300 cost more per heavy user in live-data
+    // fetches than either considered Pro price nets after Apple's cut.
+    private static let placeUnlocksPerMonth: [Tier: Int] = [.basic: 50, .pro: 120]
+    // Basic still shows its literal daily count; Pro's own quota (see
+    // `TIER_LIMITS.pro.ask_piri_chat`) stays a real number server-side but
+    // is deliberately framed as unlimited here -- it's a high backend
+    // abuse-guard, not a product-facing limit a normal user should ever
+    // see or hit.
+    private static let chatQuestionsPerDay: [Tier: Int] = [.basic: 40]
 
     @State private var period: Period = .monthly
     @State private var tier: Tier = .pro
@@ -76,6 +84,8 @@ struct PaywallScreen: View {
 
                     autoRenewDisclosure
 
+                    tripPassSection
+
                     restoreButton
                     legalLinks
                 }
@@ -117,7 +127,11 @@ struct PaywallScreen: View {
             checklistRow(String(localized: "paywall.feature.morePhotos"))
             checklistRow(String(localized: "paywall.feature.realReviews"))
             checklistRow(L("paywall.feature.placeUnlocksCount", Self.placeUnlocksPerMonth[tier] ?? 0))
-            checklistRow(L("paywall.feature.chatQuestionsCount", Self.chatQuestionsPerDay[tier] ?? 0))
+            if let chatCount = Self.chatQuestionsPerDay[tier] {
+                checklistRow(L("paywall.feature.chatQuestionsCount", chatCount))
+            } else {
+                checklistRow(String(localized: "paywall.feature.chatUnlimited"))
+            }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -165,6 +179,48 @@ struct PaywallScreen: View {
         }
         .buttonStyle(.plain)
         .disabled(matchingProduct == nil || purchasingProductID != nil)
+    }
+
+    /// One-time, repurchasable Trip Pass -- a secondary option below the
+    /// subscription tiers above, not a third tier of its own. Only shown
+    /// once the product has actually loaded (same "don't imply a purchase
+    /// exists before it's confirmed available" rule `purchaseButton`
+    /// follows for the subscriptions).
+    @ViewBuilder
+    private var tripPassSection: some View {
+        if let tripPassProduct {
+            let isPurchasing = purchasingProductID == tripPassProduct.id
+
+            VStack(spacing: 6) {
+                Button {
+                    Task {
+                        purchasingProductID = tripPassProduct.id
+                        let success = await purchaseStore.purchase(tripPassProduct, authStore: authStore)
+                        purchasingProductID = nil
+                        if success { dismiss() }
+                    }
+                } label: {
+                    if isPurchasing {
+                        ProgressView().tint(Theme.gold)
+                    } else {
+                        Text(L("paywall.tripPass.description", tripPassProduct.displayPrice))
+                    }
+                }
+                .buttonStyle(.plain)
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(Theme.gold)
+                .disabled(purchasingProductID != nil)
+
+                Text(String(localized: "paywall.tripPass.oneTime"))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .multilineTextAlignment(.center)
+        }
+    }
+
+    private var tripPassProduct: Product? {
+        purchaseStore.products.first { $0.id == PurchaseStore.tripPassProductID }
     }
 
     private var restoreButton: some View {

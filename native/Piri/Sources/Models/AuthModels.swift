@@ -23,17 +23,21 @@ struct AuthUser: Codable, Equatable {
     /// sharing is. `showRealName` still defaults `false` (rumuz first).
     var leaderboardVisible: Bool = true
     var showRealName: Bool = false
-    /// Premium tier -- `"free"` | `"basic"` | `"pro"`, mirrors the backend's
-    /// `users.tier` column (`toPublicUser` in `accounts.ts`) 1:1 rather than
-    /// a Swift enum, so an unrecognized future value round-trips instead of
-    /// failing to decode. Use `isPaidTier` rather than comparing this
-    /// directly wherever the only question is "does this account have
-    /// premium access at all."
+    /// Premium tier -- `"free"` | `"basic"` | `"pro"`, a plain `String`
+    /// rather than a Swift enum so an unrecognized future value round-trips
+    /// instead of failing to decode. This is the backend's *effective*
+    /// tier (`effectiveTier` in `entitlements.ts`, via `toPublicUser`), not
+    /// the raw `users.tier` column -- it already folds in a lapsed
+    /// subscription (downgraded to free) and an active Trip Pass (boosted
+    /// to pro), so the client never needs to know about either wrinkle
+    /// separately. Use `isPaidTier` rather than comparing this directly
+    /// wherever the only question is "does this account have premium
+    /// access at all."
     var tier: String = "free"
-    /// ISO date string, or `nil` for a free account or one whose expiry
-    /// isn't known yet. Purely informational (display only) -- access
-    /// itself is always decided server-side against `users.tier`, not by
-    /// the client comparing this against "now".
+    /// ISO date string, or `nil` for a free account, a lifetime/admin-set
+    /// override, or one whose expiry isn't known yet. Purely informational
+    /// (display only) -- access itself is always decided server-side, not
+    /// by the client comparing this against "now".
     var tierExpiresAt: String?
     /// `data:image/jpeg;base64,...`, or `nil` for the initial-letter avatar.
     /// See `PATCH /me/avatar` / `schema.ts`'s `users.avatarUrl` comment.

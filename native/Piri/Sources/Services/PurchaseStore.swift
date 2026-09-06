@@ -3,7 +3,8 @@ import Observation
 import StoreKit
 
 /// StoreKit 2 purchase flow (Premium tier Adım 4). Loads the 4 subscription
-/// `Product`s, drives a purchase, and verifies every transaction it ever
+/// `Product`s plus the one-time Trip Pass, drives a purchase, and verifies
+/// every transaction it ever
 /// sees (a fresh purchase, a renewal, or a restore alike) against the
 /// backend via `IAPAPI` -- the backend, not this store, is the actual
 /// source of truth for `AuthUser.tier`, reached via `AuthStore.refreshMe()`
@@ -12,11 +13,19 @@ import StoreKit
 /// store in this app -- cross-store orchestration lives in `RootView`.
 @Observable
 final class PurchaseStore {
+    /// One-time, repurchasable (StoreKit consumable) product: 7 days of full
+    /// Pro-tier access, activated on demand -- see `storekit.ts`'s
+    /// `TRIP_PASS_PRODUCT_ID`. Goes through the exact same `purchase(_:)`
+    /// below as the 4 subscriptions; the backend is what branches on
+    /// product id to grant a temporary Pro window instead of setting `tier`.
+    static let tripPassProductID = "com.piriapp.piri.trippass"
+
     static let productIDs = [
         "com.piriapp.piri.basic.monthly",
         "com.piriapp.piri.basic.yearly",
         "com.piriapp.piri.pro.monthly",
         "com.piriapp.piri.pro.yearly",
+        tripPassProductID,
     ]
 
     private(set) var products: [Product] = []

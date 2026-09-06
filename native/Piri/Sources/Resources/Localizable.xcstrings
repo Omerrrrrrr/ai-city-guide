@@ -22769,6 +22769,59 @@
         }
       }
     },
+    "paywall.feature.chatUnlimited" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unbegrenzte KI-Chat-Fragen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlimited AI chat questions"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preguntas de chat IA ilimitadas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questions de chat IA illimitées"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Domande in chat IA illimitate"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ubegrensede AI-chat-spørsmål"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perguntas de chat de IA ilimitadas"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sınırsız AI sohbet sorusu"
+          }
+        }
+      }
+    },
     "paywall.feature.morePhotos" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -22881,49 +22934,49 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Echte Bewertungen & Rezensionen"
+            "value" : "Aktuelle Öffnungszeiten & Preisniveau"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Real ratings & reviews"
+            "value" : "Live hours & price level"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Calificaciones y reseñas reales"
+            "value" : "Horarios en vivo y nivel de precio"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vraies notes et avis"
+            "value" : "Horaires en direct et niveau de prix"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Valutazioni e recensioni reali"
+            "value" : "Orari in tempo reale e fascia di prezzo"
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ekte vurderinger og anmeldelser"
+            "value" : "Live åpningstider og prisnivå"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Avaliações reais"
+            "value" : "Horários em tempo real e faixa de preço"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Gerçek puanlar ve yorumlar"
+            "value" : "Anlık çalışma saatleri ve fiyat seviyesi"
           }
         }
       }
@@ -23507,6 +23560,112 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Premium"
+          }
+        }
+      }
+    },
+    "paywall.tripPass.description" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oder: %@ für 7 Tage vollen Pro-Zugriff, ohne Abo"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Or: %@ for 7 days of full Pro access, no subscription"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O: %@ por 7 días de acceso Pro completo, sin suscripción"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ou : %@ pour 7 jours d'accès Pro complet, sans abonnement"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oppure: %@ per 7 giorni di accesso Pro completo, senza abbonamento"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eller: %@ for 7 dager med full Pro-tilgang, uten abonnement"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ou: %@ por 7 dias de acesso Pro completo, sem assinatura"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ya da: Abonelik olmadan 7 gün tam Pro erişimi için %@"
+          }
+        }
+      }
+    },
+    "paywall.tripPass.oneTime" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einmaliger Kauf, verlängert sich nicht automatisch."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One-time purchase, does not auto-renew."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compra única, no se renueva automáticamente."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Achat unique, sans renouvellement automatique."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acquisto unico, non si rinnova automaticamente."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Engangskjøp, fornyes ikke automatisk."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compra única, não renova automaticamente."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tek seferlik satın alma, otomatik yenilenmez."
           }
         }
       }

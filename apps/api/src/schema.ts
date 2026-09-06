@@ -199,13 +199,22 @@ export const users = pgTable('users', {
   leaderboardVisible: boolean('leaderboard_visible').notNull().default(true),
   showRealName: boolean('show_real_name').notNull().default(false),
   // Premium tier. 'free' | 'basic' | 'pro' -- both paid tiers unlock the
-  // same features (Google Places premium POI data, UGC uploads), differing
-  // only in monthly usage quota (see entitlements.ts's TIER_LIMITS), not
-  // feature access. `tierExpiresAt` is unused until the StoreKit purchase
-  // flow ships (Adım 4 of the premium-tier plan) -- until then `tier` is
-  // set manually via `PATCH /admin/users/:id/tier` for testing.
+  // same features (premium POI data, UGC uploads), differing only in
+  // monthly usage quota (see entitlements.ts's TIER_LIMITS), not feature
+  // access. Written by `/iap/verify-transaction` on every real purchase,
+  // renewal, and restore -- but NOT auto-enforced against `tierExpiresAt`
+  // anywhere a lapsed subscriber's tier is read (see
+  // `entitlements.ts`'s `effectiveTier`, which every such read now goes
+  // through instead of this column directly). `PATCH /admin/users/:id/tier`
+  // still exists for manual testing overrides.
   tier: varchar('tier', { length: 16 }).notNull().default('free'),
   tierExpiresAt: varchar('tier_expires_at', { length: 64 }),
+  // The one-time "Trip Pass" IAP (7 days of Pro access, no subscription)
+  // grants a temporary Pro-level entitlement layered on top of whatever
+  // `tier`/`tierExpiresAt` already says -- kept as its own column rather
+  // than overwriting `tier` so buying a pass never clobbers (or gets
+  // clobbered by) an actual subscription's state. See `effectiveTier`.
+  tripPassExpiresAt: varchar('trip_pass_expires_at', { length: 64 }),
   // Apple's stable per-subscription identifier (constant across renewals
   // and upgrade/downgrade within the same subscription, unlike the
   // per-event `transactionId`) -- the unique index below is what actually
@@ -270,6 +279,22 @@ export const usageCounters = pgTable('usage_counters', {
 }, (table) => [
   uniqueIndex('idx_usage_counters_user_key_period').on(table.userId, table.counterKey, table.periodStart),
 ]);
+
+// Anti-replay for consumable IAPs (today: just the Trip Pass) -- unlike a
+// subscription, a consumable can be legitimately bought many times by the
+// same account, so `users.originalTransactionId`'s one-row-per-account
+// unique index (built for subscriptions) doesn't apply. Each *event*'s own
+// `transactionId` (distinct from `originalTransactionId`, which a
+// subscription reuses across renewals but a consumable purchase does not
+// repeat) is inserted here before granting its benefit; a unique-violation
+// on retry means it was already consumed, so the caller must not grant it
+// twice from a replayed or concurrently-retried request.
+export const iapConsumedTransactions = pgTable('iap_consumed_transactions', {
+  transactionId: varchar('transaction_id', { length: 64 }).primaryKey(),
+  userId: varchar('user_id', { length: 64 }).notNull(),
+  productId: varchar('product_id', { length: 64 }).notNull(),
+  consumedAt: varchar('consumed_at', { length: 64 }).notNull(),
+});
 
 // UGC: user-submitted POI photos, reducing dependency on Wikipedia/
 // Tripadvisor/Unsplash/Google as the only photo sources. `poiKey` uses the

@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 
 import { AuthError, hashPassword, newUserId, verifyPassword } from './auth';
 import { db } from './db';
+import { effectiveTier } from './entitlements';
 import { users, userSyncBlobs, type UserRow } from './schema';
 
 export const SYNC_KEYS = ['profile', 'savedPlaces', 'trips'] as const;
@@ -25,7 +26,11 @@ export function toPublicUser(user: UserRow) {
     completedTripCount: user.completedTripCount,
     leaderboardVisible: user.leaderboardVisible,
     showRealName: user.showRealName,
-    tier: user.tier,
+    // The effective tier (folds in a lapsed subscription and an active
+    // Trip Pass, see `effectiveTier`), not the raw stored column -- the
+    // client's `isPaidTier`/gating checks should never need to know about
+    // either wrinkle separately.
+    tier: effectiveTier(user),
     tierExpiresAt: user.tierExpiresAt,
     avatarUrl: user.avatarUrl,
   };
