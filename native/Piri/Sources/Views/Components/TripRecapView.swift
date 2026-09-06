@@ -1,14 +1,13 @@
+import AVKit
+import Photos
 import SwiftUI
-import UIKit
 
-/// The Trip Recap story -- assembles `TripRecapData` (best-effort async
-/// friends/leaderboard fetch included) then hands 7 cards to
-/// `StoryContainer`. Owns the Share card's export: renders `RecapShareCard`
-/// standalone via `ImageRenderer` (no story chrome baked in, since the
-/// dots/close overlay lives only in `StoryContainer`) and hands the result
-/// to a plain `UIActivityViewController` -- more reliably renders a
-/// programmatically-drawn image than `ShareLink(item: Image(uiImage:))` in
-/// practice, and nothing in the app already wraps one to reuse.
+/// The Trip Recap -- a real, shareable .mp4 (see `TripRecapVideoRenderer`),
+/// not the swipeable story of static cards this used to be (replaced
+/// entirely 2026-09, at the user's request, after a competitor's exported
+/// recap clip set the bar). Generates once per presentation (no caching --
+/// a `PendingTripRecap` is a one-shot payload from `endRoute()` anyway, see
+/// `MapScreen.swift`), then loops the result in-place with Save/Share.
 struct TripRecapView: View {
     let trip: Trip
     let xpBefore: Int
@@ -21,68 +20,151 @@ struct TripRecapView: View {
     @Environment(AuthStore.self) private var authStore
     @Environment(\.dismiss) private var dismiss
 
-    @State private var data: TripRecapData?
-    @State private var posterImage: UIImage?
+    private enum Phase {
+        case preparing
+        case ready
+        case failed
+    }
+
+    @State private var phase: Phase = .preparing
+    @State private var progress: Double = 0
+    @State private var videoURL: URL?
+    @State private var player: AVQueuePlayer?
+    @State private var looper: AVPlayerLooper?
     @State private var showingShare = false
+    @State private var justSaved = false
 
     var body: some View {
-        Group {
-            if let data {
-                StoryContainer(pages: pages(for: data), onDismiss: { dismiss() })
-            } else {
-                ZStack {
-                    Theme.navy.ignoresSafeArea()
-                    ProgressView().tint(Theme.gold)
-                }
+        ZStack {
+            Theme.navy.ignoresSafeArea()
+            switch phase {
+            case .preparing: preparingView
+            case .ready: readyView
+            case .failed: failedView
             }
         }
-        .task {
-            data = await TripRecapData.build(
-                trip: trip,
-                xpBefore: xpBefore,
-                xpAfter: xpAfter,
-                levelBefore: levelBefore,
-                levelAfter: levelAfter,
-                myLifetimeTripCount: myLifetimeTripCount,
-                myUserId: authStore.user?.id,
-                friendsStore: friendsStore,
-                token: authStore.token
-            )
-        }
+        .task { await generate() }
         .sheet(isPresented: $showingShare) {
-            if let posterImage {
-                ActivityShareSheet(items: [posterImage])
+            if let videoURL { ActivityShareSheet(items: [videoURL]) }
+        }
+    }
+
+    private var preparingView: some View {
+        VStack(spacing: 22) {
+            ProgressView(value: progress)
+                .tint(Theme.gold)
+                .frame(width: 220)
+            Text(String(localized: "tripRecap.generating"))
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.7))
+        }
+    }
+
+    private var readyView: some View {
+        VStack(spacing: 0) {
+            Spacer()
+            if let player {
+                VideoPlayer(player: player)
+                    .aspectRatio(RecapVideoTimeline.size.width / RecapVideoTimeline.size.height, contentMode: .fit)
+                    .onAppear { player.play() }
+                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .padding(.horizontal, 16)
             }
+            Spacer()
+            controls
         }
     }
 
-    private func pages(for data: TripRecapData) -> [AnyView] {
-        var result: [AnyView] = [
-            AnyView(RecapCoverCard(trip: trip)),
-            AnyView(RecapRouteCard(trip: trip)),
-            AnyView(RecapStatsCard(trip: trip)),
-            AnyView(RecapHighlightCard(trip: trip)),
-        ]
-        // Only when there's enough to actually collage — with 0 or 1
-        // photos this would just repeat `RecapHighlightCard`'s single hero
-        // photo with nothing new to show.
-        if trip.photos.count > 1 {
-            result.append(AnyView(RecapCollageCard(trip: trip)))
+    private var controls: some View {
+        HStack(spacing: 14) {
+            Button(String(localized: "common.done")) { dismiss() }
+                .buttonStyle(.bordered)
+                .tint(.white)
+
+            Spacer()
+
+            if justSaved {
+                Text(String(localized: "tripRecap.saved"))
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Theme.gold)
+            }
+
+            Button {
+                Task { await saveToPhotos() }
+            } label: {
+                Label(String(localized: "common.save"), systemImage: "square.and.arrow.down")
+            }
+            .buttonStyle(.bordered)
+            .tint(Theme.gold)
+
+            Button {
+                showingShare = true
+            } label: {
+                Label(String(localized: "common.share"), systemImage: "square.and.arrow.up")
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Theme.gold)
         }
-        result += [
-            AnyView(RecapXPCard(data: data)),
-            AnyView(RecapSocialCard(data: data)),
-            AnyView(RecapShareCard(trip: trip, data: data, onShare: { exportAndShare(data: data) })),
-        ]
-        return result
+        .padding(.horizontal, 20)
+        .padding(.vertical, 20)
     }
 
-    private func exportAndShare(data: TripRecapData) {
-        let renderer = ImageRenderer(content: RecapShareCard(trip: trip, data: data, onShare: nil).frame(width: 390, height: 844))
-        renderer.scale = 3
-        guard let uiImage = renderer.uiImage else { return }
-        posterImage = uiImage
-        showingShare = true
+    private var failedView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 32))
+                .foregroundStyle(Theme.gold)
+            Text(String(localized: "tripRecap.generationFailed"))
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+            Button(String(localized: "common.done")) { dismiss() }
+                .buttonStyle(.borderedProminent)
+                .tint(Theme.gold)
+        }
+    }
+
+    private func generate() async {
+        let data = await TripRecapData.build(
+            trip: trip,
+            xpBefore: xpBefore,
+            xpAfter: xpAfter,
+            levelBefore: levelBefore,
+            levelAfter: levelAfter,
+            myLifetimeTripCount: myLifetimeTripCount,
+            myUserId: authStore.user?.id,
+            friendsStore: friendsStore,
+            token: authStore.token
+        )
+        do {
+            let url = try await TripRecapVideoRenderer.render(trip: trip, data: data) { fraction in
+                Task { @MainActor in progress = fraction }
+            }
+            videoURL = url
+            let item = AVPlayerItem(url: url)
+            let queuePlayer = AVQueuePlayer()
+            looper = AVPlayerLooper(player: queuePlayer, templateItem: item)
+            player = queuePlayer
+            phase = .ready
+        } catch {
+            phase = .failed
+        }
+    }
+
+    private func saveToPhotos() async {
+        guard let videoURL else { return }
+        let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+        guard status == .authorized || status == .limited else { return }
+        do {
+            try await PHPhotoLibrary.shared().performChanges {
+                PHAssetCreationRequest.forAsset().addResource(with: .video, fileURL: videoURL, options: nil)
+            }
+            justSaved = true
+        } catch {
+            // Best-effort -- Share (which can also save, via the system
+            // sheet's own "Save Video" action) is always still available.
+        }
     }
 }
 
