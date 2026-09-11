@@ -258,6 +258,7 @@ struct CollectionDetailScreen: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
                     }
+                    .accessibilityLabel(String(localized: "design.map.clearSearch"))
                 }
             }
             .padding(.horizontal, 12)
@@ -628,6 +629,7 @@ struct CollectionDetailScreen: View {
             } label: {
                 Image(systemName: "trash").foregroundStyle(.white.opacity(0.7))
             }
+            .accessibilityLabel(String(localized: "common.delete"))
         }
         .padding(.horizontal, 20)
         .padding(.top, 12)

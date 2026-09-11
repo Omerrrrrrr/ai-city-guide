@@ -235,6 +235,7 @@ struct ProfileScreen: View {
                         avatarView
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(String(localized: "profile.avatar.title"))
                 } else {
                     avatarView
                 }

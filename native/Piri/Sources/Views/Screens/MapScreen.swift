@@ -806,10 +806,11 @@ struct MapScreen: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
                 .font(.title3)
+                .accessibilityLabel(String(localized: "design.common.close"))
             }
             if trail.difficulty != nil || trail.dogsAllowed == true || trail.surface != nil || trailRouteType != nil {
                 HStack(spacing: 6) {
