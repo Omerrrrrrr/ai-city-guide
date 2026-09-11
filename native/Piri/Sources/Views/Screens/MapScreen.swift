@@ -586,7 +586,18 @@ struct MapScreen: View {
                     Button {
                         dietaryFilter = dietaryFilter == tag ? nil : tag
                     } label: {
-                        let label = String(localized: String.LocalizationValue("diet.\(tag.rawValue)"))
+                        // Building the key as a plain `String` first, not
+                        // interpolating directly inside `LocalizationValue(...)`,
+                        // matters here: `LocalizationValue("diet.\(tag.rawValue)")`
+                        // triggers Swift's string-interpolation literal init,
+                        // which treats "diet." as a format string and the tag as
+                        // a substitution *argument* rather than concatenating
+                        // into the lookup key -- it silently renders the raw
+                        // "diet.halal" instead of resolving the catalog entry.
+                        // See `DietaryFilterButton` for the same fix already
+                        // applied to the shared component this menu duplicates.
+                        let key: String = "diet.\(tag.rawValue)"
+                        let label = String(localized: String.LocalizationValue(key))
                         if dietaryFilter == tag {
                             Label(label, systemImage: "checkmark")
                         } else {
@@ -603,7 +614,10 @@ struct MapScreen: View {
                     .overlay(Circle().strokeBorder(Theme.gold, lineWidth: 1))
             }
             .accessibilityLabel(String(localized: "dietaryFilter.button"))
-            .accessibilityValue(dietaryFilter.map { String(localized: String.LocalizationValue("diet.\($0.rawValue)")) } ?? String(localized: "design.common.all"))
+            .accessibilityValue(dietaryFilter.map { tag -> String in
+                let key: String = "diet.\(tag.rawValue)"
+                return String(localized: String.LocalizationValue(key))
+            } ?? String(localized: "design.common.all"))
         }
     }
 

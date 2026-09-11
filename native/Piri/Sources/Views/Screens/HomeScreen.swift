@@ -28,6 +28,7 @@ struct HomeScreen: View {
     @State private var nearbyUser: [PlaceWithDistance] = []
     @State private var showingCityPicker = false
     @State private var showingWeatherForecast = false
+    @State private var showingSaved: SavedTab?
     @State private var selectedCategoryGroup: POICategoryGroup?
     @State private var poiResults: [POIPlace] = []
     @State private var poiLoading = false
@@ -170,6 +171,7 @@ struct HomeScreen: View {
         .sheet(isPresented: $showingCityPicker) { CityPickerScreen() }
         .sheet(item: $selectedPOI) { poi in POIExplainSheet(poi: poi) }
         .sheet(item: $showingHolidayDetail) { holiday in HolidayDetailSheet(holiday: holiday) }
+        .sheet(item: $showingSaved) { tab in SavedScreen(initialTab: tab) }
         .sheet(isPresented: $showingWeatherForecast) {
             if let weather = weatherQuery.weather,
                let lat = cityStore.lat ?? locationManager.currentLocation?.latitude,
@@ -383,7 +385,16 @@ struct HomeScreen: View {
     }
 
     private func savedShortcut(tab: SavedTab, count: Int) -> some View {
-        NavigationLink(destination: SavedScreen(initialTab: tab)) {
+        // `SavedScreen` hides its own navigation bar and supplies its own
+        // "Koleksiyon" header (it was built for `.sheet` presentation --
+        // see `ProfileScreen`'s identical `.sheet(item: $showingSaved)`).
+        // Pushing it with `NavigationLink` left it with no back button and
+        // no swipe-down, i.e. no way to leave the screen at all -- confirmed
+        // live. Presenting it as a sheet here too keeps both entry points
+        // consistent and dismissable the same way.
+        Button {
+            showingSaved = tab
+        } label: {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: tab == .saved ? "bookmark" : "calendar")
                     .font(.title3)

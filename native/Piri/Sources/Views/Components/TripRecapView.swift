@@ -138,8 +138,13 @@ struct TripRecapView: View {
             token: authStore.token
         )
         do {
+            // `render` and the frame loop inside it are both `@MainActor`,
+            // and this call itself already runs on the MainActor (`.task`
+            // on a View), so `onProgress` fires here with no actor hop
+            // needed -- a nested `Task { @MainActor in ... }` per frame
+            // would just be 240 wasted Task allocations.
             let url = try await TripRecapVideoRenderer.render(trip: trip, data: data) { fraction in
-                Task { @MainActor in progress = fraction }
+                progress = fraction
             }
             videoURL = url
             let item = AVPlayerItem(url: url)

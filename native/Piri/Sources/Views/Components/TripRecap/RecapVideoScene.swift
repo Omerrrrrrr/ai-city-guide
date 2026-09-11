@@ -168,7 +168,7 @@ struct RecapVideoScene: View {
                     .foregroundStyle(Color(red: 0.5, green: 0.85, blue: 0.6))
                 }
             }
-            .padding(.bottom, outroProgress > 0 ? 0 : 110)
+            .padding(.bottom, 110 * (1 - outroProgress))
             .opacity(statsProgress * (1 - outroProgress))
             .offset(y: (1 - statsProgress) * 30)
         }

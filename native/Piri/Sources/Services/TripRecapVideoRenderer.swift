@@ -36,6 +36,8 @@ enum TripRecapVideoRenderer {
     /// spinner during what can be several real seconds of work.
     @MainActor
     static func render(trip: Trip, data: TripRecapData, onProgress: @escaping (Double) -> Void = { _ in }) async throws -> URL {
+        try Task.checkCancellation()
+
         let coordinates = routeCoordinates(for: trip)
         guard coordinates.count > 1 else {
             throw RenderError(message: "Not enough route points to render a recap video")
@@ -54,10 +56,11 @@ enum TripRecapVideoRenderer {
             onProgress: onProgress
         )
 
+        defer { try? FileManager.default.removeItem(at: videoOnlyURL) }
+
         let finalURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("trip-recap-\(trip.id)-\(Int(Date().timeIntervalSince1970)).mp4")
         try await muxChime(into: videoOnlyURL, finalURL: finalURL)
-        try? FileManager.default.removeItem(at: videoOnlyURL)
         return finalURL
     }
 
@@ -116,24 +119,39 @@ enum TripRecapVideoRenderer {
         options.region = boundingRegion(for: coordinates)
         options.size = RecapVideoTimeline.size
         options.scale = 1
-        options.showsBuildings = true
         options.traitCollection = UITraitCollection(userInterfaceStyle: .dark)
-        if #available(iOS 16.0, *) {
-            let configuration = MKStandardMapConfiguration(elevationStyle: .flat, emphasisStyle: .muted)
-            configuration.pointOfInterestFilter = .excludingAll
-            options.preferredConfiguration = configuration
-        }
+        // No `#available` guard -- this app's deployment target is iOS 18,
+        // so `MKStandardMapConfiguration` (iOS 16+) is unconditionally
+        // available, and it supersedes the older `showsBuildings`/`mapType`
+        // options entirely once set.
+        let configuration = MKStandardMapConfiguration(elevationStyle: .flat, emphasisStyle: .muted)
+        configuration.pointOfInterestFilter = .excludingAll
+        options.preferredConfiguration = configuration
 
         let snapshotter = MKMapSnapshotter(options: options)
-        return try await withCheckedThrowingContinuation { continuation in
-            snapshotter.start { snapshot, error in
-                if let snapshot {
-                    let points = coordinates.map { snapshot.point(for: $0) }
-                    continuation.resume(returning: (snapshot.image, points))
-                } else {
-                    continuation.resume(throwing: error ?? RenderError(message: "MKMapSnapshotter returned no snapshot"))
+
+        // `MKMapSnapshotter.start` is a plain completion-handler API with
+        // no idea Swift Task cancellation exists -- without this wrapper,
+        // cancelling the surrounding Task while this network-bound call is
+        // still in flight (the single longest uninterruptible wait in the
+        // whole pipeline, easily 1-3+ real seconds) does nothing: the
+        // `withCheckedThrowingContinuation` below just keeps waiting for
+        // the real network response regardless. `snapshotter.cancel()`
+        // still invokes the completion handler itself (with an error), so
+        // the continuation is guaranteed to resume exactly once either way.
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                snapshotter.start { snapshot, error in
+                    if let snapshot {
+                        let points = coordinates.map { snapshot.point(for: $0) }
+                        continuation.resume(returning: (snapshot.image, points))
+                    } else {
+                        continuation.resume(throwing: error ?? RenderError(message: "MKMapSnapshotter returned no snapshot"))
+                    }
                 }
             }
+        } onCancel: {
+            snapshotter.cancel()
         }
     }
 
@@ -192,21 +210,44 @@ enum TripRecapVideoRenderer {
         let renderer = ImageRenderer(content: RecapVideoScene(mapImage: mapImage, routePoints: routePoints, heroImage: heroImage, trip: trip, data: data, t: 0))
         renderer.scale = 1
 
-        for frameIndex in 0..<totalFrames {
-            while !videoInput.isReadyForMoreMediaData {
-                try await Task.sleep(nanoseconds: 2_000_000)
-            }
+        do {
+            for frameIndex in 0..<totalFrames {
+                // Checked every frame, not just once -- dismissing the
+                // Trip Recap sheet mid-generation cancels this Task (see
+                // `TripRecapView`'s `.task`), and without this the ~240-frame
+                // loop would otherwise burn through the rest of a render
+                // nobody will ever see.
+                try Task.checkCancellation()
 
-            let t = totalFrames > 1 ? Double(frameIndex) / Double(totalFrames - 1) : 1
-            renderer.content = RecapVideoScene(mapImage: mapImage, routePoints: routePoints, heroImage: heroImage, trip: trip, data: data, t: t)
+                while !videoInput.isReadyForMoreMediaData {
+                    try Task.checkCancellation()
+                    try await Task.sleep(nanoseconds: 2_000_000)
+                }
 
-            guard let cgImage = renderer.cgImage,
-                  let pixelBuffer = makePixelBuffer(from: cgImage, width: width, height: height, pool: adaptor.pixelBufferPool) else {
-                continue
+                let t = totalFrames > 1 ? Double(frameIndex) / Double(totalFrames - 1) : 1
+                renderer.content = RecapVideoScene(mapImage: mapImage, routePoints: routePoints, heroImage: heroImage, trip: trip, data: data, t: t)
+
+                guard let cgImage = renderer.cgImage,
+                      let pixelBuffer = makePixelBuffer(from: cgImage, width: width, height: height, pool: adaptor.pixelBufferPool) else {
+                    continue
+                }
+                let presentationTime = CMTime(value: CMTimeValue(frameIndex), timescale: RecapVideoTimeline.frameRate)
+                guard adaptor.append(pixelBuffer, withPresentationTime: presentationTime) else {
+                    // The writer itself has failed (a dropped individual
+                    // append -- as opposed to a bad frame render above --
+                    // means something's wrong with the writer/input, not
+                    // just this one frame) -- stop burning through the
+                    // remaining frames and surface the real error instead
+                    // of silently finishing a video that's missing content
+                    // from this point on.
+                    throw writer.error ?? RenderError(message: "Failed to append frame \(frameIndex)")
+                }
+                onProgress(Double(frameIndex + 1) / Double(totalFrames))
             }
-            let presentationTime = CMTime(value: CMTimeValue(frameIndex), timescale: RecapVideoTimeline.frameRate)
-            adaptor.append(pixelBuffer, withPresentationTime: presentationTime)
-            onProgress(Double(frameIndex + 1) / Double(totalFrames))
+        } catch {
+            writer.cancelWriting()
+            try? FileManager.default.removeItem(at: outputURL)
+            throw error
         }
 
         videoInput.markAsFinished()
