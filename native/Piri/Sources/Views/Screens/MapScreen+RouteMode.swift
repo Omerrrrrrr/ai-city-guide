@@ -227,11 +227,19 @@ extension MapScreen {
         defer { isFetchingRoute = false }
         do {
             let result = try await fetchDirectionsResult()
+            // A newer preview request (another stop picked, or the profile
+            // flipped again) may have started and finished while this one
+            // was in flight -- `previewRouteTask` cancels this Task in that
+            // case, but cancellation doesn't interrupt the `await` above by
+            // itself, so this guard is what actually stops a stale, slower
+            // response from overwriting a newer one's result.
+            guard !Task.isCancelled else { return }
             routeGeometry = result.route
             routeDistanceMeters = result.distanceMeters
             routeDurationSeconds = result.durationSeconds
             routeSteps = result.steps
         } catch {
+            guard !Task.isCancelled else { return }
             routeError = directionsErrorMessage(error)
         }
     }

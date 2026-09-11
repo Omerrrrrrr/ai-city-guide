@@ -103,6 +103,14 @@ struct MapScreen: View {
     @State private var searchTask: Task<Void, Never>?
     @State private var liveFetchTask: Task<Void, Never>?
     @State private var poiExplainTask: Task<Void, Never>?
+    /// Unlike `searchTask`/`liveFetchTask`/etc., this one used to be a bare
+    /// untracked `Task { ... }` fired on every `plannedStops`/`routeProfile`
+    /// change with nothing cancelling the previous one -- picking stops
+    /// quickly, or flipping walking/cycling/driving quickly, could let an
+    /// earlier, slower response land after a newer one and clobber the
+    /// displayed route with stale data. Same fix shape as this file's other
+    /// `*Task` properties.
+    @State private var previewRouteTask: Task<Void, Never>?
     @State private var errorMessage: String?
 
     // MARK: Route mode (`MapScreen+RouteMode.swift`)
@@ -359,18 +367,21 @@ struct MapScreen: View {
                 stopsExpanded = true
             }
             guard newStops.count >= 2 else {
+                previewRouteTask?.cancel()
                 routeGeometry = nil
                 routeDistanceMeters = nil
                 routeDurationSeconds = nil
                 routeSteps = []
                 return
             }
-            Task { await previewRoute() }
+            previewRouteTask?.cancel()
+            previewRouteTask = Task { await previewRoute() }
         }
         .onChange(of: routeProfile) { _, _ in
             routeProfileDirty = true
             guard plannedStops.count >= 2 else { return }
-            Task { await previewRoute() }
+            previewRouteTask?.cancel()
+            previewRouteTask = Task { await previewRoute() }
         }
         // Refetch immediately on filter change, not just on the next pan/
         // zoom -- `currentRegion` is kept in sync by `handleRegionChange` on

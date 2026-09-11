@@ -47,6 +47,7 @@ struct AIScreen: View {
     @Environment(TripsStore.self) private var tripsStore
     @Environment(CityStore.self) private var cityStore
     @Environment(TabSelection.self) private var tabSelection
+    @Environment(AuthStore.self) private var authStore
     @Environment(\.dismiss) private var dismiss
 
     @State private var weatherQuery = WeatherQuery()
@@ -561,7 +562,13 @@ struct AIScreen: View {
         let names = Set(missing.map(\.name))
         photosInFlight.formUnion(names)
         defer { photosInFlight.subtract(names) }
-        // Same cache-first endpoint as Home; the optional token is not required.
+        // Same cache-first endpoint as Home's `loadNearbyPhotosIfNeeded` --
+        // unlike the deliberately-tokenless preview fetches in
+        // `POIExplainContent`/`MapScreen` (which stay free to avoid
+        // double-charging the paid quota before a user opens full details),
+        // this IS the full recommendation list a signed-in user actually
+        // sees, same as Home's main grid, so it should get the same
+        // paid-tier photo treatment Home's call already does.
         for start in stride(from: 0, to: missing.count, by: 20) {
             guard !Task.isCancelled else { return }
             let batch = missing[start..<min(start + 20, missing.count)]
@@ -569,7 +576,7 @@ struct AIScreen: View {
                 PhotoBulkPlace(name: $0.name, lat: $0.coordinate.latitude, lng: $0.coordinate.longitude,
                                category: $0.categoryLabel.isEmpty ? nil : $0.categoryLabel)
             })
-            guard let response = try? await PlacesAPI.photosBulk(request), !Task.isCancelled else { return }
+            guard let response = try? await PlacesAPI.photosBulk(request, token: authStore.token), !Task.isCancelled else { return }
             for result in response.results {
                 poiPhotos[result.name] = result
             }
