@@ -10,11 +10,11 @@ struct CuratedInfoRow: View {
     var body: some View {
         let badges = badges
         if !badges.isEmpty {
-            HStack(spacing: 6) {
+            FlowLayout(spacing: 6) {
                 ForEach(badges, id: \.text) { badge in
                     Label(badge.text, systemImage: badge.icon)
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(Theme.navy)
+                        .foregroundStyle(Theme.gold)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(Theme.gold.opacity(0.15), in: Capsule())

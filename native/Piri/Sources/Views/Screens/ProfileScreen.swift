@@ -59,6 +59,7 @@ struct ProfileScreen: View {
     @Environment(FriendsStore.self) private var friendsStore
     @Environment(PurchaseStore.self) private var purchaseStore
 
+    @State private var showingCurrencies = false
     @State private var isEditingName = false
     @State private var isEditingProfileDetails = false
     @State private var isEditingAppSettings = false
@@ -85,6 +86,7 @@ struct ProfileScreen: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
+                Text("tabs.profile").font(Theme.editorial(size: 34)).foregroundStyle(.white)
                 header
                 quickStatsRow
                 cityCard
@@ -110,7 +112,7 @@ struct ProfileScreen: View {
 
                 Text(L("settings.version", (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.0.0"))
                     .font(.system(size: 13))
-                    .foregroundStyle(.secondary.opacity(0.7))
+                    .foregroundStyle(Theme.secondaryText)
                     .frame(maxWidth: .infinity)
 
                 #if DEBUG
@@ -179,7 +181,7 @@ struct ProfileScreen: View {
                     if let expiresAt = user.tierExpiresAt, let date = ISO8601DateFormatter().date(from: expiresAt) {
                         Text(L("settings.premium.renewsOn", date.formatted(date: .abbreviated, time: .omitted)))
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.secondaryText)
                     }
                     if let url = URL(string: "https://apps.apple.com/account/subscriptions") {
                         Link(destination: url) {
@@ -193,13 +195,13 @@ struct ProfileScreen: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text(String(localized: String.LocalizationValue("settings.premium.free")))
                         .font(.system(size: 14))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.secondaryText)
                     Button {
                         showingPaywall = true
                     } label: {
                         Text(String(localized: String.LocalizationValue("settings.premium.upgrade")))
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Theme.navy)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
                             .background(RoundedRectangle(cornerRadius: 14).fill(Theme.gold))
@@ -252,8 +254,8 @@ struct ProfileScreen: View {
                             isEditingName = true
                         } label: {
                             HStack(spacing: 4) {
-                                Text(displayName).font(.system(size: 20, weight: .bold)).foregroundStyle(.white)
-                                Image(systemName: "pencil").font(.system(size: 16)).foregroundStyle(.white.opacity(0.35))
+                                Text(displayName).font(Theme.editorial(size: 26)).foregroundStyle(.white)
+                                Image(systemName: "pencil").font(.system(size: 16)).foregroundStyle(Theme.secondaryText)
                             }
                         }
                     }
@@ -282,17 +284,10 @@ struct ProfileScreen: View {
                 levelIndicator
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 12)
-        .padding(.bottom, 16)
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        // A gradient hero band, not the flat glass fill every other
-        // screen's header uses -- this is the one place in Profile that
-        // should read as the premium, "important" moment, matching the
-        // gold-to-navy header band every mockup gave the Profile screen.
-        .background(LinearGradient.piriHero)
-        .padding(.horizontal, -20)
-        .padding(.top, -20)
+        .background(Theme.cardFill, in: RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Theme.border))
     }
 
     /// The real uploaded photo (`AuthUser.avatarUrl`) when signed in and set,
@@ -334,7 +329,9 @@ struct ProfileScreen: View {
         }) {
             VStack(alignment: .leading, spacing: 14) {
                 if !parts.isEmpty {
-                    Text(parts.joined(separator: " · ")).font(.system(size: 15))
+                    Text(parts.joined(separator: " · ")).font(.subheadline)
+                } else if !isEditingProfileDetails {
+                    Text("design.profile.personalizeHint").font(.subheadline).foregroundStyle(Theme.secondaryText)
                 }
                 if isEditingProfileDetails {
                     profileTabsSegment
@@ -560,7 +557,7 @@ struct ProfileScreen: View {
         // would leave no way back to nil.
         card(titleKey: "settings.occasion.title") {
             VStack(alignment: .leading, spacing: 8) {
-                Text("settings.occasion.subtitle").font(.caption).foregroundStyle(.secondary)
+                Text("settings.occasion.subtitle").font(.caption).foregroundStyle(Theme.secondaryText)
                 ChipGrid(options: ProfileOptions.occasions, isSelected: { profile.occasion == $0 }) { value in
                     Haptics.light()
                     userProfileStore.update { $0.occasion = ($0.occasion == value) ? nil : value }
@@ -590,13 +587,13 @@ struct ProfileScreen: View {
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(.primary)
                         if !isEditingAppSettings {
-                            Text(appSettingsSummary).font(.system(size: 13)).foregroundStyle(.secondary).lineLimit(1)
+                            Text(appSettingsSummary).font(.system(size: 13)).foregroundStyle(Theme.secondaryText).lineLimit(1)
                         }
                     }
                     Spacer()
                     Image(systemName: "chevron.down")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.secondaryText)
                         .rotationEffect(.degrees(isEditingAppSettings ? 180 : 0))
                 }
                 .padding(14)
@@ -650,7 +647,7 @@ struct ProfileScreen: View {
             // only takes effect after Piri is force-quit and reopened.
             Text("settings.language.restartHint")
                 .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.secondaryText)
         }
         .alert(String(localized: "settings.language.restartHint"), isPresented: $showingRestartHint) {
             Button(String(localized: "common.done"), role: .cancel) {}
@@ -741,35 +738,35 @@ struct ProfileScreen: View {
             if let subtitle = cityContextSubtitle {
                 Text(subtitle)
                     .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.secondaryText)
                     .padding(.top, 2)
             }
 
-            // Two independently-pickable sides, not one auto-derived from
-            // the city -- a first version only let the destination side
-            // follow the current city's currency automatically, but the
-            // point of a converter is comparing whatever two currencies
-            // the traveler actually cares about (their own, and a
-            // *specific* one they're pricing against), not just "here vs.
-            // home." Both open the same `CurrencyPickerSheet`, just for a
-            // different side.
-            currencyRow(
-                icon: "banknote",
-                labelKey: "settings.homeCurrency",
-                code: preferredCurrencyStore.code
-            ) { pickingCurrencySide = .home }
+            DisclosureGroup(isExpanded: $showingCurrencies) {
+                VStack(alignment: .leading, spacing: 8) {
+                    currencyRow(
+                        icon: "banknote",
+                        labelKey: "settings.homeCurrency",
+                        code: preferredCurrencyStore.code
+                    ) { pickingCurrencySide = .home }
 
-            currencyRow(
-                icon: "arrow.left.arrow.right",
-                labelKey: "settings.counterpartCurrency",
-                code: destinationCurrencyCode
-            ) { pickingCurrencySide = .destination }
+                    currencyRow(
+                        icon: "arrow.left.arrow.right",
+                        labelKey: "settings.counterpartCurrency",
+                        code: destinationCurrencyCode
+                    ) { pickingCurrencySide = .destination }
 
-            if let liveRate {
-                Text("1 \(preferredCurrencyStore.code) ≈ \(String(format: "%.3f", liveRate)) \(destinationCurrencyCode)")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
+                    if let liveRate {
+                        Text("1 \(preferredCurrencyStore.code) ≈ \(String(format: "%.3f", liveRate)) \(destinationCurrencyCode)")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Theme.secondaryText)
+                    }
+                }.padding(.top, 8)
+            } label: {
+                Label("\(preferredCurrencyStore.code) · \(destinationCurrencyCode)", systemImage: "banknote")
+                    .font(.subheadline).foregroundStyle(Theme.secondaryText).padding(.vertical, 8)
             }
+
         }
         .sheet(item: $pickingCurrencySide) { side in
             CurrencyPickerSheet(
@@ -800,8 +797,9 @@ struct ProfileScreen: View {
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(.primary)
                 Spacer()
-                Text("settings.changeCurrency").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.gold)
+                Image(systemName: "chevron.right").font(.caption).foregroundStyle(Theme.gold)
             }
+            .frame(minHeight: 44)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -869,7 +867,7 @@ struct ProfileScreen: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text(String(localized: String.LocalizationValue("settings.account.signedOutNote")))
                         .font(.system(size: 14))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.secondaryText)
                     Button {
                         showingSignIn = true
                     } label: {
@@ -878,7 +876,8 @@ struct ProfileScreen: View {
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
-                            .background(RoundedRectangle(cornerRadius: 14).fill(Theme.navy))
+                            .background(RoundedRectangle(cornerRadius: 14).fill(Theme.navyLight))
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.border))
                     }
                     .buttonStyle(.plain)
                 }
@@ -943,18 +942,20 @@ struct ProfileScreen: View {
     }
 
     private func quickStatTile(icon: String, value: Int, labelKey: String) -> some View {
-        VStack(spacing: 6) {
-            Image(systemName: icon).font(.system(size: 19)).foregroundStyle(Theme.gold)
-            Text("\(value)").font(.system(size: 18, weight: .bold)).foregroundStyle(.primary)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: icon).font(.body).foregroundStyle(Theme.gold)
+                Spacer(minLength: 4)
+                Text("\(value)").font(.title3.weight(.semibold)).foregroundStyle(.white)
+            }
             Text(String(localized: String.LocalizationValue(labelKey)))
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                .font(.caption).foregroundStyle(Theme.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 14)
-        .piriElevatedCard(cornerRadius: 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(Theme.cardFill, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.border))
     }
 
     @ViewBuilder
@@ -962,16 +963,17 @@ struct ProfileScreen: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(String(localized: String.LocalizationValue(titleKey)))
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .textCase(.uppercase)
+                .foregroundStyle(Theme.secondaryText)
+
             if let noteKey {
-                Text(String(localized: String.LocalizationValue(noteKey))).font(.system(size: 14)).foregroundStyle(.secondary).padding(.top, -6)
+                Text(String(localized: String.LocalizationValue(noteKey))).font(.system(size: 14)).foregroundStyle(Theme.secondaryText).padding(.top, -6)
             }
             content()
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .piriElevatedCard()
+        .background(Theme.cardFill, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.border))
     }
 
     @ViewBuilder
@@ -980,8 +982,8 @@ struct ProfileScreen: View {
             HStack {
                 Text(String(localized: String.LocalizationValue(titleKey)))
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .textCase(.uppercase)
+                    .foregroundStyle(Theme.secondaryText)
+
                 Spacer()
                 trailing()
             }
@@ -989,7 +991,8 @@ struct ProfileScreen: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .piriElevatedCard()
+        .background(Theme.cardFill, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.border))
     }
 }
 

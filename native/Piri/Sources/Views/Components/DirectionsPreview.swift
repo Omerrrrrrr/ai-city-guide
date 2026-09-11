@@ -32,20 +32,23 @@ struct DirectionsPreview: View {
             if isLoading {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
-                    Text("directions.preview.loading").font(.footnote).foregroundStyle(.secondary)
+                    Text("directions.preview.loading").font(.footnote).foregroundStyle(Theme.secondaryText)
                 }
             } else if let errorMessage {
-                Text(errorMessage).font(.footnote).foregroundStyle(Theme.closedRed)
+                Text(errorMessage).font(.footnote).foregroundStyle(.red)
             } else if let result, let distance = result.distanceMeters, let duration = result.durationSeconds {
                 HStack(spacing: 6) {
                     Text(formattedDistance(distance)).font(.subheadline.weight(.bold))
-                    Text("·").foregroundStyle(.secondary)
+                    Text("·").foregroundStyle(Theme.secondaryText)
                     Text(formattedDuration(duration)).font(.subheadline.weight(.bold))
                 }
-                .foregroundStyle(Theme.navy)
+                .foregroundStyle(.white)
             }
         }
-        .task { await fetch() }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.cardFill, in: RoundedRectangle(cornerRadius: 16))
+        .task(id: profile) { await fetch() }
     }
 
     private func modeButton(_ candidate: RouteProfile) -> some View {
@@ -54,23 +57,28 @@ struct DirectionsPreview: View {
             guard !isSelected else { return }
             profile = candidate
             Haptics.light()
-            Task { await fetch() }
         } label: {
             Image(systemName: candidate.icon)
                 .font(.footnote.weight(.semibold))
-                .frame(width: 34, height: 34)
-                // Reversed from the original (every mode circled the same
-                // way, selected or not, reading as no distinction at all
-                // once both fills ended up equally dark) -- only the
-                // selected mode gets a circle now, in gold (this component
-                // is shared between the navy sheet and Map's still-light
-                // inline card, so it needs a fill that reads on both).
-                .foregroundStyle(isSelected ? Theme.navy : .secondary)
+                .frame(width: 44, height: 44)
+                .foregroundStyle(isSelected ? Theme.navy : Theme.secondaryText)
                 .background {
                     if isSelected {
                         Circle().fill(Theme.gold)
                     }
                 }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(String(localized: String.LocalizationValue(modeLabel(candidate))))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private func modeLabel(_ profile: RouteProfile) -> String {
+        switch profile {
+        case .footWalking: "map.route.walking"
+        case .drivingCar: "map.route.driving"
+        case .cyclingRegular: "map.route.cycling"
+        case .transit: "map.route.transit"
         }
     }
 

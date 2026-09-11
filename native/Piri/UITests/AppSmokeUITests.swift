@@ -123,4 +123,64 @@ final class AppSmokeUITests: XCTestCase {
             }
         }
     }
+    func testCitySearchAndProfileLayout() throws {
+        let app = launchedApp()
+        let home = app.buttons["piri.tab.0"]
+        XCTAssertTrue(home.waitForExistence(timeout: 15))
+        home.tap()
+        let city = app.buttons["piri.home.city"]
+        XCTAssertTrue(city.waitForExistence(timeout: 10))
+        city.tap()
+        let input = app.textFields["piri.city.search"]
+        XCTAssertTrue(input.waitForExistence(timeout: 5))
+        input.tap()
+        input.typeText("Oslo")
+        Thread.sleep(forTimeInterval: 3)
+        attach(app, name: "city-search-keyboard")
+        input.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 4))
+        XCTAssertFalse(app.activityIndicators.firstMatch.exists, "Clearing a query must stop loading")
+        attach(app, name: "city-search-cleared")
+        let cancel = app.buttons["piri.picker.cancel"]
+        XCTAssertTrue(cancel.isHittable)
+        cancel.tap()
+        XCTAssertFalse(input.exists)
+        let profile = app.buttons["piri.tab.4"]
+        XCTAssertTrue(profile.waitForExistence(timeout: 5))
+        XCTAssertTrue(profile.isHittable)
+        profile.tap()
+        attach(app, name: "profile-refined")
+    }
+
+    func testPlaceInformationLayout() throws {
+        let app = launchedApp()
+        let home = app.buttons["piri.tab.0"]
+        XCTAssertTrue(home.waitForExistence(timeout: 15))
+        home.tap()
+        let featured = app.buttons["piri.home.featured"]
+        XCTAssertTrue(featured.waitForExistence(timeout: 30))
+        featured.tap()
+        let info = app.buttons["piri.detail.info.disclosure"]
+        for _ in 0..<12 {
+            if info.exists && info.isHittable { break }
+            app.swipeUp()
+            Thread.sleep(forTimeInterval: 2)
+        }
+        XCTAssertTrue(info.waitForExistence(timeout: 20))
+        info.tap()
+        let route = app.buttons["piri.detail.routePreview"]
+        for _ in 0..<6 {
+            if route.exists && route.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(route.isHittable)
+        XCTAssertTrue(app.buttons["piri.detail.fullDetails"].exists)
+        XCTAssertTrue(app.buttons["piri.detail.openMaps"].exists)
+        attach(app, name: "place-info-actions")
+        route.tap()
+        app.swipeUp()
+        let settled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count == 0"), object: app.activityIndicators)
+        XCTAssertEqual(XCTWaiter.wait(for: [settled], timeout: 30), .completed)
+        attach(app, name: "place-route-preview")
+    }
+
 }

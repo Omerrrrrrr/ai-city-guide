@@ -74,6 +74,18 @@ struct POIExplainContent: View {
         }
     }
 
+    private func detailAction(_ key: LocalizedStringKey, icon: String, accessory: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon).font(.body).foregroundStyle(Theme.gold).frame(width: 24)
+            Text(key).font(.subheadline.weight(.medium)).foregroundStyle(.white)
+                .multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 8)
+            Image(systemName: accessory).font(.caption.weight(.semibold)).foregroundStyle(Theme.secondaryText)
+        }
+        .padding(.horizontal, 16).padding(.vertical, 12)
+        .frame(minHeight: 52).contentShape(Rectangle())
+    }
+
     private func detailBody(viewportWidth: CGFloat) -> some View {
         VStack(spacing: 0) {
             ScrollViewReader { proxy in
@@ -176,34 +188,33 @@ struct POIExplainContent: View {
                                                 DietaryTagsRow(tags: dietaryTags)
                                             }
 
-                                            VStack(alignment: .leading, spacing: 12) {
-                                                Button {
-                                                    showingMapItemDetail = true
-                                                } label: {
-                                                    Label("poiExplain.fullDetails", systemImage: "info.circle.fill")
+                                            VStack(spacing: 0) {
+                                                Button { showingMapItemDetail = true } label: {
+                                                    detailAction("poiExplain.fullDetails", icon: "info.circle", accessory: "chevron.right")
                                                 }
-                                                .buttonStyle(.borderedProminent)
-                                                .tint(Theme.gold)
+                                                .accessibilityIdentifier("piri.detail.fullDetails")
                                                 .mapItemDetailSheet(isPresented: $showingMapItemDetail, item: poi.mapItem)
-
-                                                Button("common.openInMaps") {
-                                                    let opensInApp = PlaceDirections.opensInApp
-                                                    PlaceDirections.openInMaps(
-                                                        name: poi.name, coordinate: poi.coordinate, tabSelection: tabSelection)
-                                                    if opensInApp { close() }
-                                                }
-                                                .buttonStyle(.bordered)
-
+                                                Divider().overlay(Theme.border).padding(.leading, 52)
                                                 Button {
                                                     Haptics.light()
                                                     withAnimation(.easeInOut(duration: 0.2)) { showingDirections.toggle() }
                                                 } label: {
-                                                    Label(
-                                                        "directions.preview.button",
-                                                        systemImage: "arrow.triangle.turn.up.right.circle")
+                                                    detailAction("directions.preview.button", icon: "arrow.triangle.turn.up.right.circle", accessory: showingDirections ? "chevron.up" : "chevron.down")
                                                 }
-                                                .buttonStyle(.bordered)
+                                                .accessibilityIdentifier("piri.detail.routePreview")
+                                                Divider().overlay(Theme.border).padding(.leading, 52)
+                                                Button {
+                                                    let opensInApp = PlaceDirections.opensInApp
+                                                    PlaceDirections.openInMaps(name: poi.name, coordinate: poi.coordinate, tabSelection: tabSelection)
+                                                    if opensInApp { close() }
+                                                } label: {
+                                                    detailAction("common.openInMaps", icon: "map", accessory: "arrow.up.right")
+                                                }
+                                                .accessibilityIdentifier("piri.detail.openMaps")
                                             }
+                                            .buttonStyle(.plain)
+                                            .background(Theme.cardFill, in: RoundedRectangle(cornerRadius: 16))
+                                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.border))
 
                                             if showingDirections {
                                                 DirectionsPreview(destination: poi.coordinate)
@@ -221,11 +232,12 @@ struct POIExplainContent: View {
                                         }.padding(.vertical, 12)
                                     } label: {
                                         Label(String(localized: "design.detail.location"), systemImage: "mappin.and.ellipse")
+                                            .accessibilityIdentifier("piri.detail.info.disclosure")
                                             .font(.subheadline.weight(.medium))
                                             .foregroundStyle(.white)
                                             .padding(.vertical, 10)
                                     }
-                                    .accessibilityIdentifier("piri.detail.info.disclosure")
+
                                     Divider().overlay(Theme.border)
                                     DisclosureGroup {
                                         VStack(alignment: .leading, spacing: 14) {
@@ -365,7 +377,7 @@ struct POIExplainContent: View {
         .foregroundStyle(.white)
         .tint(Theme.gold)
         .environment(\.colorScheme, .dark)
-        .overlay(alignment: .top) {
+        .safeAreaInset(edge: .top, spacing: 0) {
             HStack {
                 Button(action: close) {
                     Image(systemName: "chevron.left")
@@ -390,7 +402,8 @@ struct POIExplainContent: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(Text("placeDetail.actionBar.save"))
             }
-            .padding(12)
+            .padding(.horizontal, 12).padding(.vertical, 8)
+            .background(Theme.navy)
         }
         .sheet(item: $addToCollectionKind) { kind in AddToCollectionSheet(poi: poi, kind: kind) }
         .sheet(isPresented: $showingReviews) {

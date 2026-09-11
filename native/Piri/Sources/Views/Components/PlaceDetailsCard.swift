@@ -31,24 +31,25 @@ struct PlaceDetailsCard: View {
                 }
                 if let address {
                     row(icon: "mappin.and.ellipse") {
-                        Text(address).foregroundStyle(.secondary)
+                        Text(address).foregroundStyle(Theme.secondaryText)
                     }
                 }
             }
-            .font(.footnote)
+            .font(.subheadline)
+            .tint(Theme.gold)
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemBackground)))
+            .background(RoundedRectangle(cornerRadius: 14).fill(Theme.cardFill))
         }
     }
 
     private func row(icon: String, @ViewBuilder content: () -> some View) -> some View {
-        HStack(spacing: 10) {
+        HStack(alignment: .top, spacing: 10) {
             Image(systemName: icon)
                 .font(.system(size: 13))
                 .foregroundStyle(Theme.gold)
                 .frame(width: 18)
-            content()
+            content().fixedSize(horizontal: false, vertical: true)
         }
     }
 }

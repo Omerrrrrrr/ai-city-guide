@@ -1,6 +1,13 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "design.profile.personalizeHint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Add your interests and travel style for more personal suggestions." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Sana uygun öneriler için ilgi alanlarını ve seyahat tarzını ekle." } }
+      }
+    },
     "design.tabs.explore" : {
       "extractionState" : "manual",
       "localizations" : {

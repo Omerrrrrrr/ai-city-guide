@@ -11,7 +11,7 @@ struct DietaryTagsRow: View {
     var body: some View {
         if !tags.isEmpty {
             VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
+                FlowLayout(spacing: 6) {
                     ForEach(tags, id: \.self) { tag in
                         let key: String = "diet.\(tag)"
                         Text(String(localized: String.LocalizationValue(key)))

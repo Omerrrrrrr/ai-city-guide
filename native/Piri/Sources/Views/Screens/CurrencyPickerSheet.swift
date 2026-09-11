@@ -34,7 +34,7 @@ struct CurrencyPickerSheet: View {
                     } else if filteredCodes.isEmpty {
                         Text(L("cityPicker.noResults", query))
                             .font(.system(size: 14))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.secondaryText)
                             .frame(maxWidth: .infinity)
                             .padding(.top, 40)
                     } else {
@@ -48,6 +48,9 @@ struct CurrencyPickerSheet: View {
             }
             .scrollDismissesKeyboard(.immediately)
         }
+        .background(Theme.screenBackground.ignoresSafeArea())
+        .preferredColorScheme(.dark)
+        .tint(Theme.gold)
         .navigationBarHidden(true)
         .task { await loadCodes() }
     }
@@ -56,12 +59,13 @@ struct CurrencyPickerSheet: View {
         VStack(spacing: 14) {
             HStack {
                 Button("common.cancel") { dismiss() }
+                    .accessibilityIdentifier("piri.picker.cancel")
                     .font(.system(size: 16))
                     .foregroundStyle(.white.opacity(0.7))
                 Spacer()
                 Text(title).font(.system(size: 17, weight: .bold)).foregroundStyle(.white)
                 Spacer()
-                Color.clear.frame(width: 56)
+                Color.clear.frame(width: 56, height: 44)
             }
             .padding(.horizontal, 20)
 
@@ -76,7 +80,7 @@ struct CurrencyPickerSheet: View {
         }
         .padding(.top, 12)
         .padding(.bottom, 14)
-        .piriGlassSurface()
+        .background(Theme.navy)
     }
 
     private func row(_ code: String) -> some View {
@@ -86,7 +90,7 @@ struct CurrencyPickerSheet: View {
             dismiss()
         } label: {
             HStack {
-                Text(code).font(.system(size: 16, weight: .semibold)).foregroundStyle(.primary)
+                Text(code).font(.system(size: 16, weight: .semibold)).foregroundStyle(.white)
                 Spacer()
                 if code == selectedCode {
                     Image(systemName: "checkmark").font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.gold)

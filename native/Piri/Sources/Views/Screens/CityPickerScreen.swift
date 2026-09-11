@@ -37,7 +37,7 @@ struct CityPickerScreen: View {
 
                     if let errorMessage {
                         Text(errorMessage)
-                            .foregroundStyle(Theme.closedRed)
+                            .foregroundStyle(.red)
                             .padding(14)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(RoundedRectangle(cornerRadius: 12).fill(Theme.closedRed.opacity(0.08)))
@@ -47,19 +47,19 @@ struct CityPickerScreen: View {
                         resultsSection
                     }
 
-                    if !isLoading, errorMessage == nil, !query.trimmingCharacters(in: .whitespaces).isEmpty, results.isEmpty {
+                    if !isLoading, errorMessage == nil, query.trimmingCharacters(in: .whitespaces).count >= 3, results.isEmpty {
                         VStack(spacing: 8) {
-                            Text(L("cityPicker.noResults", query)).font(.system(size: 16, weight: .semibold)).foregroundStyle(.secondary)
-                            Text("cityPicker.noResultsSub").font(.system(size: 14)).foregroundStyle(.secondary.opacity(0.7))
+                            Text(L("cityPicker.noResults", query)).font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.secondaryText)
+                            Text("cityPicker.noResultsSub").font(.system(size: 14)).foregroundStyle(Theme.secondaryText)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.top, 32)
                     }
 
-                    if query.trimmingCharacters(in: .whitespaces).isEmpty {
+                    if query.trimmingCharacters(in: .whitespaces).count < 3 {
                         VStack(spacing: 10) {
-                            Text("cityPicker.hintTitle").font(.system(size: 17, weight: .bold)).foregroundStyle(.secondary)
-                            Text("cityPicker.hintBody").font(.system(size: 14)).foregroundStyle(.secondary.opacity(0.7)).multilineTextAlignment(.center)
+                            Text("cityPicker.hintTitle").font(.system(size: 17, weight: .bold)).foregroundStyle(Theme.secondaryText)
+                            Text("cityPicker.hintBody").font(.system(size: 14)).foregroundStyle(Theme.secondaryText).multilineTextAlignment(.center)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.top, 32)
@@ -74,6 +74,11 @@ struct CityPickerScreen: View {
             // city while the keyboard is still up silently does nothing.
             .scrollDismissesKeyboard(.immediately)
         }
+        .background(Theme.screenBackground.ignoresSafeArea())
+        .preferredColorScheme(.dark)
+        .foregroundStyle(.white)
+        .tint(Theme.gold)
+        .onDisappear { searchTask?.cancel(); isLoading = false }
         .navigationBarHidden(true)
     }
 
@@ -81,16 +86,18 @@ struct CityPickerScreen: View {
         VStack(spacing: 14) {
             HStack {
                 Button("common.cancel") { dismiss() }
+                    .accessibilityIdentifier("piri.picker.cancel")
                     .font(.system(size: 16))
                     .foregroundStyle(.white.opacity(0.7))
                 Spacer()
                 Text("cityPicker.title").font(.system(size: 17, weight: .bold)).foregroundStyle(.white)
                 Spacer()
-                Color.clear.frame(width: 56)
+                Color.clear.frame(width: 56, height: 44)
             }
             .padding(.horizontal, 20)
 
-            TextField(String(localized: "cityPicker.searchPlaceholder"), text: $query)
+            TextField("", text: $query, prompt: Text("cityPicker.searchPlaceholder").foregroundStyle(Theme.secondaryText))
+                .accessibilityIdentifier("piri.city.search")
                 .autocorrectionDisabled()
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
@@ -100,7 +107,7 @@ struct CityPickerScreen: View {
         }
         .padding(.top, 12)
         .padding(.bottom, 14)
-        .piriGlassSurface()
+        .background(Theme.navy)
         .onChange(of: query) { _, newValue in
             scheduleSearch(newValue)
         }
@@ -108,7 +115,7 @@ struct CityPickerScreen: View {
 
     private func currentCitySection(_ cityName: String) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("cityPicker.currentlyExploring").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary).textCase(.uppercase)
+            Text("cityPicker.currentlyExploring").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.secondaryText).textCase(.uppercase)
             HStack(spacing: 10) {
                 Circle().fill(Theme.gold).frame(width: 8, height: 8)
                 Text(cityName).font(.system(size: 17, weight: .semibold))
@@ -119,34 +126,36 @@ struct CityPickerScreen: View {
                 } label: {
                     Text("common.showAll")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.secondaryText)
                         .padding(.horizontal, 12).padding(.vertical, 6)
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(.secondary.opacity(0.25)))
                 }
             }
         }
         .padding(16)
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(.secondary.opacity(0.15)))
+        .background(Theme.cardFill, in: RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Theme.border))
     }
 
     private var resultsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("cityPicker.results").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary).textCase(.uppercase)
+            Text("cityPicker.results").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.secondaryText).textCase(.uppercase)
             ForEach(Array(results.enumerated()), id: \.offset) { _, city in
                 Button {
                     select(city)
                 } label: {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(city.name).font(.system(size: 16, weight: .semibold)).foregroundStyle(.primary)
+                            Text(city.name).font(.system(size: 16, weight: .semibold)).foregroundStyle(.white)
                             if let country = city.country {
-                                Text(country).font(.system(size: 13)).foregroundStyle(.secondary)
+                                Text(country).font(.system(size: 13)).foregroundStyle(Theme.secondaryText)
                             }
                         }
                         Spacer()
-                        Text("›").font(.system(size: 20)).foregroundStyle(.secondary)
+                        Image(systemName: "chevron.right").font(.caption).foregroundStyle(Theme.secondaryText)
                     }
-                    .padding(.vertical, 4)
+                    .frame(minHeight: 48)
+                    .padding(.vertical, 6)
                     // Same fix as `ProfileScreen.cityCard` — the
                     // `Spacer()`-filled middle of the row isn't part of any
                     // subview's rendered bounds, so it's otherwise a dead
@@ -157,7 +166,8 @@ struct CityPickerScreen: View {
             }
         }
         .padding(16)
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(.secondary.opacity(0.15)))
+        .background(Theme.cardFill, in: RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Theme.border))
     }
 
     // Nominatim's usage policy prohibits autocomplete/type-ahead search — wait
@@ -165,12 +175,15 @@ struct CityPickerScreen: View {
     private func scheduleSearch(_ text: String) {
         searchTask?.cancel()
         errorMessage = nil
+        results = []
+        isLoading = false
 
         guard text.trimmingCharacters(in: .whitespaces).count >= 3 else {
             results = []
             return
         }
 
+        isLoading = true
         searchTask = Task {
             try? await Task.sleep(for: .milliseconds(400))
             guard !Task.isCancelled else { return }

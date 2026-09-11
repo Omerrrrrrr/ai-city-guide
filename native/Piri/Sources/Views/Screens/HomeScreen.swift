@@ -199,6 +199,7 @@ struct HomeScreen: View {
                 Button { showingCityPicker = true } label: {
                     HStack(spacing: 5) {
                         Text(cityStore.cityName ?? String(localized: "common.everywhere"))
+                            .lineLimit(1)
                         Image(systemName: "chevron.down").font(.caption2)
                     }
                     .font(.subheadline)
@@ -209,6 +210,7 @@ struct HomeScreen: View {
                     .overlay(Capsule().stroke(Theme.border))
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("piri.home.city")
                 Spacer(minLength: 0)
                 if let weather = weatherQuery.weather {
                     Button {
