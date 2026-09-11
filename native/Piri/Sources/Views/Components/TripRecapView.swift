@@ -1,6 +1,7 @@
 import AVKit
 import Photos
 import SwiftUI
+import UIKit
 
 /// The Trip Recap -- a real, shareable .mp4 (see `TripRecapVideoRenderer`),
 /// not the swipeable story of static cards this used to be (replaced
@@ -137,15 +138,34 @@ struct TripRecapView: View {
             friendsStore: friendsStore,
             token: authStore.token
         )
-        do {
+        // Video encoding is exactly the kind of work `beginBackgroundTask`
+        // exists for -- without it, backgrounding the app mid-render (a
+        // call comes in, the user switches apps) can get this process
+        // suspended within seconds with nothing requesting extra time,
+        // abandoning `AVAssetWriter` mid-write. The render already handles
+        // `Task` cancellation cleanly (see `TripRecapVideoRenderer`,
+        // hardened earlier this session for the sheet-dismiss case) -- this
+        // just gives the system a controlled way to trigger that same
+        // cleanup from backgrounding too, instead of an uncontrolled
+        // suspension mid-write.
+        let renderTask = Task {
             // `render` and the frame loop inside it are both `@MainActor`,
             // and this call itself already runs on the MainActor (`.task`
-            // on a View), so `onProgress` fires here with no actor hop
-            // needed -- a nested `Task { @MainActor in ... }` per frame
-            // would just be 240 wasted Task allocations.
-            let url = try await TripRecapVideoRenderer.render(trip: trip, data: data) { fraction in
+            // on a View, inherited by this unstructured `Task`), so
+            // `onProgress` fires here with no actor hop needed -- a nested
+            // `Task { @MainActor in ... }` per frame would just be 240
+            // wasted Task allocations.
+            try await TripRecapVideoRenderer.render(trip: trip, data: data) { fraction in
                 progress = fraction
             }
+        }
+        let backgroundTaskId = UIApplication.shared.beginBackgroundTask(withName: "TripRecapRender") {
+            renderTask.cancel()
+        }
+        defer { UIApplication.shared.endBackgroundTask(backgroundTaskId) }
+
+        do {
+            let url = try await renderTask.value
             videoURL = url
             let item = AVPlayerItem(url: url)
             let queuePlayer = AVQueuePlayer()

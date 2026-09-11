@@ -4,8 +4,21 @@ import Observation
 /// Port of the location parts of `mobile/app/(tabs)/map.tsx` (GPS breadcrumb
 /// via `expo-location`'s `watchPositionAsync`) plus the plain
 /// `getCurrentPositionAsync` calls in `use-weather.ts` / `use-places.ts`.
+///
+/// `@MainActor`, matching this app's other `@Observable` delegate-backed
+/// classes (`CameraController`, `PushNotificationManager`) -- unlike them,
+/// this one previously had no isolation at all despite
+/// `CLLocationManagerDelegate` callbacks mutating `@Observable` state read
+/// by seven different screens. Apple only documents delivering these
+/// callbacks on the run loop the manager was created on (main, here, since
+/// every call site creates this via `@State` on a View), not as a
+/// compiler-enforced guarantee -- marking the class isolated makes Swift's
+/// generated ObjC dispatch thunk hop to the main actor for these callbacks
+/// itself, closing that gap instead of relying on an undocumented
+/// assumption.
 @Observable
-final class LocationManager: NSObject, CLLocationManagerDelegate {
+@MainActor
+final class LocationManager: NSObject, @MainActor CLLocationManagerDelegate {
     private(set) var authorizationStatus: CLAuthorizationStatus
     private(set) var currentLocation: CLLocationCoordinate2D?
     private(set) var breadcrumb: [TripWaypoint] = []
