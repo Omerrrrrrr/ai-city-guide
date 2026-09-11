@@ -51,6 +51,12 @@ struct AvatarPickerSheet: View {
                         } label: {
                             Label(String(localized: "profile.avatar.remove"), systemImage: "trash")
                         }
+                        // The toolbar's Save button already gates on
+                        // `isSubmitting`; this one didn't, so a rapid
+                        // double-tap could fire two concurrent
+                        // `submit(dataUri: nil)` calls with no feedback
+                        // that removal was already in progress.
+                        .disabled(isSubmitting)
                     }
                 }
 

@@ -320,6 +320,10 @@ struct POIExplainContent: View {
                                             HStack(spacing: 6) {
                                                 Image(systemName: "exclamationmark.triangle.fill")
                                                 Text(chatError)
+                                                Spacer()
+                                                Button("common.retry") { Task { await retryLastChat() } }
+                                                    .buttonStyle(.bordered)
+                                                    .controlSize(.small)
                                             }
                                             .font(.footnote)
                                             .foregroundStyle(Theme.closedRed)
@@ -783,6 +787,22 @@ struct POIExplainContent: View {
 
         let historyForRequest = chatHistory
         chatHistory.append(POIChatTurn(role: .user, content: message))
+        await performChatRequest(message: message, historyForRequest: historyForRequest)
+    }
+
+    /// `chatInput` is cleared optimistically before the send, so on failure
+    /// the user has nothing left to retype -- unlike the `explain()` error
+    /// right below this one in `body`, which already has a retry button.
+    /// The failed user turn is still sitting in `chatHistory` (appended
+    /// before the request, never rolled back on failure), so retrying just
+    /// resends that same turn's content instead of re-appending a duplicate.
+    private func retryLastChat() async {
+        guard let lastTurn = chatHistory.last, lastTurn.role == .user else { return }
+        let historyForRequest = Array(chatHistory.dropLast())
+        await performChatRequest(message: lastTurn.content, historyForRequest: historyForRequest)
+    }
+
+    private func performChatRequest(message: String, historyForRequest: [POIChatTurn]) async {
         chatSending = true
         chatError = nil
         defer { chatSending = false }
