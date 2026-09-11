@@ -1,25 +1,10 @@
 import MapKit
 import SwiftUI
 
-/// The personalized AI blurb for one POI — everything: description, photos,
-/// combined rating/reviews, plain contact details, hours access, directions
-/// preview, Look Around, and a follow-up chat. Self-contained (owns all its
-/// own state, fetches its own data via `.task`), so it renders identically
-/// wherever it's embedded.
-///
-/// Two presentations exist because the two contexts genuinely differ: a
-/// full-screen sheet (`POIExplainSheet`, below) for list-based screens with
-/// no map to stay visible behind it, and an inline floating card
-/// (`MapScreen.mapFeatureCard`) that keeps the map visible/pannable behind
-/// it. They used to be two separately-maintained implementations that
-/// silently drifted apart (reported live: "neden farklı sayfalar çıkıyor" —
-/// the inline card was missing chat entirely, still had a since-removed
-/// rating-popover icon) -- this type is the single shared content both now
-/// embed, so a feature added to one is never accidentally missing from the
-/// other again. `onClose` is `nil` for the sheet case (dismiss goes through
-/// the NavigationStack's own toolbar Cancel button, the HIG-correct pattern
-/// for a full-screen modal); non-nil for the inline-card case, which has no
-/// nav bar of its own and needs an in-content close affordance instead.
+/// Shared editorial POI detail for the full modal and expanded map card.
+/// Owns its data and actions; the map parent controls collapsed presentation.
+/// Secondary content is disclosed without losing reviews, sources, or chat.
+/// `onClose` dismisses the inline card; modal callers use the environment.
 struct POIExplainContent: View {
     let poi: POIPlace
     var onClose: (() -> Void)? = nil
@@ -84,6 +69,12 @@ struct POIExplainContent: View {
     @State private var chatLocationManager = LocationManager()
 
     var body: some View {
+        GeometryReader { viewport in
+            detailBody(viewportWidth: viewport.size.width)
+        }
+    }
+
+    private func detailBody(viewportWidth: CGFloat) -> some View {
         VStack(spacing: 0) {
             ScrollViewReader { proxy in
                 ScrollView {
@@ -107,242 +98,244 @@ struct POIExplainContent: View {
                         // instead of just another inset element on the card.
                         let photosToShow = result?.photos ?? previewPhoto.map { [$0] } ?? []
                         POIPhotoGallery(photos: photosToShow) {
+                            VStack(alignment: .leading, spacing: 12) {
+                                detailHeader
+                                collectionActions
+                                Divider().overlay(Theme.border).padding(.vertical, 6)
+
+                                // AI explanation — the reason someone opens this
+                                // sheet at all, but the slowest piece (grounding
+                                // fetches + LLM generation, all server-side before
+                                // this endpoint responds at all), so it stays
+                                // skeleton-loading independently of the photo above.
+                                if loading {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        SkeletonBox().frame(width: 180, height: 14)
+                                        SkeletonBox().frame(height: 12)
+                                        SkeletonBox().frame(width: 220, height: 12)
+                                    }
+                                } else if let result {
+                                    // "Why Piri recommends this" -- headline/body/
+                                    // highlights exactly as before, just gathered
+                                    // under an explicit label instead of running
+                                    // straight into the badges/ratings/reviews
+                                    // below with nothing marking where the AI's
+                                    // own voice ends. Deliberately plain text, no
+                                    // colored box -- a bordered callout here read
+                                    // as louder than the content warranted.
+                                    HStack(spacing: 9) {
+                                        Image(systemName: "sparkles").foregroundStyle(Theme.gold)
+                                        Text(String(localized: "design.detail.narration"))
+                                            .foregroundStyle(Theme.secondaryText)
+                                    }
+                                    .font(.system(size: 13, weight: .medium))
+                                    Text(result.headline)
+                                        .font(.system(size: 17, weight: .medium))
+                                        .fixedSize(horizontal: false, vertical: true)
+                                    DisclosureGroup {
+                                        VStack(alignment: .leading, spacing: 12) {
+                                            Text(result.body).font(.system(size: 16)).lineSpacing(5)
+                                            ForEach(result.highlights, id: \.self) { highlight in
+                                                HStack(alignment: .top, spacing: 8) {
+                                                    Circle().fill(Theme.gold).frame(width: 4, height: 4).padding(.top, 8)
+                                                    Text(highlight).font(.subheadline).lineSpacing(3)
+                                                }
+                                            }
+                                        }
+                                        .padding(.vertical, 10)
+                                    } label: {
+                                        Text(String(localized: "design.detail.fullStory"))
+                                            .font(.subheadline)
+                                            .foregroundStyle(Theme.secondaryText)
+                                    }
+                                    .accessibilityIdentifier("piri.detail.narration.disclosure")
+
+                                    if weatherQuery.weather != nil || goldenHourBadgeWindow(result) != nil {
+                                        HStack(spacing: 8) {
+                                            if let weather = weatherQuery.weather {
+                                                weatherBadge(weather)
+                                            }
+                                            if let window = goldenHourBadgeWindow(result) {
+                                                goldenHourBadge(window)
+                                            }
+                                        }
+                                    }
+
+                                    Divider().overlay(Theme.border)
+                                    DisclosureGroup {
+                                        VStack(alignment: .leading, spacing: 14) {
+                                            verifiedFactsRow(result)
+                                            if let rating = result.rating {
+                                                hoursRow(rating)
+                                            }
+                                            PlaceDetailsCard(mapItem: poi.mapItem)
+                                            if let curatedInfo = result.curatedInfo {
+                                                CuratedInfoRow(info: curatedInfo)
+                                            }
+                                            if let dietaryTags = result.dietaryTags {
+                                                DietaryTagsRow(tags: dietaryTags)
+                                            }
+
+                                            VStack(alignment: .leading, spacing: 12) {
+                                                Button {
+                                                    showingMapItemDetail = true
+                                                } label: {
+                                                    Label("poiExplain.fullDetails", systemImage: "info.circle.fill")
+                                                }
+                                                .buttonStyle(.borderedProminent)
+                                                .tint(Theme.gold)
+                                                .mapItemDetailSheet(isPresented: $showingMapItemDetail, item: poi.mapItem)
+
+                                                Button("common.openInMaps") {
+                                                    let opensInApp = PlaceDirections.opensInApp
+                                                    PlaceDirections.openInMaps(
+                                                        name: poi.name, coordinate: poi.coordinate, tabSelection: tabSelection)
+                                                    if opensInApp { close() }
+                                                }
+                                                .buttonStyle(.bordered)
+
+                                                Button {
+                                                    Haptics.light()
+                                                    withAnimation(.easeInOut(duration: 0.2)) { showingDirections.toggle() }
+                                                } label: {
+                                                    Label(
+                                                        "directions.preview.button",
+                                                        systemImage: "arrow.triangle.turn.up.right.circle")
+                                                }
+                                                .buttonStyle(.bordered)
+                                            }
+
+                                            if showingDirections {
+                                                DirectionsPreview(destination: poi.coordinate)
+                                            }
+
+                                            // Apple's own street-level imagery — silently
+                                            // omitted where Look Around has no coverage
+                                            // (common outside a handful of countries)
+                                            // rather than showing an empty/broken
+                                            // placeholder.
+                                            if let lookAroundScene {
+                                                LookAroundCard(scene: lookAroundScene, height: 180)
+                                            }
+
+                                        }.padding(.vertical, 12)
+                                    } label: {
+                                        Label(String(localized: "design.detail.location"), systemImage: "mappin.and.ellipse")
+                                            .font(.subheadline.weight(.medium))
+                                            .foregroundStyle(.white)
+                                            .padding(.vertical, 10)
+                                    }
+                                    .accessibilityIdentifier("piri.detail.info.disclosure")
+                                    Divider().overlay(Theme.border)
+                                    DisclosureGroup {
+                                        VStack(alignment: .leading, spacing: 14) {
+                                            if let rating = result.rating {
+                                                TripAdvisorRatingRow(rating: rating, showHours: false)
+                                                // Only offered when we already know
+                                                // Tripadvisor has a matched location for
+                                                // this place (i.e. `rating` resolved at
+                                                // all) -- avoids a dead-end tap that
+                                                // fetches reviews for a place with none.
+                                                Button {
+                                                    Haptics.light()
+                                                    showingReviews = true
+                                                } label: {
+                                                    Label(
+                                                        L("poiReviews.seeAll", rating.reviewCount), systemImage: "text.bubble"
+                                                    )
+                                                    .font(.footnote.weight(.semibold))
+                                                }
+                                            }
+                                            PiriReviewsSection(
+                                                poi: poi, tripAdvisorRating: result.rating, googleRating: result.googleRating,
+                                                initialPiriRating: result.piriRating, reviewsSummary: result.reviewsSummary,
+                                                aspectHighlights: result.aspectHighlights)
+
+                                        }.padding(.vertical, 12)
+                                    } label: {
+                                        Label("poiExplain.reviewsSection", systemImage: "star.bubble")
+                                            .font(.subheadline.weight(.medium))
+                                            .foregroundStyle(.white)
+                                            .padding(.vertical, 10)
+                                    }
+                                    .accessibilityIdentifier("piri.detail.reviews.disclosure")
+
+                                    // Chat starts collapsed -- see `showingChat`'s
+                                    // own doc comment.
+                                    Divider().padding(.vertical, 4)
+                                    Button {
+                                        Haptics.light()
+                                        withAnimation { showingChat.toggle() }
+                                    } label: {
+                                        HStack(spacing: 12) {
+                                            Label("poiExplain.askAboutPlace", systemImage: "bubble.left.and.bubble.right")
+                                            Spacer(minLength: 8)
+                                            Image(systemName: showingChat ? "chevron.down" : "chevron.right")
+                                                .font(.caption)
+                                        }
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundStyle(.white)
+                                        .frame(minHeight: 44)
+                                        .contentShape(Rectangle())
+                                    }
+                                    // A real nearby university exists (Wikidata-
+                                    // sourced) -- an honest invitation, not a
+                                    // promise: asking might still come back empty
+                                    // if that university never wrote about this
+                                    // specific place (see `hasLocalAcademicSources`'s
+                                    // own doc comment). Hidden once chat is open --
+                                    // at that point they can just ask directly.
+                                    if !showingChat, result.hasLocalAcademicSources {
+                                        Text("poiExplain.localAcademicHint")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+
+                                    if showingChat {
+                                        if !chatHistory.isEmpty {
+                                            ForEach(chatHistory) { turn in chatBubble(turn) }
+                                        }
+
+                                        if chatSending {
+                                            HStack {
+                                                ProgressView().tint(Theme.gold)
+                                                Spacer()
+                                            }
+                                            .id("chat-sending")
+                                        }
+
+                                        if let chatError {
+                                            HStack(spacing: 6) {
+                                                Image(systemName: "exclamationmark.triangle.fill")
+                                                Text(chatError)
+                                            }
+                                            .font(.footnote)
+                                            .foregroundStyle(Theme.closedRed)
+                                            .padding(10)
+                                            .background(
+                                                Theme.closedRed.opacity(0.12), in: RoundedRectangle(cornerRadius: 10)
+                                            )
+                                            .id("chat-error")
+                                        }
+                                    }
+                                } else if let errorMessage {
+                                    HStack(spacing: 8) {
+                                        Text(errorMessage).font(.footnote).foregroundStyle(Theme.closedRed)
+                                        Spacer()
+                                        Button("common.retry") { Task { await explain() } }
+                                            .buttonStyle(.bordered)
+                                            .controlSize(.small)
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.top, 20)
+                            .padding(.bottom, 24)
+                        } trailing: {
                             UserPhotoSection(poiName: poi.name, coordinate: poi.coordinate, photos: $userPhotos)
                         }
-
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack(alignment: .top) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(poi.name).font(.title3.bold())
-                                if !poi.categoryLabel.isEmpty {
-                                    Text(poi.categoryLabel).font(.subheadline).foregroundStyle(.secondary)
-                                }
-                                if let badge = result?.unescoBadge {
-                                    unescoBadgeView(badge)
-                                }
-                                if let heritage = result?.heritageDesignation {
-                                    heritageDesignationBadgeView(heritage)
-                                }
-                            }
-                            Spacer()
-                            // `poi.mapItem.identifier` is nil for some
-                            // POIs (a known Apple gap, not a bug here) —
-                            // `asReference.identifier` is never nil (it
-                            // falls back to a synthetic id), so
-                            // `isSaved`/`isPlanned` checks always work.
-                            let identifier = poi.asReference.identifier
-                            HStack(spacing: 14) {
-                                Button {
-                                    Haptics.light()
-                                    addToCollectionKind = .saved
-                                } label: {
-                                    Image(systemName: savedPlacesStore.isSaved(identifier) ? "bookmark.fill" : "bookmark")
-                                        .foregroundStyle(savedPlacesStore.isSaved(identifier) ? Theme.gold : .secondary)
-                                }
-                                Button {
-                                    Haptics.light()
-                                    addToCollectionKind = .plan
-                                } label: {
-                                    // Not "flag" — that's MapScreen's
-                                    // Route Mode toggle icon; kept
-                                    // distinct so the two concepts don't
-                                    // look like the same action there.
-                                    Image(systemName: savedPlacesStore.isPlanned(identifier) ? "suitcase.fill" : "suitcase")
-                                        .foregroundStyle(savedPlacesStore.isPlanned(identifier) ? Theme.gold : .secondary)
-                                }
-                                if let onClose {
-                                    Button {
-                                        onClose()
-                                    } label: {
-                                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
-                                    }
-                                }
-                            }
-                            .font(.title3)
-                        }
-
-                        // AI explanation — the reason someone opens this
-                        // sheet at all, but the slowest piece (grounding
-                        // fetches + LLM generation, all server-side before
-                        // this endpoint responds at all), so it stays
-                        // skeleton-loading independently of the photo above.
-                        if loading {
-                            VStack(alignment: .leading, spacing: 8) {
-                                SkeletonBox().frame(width: 180, height: 14)
-                                SkeletonBox().frame(height: 12)
-                                SkeletonBox().frame(width: 220, height: 12)
-                            }
-                        } else if let result {
-                            // "Why Piri recommends this" -- headline/body/
-                            // highlights exactly as before, just gathered
-                            // under an explicit label instead of running
-                            // straight into the badges/ratings/reviews
-                            // below with nothing marking where the AI's
-                            // own voice ends. Deliberately plain text, no
-                            // colored box -- a bordered callout here read
-                            // as louder than the content warranted.
-                            sectionLabel("poiExplain.whyRecommends")
-                            Text(result.headline).font(.subheadline.bold()).foregroundStyle(Theme.gold)
-                            Text(result.body).font(.footnote)
-                            ForEach(result.highlights, id: \.self) { highlight in
-                                HStack(alignment: .top, spacing: 6) {
-                                    Circle().fill(Theme.gold).frame(width: 5, height: 5).padding(.top, 6)
-                                    Text(highlight).font(.caption)
-                                }
-                            }
-
-                            if weatherQuery.weather != nil || goldenHourBadgeWindow(result) != nil {
-                                HStack(spacing: 8) {
-                                    if let weather = weatherQuery.weather {
-                                        weatherBadge(weather)
-                                    }
-                                    if let window = goldenHourBadgeWindow(result) {
-                                        goldenHourBadge(window)
-                                    }
-                                }
-                            }
-
-                            verifiedFactsRow(result)
-
-                            // "Good to know" -- hours (Tripadvisor's real
-                            // formatted schedule, the only source of it
-                            // besides Apple's own native sheet below),
-                            // phone/website/address, and whatever curated/
-                            // dietary tags apply, grouped under one label
-                            // instead of stacked as separate unlabeled
-                            // cards.
-                            sectionLabel("poiExplain.goodToKnow")
-                            if let rating = result.rating {
-                                hoursRow(rating)
-                            }
-                            PlaceDetailsCard(mapItem: poi.mapItem)
-                            if let curatedInfo = result.curatedInfo {
-                                CuratedInfoRow(info: curatedInfo)
-                            }
-                            if let dietaryTags = result.dietaryTags {
-                                DietaryTagsRow(tags: dietaryTags)
-                            }
-
-                            HStack(spacing: 10) {
-                                Button {
-                                    showingMapItemDetail = true
-                                } label: {
-                                    Label("poiExplain.fullDetails", systemImage: "info.circle.fill")
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .tint(Theme.gold)
-                                .mapItemDetailSheet(isPresented: $showingMapItemDetail, item: poi.mapItem)
-
-                                Button("common.openInMaps") {
-                                    let opensInApp = PlaceDirections.opensInApp
-                                    PlaceDirections.openInMaps(name: poi.name, coordinate: poi.coordinate, tabSelection: tabSelection)
-                                    if opensInApp { close() }
-                                }
-                                .buttonStyle(.bordered)
-
-                                Button {
-                                    Haptics.light()
-                                    withAnimation(.easeInOut(duration: 0.2)) { showingDirections.toggle() }
-                                } label: {
-                                    Label("directions.preview.button", systemImage: "arrow.triangle.turn.up.right.circle")
-                                }
-                                .buttonStyle(.bordered)
-                            }
-
-                            if showingDirections {
-                                DirectionsPreview(destination: poi.coordinate)
-                            }
-
-                            // Apple's own street-level imagery — silently
-                            // omitted where Look Around has no coverage
-                            // (common outside a handful of countries)
-                            // rather than showing an empty/broken
-                            // placeholder.
-                            if let lookAroundScene {
-                                LookAroundCard(scene: lookAroundScene, height: 180)
-                            }
-
-                            // "Reviews" -- Tripadvisor's own bubble/score
-                            // (hours already shown above, not repeated
-                            // here) plus Piri's own combined section.
-                            sectionLabel("poiExplain.reviewsSection")
-                            if let rating = result.rating {
-                                TripAdvisorRatingRow(rating: rating, showHours: false)
-                                // Only offered when we already know
-                                // Tripadvisor has a matched location for
-                                // this place (i.e. `rating` resolved at
-                                // all) -- avoids a dead-end tap that
-                                // fetches reviews for a place with none.
-                                Button {
-                                    Haptics.light()
-                                    showingReviews = true
-                                } label: {
-                                    Label(L("poiReviews.seeAll", rating.reviewCount), systemImage: "text.bubble")
-                                        .font(.footnote.weight(.semibold))
-                                }
-                            }
-                            PiriReviewsSection(poi: poi, tripAdvisorRating: result.rating, googleRating: result.googleRating, initialPiriRating: result.piriRating, reviewsSummary: result.reviewsSummary, aspectHighlights: result.aspectHighlights)
-
-                            // Chat starts collapsed -- see `showingChat`'s
-                            // own doc comment.
-                            Divider().padding(.vertical, 4)
-                            Button {
-                                Haptics.light()
-                                withAnimation { showingChat.toggle() }
-                            } label: {
-                                Label("poiExplain.askAboutPlace", systemImage: "bubble.left.and.bubble.right")
-                                    .font(.footnote.weight(.semibold))
-                            }
-                            // A real nearby university exists (Wikidata-
-                            // sourced) -- an honest invitation, not a
-                            // promise: asking might still come back empty
-                            // if that university never wrote about this
-                            // specific place (see `hasLocalAcademicSources`'s
-                            // own doc comment). Hidden once chat is open --
-                            // at that point they can just ask directly.
-                            if !showingChat, result.hasLocalAcademicSources {
-                                Text("poiExplain.localAcademicHint")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            if showingChat {
-                                if !chatHistory.isEmpty {
-                                    ForEach(chatHistory) { turn in chatBubble(turn) }
-                                }
-
-                                if chatSending {
-                                    HStack {
-                                        ProgressView().tint(Theme.gold)
-                                        Spacer()
-                                    }
-                                    .id("chat-sending")
-                                }
-
-                                if let chatError {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: "exclamationmark.triangle.fill")
-                                        Text(chatError)
-                                    }
-                                    .font(.footnote)
-                                    .foregroundStyle(Theme.closedRed)
-                                    .padding(10)
-                                    .background(Theme.closedRed.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
-                                    .id("chat-error")
-                                }
-                            }
-                        } else if let errorMessage {
-                            HStack(spacing: 8) {
-                                Text(errorMessage).font(.footnote).foregroundStyle(Theme.closedRed)
-                                Spacer()
-                                Button("common.retry") { Task { await explain() } }
-                                    .buttonStyle(.bordered)
-                                    .controlSize(.small)
-                            }
-                        }
-                        }
-                        .padding()
                     }
+                    .frame(width: viewportWidth, alignment: .leading)
                 }
                 .onChange(of: chatHistory.count) { _, _ in
                     guard let last = chatHistory.last else { return }
@@ -365,14 +358,140 @@ struct POIExplainContent: View {
                 Divider()
                 chatInputBar
             }
+            directionsButton
+        }
+        .frame(width: viewportWidth)
+        .background(Theme.navy)
+        .foregroundStyle(.white)
+        .tint(Theme.gold)
+        .environment(\.colorScheme, .dark)
+        .overlay(alignment: .top) {
+            HStack {
+                Button(action: close) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .background(Theme.navy, in: Circle())
+                        .overlay(Circle().stroke(Theme.border, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text("common.cancel"))
+                .accessibilityIdentifier("piri.detail.close")
+                Spacer()
+                Button { addToCollectionKind = .saved } label: {
+                    Image(systemName: savedPlacesStore.isSaved(poi.asReference.identifier) ? "bookmark.fill" : "bookmark")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(Theme.gold)
+                        .frame(width: 44, height: 44)
+                        .background(Theme.navy, in: Circle())
+                        .overlay(Circle().stroke(Theme.border, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text("placeDetail.actionBar.save"))
+            }
+            .padding(12)
         }
         .sheet(item: $addToCollectionKind) { kind in AddToCollectionSheet(poi: poi, kind: kind) }
-        .sheet(isPresented: $showingReviews) { TripAdvisorReviewsSheet(poi: poi, totalReviewCount: result?.rating?.reviewCount) }
+        .sheet(isPresented: $showingReviews) {
+            TripAdvisorReviewsSheet(poi: poi, totalReviewCount: result?.rating?.reviewCount)
+        }
         .task { await explain() }
         .task { await loadPreviewPhoto() }
         .task { await loadLookAroundScene() }
         .task { await weatherQuery.load(lat: poi.coordinate.latitude, lng: poi.coordinate.longitude) }
         .task { await loadUserPhotos() }
+    }
+
+    private func localizedCategory(_ category: MKPointOfInterestCategory) -> String {
+        if let group = POICategoryGroups.all.first(where: { $0.categories?.contains(category) == true }) {
+            return String(localized: String.LocalizationValue(group.labelKey))
+        }
+        return String(localized: "design.detail.placeOfInterest")
+    }
+
+    private var detailHeader: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(poi.name)
+                .font(Theme.editorial(size: 34))
+                .foregroundStyle(.white)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+            if let category = poi.category {
+                Text(localizedCategory(category))
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.secondaryText)
+            }
+            if let badge = result?.unescoBadge { unescoBadgeView(badge) }
+            if let heritage = result?.heritageDesignation { heritageDesignationBadgeView(heritage) }
+        }
+    }
+
+    private var collectionActions: some View {
+        let identifier = poi.asReference.identifier
+        let saved = savedPlacesStore.isSaved(identifier)
+        let planned = savedPlacesStore.isPlanned(identifier)
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: 10) {
+                collectionButton(.saved, active: saved)
+                collectionButton(.plan, active: planned)
+            }
+            VStack(spacing: 10) {
+                collectionButton(.saved, active: saved)
+                collectionButton(.plan, active: planned)
+            }
+        }
+        .padding(.top, 4)
+    }
+
+    private func collectionButton(_ kind: SavedCollectionKind, active: Bool) -> some View {
+        let isSave = kind == .saved
+        let key: LocalizedStringKey =
+            isSave
+            ? (active ? "placeDetail.actionBar.saved" : "placeDetail.actionBar.save")
+            : (active ? "placeDetail.actionBar.inPlan" : "placeDetail.actionBar.addToPlan")
+        return Button {
+            Haptics.light()
+            addToCollectionKind = kind
+        } label: {
+            Label(
+                key,
+                systemImage: isSave
+                    ? (active ? "bookmark.fill" : "bookmark") : (active ? "checkmark.circle" : "plus.circle")
+            )
+            .font(.system(size: 14, weight: .medium))
+            .fixedSize(horizontal: true, vertical: false)
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .padding(.horizontal, 12)
+            .foregroundStyle(active ? Theme.gold : .white)
+            .background(Theme.cardFill, in: RoundedRectangle(cornerRadius: 15))
+            .overlay(RoundedRectangle(cornerRadius: 15).stroke(Theme.border, lineWidth: 1))
+            .contentShape(RoundedRectangle(cornerRadius: 15))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var directionsButton: some View {
+        Button {
+            Haptics.light()
+            let opensInApp = PlaceDirections.opensInApp
+            PlaceDirections.openInMaps(
+                name: poi.name, coordinate: poi.coordinate, tabSelection: tabSelection)
+            if opensInApp { close() }
+        } label: {
+            Label("placeDetail.actionBar.directions", systemImage: "location.fill")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Theme.navy)
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .background(Theme.gold, in: RoundedRectangle(cornerRadius: 16))
+                .contentShape(RoundedRectangle(cornerRadius: 16))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("piri.detail.directions")
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Theme.navy)
+        .overlay(alignment: .top) { Rectangle().fill(Theme.border).frame(height: 1) }
     }
 
     /// `onClose` when embedded inline (no presentation context to dismiss),
@@ -449,7 +568,10 @@ struct POIExplainContent: View {
         timeFormatter.timeStyle = .short
         return HStack(spacing: 4) {
             Image(systemName: "sun.horizon.fill")
-            Text(L("poiExplain.goldenHour", timeFormatter.string(from: window.start), timeFormatter.string(from: window.end)))
+            Text(
+                L(
+                    "poiExplain.goldenHour", timeFormatter.string(from: window.start),
+                    timeFormatter.string(from: window.end)))
         }
         .font(.caption)
         .foregroundStyle(Theme.gold)
@@ -542,7 +664,10 @@ struct POIExplainContent: View {
 
     private func loadUserPhotos() async {
         guard let token = authStore.token else { return }
-        userPhotos = (try? await PhotosAPI.fetchPhotos(name: poi.name, lat: poi.coordinate.latitude, lng: poi.coordinate.longitude, token: token)) ?? []
+        userPhotos =
+            (try? await PhotosAPI.fetchPhotos(
+                name: poi.name, lat: poi.coordinate.latitude, lng: poi.coordinate.longitude, token: token))
+            ?? []
     }
 
     /// See `previewPhoto`'s own doc comment for why `token` is deliberately
@@ -552,9 +677,13 @@ struct POIExplainContent: View {
     /// `result?.photos` first, so a late-arriving preview never overwrites it.
     private func loadPreviewPhoto() async {
         let request = PhotoBulkRequest(places: [
-            PhotoBulkPlace(name: poi.name, lat: poi.coordinate.latitude, lng: poi.coordinate.longitude, category: poi.categoryLabel.isEmpty ? nil : poi.categoryLabel)
+            PhotoBulkPlace(
+                name: poi.name, lat: poi.coordinate.latitude, lng: poi.coordinate.longitude,
+                category: poi.categoryLabel.isEmpty ? nil : poi.categoryLabel)
         ])
-        guard let found = try? await PlacesAPI.photosBulk(request).results.first, let photoUrl = found.photoUrl else { return }
+        guard let found = try? await PlacesAPI.photosBulk(request).results.first,
+            let photoUrl = found.photoUrl
+        else { return }
         previewPhoto = POIPhoto(
             url: photoUrl,
             source: found.source.flatMap(POIPhotoSource.init) ?? .unsplash,
@@ -572,11 +701,7 @@ struct POIExplainContent: View {
                 .padding(10)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        // System-adaptive on the assistant side, not
-                        // `Theme.cardFill` -- this bubble is shared by the
-                        // forced-dark full sheet and the still-light Map
-                        // inline card (see `POIPhotoGallery`'s identical note).
-                        .fill(turn.role == .user ? Theme.gold.opacity(0.15) : Color(.secondarySystemBackground))
+                        .fill(turn.role == .user ? Theme.gold.opacity(0.15) : Theme.cardFill)
                 )
             if turn.role == .assistant { Spacer(minLength: 40) }
         }
@@ -652,7 +777,8 @@ struct POIExplainContent: View {
         // Mirrors the backend's own `looksLikeTransitQuestion` -- only fetch
         // (and only prompt for, on a first ask) the user's location when the
         // message actually looks like it needs it, not on every message.
-        let userLocation = Self.looksLikeTransitQuestion(message)
+        let userLocation =
+            Self.looksLikeTransitQuestion(message)
             ? await chatLocationManager.currentLocationOnce()
             : nil
 
@@ -690,7 +816,8 @@ struct POIExplainContent: View {
     /// there's no shared source between a Swift client and a Node backend.
     private static func looksLikeTransitQuestion(_ message: String) -> Bool {
         message.range(
-            of: #"\bbus\b|\bferry\b|\btrain\b|\btram\b|transit|public transport|how (do|can) i get|get (there|here)|otob[üu]s|feribot|vapur|tren|tramvay|toplu ta[şs][ıi]ma|nas[ıi]l (giderim|ulaş[ıi]r[ıi]m|gidilir)|hvordan kommer jeg|buss\b|ferge|kollektiv"#,
+            of:
+                #"\bbus\b|\bferry\b|\btrain\b|\btram\b|transit|public transport|how (do|can) i get|get (there|here)|otob[üu]s|feribot|vapur|tren|tramvay|toplu ta[şs][ıi]ma|nas[ıi]l (giderim|ulaş[ıi]r[ıi]m|gidilir)|hvordan kommer jeg|buss\b|ferge|kollektiv"#,
             options: [.regularExpression, .caseInsensitive]
         ) != nil
     }
@@ -710,11 +837,7 @@ struct POIExplainSheet: View {
                 .background(Theme.screenBackground.ignoresSafeArea())
                 .environment(\.colorScheme, .dark)
                 .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("common.cancel") { dismiss() }
-                    }
-                }
+                .toolbar(.hidden, for: .navigationBar)
         }
     }
 }

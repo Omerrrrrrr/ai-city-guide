@@ -51,13 +51,18 @@ struct AIScreen: View {
 
     @State private var weatherQuery = WeatherQuery()
     @State private var locationManager = LocationManager()
+    @FocusState private var composerFocused: Bool
     @State private var query: String
     @State private var loading = false
+    @State private var expandedAssistantTurns: Set<String> = []
     @State private var conversation: [ConversationTurn] = []
     @State private var attachedItem: PhotosPickerItem?
     @State private var attachedImage: UIImage?
     @State private var hasAutoSubmitted = false
     @State private var selectedPOI: POIPlace?
+    // Result entries also cache a nil/empty photo URL (checked, no photo found).
+    @State private var poiPhotos: [String: PhotoBulkResult] = [:]
+    @State private var photosInFlight: Set<String> = []
     /// Turn ids already saved as a Plan collection — keyed separately from
     /// `conversation` (an enum, so its cases can't carry mutable state)
     /// so the "Plan olarak kaydet" button can flip to a done state and stay
@@ -77,6 +82,14 @@ struct AIScreen: View {
     }
 
     private var profile: UserProfile { userProfileStore.profile }
+
+    private var displayedCity: String {
+        cityStore.cityName ?? String(localized: "common.everywhere")
+    }
+
+    private var cannotSubmit: Bool {
+        loading || query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
     /// True only when this instance was pushed via `NavigationLink` (e.g.
     /// Scan's "Ask more") rather than being the Ask Piri tab's own root —
@@ -124,7 +137,8 @@ struct AIScreen: View {
             header
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        introduction
                         if conversation.isEmpty {
                             emptyState
                         } else {
@@ -195,69 +209,103 @@ struct AIScreen: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top) {
+        HStack(spacing: 10) {
             if showBackButton {
-                Button {
-                    dismiss()
-                } label: {
+                Button { dismiss() } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.8))
-                        .frame(width: 32, height: 32)
+                        .frame(width: 44, height: 44)
                 }
-                .padding(.trailing, 4)
+                .accessibilityLabel(String(localized: "design.common.back"))
             }
-            VStack(alignment: .leading, spacing: 4) {
-                Text("ai.title").font(.system(size: 26, weight: .heavy)).tracking(1).foregroundStyle(Theme.gold)
-                if let weather = weatherQuery.weather {
-                    HStack(spacing: 4) {
-                        Image(systemName: weather.condition.icon)
-                        Text(L("ai.headerSub.withWeather", String(Int(weather.temp)), cityStore.cityName ?? String(localized: "common.everywhere")))
-                    }
-                    .font(.system(size: 14)).foregroundStyle(.white.opacity(0.65))
-                } else {
-                    Text(cityStore.cityName ?? String(localized: "ai.headerSub.fallback"))
-                        .font(.system(size: 14)).foregroundStyle(.white.opacity(0.65))
-                }
-            }
-            Spacer()
+            Image(systemName: "sparkle")
+                .font(.system(size: 27, weight: .regular))
+                .foregroundStyle(Theme.gold)
+                .accessibilityHidden(true)
+            Text("ai.title")
+                .font(.headline)
+            Spacer(minLength: 4)
+            // Context, not a button: this screen has no existing city-picker action.
+            Text(displayedCity)
+                .font(.caption)
+                .foregroundStyle(Theme.secondaryText)
+                .lineLimit(1)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Theme.cardFill, in: Capsule())
+                .overlay(Capsule().stroke(Theme.border, lineWidth: 0.5))
             if !conversation.isEmpty {
-                Button("common.clear") {
+                Button {
                     searchTask?.cancel()
                     loading = false
                     conversation = []
+                } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 15))
+                        .frame(width: 44, height: 44)
                 }
-                .foregroundStyle(.white.opacity(0.55))
+                .foregroundStyle(Theme.secondaryText)
+                .accessibilityLabel(Text("common.clear"))
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 12)
-        .padding(.bottom, 16)
-        .piriGlassSurface()
+        .foregroundStyle(.white)
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 10)
+        .background(Theme.navy)
+    }
+
+    private var introduction: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(String(localized: "design.ai.title"))
+                .font(Theme.editorial(size: 29))
+                .foregroundStyle(.white)
+                .accessibilityAddTraits(.isHeader)
+            Text(L("design.ai.introduction", displayedCity))
+                .font(.subheadline)
+                .foregroundStyle(Theme.secondaryText)
+                .lineSpacing(4)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.bottom, 2)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var emptyState: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 10) {
             Text("ai.tryAsking")
-                .font(.system(size: 13, weight: .bold))
-                .tracking(0.8)
-                .foregroundStyle(.secondary)
+                .font(.caption.weight(.semibold))
+                .tracking(1)
+                .foregroundStyle(Theme.secondaryText)
                 .textCase(.uppercase)
-            FlowLayout(spacing: 10) {
-                ForEach(suggestions, id: \.self) { suggestion in
-                    Button {
-                        searchTask = Task { await search(overrideQuery: suggestion) }
-                    } label: {
+                .padding(.bottom, 4)
+            ForEach(Array(suggestions.enumerated()), id: \.element) { index, suggestion in
+                Button {
+                    searchTask = Task { await search(overrideQuery: suggestion) }
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: ["cup.and.saucer", "sparkles", "sun.horizon", "binoculars"][index % 4])
+                            .font(.system(size: 19))
+                            .foregroundStyle(Theme.gold)
+                            .frame(width: 36, height: 36)
                         Text(suggestion)
-                            .font(.system(size: 14, weight: .medium))
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 10)
-                            .background(RoundedRectangle(cornerRadius: 14).fill(Theme.cardFill))
+                            .font(.subheadline)
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .multilineTextAlignment(.leading)
+                        Image(systemName: "arrow.up.left")
+                            .font(.caption)
+                            .foregroundStyle(Theme.secondaryText)
                     }
+                    .padding(12)
+                    .background(Theme.cardFill, in: RoundedRectangle(cornerRadius: 16))
+                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.border, lineWidth: 0.5))
                 }
+                .buttonStyle(.plain)
+                .disabled(loading)
             }
         }
-        .padding(.top, 24)
+        .padding(.top, 12)
     }
 
     @ViewBuilder
@@ -269,30 +317,31 @@ struct AIScreen: View {
                     Image(uiImage: image).resizable().aspectRatio(contentMode: .fill)
                         .frame(height: 140).clipShape(RoundedRectangle(cornerRadius: 12))
                 }
-                Text(content).foregroundStyle(.white)
+                Text(content).font(.subheadline).foregroundStyle(.white)
             }
             .padding(.horizontal, 14).padding(.vertical, 12)
             .frame(maxWidth: 320, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 18).fill(Theme.navy))
+            .background(RoundedRectangle(cornerRadius: 16).fill(Theme.navyLight))
             .frame(maxWidth: .infinity, alignment: .trailing)
 
         case .assistant(let id, let content, let recommendations, let isItinerary):
-            VStack(alignment: .leading, spacing: 12) {
-                Text(content)
-                    .foregroundStyle(Theme.navy)
-                    .padding(.horizontal, 14).padding(.vertical, 12)
-                    .background(RoundedRectangle(cornerRadius: 18).fill(Theme.gold))
+            VStack(alignment: .leading, spacing: 8) {
+                assistantSummary(content, turnID: id, hasCards: !recommendations.isEmpty)
 
                 if recommendations.isEmpty {
                     Text("ai.noMatches").foregroundStyle(.secondary).padding(.horizontal, 4)
                 } else {
-                    ForEach(recommendations) { recommendation in
-                        Button {
-                            selectedPOI = recommendation.poi
-                        } label: {
-                            recommendationCard(recommendation)
+                    ForEach(Array(recommendations.enumerated()), id: \.element.id) { index, recommendation in
+                        // Attribution is a sibling hit target, never a Link inside a Button.
+                        ZStack(alignment: .bottomTrailing) {
+                            Button {
+                                selectedPOI = recommendation.poi
+                            } label: {
+                                recommendationCard(recommendation, number: index + 1)
+                            }
+                            .buttonStyle(.plain)
+                            photoCredit(for: recommendation.poi)
                         }
-                        .buttonStyle(.plain)
                     }
                     // Only offer to save as a Plan when the backend itself
                     // judged this an itinerary-style request (its own
@@ -305,6 +354,7 @@ struct AIScreen: View {
                     }
                 }
             }
+            .task(id: id) { await loadRecommendationPhotos(recommendations) }
 
         case .error(_, let message, let retryQuery, let retryImage):
             VStack(alignment: .leading, spacing: 10) {
@@ -327,6 +377,40 @@ struct AIScreen: View {
         }
     }
 
+    private func assistantSummary(_ content: String, turnID: String, hasCards: Bool) -> some View {
+        let firstParagraph = content.components(separatedBy: "\n\n").first ?? content
+        let canCollapse = hasCards && (firstParagraph != content || content.count > 140)
+        let expanded = expandedAssistantTurns.contains(turnID)
+        let visible = canCollapse && !expanded ? firstParagraph : content
+        let attributed = (try? AttributedString(markdown: visible, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(visible)
+        return VStack(alignment: .leading, spacing: 8) {
+            Text(attributed)
+                .lineLimit(canCollapse && !expanded ? 2 : nil)
+                .font(.subheadline)
+                .lineSpacing(3)
+                .foregroundStyle(.white)
+                .fixedSize(horizontal: false, vertical: true)
+            if canCollapse {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        if expanded { expandedAssistantTurns.remove(turnID) }
+                        else { expandedAssistantTurns.insert(turnID) }
+                    }
+                } label: {
+                    Label(expanded ? String(localized: "design.ai.showLess") : String(localized: "design.ai.fullResponse"), systemImage: expanded ? "chevron.up" : "chevron.down")
+                        .font(.caption)
+                        .foregroundStyle(Theme.secondaryText)
+                        .frame(minHeight: 28)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 14).padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.cardFill, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.border, lineWidth: 0.5))
+    }
+
     private func saveAsPlanButton(turnId: String, recommendations: [POIRecommendation]) -> some View {
         let saved = savedPlanTurnIds.contains(turnId)
         return Button {
@@ -344,13 +428,14 @@ struct AIScreen: View {
                 Text(saved ? "ai.savedPlan.done" : "ai.savedPlan.cta")
             }
             .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(saved ? .secondary : Theme.gold)
-            .padding(.horizontal, 14).padding(.vertical, 10)
-            .frame(maxWidth: .infinity)
-            .background(RoundedRectangle(cornerRadius: 12).fill(saved ? Theme.cardFill : Theme.gold.opacity(0.12)))
+            .foregroundStyle(saved ? Theme.secondaryText : Theme.navy)
+            .padding(.horizontal, 16).padding(.vertical, 14)
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .background(RoundedRectangle(cornerRadius: 14).fill(saved ? Theme.cardFill : Theme.gold))
         }
         .buttonStyle(.plain)
         .disabled(saved)
+        .padding(.top, 6)
     }
 
     private func distanceLabel(_ distanceKm: Double) -> String {
@@ -361,99 +446,202 @@ struct AIScreen: View {
         return L("home.distance.km", String(format: "%.1f", distanceKm))
     }
 
-    private func recommendationCard(_ recommendation: POIRecommendation) -> some View {
+    private func recommendationCategory(_ poi: POIPlace) -> String {
+        guard let category = poi.category,
+              let group = POICategoryGroups.all.first(where: { $0.categories?.contains(category) == true }) else { return poi.categoryLabel }
+        return String(localized: String.LocalizationValue(group.labelKey))
+    }
+
+    private func recommendationCard(_ recommendation: POIRecommendation, number: Int) -> some View {
         let poi = recommendation.poi
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
-                Image(systemName: POICategoryGroups.icon(for: poi.category))
-                    .font(.system(size: 20))
-                    .foregroundStyle(Theme.gold)
-                    .frame(width: 36, height: 36)
-                    .background(Circle().fill(Theme.gold.opacity(0.12)))
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(poi.name).font(.system(size: 18, weight: .bold))
-                    Text(
-                        [poi.categoryLabel.isEmpty ? nil : poi.categoryLabel, distanceLabel(recommendation.distanceKm)]
-                            .compactMap { $0 }
-                            .joined(separator: " · ")
-                    )
-                    .font(.system(size: 14)).foregroundStyle(.secondary)
-                    // Honest labeling for the "closest available option, not
-                    // a great fit" case — the CONFIDENCE RULE server-side
-                    // asks the model not to dress up a fallback pick as a
-                    // strong match, so the UI shouldn't either.
-                    if recommendation.confidence == .weak {
-                        Text("ai.weakMatch")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 8).padding(.vertical, 3)
-                            .background(Capsule().fill(Theme.cardFill))
-                            .overlay(Capsule().stroke(Color(.separator), lineWidth: 1))
-                    }
+        return HStack(alignment: .center, spacing: 10) {
+            ZStack(alignment: .topLeading) {
+                recommendationThumbnail(for: poi)
+                Text("\(number)")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .frame(width: 21, height: 21)
+                    .background(Theme.navyLight, in: Circle())
+                    .overlay(Circle().stroke(Theme.border, lineWidth: 0.5))
+                    .padding(4)
+            }
+            .frame(width: 68, height: 72)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(poi.name)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                Text([poi.categoryLabel.isEmpty ? nil : recommendationCategory(poi), distanceLabel(recommendation.distanceKm)]
+                    .compactMap { $0 }.joined(separator: " · "))
+                    .font(.caption)
+                    .foregroundStyle(Theme.secondaryText)
+                Text(recommendation.aiReason)
+                    .font(.caption)
+                    .foregroundStyle(Theme.secondaryText)
+                    .lineLimit(2)
+                if recommendation.confidence == .weak {
+                    Text("ai.weakMatch")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Theme.gold)
                 }
             }
-            HStack(alignment: .top, spacing: 8) {
-                Image(systemName: "sparkles").foregroundStyle(Color(red: 0.61, green: 0.48, blue: 0.1))
-                Text(recommendation.aiReason).font(.system(size: 14, weight: .medium)).foregroundStyle(Color(red: 0.61, green: 0.48, blue: 0.1))
-            }
-            .padding(12)
-            .background(RoundedRectangle(cornerRadius: 12).fill(Theme.gold.opacity(0.1)))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.gold.opacity(0.25)))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Theme.secondaryText)
+                .accessibilityHidden(true)
         }
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: 16).fill(Theme.cardFill))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .multilineTextAlignment(.leading)
+        .padding(10)
+        .padding(.bottom, photoCreditURL(for: poi) == nil ? 0 : 15)
+        .background(Theme.cardFill, in: RoundedRectangle(cornerRadius: 17))
+        .overlay(RoundedRectangle(cornerRadius: 17).stroke(Theme.border, lineWidth: 0.5))
+    }
+
+    private func recommendationThumbnail(for poi: POIPlace) -> some View {
+        GeometryReader { geometry in
+            if let value = poiPhotos[poi.name]?.photoUrl,
+               !value.isEmpty, let url = URL(string: value) {
+                CachedAsyncImage(url: url, maxPixelSize: 240) { image in
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    recommendationThumbnailFallback(for: poi)
+                }
+                .frame(width: geometry.size.width, height: geometry.size.height)
+                .clipped()
+            } else {
+                recommendationThumbnailFallback(for: poi)
+            }
+        }
+    }
+
+    private func recommendationThumbnailFallback(for poi: POIPlace) -> some View {
+        ZStack {
+            LinearGradient(colors: [Theme.navyLight, Theme.navy], startPoint: .topLeading, endPoint: .bottomTrailing)
+            Image(systemName: POICategoryGroups.icon(for: poi.category))
+                .font(.system(size: 25, weight: .light))
+                .foregroundStyle(Theme.gold)
+        }
+    }
+
+    private func photoCreditURL(for poi: POIPlace) -> URL? {
+        guard let photo = poiPhotos[poi.name],
+              let photoURL = photo.photoUrl, !photoURL.isEmpty else { return nil }
+        let credit = photo.source == "unsplash" ? photo.photographerUrl : photo.attributionUrl
+        return credit.flatMap { URL(string: $0) }
+    }
+
+    @ViewBuilder
+    private func photoCredit(for poi: POIPlace) -> some View {
+        if let photo = poiPhotos[poi.name], let url = photoCreditURL(for: poi) {
+            Link(destination: url) {
+                Text(photo.source == "unsplash"
+                     ? (photo.photographerName.map { "\($0) · Unsplash" } ?? "Unsplash")
+                     : (photo.source?.capitalized ?? String(localized: "design.photo.source")))
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(Theme.secondaryText)
+                    .lineLimit(1)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Theme.navy, in: Capsule())
+            }
+            .padding(.horizontal, 10)
+            .padding(.bottom, 6)
+        }
+    }
+
+    @MainActor
+    private func loadRecommendationPhotos(_ recommendations: [POIRecommendation]) async {
+        var seen: Set<String> = []
+        let missing = recommendations.map(\.poi).filter {
+            poiPhotos[$0.name] == nil && !photosInFlight.contains($0.name) && seen.insert($0.name).inserted
+        }
+        guard !missing.isEmpty else { return }
+        let names = Set(missing.map(\.name))
+        photosInFlight.formUnion(names)
+        defer { photosInFlight.subtract(names) }
+        // Same cache-first endpoint as Home; the optional token is not required.
+        for start in stride(from: 0, to: missing.count, by: 20) {
+            guard !Task.isCancelled else { return }
+            let batch = missing[start..<min(start + 20, missing.count)]
+            let request = PhotoBulkRequest(places: batch.map {
+                PhotoBulkPlace(name: $0.name, lat: $0.coordinate.latitude, lng: $0.coordinate.longitude,
+                               category: $0.categoryLabel.isEmpty ? nil : $0.categoryLabel)
+            })
+            guard let response = try? await PlacesAPI.photosBulk(request), !Task.isCancelled else { return }
+            for result in response.results {
+                poiPhotos[result.name] = result
+            }
+        }
     }
 
     private var inputBar: some View {
-        VStack(spacing: 0) {
-            Divider()
+        VStack(spacing: 10) {
             if let attachedImage {
-                HStack {
+                HStack(spacing: 8) {
                     Image(uiImage: attachedImage).resizable().aspectRatio(contentMode: .fill)
                         .frame(width: 44, height: 44).clipShape(RoundedRectangle(cornerRadius: 10))
                     Button {
                         self.attachedImage = nil
                         self.attachedItem = nil
                     } label: {
-                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(Theme.secondaryText)
+                            .frame(width: 44, height: 44)
                     }
+                    .accessibilityLabel(String(localized: "design.photo.remove"))
                     Spacer()
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 10)
             }
-            HStack(spacing: 8) {
+            HStack(alignment: .bottom, spacing: 8) {
                 PhotosPicker(selection: $attachedItem, matching: .images) {
-                    Image(systemName: "camera")
-                        .frame(width: 48, height: 48)
-                        .overlay(Circle().stroke(.secondary.opacity(0.3)))
+                    Image(systemName: "plus")
+                        .font(.system(size: 21, weight: .light))
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 48)
+                        .background(Theme.cardFill, in: Capsule())
+                        .overlay(Capsule().stroke(Theme.border, lineWidth: 0.5))
                 }
+                .accessibilityLabel(String(localized: "design.photo.attach"))
                 .disabled(loading)
 
-                TextField(String(localized: "ai.inputPlaceholder"), text: $query)
-                    .padding(.horizontal, 16)
-                    .frame(height: 48)
-                    .background(RoundedRectangle(cornerRadius: 24).fill(Theme.cardFill))
-                    .disabled(loading)
-                    .onSubmit { searchTask = Task { await search() } }
+                HStack(alignment: .bottom, spacing: 4) {
+                    TextField(String(localized: "design.ai.placeholder"), text: $query, axis: .vertical)
+                        .accessibilityIdentifier("piri.ai.input")
+                        .focused($composerFocused)
+                        .font(.subheadline)
+                        .foregroundStyle(.white)
+                        .tint(Theme.gold)
+                        .lineLimit(1...5)
+                        .padding(.leading, 14)
+                        .padding(.vertical, 13)
+                        .disabled(loading)
+                        .onSubmit { searchTask = Task { await search() } }
 
-                Button {
-                    searchTask = Task { await search() }
-                } label: {
-                    Text("ai.ask")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(Theme.navy)
-                        .padding(.horizontal, 20)
-                        .frame(height: 48)
-                        .background(RoundedRectangle(cornerRadius: 24).fill(Theme.gold))
+                    Button {
+                        searchTask = Task { await search() }
+                    } label: {
+                        Image(systemName: "arrow.up")
+                            .font(.system(size: 19, weight: .semibold))
+                            .foregroundStyle(Theme.navy)
+                            .frame(width: 36, height: 36)
+                            .background(Theme.gold, in: Circle())
+                            .frame(width: 44, height: 48)
+                    }
+                    .accessibilityLabel(Text("ai.ask"))
+                    .accessibilityIdentifier("piri.ai.send")
+                    .disabled(cannotSubmit)
+                    .opacity(cannotSubmit ? 0.45 : 1)
                 }
-                .disabled(loading || query.trimmingCharacters(in: .whitespaces).isEmpty)
-                .opacity(loading || query.trimmingCharacters(in: .whitespaces).isEmpty ? 0.5 : 1)
+                .background(Theme.cardFill, in: RoundedRectangle(cornerRadius: 24))
+                .overlay(RoundedRectangle(cornerRadius: 24).stroke(Theme.border, lineWidth: 0.5))
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(Theme.navy)
+        .overlay(alignment: .top) { Rectangle().fill(Theme.border).frame(height: 0.5) }
     }
 
     /// Nearby Apple POIs are looked up fresh per message rather than reused
@@ -543,6 +731,7 @@ struct AIScreen: View {
         guard !loading else { return }
         let nextQuery = (overrideQuery ?? query).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !nextQuery.isEmpty else { return }
+        composerFocused = false
 
         let imageForRequest = overrideQuery == nil ? attachedImage : nil
         loading = true

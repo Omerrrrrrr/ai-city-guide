@@ -26,7 +26,8 @@ final class AppSmokeUITests: XCTestCase {
     }
 
     private func tapTab(_ app: XCUIApplication, _ label: String) {
-        let tab = app.tabBars.buttons[label]
+        let identifiers = ["Tara": "piri.tab.1", "Harita": "piri.tab.2", "Piri'ye Sor": "piri.tab.3", "Profil": "piri.tab.4"]
+        let tab = app.buttons[identifiers[label] ?? label]
         XCTAssertTrue(tab.waitForExistence(timeout: 10), "\(label) tab not found")
         tab.tap()
     }
@@ -70,12 +71,12 @@ final class AppSmokeUITests: XCTestCase {
         tapTab(app, "Piri'ye Sor")
         attach(app, name: "aipiri-01-opened")
 
-        let input = app.textFields.firstMatch
+        let input = app.textFields["piri.ai.input"]
         XCTAssertTrue(input.waitForExistence(timeout: 10), "Ask Piri input field not found")
         input.tap()
         input.typeText("kahve içebileceğim bir yer")
 
-        let askButton = app.buttons["Sor"]
+        let askButton = app.buttons["piri.ai.send"]
         XCTAssertTrue(askButton.waitForExistence(timeout: 5), "Sor button not found")
         askButton.tap()
 

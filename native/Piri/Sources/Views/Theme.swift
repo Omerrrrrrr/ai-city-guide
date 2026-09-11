@@ -1,17 +1,16 @@
 import SwiftUI
 
-/// Piri's brand colors, matching the `NAVY`/`GOLD` constants repeated across
-/// `mobile/app/(tabs)/*.tsx` and `mobile/app/place/[id].tsx`.
+/// Shared colors and editorial typography for Piri's navy-and-gold interface.
 enum Theme {
-    static let navy = Color(red: 0x0F / 255, green: 0x1C / 255, blue: 0x3F / 255)
-    static let gold = Color(red: 0xD4 / 255, green: 0xA8 / 255, blue: 0x43 / 255)
+    static let navy = Color(red: 0x07 / 255, green: 0x19 / 255, blue: 0x2D / 255)
+    static let gold = Color(red: 0xE9 / 255, green: 0xB9 / 255, blue: 0x51 / 255)
     static let openGreen = Color(red: 0x06 / 255, green: 0x76 / 255, blue: 0x47 / 255)
     static let closedRed = Color(red: 0xB4 / 255, green: 0x23 / 255, blue: 0x18 / 255)
     /// A lighter tint of `navy` -- card elevation in Dark mode comes from
     /// this (a lighter navy on a navy background), not a light/white card
     /// on a dark background the way `.secondarySystemGroupedBackground`
     /// alone would render.
-    static let navyLight = Color(red: 0x35 / 255, green: 0x43 / 255, blue: 0x66 / 255)
+    static let navyLight = Color(red: 0x15 / 255, green: 0x2C / 255, blue: 0x45 / 255)
 
     /// Every AI-generated concept mockup for this app showed one thing in
     /// common that the real app never actually built: the *entire* screen
@@ -31,7 +30,12 @@ enum Theme {
     static let screenBackground = navy
 
     /// Card counterpart to `screenBackground` -- see its doc comment.
-    static let cardFill = navyLight
+    static let cardFill = Color(red: 0x10 / 255, green: 0x24 / 255, blue: 0x3A / 255)
+    static let border = Color.white.opacity(0.18)
+    static let secondaryText = Color(red: 0xB8 / 255, green: 0xC6 / 255, blue: 0xD7 / 255)
+    static func editorial(size: CGFloat) -> Font {
+        .system(size: size, weight: .regular, design: .serif)
+    }
 }
 
 extension View {

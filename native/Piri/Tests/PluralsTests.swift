@@ -16,7 +16,7 @@ import XCTest
 /// this exact failure mode was hit and fixed while writing this test, see
 /// `Localization.swift`'s `LPlural`).
 final class PluralsTests: XCTestCase {
-    private let pluralizedKeys = ["explore.placesFound", "map.placesCount", "cityPicker.placeCount"]
+    private let pluralizedKeys = ["explore.placesFound", "map.placesCount", "cityPicker.placeCount", "design.home.planCount"]
 
     func testBothPluralFormsResolveToRealSubstitutedText() {
         for key in pluralizedKeys {

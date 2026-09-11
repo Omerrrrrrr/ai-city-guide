@@ -15,6 +15,10 @@ struct HomeScreen: View {
     @Environment(RecentlyViewedStore.self) private var recentlyViewedStore
     @Environment(TabSelection.self) private var tabSelection
     @Environment(AuthStore.self) private var authStore
+    @Environment(SavedPlacesStore.self) private var savedPlacesStore
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .largeTitle) private var headlineSize = 34
+    @ScaledMetric(relativeTo: .title) private var featuredTitleSize = 29
 
     @State private var weatherQuery = WeatherQuery()
     @State private var holidayQuery = HolidayQuery()
@@ -73,7 +77,7 @@ struct HomeScreen: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
                 header
                 categoryChipsRow
                 if !Self.useCuratedHomeData, dietaryFilter != nil {
@@ -84,7 +88,9 @@ struct HomeScreen: View {
                     errorBanner(error)
                 }
 
-                suggestionCard
+                if !Self.useCuratedHomeData { featuredPOICard }
+                aiBanner
+                savedShortcuts
 
                 if Self.useCuratedHomeData {
                     if featured.isEmpty, !ranked.isEmpty {
@@ -119,6 +125,9 @@ struct HomeScreen: View {
                 } else {
                     poiSection
                 }
+
+                if !hasProfile, !poiLoading { profileNudge }
+                if soonHoliday != nil || goldenHour?.activeWindow != nil { infoPillsRow }
             }
             .padding(.bottom, 40)
         }
@@ -173,61 +182,72 @@ struct HomeScreen: View {
         .navigationBarHidden(true)
     }
 
+    private func localizedCategory(_ poi: POIPlace) -> String {
+        guard let category = poi.category,
+              let group = POICategoryGroups.all.first(where: { $0.categories?.contains(category) == true }) else { return poi.categoryLabel }
+        return String(localized: String.LocalizationValue(group.labelKey))
+    }
+
     private var header: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("PIRI").font(.system(size: 26, weight: .heavy)).tracking(6).foregroundStyle(Theme.gold)
-                    Text(greeting).font(.system(size: 15, weight: .medium)).foregroundStyle(.white.opacity(0.75))
-                    Button {
-                        showingCityPicker = true
-                    } label: {
-                        HStack(spacing: 3) {
-                            Image(systemName: cityStore.cityName != nil ? "mappin" : "globe")
-                            Text((cityStore.cityName.map { L("home.cityPill", $0) } ?? String(localized: "common.everywhere")) + " ›")
-                        }
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.55))
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 12) {
+                Text("PIRI")
+                    .font(Theme.editorial(size: 28))
+                    .tracking(1.5)
+                    .foregroundStyle(Theme.gold)
+                    .accessibilityAddTraits(.isHeader)
+                Button { showingCityPicker = true } label: {
+                    HStack(spacing: 5) {
+                        Text(cityStore.cityName ?? String(localized: "common.everywhere"))
+                        Image(systemName: "chevron.down").font(.caption2)
                     }
+                    .font(.subheadline)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 9)
+                    .background(Theme.cardFill, in: Capsule())
+                    .overlay(Capsule().stroke(Theme.border))
                 }
-                Spacer()
+                .buttonStyle(.plain)
+                Spacer(minLength: 0)
                 if let weather = weatherQuery.weather {
                     Button {
                         Haptics.light()
                         showingWeatherForecast = true
                     } label: {
-                        HStack(spacing: 4) {
+                        HStack(spacing: 5) {
                             Image(systemName: weather.condition.icon).foregroundStyle(Theme.gold)
-                            Text("\(Int(weather.temp))°").font(.system(size: 15, weight: .bold)).foregroundStyle(.white.opacity(0.9))
-                            Text(weather.city).font(.system(size: 13)).foregroundStyle(.white.opacity(0.55))
+                            Text("\(Int(weather.temp))°").foregroundStyle(.white)
                         }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Capsule().fill(.white.opacity(0.1)))
+                        .font(.body)
+                        .fixedSize()
+                        .frame(minHeight: 44)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("\(weather.city), \(Int(weather.temp))°")
                 }
             }
+            Text(String(localized: "design.home.title"))
+                .font(Theme.editorial(size: headlineSize))
+                .foregroundStyle(.white)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
             NavigationLink(destination: ExploreScreen()) {
-                Text("common.searchPlaces")
-                    .font(.system(size: 15))
-                    .foregroundStyle(.white.opacity(0.5))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 11)
-                    .background(RoundedRectangle(cornerRadius: 12).fill(.white.opacity(0.1)))
+                HStack(spacing: 12) {
+                    Image(systemName: "magnifyingglass").font(.title3)
+                    Text("common.searchPlaces").font(.subheadline)
+                    Spacer(minLength: 0)
+                }
+                .foregroundStyle(Theme.secondaryText)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 11)
+                .background(Theme.cardFill, in: Capsule())
+                .overlay(Capsule().stroke(Theme.border))
             }
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, 20)
-        .padding(.top, 12)
-        .padding(.bottom, 16)
-        // Plain fill, not `piriGlassSurface()` -- that material's own edge
-        // highlight read as an unwanted rectangular border once the body
-        // below went navy too (see `Theme.screenBackground`): with nothing
-        // behind it left to blur/tint differently, the glass shape's own
-        // bounds became the only visible thing about it. A flat fill reads
-        // seamlessly with the (now identically navy) scroll content below.
-        .background(Theme.navy)
+        .padding(.top, 4)
     }
 
     private var greeting: String {
@@ -240,37 +260,149 @@ struct HomeScreen: View {
     // Apple's own POI categories (same grouping as the map screen's category
     // chips) rather than Piri's own tag taxonomy, while curated data is
     // disabled — see `useCuratedHomeData`.
+    private var homeCategoryGroups: [POICategoryGroup] {
+        let priority = ["mapPoiCategories.cafes", "mapPoiCategories.culture"]
+        let groups = POICategoryGroups.all.filter { $0.categories != nil }
+        return priority.compactMap { key in groups.first { $0.labelKey == key } }
+            + groups.filter { !priority.contains($0.labelKey) }
+    }
+
     private var categoryChipsRow: some View {
         HStack(spacing: 8) {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(POICategoryGroups.all) { group in
+                HStack(spacing: 8) {
+                    Button { selectedCategoryGroup = nil } label: {
+                        Text("categoryFilters.all")
+                            .padding(.horizontal, 22)
+                            .padding(.vertical, 12)
+                            .background(selectedCategoryGroup == nil ? Theme.gold : Theme.cardFill, in: Capsule())
+                            .foregroundStyle(selectedCategoryGroup == nil ? Theme.navy : .white)
+                            .overlay(Capsule().stroke(selectedCategoryGroup == nil ? .clear : Theme.border))
+                    }
+                    .accessibilityAddTraits(selectedCategoryGroup == nil ? .isSelected : [])
+                    ForEach(homeCategoryGroups) { group in
                         let active = selectedCategoryGroup?.id == group.id
-                        Button {
-                            selectedCategoryGroup = active ? nil : group
-                        } label: {
+                        Button { selectedCategoryGroup = active ? nil : group } label: {
                             Label(String(localized: String.LocalizationValue(group.labelKey)), systemImage: group.icon)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                                .background(active ? Theme.gold : Theme.cardFill, in: Capsule())
+                                .foregroundStyle(active ? Theme.navy : .white)
+                                .overlay(Capsule().stroke(active ? .clear : Theme.border))
                         }
-                        .font(.system(size: 14, weight: .medium))
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(Capsule().fill(active ? Theme.gold : Theme.navy.opacity(0.08)))
-                        .foregroundStyle(active ? .white : .primary)
+                        .accessibilityAddTraits(active ? .isSelected : [])
                     }
                 }
-                .padding(.leading, 20)
+                .font(.subheadline.weight(.medium))
+                .buttonStyle(.plain)
             }
-            // Not gated by `useCuratedHomeData` the way `dietaryResultsSection`
-            // still is below -- the button itself is harmless to show either
-            // way, and keeping it in this always-rendered row (rather than a
-            // separate conditional one) is what makes it a persistent,
-            // non-scrolling fixture next to the category chips.
             if !Self.useCuratedHomeData {
                 DietaryFilterButton(selection: Binding(get: { dietaryFilter }, set: { dietaryFilter = $0 }))
             }
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 14)
+    }
+
+    private var featuredHomePOI: POIPlace? {
+        poiResults.first { poi in
+            guard let url = poiPhotos[poi.name]?.photoUrl else { return false }
+            return !url.isEmpty
+        } ?? poiResults.first
+    }
+
+    @ViewBuilder
+    private var featuredPOICard: some View {
+        if let poi = featuredHomePOI {
+            ZStack(alignment: .topTrailing) {
+                Button { selectedPOI = poi } label: {
+                    VStack {
+                        Spacer(minLength: 100)
+                        HStack(alignment: .bottom, spacing: 12) {
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text("home.sections.nearYou")
+                                    .font(.caption2.weight(.medium))
+                                    .padding(.horizontal, 9)
+                                    .padding(.vertical, 4)
+                                    .background(Theme.navy.opacity(0.85), in: Capsule())
+                                Text(poi.name)
+                                    .font(Theme.editorial(size: featuredTitleSize))
+                                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                if !poi.categoryLabel.isEmpty {
+                                    Text(localizedCategory(poi)).font(.subheadline)
+                                }
+                                personalizedBadge(for: poi)
+                            }
+                            Spacer(minLength: 0)
+                            Image(systemName: "arrow.right")
+                                .font(.title3.weight(.medium))
+                                .foregroundStyle(Theme.navy)
+                                .frame(width: 46, height: 46)
+                                .background(Theme.gold, in: Circle())
+                        }
+                        .padding(18)
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: 260)
+                    .background {
+                        nearbyTileImage(for: poi, maxPixelSize: 1000)
+                            .overlay(LinearGradient(stops: [
+                                .init(color: .clear, location: 0.35),
+                                .init(color: .black.opacity(0.82), location: 1)
+                            ], startPoint: .top, endPoint: .bottom))
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .overlay(RoundedRectangle(cornerRadius: 20).stroke(Theme.border))
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("piri.home.featured")
+                unsplashBadge(for: poi)
+            }
+            .padding(.horizontal, 16)
+        } else if poiLoading {
+            SkeletonBox().frame(height: 260).clipShape(RoundedRectangle(cornerRadius: 20))
+                .padding(.horizontal, 16)
+        }
+    }
+
+    private var savedShortcuts: some View {
+        let savedCount = Set(savedPlacesStore.savedLists.flatMap(\.places).map(\.identifier)).count
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: 10) {
+                savedShortcut(tab: .saved, count: savedCount)
+                savedShortcut(tab: .plan, count: savedPlacesStore.plans.count)
+            }
+            VStack(spacing: 10) {
+                savedShortcut(tab: .saved, count: savedCount)
+                savedShortcut(tab: .plan, count: savedPlacesStore.plans.count)
+            }
+        }
+        .padding(.horizontal, 20)
+    }
+
+    private func savedShortcut(tab: SavedTab, count: Int) -> some View {
+        NavigationLink(destination: SavedScreen(initialTab: tab)) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: tab == .saved ? "bookmark" : "calendar")
+                    .font(.title3)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(tab == .saved ? String(localized: "design.home.saved") : String(localized: "design.home.plans"))
+                        .font(.subheadline.weight(.medium))
+                    Text(tab == .saved
+                         ? LPlural("saved.collections.placesCount", count: count)
+                         : LPlural("design.home.planCount", count: count))
+                        .font(.caption)
+                        .foregroundStyle(Theme.secondaryText)
+                }
+            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+            .frame(minHeight: 64)
+            .background(Theme.cardFill, in: RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.border))
+        }
+        .buttonStyle(.plain)
     }
 
     /// Shown only while a dietary filter is active — the primary thing the
@@ -378,8 +510,8 @@ struct HomeScreen: View {
                 // -- confirmed live via the accessibility hierarchy: two
                 // cards in the same row had card-top Y-origins 39pt
                 // apart, tracking exactly with 1-line vs. 2-line names.
-                LazyVGrid(columns: [GridItem(.flexible(), alignment: .top), GridItem(.flexible(), alignment: .top)], spacing: 12) {
-                    ForEach(poiResults) { poi in
+                LazyVGrid(columns: dynamicTypeSize.isAccessibilitySize ? [GridItem(.flexible(), alignment: .top)] : [GridItem(.flexible(), alignment: .top), GridItem(.flexible(), alignment: .top)], spacing: 12) {
+                    ForEach(poiResults.filter { $0.id != featuredHomePOI?.id }) { poi in
                         // The Unsplash attribution badge is a sibling
                         // overlay, not nested inside the Button's own label
                         // — two full-size overlapping tappable controls
@@ -402,15 +534,16 @@ struct HomeScreen: View {
                                     nearbyTileImage(for: poi)
                                     LinearGradient(colors: [.clear, .black.opacity(0.85)], startPoint: .top, endPoint: .bottom)
                                     VStack(alignment: .leading, spacing: 3) {
-                                        Text(poi.name).font(.system(size: 15, weight: .bold)).foregroundStyle(.white).lineLimit(2)
+                                        Text(poi.name).font(.subheadline.weight(.semibold)).foregroundStyle(.white).lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                                         if !poi.categoryLabel.isEmpty {
-                                            Text(poi.categoryLabel).font(.system(size: 12)).foregroundStyle(.white.opacity(0.75))
+                                            Text(poi.categoryLabel).font(.caption).foregroundStyle(.white.opacity(0.75))
                                         }
                                         personalizedBadge(for: poi)
                                     }
                                     .padding(12)
+                                    .padding(.top, 65)
                                 }
-                                .frame(height: 170)
+                                .frame(minHeight: dynamicTypeSize.isAccessibilitySize ? 240 : 170)
                                 .clipShape(RoundedRectangle(cornerRadius: 18))
                                 .shadow(color: .black.opacity(0.35), radius: 12, x: 0, y: 6)
                             }
@@ -468,11 +601,11 @@ struct HomeScreen: View {
     // `aspectRatio(.fill)` infer a size from an ambient proposal) is the
     // standard, unambiguous fix for this SwiftUI sizing gap.
     @ViewBuilder
-    private func nearbyTileImage(for poi: POIPlace) -> some View {
+    private func nearbyTileImage(for poi: POIPlace, maxPixelSize: CGFloat = 400) -> some View {
         let urlString = poiPhotos[poi.name]?.photoUrl
         GeometryReader { geo in
             if let urlString, !urlString.isEmpty, let url = URL(string: urlString) {
-                CachedAsyncImage(url: url, maxPixelSize: 400) { image in
+                CachedAsyncImage(url: url, maxPixelSize: maxPixelSize) { image in
                     image.resizable().aspectRatio(contentMode: .fill)
                 } placeholder: {
                     nearbyIconFallback(for: poi)
@@ -523,7 +656,7 @@ struct HomeScreen: View {
            let photographerUrl = photo.photographerUrl, let url = URL(string: photographerUrl) {
             HStack(spacing: 4) {
                 Link(destination: url) {
-                    Text("Unsplash")
+                    Text(photo.photographerName.map { "\($0) · Unsplash" } ?? "Unsplash")
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 6)
@@ -727,21 +860,45 @@ struct HomeScreen: View {
     }
 
     private var aiBanner: some View {
-        Button {
-            tabSelection.selection = 3
-        } label: {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("home.aiBanner.title").font(.system(size: 17, weight: .bold)).foregroundStyle(.white)
-                    Text("home.aiBanner.sub").font(.system(size: 14)).foregroundStyle(.white.opacity(0.7))
+        Button { tabSelection.selection = 3 } label: {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    Image(systemName: "sparkles").font(.title2).foregroundStyle(Theme.gold)
+                    planningLabel
+                    Spacer(minLength: 4)
+                    planningAction
                 }
-                Spacer()
-                Text("›").font(.system(size: 28)).foregroundStyle(Theme.gold)
+                VStack(alignment: .leading, spacing: 10) {
+                    planningLabel
+                    planningAction
+                }
             }
-            .padding(20)
-            .background(RoundedRectangle(cornerRadius: 18).fill(Theme.navy))
+            .padding(12)
+            .frame(minHeight: 64)
+            .background(Theme.cardFill, in: RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.border))
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 20)
+    }
+
+    private var planningLabel: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(String(localized: "design.home.planTogether"))
+                .font(.subheadline.weight(.medium)).foregroundStyle(.white)
+            Text(String(localized: "design.home.planSubtitle"))
+                .font(.caption2).foregroundStyle(Theme.secondaryText)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var planningAction: some View {
+        HStack(spacing: 5) {
+            Text(String(localized: "design.home.askPiri"))
+            Image(systemName: "arrow.right")
+        }
+        .font(.caption.weight(.medium))
+        .foregroundStyle(Theme.gold)
+        .fixedSize()
     }
 }

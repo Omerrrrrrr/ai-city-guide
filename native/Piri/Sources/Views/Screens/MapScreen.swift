@@ -95,6 +95,7 @@ struct MapScreen: View {
     /// drives a retry affordance in `mapFeatureCard`'s loading state instead
     /// of leaving it stuck on a skeleton forever.
     @State private var resolveFailed = false
+    @State private var mapFeatureExpanded = false
     @State private var routeCoordinates: [CLLocationCoordinate2D] = []
     @State var initialRegion: MKCoordinateRegion?
     @State private var recenterTrigger: UUID?
@@ -263,7 +264,15 @@ struct MapScreen: View {
                         .padding(8)
                         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8))
                 }
-                Spacer()
+                Spacer(minLength: 8)
+                HStack(spacing: 10) {
+                    Spacer()
+                    mapTypeButton
+                    routeModeToggleButton
+                        .environment(\.colorScheme, .dark)
+                        .accessibilityLabel(String(localized: "design.map.plan"))
+                    locationButton
+                }
                 if routeMode {
                     routeModeSheet
                 } else if let selectedPlace {
@@ -277,8 +286,8 @@ struct MapScreen: View {
                     ))
                 } else if let selectedTrail {
                     trailCard(for: selectedTrail)
-                } else if let selectedMapFeature {
-                    mapFeatureCard(for: MapFeatureIdentity(title: selectedMapFeature.title, coordinate: selectedMapFeature.coordinate))
+                } else if let visibleMapFeatureIdentity {
+                    mapFeatureCard(for: visibleMapFeatureIdentity)
                 } else if hikingLayerActive, !trailPins.isEmpty {
                     // Nearest-first (backend already sorts by
                     // `approxDistanceFromQueryKm`) so this doubles as "what's
@@ -289,14 +298,6 @@ struct MapScreen: View {
                 }
             }
             .padding()
-        }
-        .overlay(alignment: .bottomTrailing) {
-            VStack(spacing: 12) {
-                locationButton
-                mapTypeButton
-                routeModeToggleButton
-            }
-            .padding(20)
         }
         // Not `.navigationTitle` — the system nav bar/large-title reserved a
         // big, unstyled blank band above the map (inconsistent with every
@@ -439,11 +440,12 @@ struct MapScreen: View {
         } label: {
             Image(systemName: mapTypeIconName)
                 .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(.primary)
-                .frame(width: 48, height: 48)
-                .background(Circle().fill(.thinMaterial))
-                .shadow(radius: 3)
+                .foregroundStyle(.white)
+                .frame(width: 44, height: 44)
+                .background(Theme.navy, in: Circle())
+                .overlay(Circle().strokeBorder(Theme.border, lineWidth: 1))
         }
+        .accessibilityLabel(String(localized: "design.map.appearance"))
     }
 
     /// Re-centers on the user's live GPS position -- distinct from
@@ -461,11 +463,12 @@ struct MapScreen: View {
         } label: {
             Image(systemName: "location.fill")
                 .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(.primary)
-                .frame(width: 48, height: 48)
-                .background(Circle().fill(.thinMaterial))
-                .shadow(radius: 3)
+                .foregroundStyle(.white)
+                .frame(width: 44, height: 44)
+                .background(Theme.navy, in: Circle())
+                .overlay(Circle().strokeBorder(Theme.border, lineWidth: 1))
         }
+        .accessibilityLabel(String(localized: "design.map.recenter"))
     }
 
     private var mapTypeIconName: String {
@@ -477,27 +480,43 @@ struct MapScreen: View {
     }
 
     private var searchBar: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-            TextField(String(localized: "common.searchPlaces"), text: $searchQuery)
-                .textFieldStyle(.plain)
-                .autocorrectionDisabled()
-                .onSubmit {
-                    searchTask?.cancel()
-                    searchTask = Task { await searchAndCenterMap(searchQuery) }
-                }
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(Theme.secondaryText)
+            TextField(
+                "",
+                text: $searchQuery,
+                prompt: Text(String(localized: "design.map.search"))
+                    .foregroundStyle(Theme.secondaryText)
+            )
+            .font(.system(size: 15))
+            .foregroundStyle(.white)
+            .tint(Theme.gold)
+            .textFieldStyle(.plain)
+            .submitLabel(.search)
+            .autocorrectionDisabled()
+            .accessibilityLabel(String(localized: "design.map.search"))
+            .onSubmit {
+                searchTask?.cancel()
+                searchTask = Task { await searchAndCenterMap(searchQuery) }
+            }
             if !searchQuery.isEmpty {
                 Button {
                     searchQuery = ""
                     searchTask?.cancel()
                 } label: {
-                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(Theme.secondaryText)
+                        .frame(width: 32, height: 36)
                 }
+                .accessibilityLabel(String(localized: "design.map.clearSearch"))
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .piriGlassCard(cornerRadius: 12)
+        .padding(.horizontal, 16)
+        .frame(minHeight: 48)
+        .background(Theme.navy, in: RoundedRectangle(cornerRadius: 22))
+        .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(Theme.secondaryText.opacity(0.65), lineWidth: 1))
+        .shadow(color: Theme.navy.opacity(0.16), radius: 8, y: 3)
     }
 
     private func searchAndCenterMap(_ query: String) async {
@@ -524,29 +543,67 @@ struct MapScreen: View {
         }
     }
 
+    private var mapCategoryGroups: [POICategoryGroup] {
+        let leadingKeys = ["all", "cafes", "food", "nature", "culture"]
+            .map { "mapPoiCategories.\($0)" }
+        let leading = leadingKeys.compactMap { key in
+            POICategoryGroups.all.first { $0.labelKey == key }
+        }
+        return leading + POICategoryGroups.all.filter { !leadingKeys.contains($0.labelKey) }
+    }
+
     private var categoryChips: some View {
         HStack(spacing: 8) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    ForEach(POICategoryGroups.all) { group in
-                        let active = selectedCategoryGroup?.id == group.id
+                    ForEach(mapCategoryGroups) { group in
+                        let active = selectedCategoryGroup?.id == group.id || (selectedCategoryGroup == nil && group.categories == nil)
                         Button {
                             selectedCategoryGroup = active ? nil : group
                         } label: {
-                            Label(String(localized: String.LocalizationValue(group.labelKey)), systemImage: group.icon)
+                            HStack(spacing: 6) {
+                                if group.categories != nil {
+                                    Image(systemName: group.icon)
+                                }
+                                Text(String(localized: String.LocalizationValue(group.labelKey)))
+                            }
                         }
-                        .font(.footnote.weight(.medium))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(active ? Color.accentColor : Color(.secondarySystemBackground), in: Capsule())
-                        .foregroundStyle(active ? .white : .primary)
+                        .buttonStyle(.plain)
+                        .font(.system(size: 12, weight: .medium))
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: 36)
+                        .background(active ? Theme.gold : Theme.navy, in: Capsule())
+                        .overlay(Capsule().strokeBorder(active ? Theme.gold : Theme.border, lineWidth: 1))
+                        .foregroundStyle(active ? Theme.navy : .white)
+                        .accessibilityAddTraits(active ? [.isSelected] : [])
                     }
                 }
             }
-            // Was its own always-visible chip row (`dietaryChips`) — see
-            // `HomeScreen.categoryChipsRow`'s identical change for why a
-            // single compact `DietaryFilterButton` replaced it.
-            DietaryFilterButton(selection: Binding(get: { dietaryFilter }, set: { dietaryFilter = $0 }))
+            // Keep the shared dietary selection and toggle semantics,
+            // with a locally styled menu to match the map overlay.
+            Menu {
+                ForEach(DietTag.allCases) { tag in
+                    Button {
+                        dietaryFilter = dietaryFilter == tag ? nil : tag
+                    } label: {
+                        let label = String(localized: String.LocalizationValue("diet.\(tag.rawValue)"))
+                        if dietaryFilter == tag {
+                            Label(label, systemImage: "checkmark")
+                        } else {
+                            Text(label)
+                        }
+                    }
+                }
+            } label: {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 17))
+                    .foregroundStyle(dietaryFilter == nil ? .white : Theme.navy)
+                    .frame(width: 44, height: 44)
+                    .background(dietaryFilter == nil ? Theme.navy : Theme.gold, in: Circle())
+                    .overlay(Circle().strokeBorder(Theme.gold, lineWidth: 1))
+            }
+            .accessibilityLabel(String(localized: "dietaryFilter.button"))
+            .accessibilityValue(dietaryFilter.map { String(localized: String.LocalizationValue("diet.\($0.rawValue)")) } ?? String(localized: "design.common.all"))
         }
     }
 
@@ -575,6 +632,7 @@ struct MapScreen: View {
     }
 
     private func selectDietaryPin(_ pin: DietaryPin) {
+        mapFeatureExpanded = false
         selectedDietaryPin = pin
         selectedPlace = nil
         selectedLivePin = nil
@@ -590,6 +648,7 @@ struct MapScreen: View {
     }
 
     private func selectMapFeature(_ feature: MKMapFeatureAnnotation) {
+        mapFeatureExpanded = false
         selectedMapFeature = feature
         selectedPlace = nil
         selectedLivePin = nil
@@ -605,6 +664,7 @@ struct MapScreen: View {
     }
 
     private func dismissMapFeature() {
+        mapFeatureExpanded = false
         selectedMapFeature = nil
         selectedDietaryPin = nil
         resolvedMapFeatureItem = nil
@@ -859,6 +919,10 @@ struct MapScreen: View {
         let coordinate: CLLocationCoordinate2D
     }
 
+    private var visibleMapFeatureIdentity: MapFeatureIdentity? {
+        return selectedMapFeature.map { MapFeatureIdentity(title: $0.title, coordinate: $0.coordinate) }
+    }
+
     private func resolvedMapFeaturePOI(for identity: MapFeatureIdentity) -> POIPlace? {
         guard let resolvedMapFeatureItem else { return nil }
         return POIPlace(
@@ -869,64 +933,116 @@ struct MapScreen: View {
         )
     }
 
-    /// Thin wrapper around the shared `POIExplainContent` (see that type's
-    /// own doc comment) -- everything content-wise (description, photos,
-    /// combined reviews, chat, etc.) lives there now, identical to what
-    /// `POIExplainSheet` shows. `resolvedMapFeatureItem` resolves
-    /// asynchronously (`explainMapFeature`/`explainDietaryPin`), so a real
-    /// `POIPlace` isn't available the instant this card appears -- shows a
-    /// brief skeleton in the meantime rather than mounting
-    /// `POIExplainContent` with a placeholder `POIPlace`.
+    /// Details mount only after an explicit expansion; the first tap leaves
+    /// room to browse the map and start planning a route.
     private func mapFeatureCard(for identity: MapFeatureIdentity) -> some View {
         let poi = resolvedMapFeaturePOI(for: identity)
-
-        return Group {
-            if let poi {
+        return VStack(alignment: .leading, spacing: 0) {
+            if mapFeatureExpanded, let poi {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { mapFeatureExpanded = false }
+                } label: {
+                    Label(String(localized: "design.map.collapse"), systemImage: "chevron.down")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(Theme.gold)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
                 POIExplainContent(poi: poi, onClose: dismissMapFeature)
+                    .id(poi.asReference.id)
+                    .environment(\.colorScheme, .dark)
             } else {
                 VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        Text("◈").foregroundStyle(Theme.gold)
-                        Text(identity.title ?? "").font(.headline).lineLimit(1)
-                        Spacer()
-                        Button {
-                            dismissMapFeature()
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.secondary)
-                                .frame(width: 36, height: 36)
+                    HStack(alignment: .top, spacing: 12) {
+                        MapPreviewThumbnail(poi: poi)
+                            .id(poi?.asReference.id ?? "resolving")
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(poi?.name ?? identity.title ?? "")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .lineLimit(2)
+                                .accessibilityIdentifier("map.poi.name")
+                            Text(mapFeatureSubtitle(poi))
+                                .font(.system(size: 13))
+                                .foregroundStyle(Theme.secondaryText)
+                                .lineLimit(2)
+                            if poi != nil {
+                                Button {
+                                    withAnimation(.easeInOut(duration: 0.2)) { mapFeatureExpanded = true }
+                                } label: {
+                                    Label(String(localized: "design.map.details"), systemImage: "arrow.right")
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundStyle(Theme.gold)
+                                        .frame(minHeight: 36)
+                                }
+                                .accessibilityIdentifier("map.poi.expand")
+                            } else if resolveFailed {
+                                Button("common.retry") {
+                                    poiExplainTask?.cancel()
+                                    resolveFailed = false
+                                    if let selectedDietaryPin {
+                                        poiExplainTask = Task { await explainDietaryPin(selectedDietaryPin) }
+                                    } else if let selectedMapFeature {
+                                        poiExplainTask = Task { await explainMapFeature(selectedMapFeature) }
+                                    }
+                                }
+                                .tint(Theme.gold)
+                                .frame(minHeight: 36)
+                            } else {
+                                ProgressView().tint(Theme.gold).frame(height: 36)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        Button(action: dismissMapFeature) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Theme.secondaryText)
+                                .frame(width: 32, height: 44)
                                 .contentShape(Rectangle())
                         }
-                        .font(.title3)
+                        .accessibilityLabel(String(localized: "design.common.close"))
                     }
                     if resolveFailed {
-                        HStack(spacing: 8) {
-                            Text("map.live.error").font(.footnote).foregroundStyle(.secondary)
-                            Spacer()
-                            Button("common.retry") {
-                                poiExplainTask?.cancel()
-                                if let selectedDietaryPin {
-                                    poiExplainTask = Task { await explainDietaryPin(selectedDietaryPin) }
-                                } else if let selectedMapFeature {
-                                    poiExplainTask = Task { await explainMapFeature(selectedMapFeature) }
-                                }
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                        }
-                    } else {
-                        VStack(alignment: .leading, spacing: 8) {
-                            SkeletonBox().frame(width: 180, height: 14)
-                            SkeletonBox().frame(height: 12)
-                            SkeletonBox().frame(width: 220, height: 12)
-                        }
+                        Text("map.live.error")
+                            .font(.caption)
+                            .foregroundStyle(Theme.secondaryText)
                     }
+                    Button {
+                        guard let poi else { return }
+                        Haptics.light()
+                        var stops = plannedStops
+                        if !stops.contains(where: { $0.id == poi.asReference.id }) {
+                            stops.append(poi.asReference)
+                        }
+                        Task { await startPendingRoute(stops) }
+                    } label: {
+                        Label(String(localized: "design.map.createRoute"), systemImage: "location.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Theme.navy)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .background(Theme.gold.opacity(poi == nil ? 0.45 : 1), in: RoundedRectangle(cornerRadius: 14))
+                    }
+                    .disabled(poi == nil)
+                    .accessibilityIdentifier("map.poi.createRoute")
                 }
-                .padding()
+                .padding(12)
+                .accessibilityIdentifier("map.poi.compactCard")
             }
         }
-        .piriGlassCard(cornerRadius: 16)
-        .frame(maxHeight: UIScreen.main.bounds.height * 0.6)
+        .buttonStyle(.plain)
+        .background(Theme.navy, in: RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Theme.border, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .shadow(color: Theme.navy.opacity(0.2), radius: 12, y: 4)
+        .frame(maxHeight: mapFeatureExpanded ? UIScreen.main.bounds.height * 0.6 : nil)
+    }
+
+    private func mapFeatureSubtitle(_ poi: POIPlace?) -> String {
+        let category = (poi?.category).flatMap { category in
+            POICategoryGroups.all.first { $0.categories?.contains(category) == true }
+        }.map { String(localized: String.LocalizationValue($0.labelKey)) }
+        let locality = poi?.mapItem.placemark.locality ?? cityStore.cityName ?? ""
+        return [category ?? String(localized: "design.common.place"), locality]
+            .filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
     private func setInitialRegionIfNeeded() async {
@@ -1116,6 +1232,7 @@ struct MapScreen: View {
     /// two cards share it (see that type's own doc comment).
     private func explainMapFeature(_ feature: MKMapFeatureAnnotation) async {
         let mapItem = try? await MKMapItemRequest(mapFeatureAnnotation: feature).mapItem
+        guard !Task.isCancelled else { return }
         resolvedMapFeatureItem = mapItem
         // Unlike `explainDietaryPin` (a local synthesis that can't fail),
         // this is a real network request -- without tracking a failure here,
@@ -1190,5 +1307,62 @@ private struct TrailReviewsSheet: View {
             let locale = languageStore.code ?? Locale.current.language.languageCode?.identifier
             summary = try? await TrailsAPI.summary(for: trail, locale: locale)
         }
+    }
+}
+
+private struct MapPreviewThumbnail: View {
+    let poi: POIPlace?
+    @State private var photo: PhotoBulkResult?
+
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            if let photo, let urlString = photo.photoUrl, let url = URL(string: urlString) {
+                CachedAsyncImage(url: url, maxPixelSize: 300) { image in
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    fallback
+                }
+                .frame(width: 94, height: 94)
+                .clipped()
+                if let attribution = photo.attributionUrl, let url = URL(string: attribution) {
+                    Link(photo.source?.capitalized ?? "Photo", destination: url)
+                        .font(.system(size: 8, weight: .medium))
+                        .foregroundStyle(.white)
+                        .padding(4)
+                        .background(.black.opacity(0.65), in: Capsule())
+                        .padding(4)
+                }
+            } else {
+                fallback
+            }
+        }
+        .frame(width: 94, height: 94)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .task(id: poi?.asReference.id) {
+            photo = nil
+            guard let poi else { return }
+            let request = PhotoBulkRequest(places: [PhotoBulkPlace(
+                name: poi.name, lat: poi.coordinate.latitude, lng: poi.coordinate.longitude,
+                category: poi.categoryLabel.isEmpty ? nil : poi.categoryLabel
+            )])
+            // Same free preview path as POIExplainContent; expanding details
+            // remains the only request that can consume paid photo quota.
+            guard let result = try? await PlacesAPI.photosBulk(request).results.first,
+                  !Task.isCancelled,
+                  ["wikipedia", "tripadvisor", "google"].contains(result.source ?? "") else { return }
+            // Category stock photos aren't presented as a photo of this POI.
+            photo = result
+        }
+    }
+
+    private var fallback: some View {
+        ZStack {
+            Theme.navyLight
+            Image(systemName: POICategoryGroups.icon(for: poi?.category))
+                .font(.system(size: 28, weight: .regular))
+                .foregroundStyle(Theme.gold)
+        }
+        .frame(width: 94, height: 94)
+        .accessibilityHidden(true)
     }
 }

@@ -17,7 +17,7 @@ final class PlanBuilderUITests: XCTestCase {
         app.launch()
         attach(app, name: "01-launch")
 
-        let profileTab = app.tabBars.buttons["Profil"]
+        let profileTab = app.buttons["piri.tab.4"]
         XCTAssertTrue(profileTab.waitForExistence(timeout: 10), "Profil tab bar item not found")
         profileTab.tap()
         attach(app, name: "02-profile")

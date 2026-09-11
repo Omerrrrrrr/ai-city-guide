@@ -18,7 +18,7 @@ final class AccountUITests: XCTestCase {
 
         completeOnboardingIfNeeded(app)
 
-        let profileTab = app.tabBars.buttons["Profil"]
+        let profileTab = app.buttons["piri.tab.4"]
         XCTAssertTrue(profileTab.waitForExistence(timeout: 10), "Profil tab bar item not found")
         profileTab.tap()
         attach(app, name: "02-profile")
@@ -105,7 +105,7 @@ final class AccountUITests: XCTestCase {
     /// Taps through it (welcome "Başla", then "Devam et"/"Bitti" on each
     /// wizard step) so this test works from a truly clean install too.
     private func completeOnboardingIfNeeded(_ app: XCUIApplication) {
-        guard !app.tabBars.buttons["Profil"].waitForExistence(timeout: 2) else { return }
+        guard !app.buttons["piri.tab.4"].waitForExistence(timeout: 2) else { return }
 
         let start = app.buttons["Başla"]
         if start.waitForExistence(timeout: 3) {
@@ -113,7 +113,7 @@ final class AccountUITests: XCTestCase {
         }
 
         var attempts = 0
-        while !app.tabBars.buttons["Profil"].exists, attempts < 12 {
+        while !app.buttons["piri.tab.4"].exists, attempts < 12 {
             let advance = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@ OR label CONTAINS[c] %@", "Devam et", "Bitti")).firstMatch
             if advance.waitForExistence(timeout: 3), advance.isHittable {
                 advance.tap()

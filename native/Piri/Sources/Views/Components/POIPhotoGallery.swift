@@ -1,20 +1,10 @@
 import SwiftUI
 
-/// A hero preview above a filmstrip of every photo (including whichever one
-/// the hero is currently showing) -- tapping a thumbnail swaps the hero to
-/// that photo, matching live feedback that treated the thumbnail row as a
-/// selector for the preview above it rather than each thumbnail being its
-/// own independent full-screen trigger. Tapping the hero itself still opens
-/// the full-screen pager, at whichever photo is currently selected. Rounded
-/// corners on the hero now, not full-bleed -- an earlier full-bleed version
-/// (and a since-abandoned attempt at bleeding it under the status bar) both
-/// read as a harder edge than intended once every corner around it
-/// (thumbnails, the card itself) was already rounded. Each thumbnail (and
-/// the hero) carries its own source label rather than one blanket
-/// attribution, since a place can have photos from both providers at once.
-/// Only ever embedded by `POIExplainSheet` (verified — no other call site).
-struct POIPhotoGallery<Trailing: View>: View {
+/// Edge-to-edge photo header with an expandable filmstrip. Source badges,
+/// full-screen viewing, user contributions, and paid-photo hints stay available.
+struct POIPhotoGallery<Content: View, Trailing: View>: View {
     let photos: [POIPhoto]
+    @ViewBuilder let content: () -> Content
     /// Appended as extra tiles at the end of the same filmstrip row as the
     /// Tripadvisor/Wikipedia thumbnails -- lets `POIExplainContent` fold its
     /// user-submitted-photos strip and "add a photo" button into this one
@@ -24,25 +14,43 @@ struct POIPhotoGallery<Trailing: View>: View {
     @Environment(AuthStore.self) private var authStore
     @State private var viewerIndex: PhotoIndex?
     @State private var selectedIndex = 0
+    @State private var showingPhotos = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 0) {
             if photos.indices.contains(selectedIndex) {
                 heroPhoto(photos[selectedIndex], index: selectedIndex)
             }
+            content()
             // Always shown, even with zero official photos -- `trailing`
             // (the user-submitted strip + add-photo button) needs to stay
             // reachable regardless, so a place with no Tripadvisor/Wikipedia
             // photo at all doesn't lose its only way to contribute one.
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(Array(photos.enumerated()), id: \.element.id) { index, photo in
-                        thumbnail(photo, index: index)
+            DisclosureGroup(isExpanded: $showingPhotos) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(Array(photos.enumerated()), id: \.element.id) { index, photo in
+                            thumbnail(photo, index: index)
+                        }
+                        trailing()
                     }
-                    trailing()
+                    .padding(.vertical, 10)
                 }
-                .padding(.horizontal, 20)
+            } label: {
+                Label(
+                    String(localized: "design.photo.contributions"),
+                    systemImage: "photo.on.rectangle"
+                )
+                .font(.caption)
+                .foregroundStyle(Theme.secondaryText)
+                .frame(minHeight: 36)
             }
+            .accessibilityIdentifier("piri.detail.photos.disclosure")
+            .padding(.horizontal, 20)
+            .padding(.bottom, 20)
+        }
+        .onChange(of: photos.map(\.id)) { _, _ in
+            if !photos.indices.contains(selectedIndex) { selectedIndex = 0 }
         }
         .fullScreenCover(item: $viewerIndex) { wrapped in
             POIPhotoViewer(photos: photos, index: wrapped.value)
@@ -53,28 +61,28 @@ struct POIPhotoGallery<Trailing: View>: View {
         Button {
             viewerIndex = PhotoIndex(value: index)
         } label: {
-            ZStack(alignment: .bottomLeading) {
-                // System-adaptive, not `Theme.cardFill`/`Theme.navyLight` --
-                // this gallery is shared by `POIExplainSheet` (forced dark)
-                // and `MapScreen.mapFeatureCard`'s translucent inline card,
-                // which stays on the system's own Light/Dark rendering. A
-                // hardcoded navy placeholder here looked like a stray dark
-                // box floating in that still-light glass card.
-                CachedAsyncImage(url: URL(string: photo.url), maxPixelSize: 800) { image in
-                    image.resizable().aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Color(.secondarySystemBackground)
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 240)
-                .clipped()
+            GeometryReader { geometry in
+                ZStack(alignment: .bottomLeading) {
+                    CachedAsyncImage(url: URL(string: photo.url), maxPixelSize: 800) { image in
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Theme.cardFill
+                    }
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .clipped()
 
-                photoBadges(photo).padding(10)
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.35)], startPoint: .center, endPoint: .bottom)
+                    photoBadges(photo).padding(12)
+                }
+                .frame(width: geometry.size.width, height: geometry.size.height)
+                .clipped()
             }
-            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .frame(height: 280)
+            .clipped()
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 20)
+        .accessibilityLabel(Text(String(localized: "design.photo.fullScreen")))
     }
 
     private func thumbnail(_ photo: POIPhoto, index: Int) -> some View {
@@ -86,7 +94,7 @@ struct POIPhotoGallery<Trailing: View>: View {
                 CachedAsyncImage(url: URL(string: photo.url), maxPixelSize: 400) { image in
                     image.resizable().aspectRatio(contentMode: .fill)
                 } placeholder: {
-                    Color(.secondarySystemBackground)
+                    Theme.cardFill
                 }
                 .frame(width: 110, height: 110)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -118,9 +126,18 @@ struct POIPhotoGallery<Trailing: View>: View {
     }
 }
 
-extension POIPhotoGallery where Trailing == EmptyView {
+extension POIPhotoGallery where Content == EmptyView {
+    init(photos: [POIPhoto], @ViewBuilder trailing: @escaping () -> Trailing) {
+        self.photos = photos
+        self.content = { EmptyView() }
+        self.trailing = trailing
+    }
+}
+
+extension POIPhotoGallery where Content == EmptyView, Trailing == EmptyView {
     init(photos: [POIPhoto]) {
         self.photos = photos
+        self.content = { EmptyView() }
         self.trailing = { EmptyView() }
     }
 }
