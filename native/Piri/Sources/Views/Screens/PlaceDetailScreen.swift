@@ -394,7 +394,7 @@ struct PlaceDetailScreen: View {
                     ForEach(nearby) { entry in
                         NavigationLink(destination: PlaceDetailScreen(placeId: entry.place.id)) {
                             VStack(alignment: .leading, spacing: 4) {
-                                PlaceImageView(place: entry.place, cornerRadius: 0).frame(width: 140, height: 90)
+                                PlaceImageView(place: entry.place, cornerRadius: 0, maxPixelSize: 250).frame(width: 140, height: 90)
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(entry.place.name).font(.system(size: 13, weight: .bold)).lineLimit(2)
                                     Text(walkMinutesLabel(entry.distanceKm)).font(.system(size: 11)).foregroundStyle(.secondary)

@@ -4,11 +4,19 @@ import SwiftUI
 struct PlaceImageView: View {
     let place: Place
     var cornerRadius: CGFloat = 0
+    /// Left at `CachedAsyncImage`'s own 900px default for back-compat, but
+    /// every call site showing this at a small/medium display size (a 60x60
+    /// list row thumbnail, a 180x130 featured card) should pass a smaller
+    /// value -- `CachedAsyncImage`'s own doc comment describes the exact
+    /// failure mode of not doing this: a screen full of place cards all
+    /// decoding multi-megabyte images at once can block the main thread
+    /// badly enough that taps stop registering.
+    var maxPixelSize: CGFloat = 900
 
     var body: some View {
         Group {
             if place.image.verified, let url = URL(string: place.imageUrl) {
-                CachedAsyncImage(url: url) { image in
+                CachedAsyncImage(url: url, maxPixelSize: maxPixelSize) { image in
                     image.resizable().aspectRatio(contentMode: .fill)
                 } placeholder: {
                     placeholder

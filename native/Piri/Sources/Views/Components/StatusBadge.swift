@@ -27,7 +27,7 @@ struct PlaceRowView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            PlaceImageView(place: place, cornerRadius: 10)
+            PlaceImageView(place: place, cornerRadius: 10, maxPixelSize: 150)
                 .frame(width: 60, height: 60)
             VStack(alignment: .leading, spacing: 4) {
                 Text(place.name).font(.system(size: 15, weight: .semibold)).lineLimit(1)
@@ -50,7 +50,7 @@ struct FeaturedCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            PlaceImageView(place: place)
+            PlaceImageView(place: place, maxPixelSize: 300)
                 .frame(width: 180, height: 130)
             StatusBadge(place: place)
             Text(place.name).font(.system(size: 15, weight: .bold)).lineLimit(2)
