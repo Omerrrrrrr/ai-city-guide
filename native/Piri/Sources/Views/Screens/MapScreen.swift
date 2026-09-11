@@ -1220,7 +1220,16 @@ struct MapScreen: View {
                 PlaceCoordinate(lat: userLocation.latitude, lng: userLocation.longitude),
                 PlaceCoordinate(lat: location.lat, lng: location.lng),
             ])
-            routeCoordinates = result.route.map { CLLocationCoordinate2D(latitude: $0[0], longitude: $0[1]) }
+            // Matches the guarded decode every other coordinate-pair site in
+            // this codebase uses (`TripsScreen`, `TripDetailScreen`,
+            // `MapScreen+RouteMode`, `TripRecapVideoRenderer`) -- an
+            // unguarded `$0[0]`/`$0[1]` here would crash on a malformed or
+            // short pair from `RoutesAPI.directions` instead of just
+            // dropping that one point.
+            routeCoordinates = result.route.compactMap { pair -> CLLocationCoordinate2D? in
+                guard pair.count == 2 else { return nil }
+                return CLLocationCoordinate2D(latitude: pair[0], longitude: pair[1])
+            }
         } catch {
             errorMessage = error.localizedDescription
         }

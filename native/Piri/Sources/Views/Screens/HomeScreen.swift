@@ -823,7 +823,15 @@ struct HomeScreen: View {
     }
 
     private var profileNudge: some View {
-        NavigationLink(destination: ProfileScreen()) {
+        // `ProfileScreen` is a tab root (`MainTabView` tag 4) that hides its
+        // own nav bar and has no back button -- pushing a second, dead-end
+        // copy of it via `NavigationLink` (as this used to) left no way out,
+        // same bug class as the `SavedScreen`/`ExploreScreen` fixes above.
+        // Switching tabs is the structurally correct move here, not adding
+        // a back button to a screen that's meant to be a tab root.
+        Button {
+            tabSelection.selection = 4
+        } label: {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("home.profileNudge.title").font(.system(size: 15, weight: .bold)).foregroundStyle(.white)

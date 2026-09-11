@@ -110,6 +110,19 @@ struct OnboardingScreen: View {
             .padding(.horizontal, 24)
             .padding(.vertical, 16)
         }
+        // `welcomeStep`/`rewardStep` (either side of this in `body`'s
+        // switch) both hardcode a navy background + white text and never
+        // needed to force color scheme since none of their colors are
+        // adaptive. This step's content (`nameStep`/`professionStep`/etc.)
+        // uses system-adaptive colors instead (`Color(.secondarySystemBackground)`,
+        // default `.primary` text) with no background override at all --
+        // so on a device in system Light Mode, onboarding visibly flipped
+        // dark navy (welcome) -> light system background (wizard) -> dark
+        // navy (reward) mid-flow. Forcing dark here matches the rest of
+        // this screen (and the rest of the app's approved navy/gold
+        // redesign) without having to rewrite every adaptive color inside.
+        .environment(\.colorScheme, .dark)
+        .background(Theme.screenBackground.ignoresSafeArea())
     }
 
     private var nameStep: some View {

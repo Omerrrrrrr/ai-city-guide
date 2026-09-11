@@ -13,6 +13,7 @@ import SwiftUI
 struct ExploreScreen: View {
     @Environment(CityStore.self) private var cityStore
     @Environment(AuthStore.self) private var authStore
+    @Environment(\.dismiss) private var dismiss
 
     @State private var query = ""
     @State private var selectedCategoryGroup: POICategoryGroup?
@@ -107,6 +108,20 @@ struct ExploreScreen: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 12) {
+            // `ExploreScreen` is only ever reached by `NavigationLink` push
+            // (from `HomeScreen`), never as a tab root, but hides its own
+            // navigation bar to match this app's other headers -- without
+            // an explicit back button here, pushing into it was a dead end
+            // (no back button, no swipe-down since it isn't a sheet).
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 32, height: 32)
+                    .background(Circle().fill(.white.opacity(0.12)))
+            }
             Text(cityStore.cityName ?? String(localized: "explore.placesFallback"))
                 .font(.system(size: 26, weight: .bold))
                 .foregroundStyle(.white)
