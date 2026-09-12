@@ -38,12 +38,18 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>Piri uses your camera to identify places and give you personalized explanations.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Piri needs Always location access to keep recording your trip route while your phone is locked or you're using another app during an active trip.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Piri uses your location to show nearby places and give you city-specific recommendations.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Piri can save trip photos to your library.</string>
 	<key>PiriAPIBaseURL</key>
 	<string>$(PIRI_API_BASE_URL)</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UIRequiresFullScreen</key>

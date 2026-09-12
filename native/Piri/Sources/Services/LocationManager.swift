@@ -41,6 +41,18 @@ final class LocationManager: NSObject, @MainActor CLLocationManagerDelegate {
         manager.requestWhenInUseAuthorization()
     }
 
+    /// Only ever called from `startBreadcrumbRecording()`, i.e. right as an
+    /// actual trip starts -- Apple's own guidance is to ask for the Always
+    /// upgrade at the moment it's actually needed, not at first launch.
+    /// A no-op (no re-prompt, no crash) if already decided either way, or
+    /// if `.whenInUse` hasn't been granted yet -- in the latter case iOS
+    /// itself first asks for `.whenInUse` and defers the Always upgrade
+    /// prompt to a later, system-chosen moment.
+    private func requestAlwaysAuthorizationIfNeeded() {
+        guard authorizationStatus == .authorizedWhenInUse else { return }
+        manager.requestAlwaysAuthorization()
+    }
+
     func startUpdatingLocation() {
         manager.startUpdatingLocation()
     }
@@ -54,10 +66,21 @@ final class LocationManager: NSObject, @MainActor CLLocationManagerDelegate {
         lastBreadcrumbAt = nil
         lastBreadcrumbLocation = nil
         isRecordingBreadcrumb = true
+        requestAlwaysAuthorizationIfNeeded()
+        // Both require the `location` `UIBackgroundModes` capability
+        // (declared in `project.yml`) to not be a fatal error at the first
+        // call -- toggled on only for the duration of an actual trip, not
+        // left on for the app's whole lifetime, since continuous Always
+        // access with no corresponding benefit is exactly what draws
+        // heavier App Review scrutiny/rejection risk.
+        manager.allowsBackgroundLocationUpdates = true
+        manager.pausesLocationUpdatesAutomatically = false
     }
 
     func stopBreadcrumbRecording() {
         isRecordingBreadcrumb = false
+        manager.allowsBackgroundLocationUpdates = false
+        manager.pausesLocationUpdatesAutomatically = true
     }
 
     /// Port of `getCurrentLocation` in `mobile/src/utils/location.ts` — a

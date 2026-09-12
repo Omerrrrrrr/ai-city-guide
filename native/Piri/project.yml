@@ -47,6 +47,12 @@ targets:
         # multi-orientation/multitasking support unless this is set.
         UIRequiresFullScreen: true
         NSLocationWhenInUseUsageDescription: "Piri uses your location to show nearby places and give you city-specific recommendations."
+        # Requested only when an actual trip starts (`LocationManager
+        # .startBreadcrumbRecording`), not at first launch -- without this,
+        # iOS suspends location delivery within seconds of the app
+        # backgrounding mid-trip (phone locked, another app opened),
+        # leaving a gap or an abrupt stop in the recorded route.
+        NSLocationAlwaysAndWhenInUseUsageDescription: "Piri needs Always location access to keep recording your trip route while your phone is locked or you're using another app during an active trip."
         NSCameraUsageDescription: "Piri uses your camera to identify places and give you personalized explanations."
         NSPhotoLibraryAddUsageDescription: "Piri can save trip photos to your library."
         CFBundleShortVersionString: "1.0.0"
@@ -83,6 +89,14 @@ targets:
         LSApplicationQueriesSchemes:
           - comgooglemaps
           - yandexmaps
+        # Paired with `allowsBackgroundLocationUpdates` (toggled on only
+        # while a trip is actively recording, see `LocationManager`) --
+        # declaring this capability without actually using Always
+        # authorization the rest of the time is exactly what avoids the
+        # heavier App Review scrutiny/rejection risk blanket background
+        # location otherwise invites.
+        UIBackgroundModes:
+          - location
     entitlements:
       path: Piri.entitlements
       properties:
