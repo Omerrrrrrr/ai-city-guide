@@ -142,6 +142,18 @@ final class SavedPlacesStore {
         persist()
     }
 
+    /// Called on sign-out ([[AuthStore.signOut]]) -- without this, a
+    /// different person signing in afterward on the same device would
+    /// inherit (and, via `AuthStore.performInitialSync`'s "push local data
+    /// to seed the account" path, permanently upload under their own
+    /// account) whatever saved places/plans the previous person left
+    /// behind. This is exactly the "personal data" this store's own doc
+    /// comment already calls it out as.
+    func clearAllLocalData() {
+        collections = []
+        persist()
+    }
+
     private func persist() {
         persistence.save(SavedPlacesState(collections: collections))
     }

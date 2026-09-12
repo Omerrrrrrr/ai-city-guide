@@ -854,7 +854,12 @@ struct ProfileScreen: View {
                     Text((name?.isEmpty == false ? name : nil) ?? user.email)
                         .font(.system(size: 15, weight: .semibold))
                     Button(role: .destructive) {
-                        authStore.signOut()
+                        authStore.signOut(
+                            userProfileStore: userProfileStore,
+                            savedPlacesStore: savedPlacesStore,
+                            tripsStore: tripsStore,
+                            recentlyViewedStore: recentlyViewedStore
+                        )
                     } label: {
                         Text(String(localized: String.LocalizationValue("settings.account.signOut")))
                             .font(.system(size: 14, weight: .semibold))

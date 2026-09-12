@@ -8,10 +8,19 @@ private struct AuthState: Codable {
 
 /// Optional account layer on top of the app's existing local-only stores.
 /// Sign-in is opt-in, not a gate -- the app works fully signed-out exactly
-/// as it did before this store existed, and local data is never cleared on
-/// sign-out (it just keeps working as offline/guest data). No `sessions`
-/// table on the backend: the token here is a long-lived, self-issued JWT,
-/// so signing out is just discarding it locally.
+/// as it did before this store existed. No `sessions` table on the
+/// backend: the token here is a long-lived, self-issued JWT, so signing out
+/// is just discarding it locally.
+///
+/// `signOut()` DOES clear the other local stores (saved places, trips,
+/// profile, recently-viewed) -- it used to leave them alone entirely so a
+/// signed-out session could keep working as "offline/guest data," but that
+/// had a real cross-account leak: `performInitialSync` pushes local data to
+/// the server to "seed" any account that has none server-side yet, so a
+/// second person signing into their own (different, sync-empty) account on
+/// the same device would inherit and permanently upload the first person's
+/// saved places/trips/profile under their own account. Confirmed via a
+/// review sweep, not hypothetical.
 @Observable
 final class AuthStore {
     private(set) var token: String?
@@ -27,10 +36,19 @@ final class AuthStore {
         user = saved?.user
     }
 
-    func signOut() {
+    func signOut(
+        userProfileStore: UserProfileStore,
+        savedPlacesStore: SavedPlacesStore,
+        tripsStore: TripsStore,
+        recentlyViewedStore: RecentlyViewedStore
+    ) {
         token = nil
         user = nil
         persistence.clear()
+        userProfileStore.resetProfile()
+        savedPlacesStore.clearAllLocalData()
+        tripsStore.clearAllLocalData()
+        recentlyViewedStore.clearHistory()
     }
 
     func signInWithApple(identityToken: String, email: String?, fullName: String?) async throws {

@@ -28,8 +28,20 @@ final class UserProfileStore {
         persistence.save(profile)
     }
 
+    /// Called on sign-out ([[AuthStore.signOut]]) -- clears the personal
+    /// onboarding answers (name/profession/faith/budget/travel style/
+    /// interests) so a different person signing in afterward on the same
+    /// device doesn't inherit them (or, via `AuthStore.performInitialSync`'s
+    /// "push local data to seed the account" path, have them permanently
+    /// uploaded under a different person's account). Deliberately keeps
+    /// `onboardingCompleted` true regardless -- this device has already
+    /// been through onboarding, and resetting that flag would incorrectly
+    /// send whoever opens the app next back through the wizard, which
+    /// signing out was never meant to trigger.
     func resetProfile() {
-        profile = UserProfile()
+        var cleared = UserProfile()
+        cleared.onboardingCompleted = true
+        profile = cleared
         persistence.save(profile)
     }
 

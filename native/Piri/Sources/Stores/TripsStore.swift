@@ -134,6 +134,18 @@ final class TripsStore {
         persist()
     }
 
+    /// Called on sign-out ([[AuthStore.signOut]]) -- unlike `replaceTrips`,
+    /// this also clears `activeTripId`. Without this, a different person
+    /// signing in afterward on the same device would inherit (and, via
+    /// `AuthStore.performInitialSync`'s "push local data to seed the
+    /// account" path, permanently upload under their own account) whatever
+    /// trip history the previous person left behind.
+    func clearAllLocalData() {
+        trips = []
+        activeTripId = nil
+        persist()
+    }
+
     private func persist() {
         persistence.save(TripsState(trips: trips, activeTripId: activeTripId))
     }
