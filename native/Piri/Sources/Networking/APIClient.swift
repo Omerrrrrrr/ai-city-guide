@@ -1,5 +1,14 @@
 import Foundation
 
+/// Posted whenever an authenticated request comes back 401 -- `AuthStore`
+/// observes this and clears the (now-invalid) local session, instead of
+/// each of this app's 15+ `bearerToken`-passing call sites independently
+/// showing a generic error with no indication the real problem is an
+/// expired/revoked token needing re-auth.
+extension Notification.Name {
+    static let piriAuthTokenExpired = Notification.Name("piri.auth.tokenExpired")
+}
+
 enum APIError: Error, LocalizedError {
     case server(status: Int, message: String?)
     case decoding(Error)
@@ -125,6 +134,11 @@ final class APIClient {
         }
 
         guard (200..<300).contains(http.statusCode) else {
+            // Only for requests that actually carried a token -- an
+            // anonymous call 401ing doesn't mean any session expired.
+            if http.statusCode == 401, bearerToken != nil {
+                NotificationCenter.default.post(name: .piriAuthTokenExpired, object: nil)
+            }
             let body = try? decoder.decode(ServerErrorBody.self, from: data)
             // Prefer `message` over `error` when both are present — this
             // app's own handlers only ever send `{ error }`, but

@@ -1,3 +1,4 @@
+import AuthenticationServices
 import Foundation
 import Observation
 
@@ -34,17 +35,59 @@ final class AuthStore {
         let saved = persistence.load()
         token = saved?.token
         user = saved?.user
+
+        // Fires if the user revokes Piri's Sign in with Apple access from
+        // their Apple ID settings, entirely outside the app. Without this,
+        // a locally "signed in" session would keep making authenticated API
+        // calls with a token the backend may now consider invalid,
+        // producing confusing repeated failures instead of a clean sign-out.
+        // Deliberately only clears the session (token/user), not the local
+        // data wipe `signOut()` does -- this is very likely still the same
+        // person on the same device who just revoked API access, not a
+        // second person taking over the device, so silently deleting their
+        // saved places/trips here would be an unwanted, unrelated surprise.
+        NotificationCenter.default.addObserver(
+            forName: ASAuthorizationAppleIDProvider.credentialRevokedNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.clearSession() }
+        }
+
+        // Posted by `APIClient` on any 401 from an authenticated request --
+        // an expired/revoked token used to surface as a generic error on
+        // whatever screen happened to make the call, with nothing telling
+        // the user (or the rest of the app) that re-authenticating is what
+        // actually fixes it. Same "clear session, don't wipe local data"
+        // reasoning as the Apple ID revocation case above.
+        NotificationCenter.default.addObserver(
+            forName: .piriAuthTokenExpired,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.clearSession() }
+        }
     }
 
+    private func clearSession() {
+        token = nil
+        user = nil
+        persistence.clear()
+    }
+
+    /// Explicit, user-initiated sign-out ("Sign Out" button) -- unlike
+    /// `clearSession()` (used for the Apple ID revocation case above), this
+    /// also wipes the other local stores. See this type's own doc comment
+    /// for why: without it, a second person signing into their own account
+    /// on the same device would inherit (and permanently upload) whatever
+    /// the previous person left behind.
     func signOut(
         userProfileStore: UserProfileStore,
         savedPlacesStore: SavedPlacesStore,
         tripsStore: TripsStore,
         recentlyViewedStore: RecentlyViewedStore
     ) {
-        token = nil
-        user = nil
-        persistence.clear()
+        clearSession()
         userProfileStore.resetProfile()
         savedPlacesStore.clearAllLocalData()
         tripsStore.clearAllLocalData()
