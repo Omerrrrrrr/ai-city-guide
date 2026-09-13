@@ -2,7 +2,7 @@ import { and, desc, eq, ilike, inArray, isNotNull, ne, or } from 'drizzle-orm';
 
 import { AuthError } from './auth';
 import { db } from './db';
-import { follows, users, type UserRow } from './schema';
+import { blocks, follows, users, type UserRow } from './schema';
 
 // Social graph. Faz 1 (mutual-follow, opt-in-from-off sharing) + Faz 2
 // (public leaderboard/search, opt-in-from-on visibility, user-chosen
@@ -43,8 +43,20 @@ export async function claimUsername(userId: string, rawUsername: string) {
     throw new AuthError('That username is already taken.', 409);
   }
 
-  const [updated] = await db.update(users).set({ username }).where(eq(users.id, userId)).returning();
-  return updated;
+  try {
+    const [updated] = await db.update(users).set({ username }).where(eq(users.id, userId)).returning();
+    return updated;
+  } catch (dbError: any) {
+    // Backstop for the race between the check above and this write --
+    // `idx_users_username`'s unique index (schema.ts) is the actual
+    // enforcement; this just turns a raw constraint-violation into the
+    // same friendly error the non-concurrent case above already gives,
+    // instead of an unhandled exception surfacing as a generic 500.
+    if (dbError?.code === '23505') {
+      throw new AuthError('That username is already taken.', 409);
+    }
+    throw dbError;
+  }
 }
 
 export async function findUserByUsername(rawUsername: string) {
@@ -56,6 +68,27 @@ export async function findUserByUsername(rawUsername: string) {
 async function sendFollowRequestToId(followerId: string, followeeId: string) {
   if (followeeId === followerId) {
     throw new AuthError("You can't follow yourself.", 400);
+  }
+
+  // `blocks` (Apple Guideline 1.2 (c)) was scoped to UGC-photo visibility
+  // only when it was introduced -- but a blocked-for-abuse user was still
+  // able to send (or receive) a follow request to/from the person who
+  // blocked them, since nothing in the follow-request path checked it.
+  // Checked in both directions: either party having blocked the other
+  // should block the relationship from forming at all, not just who
+  // blocked whom.
+  const [existingBlock] = await db
+    .select({ blockerId: blocks.blockerId })
+    .from(blocks)
+    .where(
+      or(
+        and(eq(blocks.blockerId, followerId), eq(blocks.blockedId, followeeId)),
+        and(eq(blocks.blockerId, followeeId), eq(blocks.blockedId, followerId))
+      )
+    )
+    .limit(1);
+  if (existingBlock) {
+    throw new AuthError('Unable to send a follow request to this user.', 403);
   }
 
   const [existing] = await db
