@@ -117,10 +117,24 @@ final class PurchaseStore {
         }
         do {
             _ = try await IAPAPI.verifyTransaction(signedTransactionInfo: verification.jwsRepresentation, token: token)
+        } catch APIError.server(let status, let message) where status == 400 || status == 409 {
+            // A permanent rejection from the backend (revoked, expired, or
+            // already redeemed/linked to a different account -- see
+            // `/iap/verify-transaction`'s own 400/409 cases) will never
+            // resolve itself on retry, unlike a real network failure.
+            // Leaving it unfinished (the `catch` below's behavior) meant
+            // StoreKit kept redelivering it through `Transaction.updates`
+            // on every launch, silently failing the same way forever --
+            // the user paid Apple and never saw why nothing happened.
+            // Finishing it here stops that loop, and surfacing the
+            // backend's own message tells them what actually went wrong.
+            await transaction.finish()
+            purchaseError = message ?? String(localized: "paywall.purchaseFailed")
+            return false
         } catch {
-            // Backend unreachable or rejected it -- also leave unfinished
-            // so this retries later rather than silently dropping a real
-            // purchase.
+            // Real network/transport failure (or an unexpected server
+            // error) -- leave unfinished so this retries later rather than
+            // silently dropping a real purchase.
             return false
         }
         await transaction.finish()
