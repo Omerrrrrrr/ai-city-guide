@@ -20,6 +20,7 @@ import {
 } from './ai-recommendations';
 import {
   authenticateUser,
+  deleteAccount,
   findOrCreateAppleUser,
   getSyncBlobs,
   getUserById,
@@ -4244,6 +4245,22 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
     const user = await getUserById(userId);
     if (!user) return reply.code(401).send({ error: 'Unauthorized' });
     return reply.send(toPublicUser(user));
+  });
+
+  // Apple Guideline 5.1.1(v): account deletion, right from the app. See
+  // `deleteAccount` in accounts.ts for exactly what does and doesn't get
+  // removed (and why) -- irreversible, so this is a hard delete, not a
+  // soft/deactivation flag.
+  app.delete('/me', async (request, reply) => {
+    const userId = await requireUserId(request, reply, AUTH_JWT_SECRET);
+    if (!userId) return;
+
+    try {
+      await deleteAccount(userId);
+      return reply.code(204).send();
+    } catch (e) {
+      return sendServerError(request, reply, e, 'Failed to delete account');
+    }
   });
 
   // ── /iap/verify-transaction — StoreKit 2 purchase → tier upgrade ───────────

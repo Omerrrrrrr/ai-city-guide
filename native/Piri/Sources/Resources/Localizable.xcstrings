@@ -37202,6 +37202,58 @@
         }
       }
     },
+    "settings.account.deleteAccount" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Konto löschen" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Delete Account" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Eliminar cuenta" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Supprimer le compte" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Elimina account" } },
+        "nb" : { "stringUnit" : { "state" : "translated", "value" : "Slett konto" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Excluir conta" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Hesabı Sil" } }
+      }
+    },
+    "settings.account.deleteConfirmTitle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Konto löschen?" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Delete your account?" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "¿Eliminar tu cuenta?" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Supprimer votre compte ?" } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Eliminare il tuo account?" } },
+        "nb" : { "stringUnit" : { "state" : "translated", "value" : "Slette kontoen din?" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Excluir sua conta?" } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Hesabını silmek istiyor musun?" } }
+      }
+    },
+    "settings.account.deleteConfirmMessage" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Dies löscht dein Konto und alles, was damit verknüpft ist – gespeicherte Orte, Reisen, Bewertungen und Fotos – dauerhaft. Dies kann nicht rückgängig gemacht werden." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This permanently deletes your account and everything tied to it — saved places, trips, reviews, and photos. This can't be undone." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Esto elimina permanentemente tu cuenta y todo lo relacionado con ella: lugares guardados, viajes, reseñas y fotos. Esta acción no se puede deshacer." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Cette action supprime définitivement votre compte et tout ce qui y est lié : lieux enregistrés, voyages, avis et photos. Cette action est irréversible." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Questa azione elimina definitivamente il tuo account e tutto ciò che è collegato ad esso: luoghi salvati, viaggi, recensioni e foto. Non può essere annullata." } },
+        "nb" : { "stringUnit" : { "state" : "translated", "value" : "Dette sletter kontoen din og alt knyttet til den permanent – lagrede steder, turer, anmeldelser og bilder. Dette kan ikke angres." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Isso exclui permanentemente sua conta e tudo relacionado a ela — lugares salvos, viagens, avaliações e fotos. Essa ação não pode ser desfeita." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bu işlem hesabını ve ona bağlı her şeyi — kaydedilen yerler, geziler, yorumlar ve fotoğraflar — kalıcı olarak siler. Bu işlem geri alınamaz." } }
+      }
+    },
+    "settings.account.deleteFailed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Dein Konto konnte nicht gelöscht werden. Bitte versuche es erneut." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Couldn't delete your account. Please try again." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "No se pudo eliminar tu cuenta. Inténtalo de nuevo." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Impossible de supprimer votre compte. Veuillez réessayer." } },
+        "it" : { "stringUnit" : { "state" : "translated", "value" : "Impossibile eliminare il tuo account. Riprova." } },
+        "nb" : { "stringUnit" : { "state" : "translated", "value" : "Kunne ikke slette kontoen din. Prøv igjen." } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Não foi possível excluir sua conta. Tente novamente." } },
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Hesabın silinemedi. Lütfen tekrar dene." } }
+      }
+    },
     "settings.adminDevOnly" : {
       "extractionState" : "stale",
       "localizations" : {

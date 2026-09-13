@@ -88,6 +88,41 @@ final class AuthStore {
         recentlyViewedStore: RecentlyViewedStore
     ) {
         clearSession()
+        wipeLocalData(
+            userProfileStore: userProfileStore,
+            savedPlacesStore: savedPlacesStore,
+            tripsStore: tripsStore,
+            recentlyViewedStore: recentlyViewedStore
+        )
+    }
+
+    /// Apple Guideline 5.1.1(v) -- irreversible. Deletes the account
+    /// server-side first (throws on failure, so the caller can show an
+    /// error instead of wiping local data for an account that's still
+    /// alive server-side); only clears local state after that succeeds.
+    func deleteAccount(
+        userProfileStore: UserProfileStore,
+        savedPlacesStore: SavedPlacesStore,
+        tripsStore: TripsStore,
+        recentlyViewedStore: RecentlyViewedStore
+    ) async throws {
+        guard let token else { return }
+        try await AuthAPI.deleteAccount(token: token)
+        clearSession()
+        wipeLocalData(
+            userProfileStore: userProfileStore,
+            savedPlacesStore: savedPlacesStore,
+            tripsStore: tripsStore,
+            recentlyViewedStore: recentlyViewedStore
+        )
+    }
+
+    private func wipeLocalData(
+        userProfileStore: UserProfileStore,
+        savedPlacesStore: SavedPlacesStore,
+        tripsStore: TripsStore,
+        recentlyViewedStore: RecentlyViewedStore
+    ) {
         userProfileStore.resetProfile()
         savedPlacesStore.clearAllLocalData()
         tripsStore.clearAllLocalData()

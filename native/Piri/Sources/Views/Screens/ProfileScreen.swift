@@ -76,6 +76,9 @@ struct ProfileScreen: View {
     @State private var showingSignIn = false
     @State private var showingPaywall = false
     @State private var showingAvatarPicker = false
+    @State private var showingDeleteAccountConfirm = false
+    @State private var isDeletingAccount = false
+    @State private var deleteAccountError: String?
 
     private var profile: UserProfile { userProfileStore.profile }
     private var displayName: String {
@@ -156,6 +159,17 @@ struct ProfileScreen: View {
         .sheet(isPresented: $showingSignIn) { SignInScreen() }
         .sheet(isPresented: $showingPaywall) { PaywallScreen() }
         .sheet(isPresented: $showingAvatarPicker) { AvatarPickerSheet() }
+        .alert(
+            String(localized: "settings.account.deleteConfirmTitle"),
+            isPresented: $showingDeleteAccountConfirm
+        ) {
+            Button(String(localized: "common.cancel"), role: .cancel) {}
+            Button(String(localized: "settings.account.deleteAccount"), role: .destructive) {
+                Task { await deleteAccount() }
+            }
+        } message: {
+            Text(String(localized: "settings.account.deleteConfirmMessage"))
+        }
         .background(Theme.screenBackground.ignoresSafeArea())
         .environment(\.colorScheme, .dark)
         .navigationBarHidden(true)
@@ -831,6 +845,22 @@ struct ProfileScreen: View {
         await task.value
     }
 
+    private func deleteAccount() async {
+        isDeletingAccount = true
+        deleteAccountError = nil
+        defer { isDeletingAccount = false }
+        do {
+            try await authStore.deleteAccount(
+                userProfileStore: userProfileStore,
+                savedPlacesStore: savedPlacesStore,
+                tripsStore: tripsStore,
+                recentlyViewedStore: recentlyViewedStore
+            )
+        } catch {
+            deleteAccountError = String(localized: "settings.account.deleteFailed")
+        }
+    }
+
     /// Reads `CityStore`'s per-city cache (country/timezone, fetched once
     /// per city change -- see `CityStore.refreshContext`) rather than
     /// making its own network call. No currency here anymore -- that's the
@@ -868,6 +898,30 @@ struct ProfileScreen: View {
                             .overlay(RoundedRectangle(cornerRadius: 12).stroke(.secondary.opacity(0.24)))
                     }
                     .buttonStyle(.plain)
+
+                    // Apple Guideline 5.1.1(v) -- kept right next to Sign
+                    // Out (not buried in a nested settings screen) so it's
+                    // as easy to find as account creation is. A destructive
+                    // `.alert` confirmation (not a bare tap) is the actual
+                    // "necessary warning," since this is irreversible.
+                    if isDeletingAccount {
+                        ProgressView().frame(maxWidth: .infinity)
+                    } else {
+                        Button(role: .destructive) {
+                            showingDeleteAccountConfirm = true
+                        } label: {
+                            Text(String(localized: "settings.account.deleteAccount"))
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Theme.closedRed)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    if let deleteAccountError {
+                        Text(deleteAccountError).font(.footnote).foregroundStyle(Theme.closedRed)
+                    }
                 }
             } else {
                 VStack(alignment: .leading, spacing: 10) {

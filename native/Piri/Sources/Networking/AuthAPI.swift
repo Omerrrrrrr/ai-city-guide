@@ -32,4 +32,13 @@ enum AuthAPI {
     static func pushSync(_ request: SyncPushRequest, token: String) async throws {
         let _: SyncPushResponse = try await APIClient.shared.put("/me/sync", body: request, bearerToken: token)
     }
+
+    /// Apple Guideline 5.1.1(v) — irreversible, hard delete server-side (see
+    /// `deleteAccount` in apps/api's accounts.ts for exactly what gets
+    /// removed). Throws on failure, unlike the fire-and-forget pushes
+    /// elsewhere in this app -- the caller must know if this didn't
+    /// actually happen, not silently proceed as if the account were gone.
+    static func deleteAccount(token: String) async throws {
+        let _: EmptyResponse = try await APIClient.shared.delete("/me", bearerToken: token)
+    }
 }
