@@ -4320,18 +4320,38 @@ ${poiCandidates.length > 0 ? `Candidates (${poiCandidates.length}):\n${candidate
             return reply.code(409).send({ error: 'This purchase has already been redeemed.' });
           }
 
-          const [existingUser] = await db.select({ tripPassExpiresAt: users.tripPassExpiresAt }).from(users).where(eq(users.id, userId)).limit(1);
-          if (!existingUser) return reply.code(401).send({ error: 'Unauthorized' });
+          // Wrapped in a transaction with a row lock (`for('update')`) --
+          // two genuinely-different, both-legitimate Trip Pass purchases
+          // processed concurrently (rapid double-purchase, or two devices)
+          // used to each independently read the same starting
+          // `tripPassExpiresAt`, compute the stacked value from that same
+          // stale read, and overwrite each other with a flat `UPDATE`
+          // instead of stacking additively -- the user paid for 2 passes
+          // and got +7 days credited instead of +14, both requests
+          // returning 200 with no sign anything was wrong. The row lock
+          // makes the second transaction's SELECT block until the first
+          // one's UPDATE commits, so it reads the already-stacked value
+          // instead of the stale one.
+          const updated = await db.transaction(async (tx) => {
+            const [existingUser] = await tx
+              .select({ tripPassExpiresAt: users.tripPassExpiresAt })
+              .from(users)
+              .where(eq(users.id, userId))
+              .for('update')
+              .limit(1);
+            if (!existingUser) return null;
 
-          // Stacks onto remaining time from an already-active pass instead
-          // of resetting to a flat +7 days -- buying a second pass while
-          // the first hasn't expired shouldn't waste the time already paid
-          // for.
-          const currentExpiry = existingUser.tripPassExpiresAt ? new Date(existingUser.tripPassExpiresAt).getTime() : 0;
-          const base = Math.max(currentExpiry, Date.now());
-          const tripPassExpiresAt = new Date(base + TRIP_PASS_DURATION_DAYS * 24 * 60 * 60 * 1000).toISOString();
+            // Stacks onto remaining time from an already-active pass
+            // instead of resetting to a flat +7 days -- buying a second
+            // pass while the first hasn't expired shouldn't waste the
+            // time already paid for.
+            const currentExpiry = existingUser.tripPassExpiresAt ? new Date(existingUser.tripPassExpiresAt).getTime() : 0;
+            const base = Math.max(currentExpiry, Date.now());
+            const tripPassExpiresAt = new Date(base + TRIP_PASS_DURATION_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
-          const [updated] = await db.update(users).set({ tripPassExpiresAt }).where(eq(users.id, userId)).returning();
+            const [row] = await tx.update(users).set({ tripPassExpiresAt }).where(eq(users.id, userId)).returning();
+            return row ?? null;
+          });
           if (!updated) return reply.code(401).send({ error: 'Unauthorized' });
           return reply.send(toPublicUser(updated));
         }
