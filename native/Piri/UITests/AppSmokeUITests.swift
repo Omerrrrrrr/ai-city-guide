@@ -183,4 +183,25 @@ final class AppSmokeUITests: XCTestCase {
         attach(app, name: "place-route-preview")
     }
 
+    func testProfileSettingsAndCity() throws {
+        let app = launchedApp()
+        let profile = app.buttons["piri.tab.4"]
+        XCTAssertTrue(profile.waitForExistence(timeout: 15))
+        profile.tap()
+        let settings = app.buttons["piri.profile.settings"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+        Thread.sleep(forTimeInterval: 5)
+        attach(app, name: "profile-v3")
+        settings.tap()
+        XCTAssertTrue(app.navigationBars["Ayarlar"].waitForExistence(timeout: 5))
+        attach(app, name: "profile-settings")
+        app.buttons["Bitti"].tap()
+        let city = app.buttons["piri.profile.city"]
+        XCTAssertTrue(city.waitForExistence(timeout: 5))
+        city.tap()
+        XCTAssertTrue(app.textFields["piri.city.search"].waitForExistence(timeout: 5))
+        app.buttons["piri.picker.cancel"].tap()
+        XCTAssertTrue(settings.waitForExistence(timeout: 5))
+    }
+
 }

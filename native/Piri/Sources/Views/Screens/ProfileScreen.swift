@@ -59,6 +59,7 @@ struct ProfileScreen: View {
     @Environment(FriendsStore.self) private var friendsStore
     @Environment(PurchaseStore.self) private var purchaseStore
 
+    @State private var cityPhoto: PhotoBulkResult?
     @State private var showingCurrencies = false
     @State private var isEditingName = false
     @State private var isEditingProfileDetails = false
@@ -89,7 +90,7 @@ struct ProfileScreen: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                Text("tabs.profile").font(Theme.editorial(size: 34)).foregroundStyle(.white)
+                profileNavigation
                 header
                 quickStatsRow
                 cityCard
@@ -97,20 +98,6 @@ struct ProfileScreen: View {
                     premiumCard
                 }
                 profileSummaryCard
-                // Plain app settings (display language, light/dark mode,
-                // preferred maps app) -- previously nested inside "Seni
-                // Böyle Görüyoruz"'s personalization tabs, behind its edit
-                // toggle, under a "Dil" tab. Reported live ("Bu sayfa
-                // yanlış," referring to that card): none of these three
-                // describe how the app personalizes to the user, so they
-                // don't belong gated inside a personalization-profile
-                // editor at all -- they're just settings, always visible.
-                // Grouped with "How we see you" just above Account, at the
-                // bottom of the scroll -- both are settings-adjacent
-                // ("configure how the app treats me") rather than the
-                // profile's own substantive content (Friends/Trips/Saved/
-                // Premium), which now leads the screen instead.
-                appSettingsCard
                 accountCard
 
                 Text(L("settings.version", (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "1.0.0"))
@@ -158,6 +145,20 @@ struct ProfileScreen: View {
         .sheet(item: $showingSaved) { tab in SavedScreen(initialTab: tab) }
         .sheet(isPresented: $showingSignIn) { SignInScreen() }
         .sheet(isPresented: $showingPaywall) { PaywallScreen() }
+        .sheet(isPresented: $isEditingAppSettings) {
+            NavigationStack {
+                ScrollView {
+                    VStack(spacing: 16) { languageCard; appearanceCard; mapsProviderCard }.padding(20)
+                }
+                .background(Theme.navy.ignoresSafeArea())
+                .navigationTitle(String(localized: "settings.appSettings.title"))
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("common.done") { isEditingAppSettings = false }
+                    }
+                }
+            }.preferredColorScheme(.dark).tint(Theme.gold)
+        }
         .sheet(isPresented: $showingAvatarPicker) { AvatarPickerSheet() }
         .alert(
             String(localized: "settings.account.deleteConfirmTitle"),
@@ -234,9 +235,25 @@ struct ProfileScreen: View {
         }
     }
 
+    private var profileNavigation: some View {
+        HStack {
+            Text("PIRI").font(Theme.editorial(size: 28)).tracking(1.5).foregroundStyle(Theme.gold)
+            Spacer()
+            Button { isEditingAppSettings = true } label: {
+                Image(systemName: "gearshape").font(.title3)
+                    .foregroundStyle(Theme.secondaryText).frame(width: 44, height: 44)
+                    .background(Theme.cardFill, in: Circle())
+                    .overlay(Circle().stroke(Theme.border))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(String(localized: "settings.appSettings.title"))
+            .accessibilityIdentifier("piri.profile.settings")
+        }
+    }
+
     private var header: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .top, spacing: 14) {
+            HStack(alignment: .center, spacing: 16) {
                 // Only signed-in accounts can actually store a photo
                 // server-side (see `PATCH /me/avatar`) -- a signed-out
                 // session keeps the plain initial-letter circle, not
@@ -268,10 +285,12 @@ struct ProfileScreen: View {
                             nameInput = profile.name
                             isEditingName = true
                         } label: {
-                            HStack(spacing: 4) {
-                                Text(displayName).font(Theme.editorial(size: 26)).foregroundStyle(.white)
-                                Image(systemName: "pencil").font(.system(size: 16)).foregroundStyle(Theme.secondaryText)
-                            }
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(displayName).font(Theme.editorial(size: 30)).foregroundStyle(.white)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Label("design.profile.edit", systemImage: "chevron.right")
+                                    .font(.subheadline).foregroundStyle(Theme.gold)
+                            }.frame(minHeight: 44, alignment: .leading)
                         }
                     }
 
@@ -299,10 +318,8 @@ struct ProfileScreen: View {
                 levelIndicator
             }
         }
-        .padding(18)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.cardFill, in: RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Theme.border))
     }
 
     /// The real uploaded photo (`AuthUser.avatarUrl`) when signed in and set,
@@ -312,14 +329,14 @@ struct ProfileScreen: View {
     private var avatarView: some View {
         if let avatarUrl = authStore.user?.avatarUrl {
             DataURIImage(dataUri: avatarUrl)
-                .frame(width: 52, height: 52)
+                .frame(width: 72, height: 72)
                 .clipShape(Circle())
         } else {
             ZStack {
-                Circle().fill(.white.opacity(0.15))
-                Text(displayName.prefix(1).uppercased()).font(.system(size: 24, weight: .bold)).foregroundStyle(Theme.gold)
+                Circle().fill(Theme.navyLight)
+                Text(displayName.prefix(1).uppercased()).font(Theme.editorial(size: 40)).foregroundStyle(Theme.gold)
             }
-            .frame(width: 52, height: 52)
+            .frame(width: 72, height: 72)
         }
     }
 
@@ -335,7 +352,7 @@ struct ProfileScreen: View {
     /// a passive, always-visible label about them.
     private var profileSummaryCard: some View {
         let parts = ProfileOptions.summaryParts(for: profile)
-        return card(titleKey: "settings.profileSummary.title", trailing: {
+        return card(titleKey: "design.profile.travelStyle", trailing: {
             Button(String(localized: isEditingProfileDetails ? "common.done" : "settings.profileSummary.edit")) {
                 withAnimation { isEditingProfileDetails.toggle() }
             }
@@ -586,53 +603,6 @@ struct ProfileScreen: View {
     /// as visual clutter now that each renders as its own full elevated
     /// card. Tapping reveals the exact same three cards, unchanged,
     /// directly below.
-    private var appSettingsCard: some View {
-        VStack(spacing: 12) {
-            Button {
-                Haptics.light()
-                withAnimation { isEditingAppSettings.toggle() }
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "gearshape.fill")
-                        .foregroundStyle(Theme.gold)
-                        .frame(width: 28, height: 28)
-                        .background(Circle().fill(Theme.gold.opacity(0.12)))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(String(localized: "settings.appSettings.title"))
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.primary)
-                        if !isEditingAppSettings {
-                            Text(appSettingsSummary).font(.system(size: 13)).foregroundStyle(Theme.secondaryText).lineLimit(1)
-                        }
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.secondaryText)
-                        .rotationEffect(.degrees(isEditingAppSettings ? 180 : 0))
-                }
-                .padding(14)
-                .piriElevatedCard(cornerRadius: 14)
-            }
-            .buttonStyle(.plain)
-
-            if isEditingAppSettings {
-                languageCard
-                appearanceCard
-                mapsProviderCard
-            }
-        }
-    }
-
-    private var appSettingsSummary: String {
-        let language = languageOptions.first { $0.code == languageStore.code }
-            .map { String(localized: String.LocalizationValue($0.labelKey)) } ?? ""
-        let appearance = appearanceOptions.first { $0.scheme == appearanceStore.scheme }
-            .map { String(localized: String.LocalizationValue($0.labelKey)) } ?? ""
-        let maps = String(localized: String.LocalizationValue(mapsProviderStore.provider.labelKey))
-        return [language, appearance, maps].joined(separator: " · ")
-    }
-
     private var languageCard: some View {
         card(titleKey: "settings.language.label") {
             FlowLayout(spacing: 8) {
@@ -727,34 +697,54 @@ struct ProfileScreen: View {
     }
 
     private var cityCard: some View {
-        card(titleKey: "settings.currentCity") {
-            Button {
-                showingCityPicker = true
-            } label: {
-                HStack {
-                    Image(systemName: cityStore.cityName != nil ? "mappin" : "globe")
-                        .foregroundStyle(.primary)
-                    Text(cityStore.cityName.map { L("home.cityPill", $0) } ?? String(localized: "common.everywhere"))
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.primary)
-                    Spacer()
-                    Text("settings.changeCity").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.gold)
+        VStack(spacing: 12) {
+            Button { showingCityPicker = true } label: {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("design.profile.exploringCity").font(.caption.weight(.medium)).tracking(1.5)
+                        .foregroundStyle(Theme.secondaryText)
+                    Text(cityStore.cityName ?? String(localized: "common.everywhere"))
+                        .font(Theme.editorial(size: 30)).foregroundStyle(.white)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let country = cityStore.countryInfo?.name {
+                        Text(country).font(.subheadline).foregroundStyle(Theme.secondaryText)
+                    }
+                    Text("settings.changeCity").font(.subheadline.weight(.medium))
+                        .foregroundStyle(Theme.gold).padding(.top, 12)
                 }
-                // Without this, only the icon/text/label glyphs themselves
-                // are tappable — the `Spacer()`-filled middle of the row
-                // isn't part of any subview's rendered bounds, so a tap
-                // there (found via a UI test computing its tap point from
-                // the accessibility frame's center, which lands in exactly
-                // that gap) silently misses the button entirely.
+                .padding(20).padding(.bottom, cityPhoto?.attributionUrl == nil ? 0 : 24)
+                .frame(maxWidth: .infinity, minHeight: 190, alignment: .leading)
+                .background {
+                    GeometryReader { bounds in
+                        ZStack {
+                            Theme.navyLight
+                            if let urlString = cityPhoto?.photoUrl, let url = URL(string: urlString) {
+                                AsyncImage(url: url) { image in
+                                    image.resizable().scaledToFill()
+                                } placeholder: { Theme.navyLight }
+                                .frame(width: bounds.size.width, height: bounds.size.height).clipped()
+                            } else {
+                                Image(systemName: "map").font(.system(size: 90, weight: .ultraLight))
+                                    .foregroundStyle(Theme.gold.opacity(0.15))
+                                    .frame(maxWidth: .infinity, alignment: .trailing).padding(20)
+                            }
+                            LinearGradient(colors: [Theme.navy.opacity(0.97), Theme.navy.opacity(0.72), Theme.navy.opacity(0.2)], startPoint: .leading, endPoint: .trailing)
+                        }
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 18))
+                .overlay(RoundedRectangle(cornerRadius: 18).stroke(Theme.border))
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-
-            if let subtitle = cityContextSubtitle {
-                Text(subtitle)
-                    .font(.system(size: 13))
-                    .foregroundStyle(Theme.secondaryText)
-                    .padding(.top, 2)
+            .accessibilityIdentifier("piri.profile.city")
+            .overlay(alignment: .bottomTrailing) {
+                if let photo = cityPhoto, let source = photo.source,
+                   let attribution = photo.attributionUrl, let url = URL(string: attribution) {
+                    Link(source.capitalized, destination: url)
+                        .font(.caption2).foregroundStyle(.white)
+                        .padding(.horizontal, 10).frame(minHeight: 44)
+                        .background(Theme.navy.opacity(0.8), in: Capsule()).padding(8)
+                }
             }
 
             DisclosureGroup(isExpanded: $showingCurrencies) {
@@ -778,10 +768,25 @@ struct ProfileScreen: View {
                     }
                 }.padding(.top, 8)
             } label: {
-                Label("\(preferredCurrencyStore.code) · \(destinationCurrencyCode)", systemImage: "banknote")
-                    .font(.subheadline).foregroundStyle(Theme.secondaryText).padding(.vertical, 8)
+                HStack(spacing: 12) {
+                    Image(systemName: "banknote").font(.title3).foregroundStyle(Theme.secondaryText)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("design.profile.currencies").foregroundStyle(.white)
+                        Text("\(preferredCurrencyStore.code) · \(destinationCurrencyCode)").foregroundStyle(Theme.secondaryText)
+                    }.font(.subheadline)
+                }.padding(.vertical, 4)
             }
-
+            .padding(16)
+            .background(Theme.cardFill, in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.border))
+        }
+        .task(id: "\(cityStore.cityName ?? "")/\(cityStore.lat ?? 0)/\(cityStore.lng ?? 0)") {
+            cityPhoto = nil
+            guard let name = cityStore.cityName, let lat = cityStore.lat, let lng = cityStore.lng else { return }
+            let request = PhotoBulkRequest(places: [PhotoBulkPlace(name: name, lat: lat, lng: lng, category: nil)])
+            guard let response = try? await PlacesAPI.photosBulk(request), !Task.isCancelled else { return }
+            // Generic stock imagery should never be presented as the selected city.
+            cityPhoto = response.results.first { $0.photoUrl != nil && ["wikipedia", "tripadvisor"].contains($0.source ?? "") }
         }
         .sheet(item: $pickingCurrencySide) { side in
             CurrencyPickerSheet(
@@ -876,9 +881,10 @@ struct ProfileScreen: View {
         return parts.joined(separator: " · ")
     }
 
+    @ViewBuilder
     private var accountCard: some View {
-        card(titleKey: "settings.account") {
-            if let user = authStore.user {
+        if let user = authStore.user {
+            card(titleKey: "settings.account") {
                 VStack(alignment: .leading, spacing: 10) {
                     let name = user.displayName?.trimmingCharacters(in: .whitespaces)
                     Text((name?.isEmpty == false ? name : nil) ?? user.email)
@@ -912,36 +918,37 @@ struct ProfileScreen: View {
                         } label: {
                             Text(String(localized: "settings.account.deleteAccount"))
                                 .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(Theme.closedRed)
+                                .foregroundStyle(.red)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 12)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityIdentifier("piri.profile.deleteAccount")
                     }
 
                     if let deleteAccountError {
-                        Text(deleteAccountError).font(.footnote).foregroundStyle(Theme.closedRed)
+                        Text(deleteAccountError).font(.footnote).foregroundStyle(.red)
                     }
-                }
-            } else {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(String(localized: String.LocalizationValue("settings.account.signedOutNote")))
-                        .font(.system(size: 14))
-                        .foregroundStyle(Theme.secondaryText)
-                    Button {
-                        showingSignIn = true
-                    } label: {
-                        Text(String(localized: String.LocalizationValue("settings.account.signIn")))
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(RoundedRectangle(cornerRadius: 14).fill(Theme.navyLight))
-                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.border))
-                    }
-                    .buttonStyle(.plain)
                 }
             }
+        } else {
+            Button { showingSignIn = true } label: {
+                HStack(spacing: 14) {
+                    Image(systemName: "person.crop.circle").font(.title2).foregroundStyle(Theme.secondaryText)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("settings.account").font(.subheadline.weight(.semibold)).foregroundStyle(.white)
+                        Text("design.profile.signInHint").font(.subheadline).foregroundStyle(Theme.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 4)
+                    Image(systemName: "chevron.right").font(.caption).foregroundStyle(Theme.secondaryText)
+                }
+                .padding(16).frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+                .background(Theme.cardFill, in: RoundedRectangle(cornerRadius: 16))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.border))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("piri.profile.signIn")
         }
     }
 

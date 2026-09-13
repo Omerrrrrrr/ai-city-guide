@@ -1,6 +1,11 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "design.profile.signInHint" : {"extractionState":"manual","localizations":{"en":{"stringUnit":{"state":"translated","value":"Sign in and keep your discoveries"}},"tr":{"stringUnit":{"state":"translated","value":"Giriş yap ve keşiflerini sakla"}}}},
+    "design.profile.edit" : {"extractionState": "manual", "localizations": {"en": {"stringUnit": {"state": "translated", "value": "Edit profile"}}, "tr": {"stringUnit": {"state": "translated", "value": "Profili düzenle"}}}},
+    "design.profile.travelStyle" : {"extractionState": "manual", "localizations": {"en": {"stringUnit": {"state": "translated", "value": "Your travel style"}}, "tr": {"stringUnit": {"state": "translated", "value": "Seyahat tarzın"}}}},
+    "design.profile.exploringCity" : {"extractionState": "manual", "localizations": {"en": {"stringUnit": {"state": "translated", "value": "CITY YOU ARE EXPLORING"}}, "tr": {"stringUnit": {"state": "translated", "value": "KEŞFETTİĞİN ŞEHİR"}}}},
+    "design.profile.currencies" : {"extractionState": "manual", "localizations": {"en": {"stringUnit": {"state": "translated", "value": "Currencies"}}, "tr": {"stringUnit": {"state": "translated", "value": "Para birimleri"}}}},
     "design.profile.personalizeHint" : {
       "extractionState" : "manual",
       "localizations" : {
