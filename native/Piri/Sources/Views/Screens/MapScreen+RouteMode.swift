@@ -649,7 +649,19 @@ extension MapScreen {
                 // uses below `count >= 2`) makes that state visible and
                 // gives the user something to act on instead of a removal
                 // that silently didn't take.
-                if stopsChangedFromActiveTrip {
+                //
+                // Also shown on `routeProfileDirty` alone (stops unchanged,
+                // only the profile flipped) -- this used to check
+                // `stopsChangedFromActiveTrip` only, unlike the map's own
+                // preview-vs-persisted display logic just above (`body`'s
+                // `liveGeometry`), which already keys off both flags. A
+                // mid-trip profile switch with no stop change previewed a
+                // new route with no way to ever commit it via "Güncelle",
+                // and that preview would silently vanish back to the
+                // trip's stale original route on the next view teardown
+                // (backgrounding, tab switch) since it lived only in
+                // `@State`, not in `TripsStore`.
+                if stopsChangedFromActiveTrip || routeProfileDirty {
                     VStack(alignment: .trailing, spacing: 4) {
                         Button {
                             Task { await updateRoute() }
