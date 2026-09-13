@@ -522,7 +522,7 @@ struct POIExplainContent: View {
     private func weatherBadge(_ weather: Weather) -> some View {
         HStack(spacing: 4) {
             Image(systemName: weather.condition.icon)
-            Text("\(Int(weather.temp))°, \(weather.description.capitalized)")
+            Text("\(weather.temp.localizedTemperatureRounded)°, \(weather.description.capitalized)")
         }
         .font(.caption)
         .foregroundStyle(.secondary)

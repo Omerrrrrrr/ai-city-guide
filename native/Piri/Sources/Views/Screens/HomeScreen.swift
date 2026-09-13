@@ -221,14 +221,14 @@ struct HomeScreen: View {
                     } label: {
                         HStack(spacing: 5) {
                             Image(systemName: weather.condition.icon).foregroundStyle(Theme.gold)
-                            Text("\(Int(weather.temp))°").foregroundStyle(.white)
+                            Text("\(weather.temp.localizedTemperatureRounded)°").foregroundStyle(.white)
                         }
                         .font(.body)
                         .fixedSize()
                         .frame(minHeight: 44)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("\(weather.city), \(Int(weather.temp))°")
+                    .accessibilityLabel("\(weather.city), \(weather.temp.localizedTemperatureRounded)°")
                 }
             }
             Text(String(localized: "design.home.title"))

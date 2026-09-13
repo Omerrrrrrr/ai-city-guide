@@ -143,7 +143,7 @@ private struct WeatherForecastPageView: View {
                     Text(current.description.capitalized).font(.subheadline).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Text("\(Int(current.temp))°").font(.system(size: 34, weight: .bold))
+                Text("\(current.temp.localizedTemperatureRounded)°").font(.system(size: 34, weight: .bold))
             }
             if let airQuality = current.airQuality {
                 airQualityRow(airQuality)
@@ -176,8 +176,8 @@ private struct WeatherForecastPageView: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
             Spacer()
-            Text("\(Int(day.tempMax))°").font(.subheadline.weight(.semibold))
-            Text("\(Int(day.tempMin))°").font(.subheadline).foregroundStyle(.secondary)
+            Text("\(day.tempMax.localizedTemperatureRounded)°").font(.subheadline.weight(.semibold))
+            Text("\(day.tempMin.localizedTemperatureRounded)°").font(.subheadline).foregroundStyle(.secondary)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)

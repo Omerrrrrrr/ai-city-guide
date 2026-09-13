@@ -27,6 +27,25 @@ struct Weather: Codable, Hashable {
     }
 }
 
+extension Double {
+    /// The backend's `/weather`, `/weather/forecast`, and `/weather/daily`
+    /// routes are all hardcoded to OpenWeatherMap's `units=metric` --
+    /// every temperature value reaching the client is Celsius regardless
+    /// of the device's region, and every display site previously just
+    /// appended a bare "°" with no conversion or unit letter. A
+    /// Fahrenheit-locale user (US) saw the raw Celsius number as if it
+    /// were their own units -- a mild 18°C read as "18°" is misleadable
+    /// as a near-freezing 18°F. Converts the same way iOS's own Weather
+    /// app picks units (device region, not language), keeping the
+    /// existing compact "18°" display style rather than adding a unit
+    /// letter that wouldn't fit this app's tightest badges.
+    var localizedTemperatureRounded: Int {
+        let usesFahrenheit = Locale.current.measurementSystem == .us
+        let value = usesFahrenheit ? self * 9 / 5 + 32 : self
+        return Int(value.rounded())
+    }
+}
+
 enum AirQualityLevel: String, Codable {
     case good, fair, moderate, poor
     case veryPoor = "very_poor"
