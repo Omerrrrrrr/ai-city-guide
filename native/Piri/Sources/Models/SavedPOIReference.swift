@@ -9,6 +9,13 @@ import MapKit
 /// `MKMapItem.Identifier.rawValue`, used to resolve back to a live
 /// `MKMapItem` (for Look Around / Open in Maps / follow-up chat) only when
 /// the user actually opens the detail sheet.
+// Reused inside `Trip.stops`, `SavedCollection.places`, and
+// `RecentlyViewedStore.viewed` -- a decode failure here (from a future
+// non-optional, no-default field added the "normal" way) cascades into
+// breaking trips, saved collections, AND recently-viewed all at once,
+// whichever store happens to decode first. Same `AuthUser` precedent/rule
+// as `Trip.swift`/`SavedCollection.swift` document on themselves: any new
+// field must be `Optional` or carry a default.
 struct SavedPOIReference: Codable, Identifiable, Hashable {
     var identifier: String
     var name: String

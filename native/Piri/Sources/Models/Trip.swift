@@ -15,6 +15,23 @@ struct TripPhoto: Codable, Hashable, Identifiable {
     var id: String { "\(uri)-\(timestamp)" }
 }
 
+// This struct's stored breadcrumb/photos have no other copy anywhere --
+// unlike `PlacesQuery`'s server-refetchable cache, a decode failure here
+// is real, irreplaceable data loss, not just a slower next launch.
+// `KeychainStore`/`UserDefaultsStore` both `try?` their decode and
+// silently reset to empty on failure (by design, to avoid crashing), and
+// because `TripsStore` persists `[Trip]` as one array, ONE trip failing to
+// decode fails the WHOLE array, wiping every trip for every user on that
+// device. `AuthUser` (see AuthModels.swift) already hit this exact failure
+// mode for real once (a Faz 2 field addition silently signed out live
+// accounts) and had to grow a custom `init(from:)` using
+// `decodeIfPresent(...) ?? default` for every field added after its
+// original three. Any new field added to `Trip` (or `SavedPOIReference`/
+// `TripWaypoint`/`TripPhoto` below/above) MUST be `Optional` or carry a
+// default and be added the same `decodeIfPresent` way if this struct ever
+// grows a custom decoder -- a plain non-optional, no-default field added
+// the "normal" way will repeat the `AuthUser` incident here, at a higher
+// cost.
 struct Trip: Codable, Identifiable, Hashable {
     var id: String
     var name: String?

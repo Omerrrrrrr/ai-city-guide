@@ -1,5 +1,16 @@
 import Foundation
 
+// Every enum on this file persists as part of `UserProfile` (Keychain via
+// `UserProfileStore`), all as `Optional` fields on that struct -- but a
+// synthesized `Decodable` enum still throws on an unrecognized raw value
+// rather than decoding to `nil`, and one field throwing fails the WHOLE
+// `UserProfile` decode (`KeychainStore`'s `try?` then silently resets the
+// entire onboarding profile, not just that one field). No case has ever
+// been removed/renamed yet, so this is safe today -- but the next time one
+// is, every case below needs either a custom `init(from:)` with a fallback
+// (`nil`/a default case) or to stay additive-only (new cases fine, no
+// removals/renames) to avoid repeating the `AuthUser` incident
+// (AuthModels.swift) for this data.
 enum Profession: String, Codable, CaseIterable {
     case architect, historian, photographer, artist, engineer, doctor, foodie, student, writer, other
 }
