@@ -508,7 +508,12 @@ struct ProfileScreen: View {
     }
 
     private func addCustomInterest() {
-        let trimmed = newInterestText.trimmingCharacters(in: .whitespaces)
+        // Matches the backend's own per-interest cap (user-context.ts's
+        // `interests` schema, max 40) and OnboardingScreen's identical fix
+        // -- without this, a pasted wall of text became one giant,
+        // unbounded custom-interest chip that would silently get
+        // truncated by the time it actually reached an AI prompt.
+        let trimmed = String(newInterestText.trimmingCharacters(in: .whitespaces).prefix(40))
         guard !trimmed.isEmpty else { return }
         Haptics.light()
         userProfileStore.update { profile in
@@ -525,7 +530,10 @@ struct ProfileScreen: View {
     private var professionOtherField: some View {
         TextField(String(localized: "profileOptions.professions.otherPlaceholder"), text: Binding(
             get: { profile.professionOther },
-            set: { newValue in userProfileStore.update { $0.professionOther = newValue } }
+            // Matches the backend's own cap on this field (user-context.ts's
+            // `profession` schema, max 60) and OnboardingScreen's identical
+            // fix -- avoids the same silent-server-side-truncation mismatch.
+            set: { newValue in userProfileStore.update { $0.professionOther = String(newValue.prefix(60)) } }
         ))
         .textInputAutocapitalization(.words)
         .padding(.horizontal, 14)

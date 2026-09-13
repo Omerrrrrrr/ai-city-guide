@@ -154,6 +154,15 @@ struct OnboardingScreen: View {
                     .padding(.vertical, 16)
                     .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemBackground)))
                     .padding(.top, 10)
+                    // Matches the backend's own cap on this field
+                    // (user-context.ts's `profession` schema, max 60) --
+                    // capping here too instead of only relying on that
+                    // silently-truncating server-side cap avoids a UI
+                    // mismatch where what the user typed and what actually
+                    // reaches the AI prompt quietly diverge.
+                    .onChange(of: professionOther) { _, newValue in
+                        if newValue.count > 60 { professionOther = String(newValue.prefix(60)) }
+                    }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -242,7 +251,12 @@ struct OnboardingScreen: View {
     }
 
     private func addOnboardingCustomInterest() {
-        let trimmed = newInterestText.trimmingCharacters(in: .whitespaces)
+        // Matches the backend's own per-interest cap (user-context.ts's
+        // `interests` schema, max 40) -- without this, a pasted wall of
+        // text became one giant, unbounded custom-interest chip that
+        // would silently get truncated by the time it actually reached
+        // an AI prompt, with nothing on-device reflecting that.
+        let trimmed = String(newInterestText.trimmingCharacters(in: .whitespaces).prefix(40))
         guard !trimmed.isEmpty else { return }
         Haptics.light()
         if !customInterests.contains(where: { $0.caseInsensitiveCompare(trimmed) == .orderedSame }) {
