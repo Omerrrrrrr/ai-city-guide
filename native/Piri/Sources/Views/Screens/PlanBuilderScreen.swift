@@ -247,9 +247,17 @@ struct PlanBuilderScreen: View {
                         .background(Circle().fill(Theme.gold.opacity(0.12)))
                     VStack(alignment: .leading, spacing: 2) {
                         Text(poi.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(.primary).lineLimit(1)
-                        if !poi.categoryLabel.isEmpty {
-                            Text(poi.categoryLabel).font(.system(size: 13)).foregroundStyle(.secondary)
+                        HStack(spacing: 4) {
+                            if !poi.categoryLabel.isEmpty {
+                                Text(poi.categoryLabel)
+                            }
+                            if let lat = cityStore.lat, let lng = cityStore.lng {
+                                if !poi.categoryLabel.isEmpty { Text("·") }
+                                Text(distanceLabel(geoDistanceKm(poi.coordinate.latitude, poi.coordinate.longitude, lat, lng)))
+                            }
                         }
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
                     }
                     Spacer()
                 }
@@ -274,6 +282,18 @@ struct PlanBuilderScreen: View {
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 12).fill(added ? Theme.gold.opacity(0.08) : Theme.cardFill))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(added ? Theme.gold.opacity(0.35) : .clear, lineWidth: 1.5))
+    }
+
+    /// Same `home.distance.*` keys/rounding `AIScreen` already uses for its
+    /// own place-distance labels -- a tester noted this screen's candidate
+    /// rows used to show only a category, no distance, unlike everywhere
+    /// else in the app.
+    private func distanceLabel(_ distanceKm: Double) -> String {
+        if distanceKm < 1 {
+            let meters = (distanceKm * 1000 / 50).rounded() * 50
+            return L("home.distance.meters", String(Int(meters)))
+        }
+        return L("home.distance.km", String(format: "%.1f", distanceKm))
     }
 
     private var createButton: some View {

@@ -34,8 +34,12 @@ struct PaywallScreen: View {
     // see or hit.
     private static let chatQuestionsPerDay: [Tier: Int] = [.basic: 40]
 
-    @State private var period: Period = .monthly
-    @State private var tier: Tier = .pro
+    // `@AppStorage`, not `@State` -- a tester flagged that reopening the
+    // paywall always reset back to Pro/Monthly even right after picking
+    // Basic/Yearly, so this now remembers the last tier/period picked
+    // across the whole app, not just for the lifetime of one sheet.
+    @AppStorage("paywall.lastTier") private var tier: Tier = .pro
+    @AppStorage("paywall.lastPeriod") private var period: Period = .monthly
     @State private var purchasingProductID: String?
 
     var body: some View {

@@ -352,7 +352,16 @@ struct ScanScreen: View {
         // failing with "Request body is too large". 1280px is plenty of
         // detail for vision identification, well below any sensor's own
         // resolution.
-        guard let jpeg = image.resized(maxDimension: 1280).jpegData(compressionQuality: 0.6) else {
+        //
+        // A single fixed quality still isn't a hard guarantee, though: a
+        // busy/detailed scene JPEG-compresses larger than a plain one at
+        // the same quality, and base64 (below) inflates whatever comes out
+        // of this by another third -- a tester still hit "Request body is
+        // too large" on build 16 with this same 1280/0.6 fixed setting.
+        // Stepping quality down further when the first attempt is still
+        // too big costs nothing on the common case (one JPEG encode) and
+        // removes the failure mode on the rare oversized one.
+        guard let jpeg = Self.compressedForUpload(image.resized(maxDimension: 1280)) else {
             state = .error(String(localized: "scan.errorIdentify"), image)
             return
         }
@@ -381,5 +390,21 @@ struct ScanScreen: View {
         } catch {
             state = .error(error.localizedDescription, image)
         }
+    }
+
+    /// Targets raw JPEG bytes comfortably under Fastify's 1MB body limit
+    /// once base64-inflated (×4/3) plus the request's other small JSON
+    /// fields -- 700KB raw becomes ~933KB encoded, leaving headroom.
+    /// Quality 0.6 is already small enough for the common photo; this
+    /// only does real work (a couple of extra encodes) on the rare
+    /// busy/detailed scene that compresses larger than usual at 0.6.
+    private static func compressedForUpload(_ image: UIImage) -> Data? {
+        let maxBytes = 700_000
+        for quality in [0.6, 0.4, 0.25, 0.15] {
+            if let data = image.jpegData(compressionQuality: quality), data.count <= maxBytes {
+                return data
+            }
+        }
+        return image.jpegData(compressionQuality: 0.15)
     }
 }

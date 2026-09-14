@@ -814,12 +814,8 @@ struct ProfileScreen: View {
                         labelKey: "settings.counterpartCurrency",
                         code: destinationCurrencyCode
                     ) { pickingCurrencySide = .destination }
-
-                    if let liveRate {
-                        Text("1 \(preferredCurrencyStore.code) ≈ \(String(format: "%.3f", liveRate)) \(destinationCurrencyCode)")
-                            .font(.system(size: 13))
-                            .foregroundStyle(Theme.secondaryText)
-                    }
+                    // The rate itself now shows in the always-visible label
+                    // above instead of only here, once expanded.
                 }.padding(.top, 8)
             } label: {
                 HStack(spacing: 12) {
@@ -827,6 +823,14 @@ struct ProfileScreen: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("design.profile.currencies").foregroundStyle(.white)
                         Text("\(preferredCurrencyStore.code) · \(destinationCurrencyCode)").foregroundStyle(Theme.secondaryText)
+                        // Shown here too, not just once expanded -- a tester
+                        // circled this exact collapsed row expecting the
+                        // rate itself, not just the two currency codes.
+                        if let liveRate {
+                            Text("1 \(preferredCurrencyStore.code) ≈ \(String(format: "%.3f", liveRate)) \(destinationCurrencyCode)")
+                                .font(.caption2)
+                                .foregroundStyle(Theme.gold)
+                        }
                     }.font(.subheadline)
                 }.padding(.vertical, 4)
             }
