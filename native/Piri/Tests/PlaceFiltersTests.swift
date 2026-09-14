@@ -9,7 +9,7 @@ final class PlaceFiltersTests: XCTestCase {
         let museum = makePlace(id: "museum", category: "museum")
         let cafe = makePlace(id: "cafe", category: "cafe")
 
-        let result = PlaceFilters.sortedForProfile([cafe, museum], profile: UserProfile(profession: .historian))
+        let result = PlaceFilters.sortedForProfile([cafe, museum], profile: UserProfile(professions: [.historian]))
         XCTAssertEqual(result.first?.id, "museum")
     }
 
@@ -71,7 +71,7 @@ final class PlaceFiltersTests: XCTestCase {
         let viewedCafe = makePlace(id: "viewed-cafe", category: "cafe")
 
         // Historian profile boost (+6) for museum outweighs a single history match (+2) for cafe.
-        let result = PlaceFilters.sortedForProfile([cafe, museum], profile: UserProfile(profession: .historian), viewed: [viewedCafe])
+        let result = PlaceFilters.sortedForProfile([cafe, museum], profile: UserProfile(professions: [.historian]), viewed: [viewedCafe])
         XCTAssertEqual(result.first?.id, "museum")
     }
 

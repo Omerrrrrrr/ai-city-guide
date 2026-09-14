@@ -273,10 +273,10 @@ enum POICategoryGroups {
             guard let categories = reasonCategories[reason], categories.contains(category) else { continue }
             let signalPresent: Bool
             switch reason {
-            case .architecture: signalPresent = profile.profession == .architect || interested(.architecture)
-            case .history: signalPresent = profile.profession == .historian || interested(.history)
-            case .art: signalPresent = profile.profession == .artist || interested(.art)
-            case .food: signalPresent = profile.profession == .foodie || interested(.food)
+            case .architecture: signalPresent = profile.professions.contains(.architect) || interested(.architecture)
+            case .history: signalPresent = profile.professions.contains(.historian) || interested(.history)
+            case .art: signalPresent = profile.professions.contains(.artist) || interested(.art)
+            case .food: signalPresent = profile.professions.contains(.foodie) || interested(.food)
             case .nature: signalPresent = interested(.nature)
             case .nightlife: signalPresent = interested(.nightlife)
             case .religion:

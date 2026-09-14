@@ -100,19 +100,19 @@ enum PlaceFilters {
 
         func interested(_ interest: String) -> Bool { interests.contains(interest) }
 
-        if profile.profession == .architect || interested("architecture") {
+        if profile.professions.contains(.architect) || interested("architecture") {
             if tags.contains("architecture") || category == "landmark" || category == "museum" { score += 6 }
         }
-        if profile.profession == .historian || interested("history") {
+        if profile.professions.contains(.historian) || interested("history") {
             if category == "museum" || category == "cultural-spot" || category == "landmark" || tags.contains("history") { score += 6 }
         }
-        if profile.profession == .photographer || interested("photography") {
+        if profile.professions.contains(.photographer) || interested("photography") {
             if tags.contains("photogenic") || category == "viewpoint" { score += 6 }
         }
-        if profile.profession == .foodie || interested("food") {
+        if profile.professions.contains(.foodie) || interested("food") {
             if category == "cafe" || category == "restaurant" || tags.contains("meal") || tags.contains("coffee break") { score += 6 }
         }
-        if profile.profession == .artist || interested("art") {
+        if profile.professions.contains(.artist) || interested("art") {
             if tags.contains("art") || category == "museum" || category == "cultural-spot" { score += 5 }
         }
         if interested("nature") {
@@ -148,7 +148,7 @@ enum PlaceFilters {
     }
 
     static func sortedForProfile(_ places: [Place], profile: UserProfile, viewed: [Place] = []) -> [Place] {
-        let hasProfile = profile.profession != nil || !profile.interests.isEmpty || profile.faith != nil
+        let hasProfile = !profile.professions.isEmpty || !profile.interests.isEmpty || profile.faith != nil
             || profile.budget != nil || profile.groupType != nil || profile.pace != nil
         guard hasProfile || !viewed.isEmpty else { return sortedForBrowse(places) }
 

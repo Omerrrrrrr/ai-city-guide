@@ -115,12 +115,19 @@ struct AIScreen: View {
                 return [String(localized: "ai.suggestions.outdoorTerraces")] + Array(base.prefix(3))
             }
         }
-        switch profile.profession {
-        case .photographer: return [String(localized: "ai.suggestions.photoSpots")] + Array(base.prefix(3))
-        case .architect: return [String(localized: "ai.suggestions.architectureBuildings")] + Array(base.prefix(3))
-        case .foodie: return [String(localized: "ai.suggestions.localFood")] + Array(base.prefix(3))
-        default: return base
+        // Multi-select as of 2026-09 -- picks the first matching profession
+        // in this fixed priority order rather than trying to blend
+        // multiple profession-flavored suggestion sets into one row.
+        if profile.professions.contains(.photographer) {
+            return [String(localized: "ai.suggestions.photoSpots")] + Array(base.prefix(3))
         }
+        if profile.professions.contains(.architect) {
+            return [String(localized: "ai.suggestions.architectureBuildings")] + Array(base.prefix(3))
+        }
+        if profile.professions.contains(.foodie) {
+            return [String(localized: "ai.suggestions.localFood")] + Array(base.prefix(3))
+        }
+        return base
     }
 
     private var history: [AIConversationMessage] {

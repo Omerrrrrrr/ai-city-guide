@@ -54,7 +54,7 @@ struct HomeScreen: View {
 
     private var profile: UserProfile { userProfileStore.profile }
     private var hasProfile: Bool {
-        profile.profession != nil || !profile.interests.isEmpty || profile.faith != nil
+        !profile.professions.isEmpty || !profile.interests.isEmpty || profile.faith != nil
             || profile.budget != nil || profile.groupType != nil || profile.pace != nil
     }
 

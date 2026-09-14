@@ -31,7 +31,7 @@ enum MapsProvider: String, CaseIterable, Identifiable {
     }
 }
 
-/// Same shape as `AppearanceStore`/`LanguageStore`.
+/// Same shape as `LanguageStore`.
 @Observable
 final class MapsProviderStore {
     private(set) var provider: MapsProvider

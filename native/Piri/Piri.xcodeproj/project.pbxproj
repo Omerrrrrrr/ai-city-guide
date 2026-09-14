@@ -155,7 +155,6 @@
 		E640521527F5AC8FD9D572B9 /* PlanBuilderUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86DB5417C3A05EBAEE7EB68E /* PlanBuilderUITests.swift */; };
 		E93D3353A607936755D9A439 /* RecapVideoScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4227BAE0FF778131A60CAF2B /* RecapVideoScene.swift */; };
 		E968B4E4E5708B1EE5397107 /* TripAdvisorReviewsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92DFDDACD42B19290D630D8B /* TripAdvisorReviewsSheet.swift */; };
-		E9940CD5440B91A6557A816A /* AppearanceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65247BC33CC1FE5379F40135 /* AppearanceStore.swift */; };
 		EEA660AEBC9717682E73353A /* TripMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAC41208BF2D68EC120AB9AC /* TripMapView.swift */; };
 		F0F144BF16851A2F462FDD25 /* POISearchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86C75B0218F5B71CC3B5E384 /* POISearchService.swift */; };
 		F182CDE70C48E7D2EFF150DF /* UserDefaultsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A815DA9290E4BCF581F66E2 /* UserDefaultsStore.swift */; };
@@ -243,7 +242,6 @@
 		627629055B808FB73F268A0F /* PlanThemes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanThemes.swift; sourceTree = "<group>"; };
 		642AE03D91D3B2C9EC654135 /* TripAdvisorRatingRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripAdvisorRatingRow.swift; sourceTree = "<group>"; };
 		64810E1DD81476D0660B3CDB /* CuratedInfoRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CuratedInfoRow.swift; sourceTree = "<group>"; };
-		65247BC33CC1FE5379F40135 /* AppearanceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceStore.swift; sourceTree = "<group>"; };
 		671A824ED89E058394F705D9 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		674770D930511AA70C53CCF8 /* POICategoryGroups.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = POICategoryGroups.swift; sourceTree = "<group>"; };
 		6774362FE77E72E23C4DF520 /* AdminReviewsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminReviewsScreen.swift; sourceTree = "<group>"; };
@@ -604,7 +602,6 @@
 			isa = PBXGroup;
 			children = (
 				5DD8BEE6C2632619EE84A762 /* AdminAuthStore.swift */,
-				65247BC33CC1FE5379F40135 /* AppearanceStore.swift */,
 				A17B0F507C6E18A7B9522F96 /* AuthStore.swift */,
 				8F1514436FA3675EF8BA0636 /* CityStore.swift */,
 				F146295244C70DC7156EB3B3 /* FriendsStore.swift */,
@@ -849,7 +846,6 @@
 				11C521953FC9803C13AA77E8 /* AdminReview.swift in Sources */,
 				07FA334EE5441A5F9A5A51F5 /* AdminReviewsScreen.swift in Sources */,
 				67C48EABCD403E15AADF832D /* AppDelegate.swift in Sources */,
-				E9940CD5440B91A6557A816A /* AppearanceStore.swift in Sources */,
 				1A4535B5C0C30CBBA074EE6A /* AuthAPI.swift in Sources */,
 				11902DAA906C544983E91F21 /* AuthModels.swift in Sources */,
 				BCB29456771D85C06ACF1203 /* AuthStore.swift in Sources */,

@@ -9,7 +9,7 @@ struct OnboardingScreen: View {
     @State private var step = 0
     @State private var showingReward = false
     @State private var name = ""
-    @State private var profession: Profession?
+    @State private var professions: [Profession] = []
     @State private var professionOther = ""
     @State private var interests: [Interest] = []
     @State private var customInterests: [String] = []
@@ -143,11 +143,11 @@ struct OnboardingScreen: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("onboarding.profession.title").font(.system(size: 28, weight: .bold))
             Text("onboarding.profession.subtitle").font(.system(size: 15)).foregroundStyle(.secondary).padding(.bottom, 18)
-            ChipGrid(options: ProfileOptions.professions, isSelected: { profession == $0 }) { value in
+            ChipGrid(options: ProfileOptions.professions, isSelected: { professions.contains($0) }) { value in
                 Haptics.light()
-                profession = value
+                if let index = professions.firstIndex(of: value) { professions.remove(at: index) } else { professions.append(value) }
             }
-            if profession == .other {
+            if professions.contains(.other) {
                 TextField(String(localized: "profileOptions.professions.otherPlaceholder"), text: $professionOther)
                     .textInputAutocapitalization(.words)
                     .padding(.horizontal, 18)
@@ -286,7 +286,7 @@ struct OnboardingScreen: View {
     private func saveProfile() {
         userProfileStore.update { profile in
             profile.name = name.trimmingCharacters(in: .whitespaces)
-            profile.profession = profession
+            profile.professions = professions
             profile.professionOther = professionOther
             profile.interests = interests
             profile.customInterests = customInterests

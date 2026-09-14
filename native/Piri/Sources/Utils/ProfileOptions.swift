@@ -81,7 +81,7 @@ enum ProfileOptions {
     static func summaryParts(for profile: UserProfile) -> [String] {
         var parts: [String] = []
 
-        if let profession = profile.profession {
+        for profession in profile.professions {
             if profession == .other {
                 let custom = profile.professionOther.trimmingCharacters(in: .whitespaces)
                 if !custom.isEmpty { parts.append(custom) }

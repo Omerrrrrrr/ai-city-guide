@@ -17,12 +17,6 @@ private let languageOptions: [(code: String?, icon: String, labelKey: String)] =
     ("pt-BR", "globe", "settings.language.pt"),
 ]
 
-private let appearanceOptions: [(scheme: ColorScheme?, icon: String, labelKey: String)] = [
-    (nil, "circle.righthalf.filled", "settings.appearance.system"),
-    (.light, "sun.max.fill", "settings.appearance.light"),
-    (.dark, "moon.fill", "settings.appearance.dark"),
-]
-
 /// Groups the same way `OnboardingScreen`'s wizard steps already do:
 /// interests+faith together, pace+budget+group ("who are you traveling
 /// with") together under "Preferences" — mirrored here as tabs instead of
@@ -58,7 +52,6 @@ struct ProfileScreen: View {
     @Environment(UserProfileStore.self) private var userProfileStore
     @Environment(CityStore.self) private var cityStore
     @Environment(LanguageStore.self) private var languageStore
-    @Environment(AppearanceStore.self) private var appearanceStore
     @Environment(MapsProviderStore.self) private var mapsProviderStore
     @Environment(PreferredCurrencyStore.self) private var preferredCurrencyStore
     @Environment(SavedPlacesStore.self) private var savedPlacesStore
@@ -168,7 +161,7 @@ struct ProfileScreen: View {
         .sheet(isPresented: $isEditingAppSettings) {
             NavigationStack {
                 ScrollView {
-                    VStack(spacing: 16) { languageCard; appearanceCard; mapsProviderCard }.padding(20)
+                    VStack(spacing: 16) { languageCard; mapsProviderCard }.padding(20)
                 }
                 .background(Theme.navy.ignoresSafeArea())
                 .navigationTitle(String(localized: "settings.appSettings.title"))
@@ -332,9 +325,12 @@ struct ProfileScreen: View {
                         }
                     }
 
-                    let professionLabel = profile.profession.map { profession in
-                        ProfileOptions.professions.first { $0.value == profession }.map { String(localized: String.LocalizationValue($0.labelKey)) }
-                    } ?? nil
+                    let professionLabel: String? = {
+                        let labels = profile.professions.compactMap { profession in
+                            ProfileOptions.professions.first { $0.value == profession }.map { String(localized: String.LocalizationValue($0.labelKey)) }
+                        }
+                        return labels.isEmpty ? nil : labels.joined(separator: ", ")
+                    }()
                     let faithLabel = (profile.faith != nil && profile.faith != .preferNotToSay)
                         ? ProfileOptions.faiths.first { $0.value == profile.faith }.map { String(localized: String.LocalizationValue($0.labelKey)) }
                         : nil
@@ -489,11 +485,17 @@ struct ProfileScreen: View {
 
     private var professionCard: some View {
         card(titleKey: "onboarding.profession.title") {
-            ChipGrid(options: ProfileOptions.professions, isSelected: { profile.profession == $0 }) { value in
+            ChipGrid(options: ProfileOptions.professions, isSelected: { profile.professions.contains($0) }) { value in
                 Haptics.light()
-                userProfileStore.update { $0.profession = value }
+                userProfileStore.update { profile in
+                    if let index = profile.professions.firstIndex(of: value) {
+                        profile.professions.remove(at: index)
+                    } else {
+                        profile.professions.append(value)
+                    }
+                }
             }
-            if profile.profession == .other {
+            if profile.professions.contains(.other) {
                 professionOtherField
             }
         }
@@ -693,39 +695,18 @@ struct ProfileScreen: View {
         }
     }
 
-    private var appearanceCard: some View {
-        card(titleKey: "settings.appearance.label") {
-            HStack(spacing: 8) {
-                ForEach(appearanceOptions, id: \.labelKey) { option in
-                    let active = appearanceStore.scheme == option.scheme
-                    Button {
-                        guard !active else { return }
-                        Haptics.light()
-                        appearanceStore.setScheme(option.scheme)
-                    } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: option.icon)
-                            Text(String(localized: String.LocalizationValue(option.labelKey)))
-                        }
-                        .font(.system(size: 14, weight: .medium))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background(Capsule().fill(active ? Theme.navy : Theme.cardFill))
-                        .foregroundStyle(active ? .white : .primary)
-                        .overlay(Capsule().stroke(active ? Theme.navy : Color(.separator), lineWidth: 1.5))
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-    }
-
     /// Which app "Open in Maps" hands off to, app-wide (`PlaceDirections`
     /// reads this same preference) — not just Apple Maps, since not every
     /// traveler has or prefers it.
+    // Was 4 equal-width capsules crammed into one HStack -- fine for the
+    // short language/appearance labels sharing that layout elsewhere, but
+    // "Piri Haritası (uygulama içi)" wrapped to three cramped lines next
+    // to single-line "Apple Haritalar" and looked broken (a tester circled
+    // it asking for this to look better). A vertical list, one full-width
+    // row per option, gives every label room on one line.
     private var mapsProviderCard: some View {
         card(titleKey: "settings.mapsProvider.label") {
-            HStack(spacing: 8) {
+            VStack(spacing: 8) {
                 ForEach(MapsProvider.allCases) { option in
                     let active = mapsProviderStore.provider == option
                     Button {
@@ -733,16 +714,22 @@ struct ProfileScreen: View {
                         Haptics.light()
                         mapsProviderStore.setProvider(option)
                     } label: {
-                        HStack(spacing: 5) {
+                        HStack(spacing: 12) {
                             Image(systemName: option.icon)
+                                .font(.system(size: 16, weight: .medium))
+                                .frame(width: 28)
                             Text(String(localized: String.LocalizationValue(option.labelKey)))
+                                .font(.system(size: 15, weight: .medium))
+                            Spacer()
+                            if active {
+                                Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.gold)
+                            }
                         }
-                        .font(.system(size: 14, weight: .medium))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background(Capsule().fill(active ? Theme.navy : Theme.cardFill))
+                        .frame(minHeight: 44)
+                        .padding(.horizontal, 14)
                         .foregroundStyle(active ? .white : .primary)
-                        .overlay(Capsule().stroke(active ? Theme.navy : Color(.separator), lineWidth: 1.5))
+                        .background(RoundedRectangle(cornerRadius: 12).fill(active ? Theme.navy : Theme.cardFill))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(active ? Theme.navy : Color(.separator), lineWidth: 1.5))
                     }
                     .buttonStyle(.plain)
                 }
