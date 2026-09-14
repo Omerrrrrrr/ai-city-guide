@@ -90,7 +90,7 @@ struct HomeScreen: View {
                 }
 
                 if !Self.useCuratedHomeData { featuredPOICard }
-                aiBanner
+                suggestionCard
                 savedShortcuts
 
                 if Self.useCuratedHomeData {
@@ -126,9 +126,6 @@ struct HomeScreen: View {
                 } else {
                     poiSection
                 }
-
-                if !hasProfile, !poiLoading { profileNudge }
-                if soonHoliday != nil || goldenHour?.activeWindow != nil { infoPillsRow }
             }
             .padding(.bottom, 40)
         }

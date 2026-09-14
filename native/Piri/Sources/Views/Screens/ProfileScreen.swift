@@ -746,8 +746,8 @@ struct ProfileScreen: View {
                     Text(cityStore.cityName ?? String(localized: "common.everywhere"))
                         .font(Theme.editorial(size: 30)).foregroundStyle(.white)
                         .fixedSize(horizontal: false, vertical: true)
-                    if let country = cityStore.countryInfo?.name {
-                        Text(country).font(.subheadline).foregroundStyle(Theme.secondaryText)
+                    if let subtitle = cityContextSubtitle {
+                        Text(subtitle).font(.subheadline).foregroundStyle(Theme.secondaryText)
                     }
                     Text("settings.changeCity").font(.subheadline.weight(.medium))
                         .foregroundStyle(Theme.gold).padding(.top, 12)
