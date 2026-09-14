@@ -36,4 +36,52 @@ struct SavedCollection: Codable, Identifiable, Hashable {
     /// than persisting them here — a forecast baked in once would just go
     /// stale.
     var targetDate: Double? = nil
+
+    // A custom `init(from:)` below suppresses Swift's free synthesized
+    // memberwise init, so it's rebuilt explicitly here.
+    init(
+        id: String,
+        name: String,
+        kind: SavedCollectionKind,
+        createdAt: Double,
+        places: [SavedPOIReference] = [],
+        targetDate: Double? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.kind = kind
+        self.createdAt = createdAt
+        self.places = places
+        self.targetDate = targetDate
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, kind, createdAt, places, targetDate
+    }
+
+    /// Custom decoder -- see this file's own top-of-file warning: a
+    /// synthesized decoder throws on ANY missing key (confirmed for real
+    /// against `UserProfile`, see that type's own decoder comment), which
+    /// fails the whole `[SavedCollection]` array decode for one bad
+    /// element, wiping every saved list and plan for every user on that
+    /// device. Every field falls back to a default instead.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(String.self, forKey: .id) ?? ""
+        name = try c.decodeIfPresent(String.self, forKey: .name) ?? ""
+        kind = try c.decodeIfPresent(SavedCollectionKind.self, forKey: .kind) ?? .saved
+        createdAt = try c.decodeIfPresent(Double.self, forKey: .createdAt) ?? 0
+        places = try c.decodeIfPresent([SavedPOIReference].self, forKey: .places) ?? []
+        targetDate = try c.decodeIfPresent(Double.self, forKey: .targetDate)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(name, forKey: .name)
+        try c.encode(kind, forKey: .kind)
+        try c.encode(createdAt, forKey: .createdAt)
+        try c.encode(places, forKey: .places)
+        try c.encodeIfPresent(targetDate, forKey: .targetDate)
+    }
 }

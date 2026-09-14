@@ -24,6 +24,38 @@ struct SavedPOIReference: Codable, Identifiable, Hashable {
     var lng: Double
     var address: String?
 
+    // A custom `init(from:)` below suppresses Swift's free synthesized
+    // memberwise init, so it's rebuilt explicitly here (call sites like
+    // `POIPlace.asReference` rely on it).
+    init(identifier: String, name: String, categoryRawValue: String? = nil, lat: Double, lng: Double, address: String? = nil) {
+        self.identifier = identifier
+        self.name = name
+        self.categoryRawValue = categoryRawValue
+        self.lat = lat
+        self.lng = lng
+        self.address = address
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case identifier, name, categoryRawValue, lat, lng, address
+    }
+
+    /// Custom decoder -- see this file's own top-of-file warning: a
+    /// synthesized decoder throws on ANY missing key (confirmed for real
+    /// against `UserProfile`, see that type's own decoder comment), which
+    /// cascades into failing the whole `Trip`/`SavedCollection`/
+    /// `RecentlyViewedStore` array decode this type sits inside. Every
+    /// field falls back to a default instead.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        identifier = try c.decodeIfPresent(String.self, forKey: .identifier) ?? ""
+        name = try c.decodeIfPresent(String.self, forKey: .name) ?? ""
+        categoryRawValue = try c.decodeIfPresent(String.self, forKey: .categoryRawValue)
+        lat = try c.decodeIfPresent(Double.self, forKey: .lat) ?? 0
+        lng = try c.decodeIfPresent(Double.self, forKey: .lng) ?? 0
+        address = try c.decodeIfPresent(String.self, forKey: .address)
+    }
+
     var id: String { identifier }
 
     var category: MKPointOfInterestCategory? {

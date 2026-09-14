@@ -44,6 +44,72 @@ struct Trip: Codable, Identifiable, Hashable {
     var startedAt: Double
     var endedAt: Double?
 
+    // A custom `init(from:)` below suppresses Swift's free synthesized
+    // memberwise init, so it's rebuilt explicitly here (`TripsStore`'s
+    // `startTrip`/tests rely on it).
+    init(
+        id: String,
+        name: String? = nil,
+        stops: [SavedPOIReference],
+        routeGeometry: [[Double]]? = nil,
+        distanceMeters: Double? = nil,
+        durationSeconds: Double? = nil,
+        breadcrumb: [TripWaypoint] = [],
+        photos: [TripPhoto] = [],
+        startedAt: Double,
+        endedAt: Double? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.stops = stops
+        self.routeGeometry = routeGeometry
+        self.distanceMeters = distanceMeters
+        self.durationSeconds = durationSeconds
+        self.breadcrumb = breadcrumb
+        self.photos = photos
+        self.startedAt = startedAt
+        self.endedAt = endedAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, stops, routeGeometry, distanceMeters, durationSeconds, breadcrumb, photos, startedAt, endedAt
+    }
+
+    /// Custom decoder -- see this file's own top-of-file warning: a
+    /// synthesized decoder throws on ANY missing key (confirmed for real
+    /// against `UserProfile`, see that type's own decoder comment), and
+    /// because `TripsStore` persists `[Trip]` as one array, one trip
+    /// failing to decode fails the WHOLE array, wiping every trip for
+    /// every user on that device. Every field falls back to a default
+    /// instead.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(String.self, forKey: .id) ?? ""
+        name = try c.decodeIfPresent(String.self, forKey: .name)
+        stops = try c.decodeIfPresent([SavedPOIReference].self, forKey: .stops) ?? []
+        routeGeometry = try c.decodeIfPresent([[Double]].self, forKey: .routeGeometry)
+        distanceMeters = try c.decodeIfPresent(Double.self, forKey: .distanceMeters)
+        durationSeconds = try c.decodeIfPresent(Double.self, forKey: .durationSeconds)
+        breadcrumb = try c.decodeIfPresent([TripWaypoint].self, forKey: .breadcrumb) ?? []
+        photos = try c.decodeIfPresent([TripPhoto].self, forKey: .photos) ?? []
+        startedAt = try c.decodeIfPresent(Double.self, forKey: .startedAt) ?? 0
+        endedAt = try c.decodeIfPresent(Double.self, forKey: .endedAt)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encodeIfPresent(name, forKey: .name)
+        try c.encode(stops, forKey: .stops)
+        try c.encodeIfPresent(routeGeometry, forKey: .routeGeometry)
+        try c.encodeIfPresent(distanceMeters, forKey: .distanceMeters)
+        try c.encodeIfPresent(durationSeconds, forKey: .durationSeconds)
+        try c.encode(breadcrumb, forKey: .breadcrumb)
+        try c.encode(photos, forKey: .photos)
+        try c.encode(startedAt, forKey: .startedAt)
+        try c.encodeIfPresent(endedAt, forKey: .endedAt)
+    }
+
     var formattedDistance: String {
         guard let meters = distanceMeters, meters > 0 else { return "—" }
         return String(format: "%.1f km", meters / 1000)
