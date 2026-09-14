@@ -38,7 +38,15 @@ enum TripRecapVideoRenderer {
     static func render(trip: Trip, data: TripRecapData, onProgress: @escaping (Double) -> Void = { _ in }) async throws -> URL {
         try Task.checkCancellation()
 
-        let coordinates = routeCoordinates(for: trip)
+        // Filtered here, not just at the source -- a single corrupt point
+        // (NaN/out-of-range lat-lng, seen in the wild from GPS glitches
+        // recorded into `breadcrumb`) reaching `MKMapSnapshotOptions.region`
+        // crashes the whole render with an uncatchable NSException, so
+        // anything invalid needs to be dropped before it gets anywhere
+        // near `boundingRegion`.
+        let coordinates = routeCoordinates(for: trip).filter {
+            CLLocationCoordinate2DIsValid($0) && $0.latitude.isFinite && $0.longitude.isFinite
+        }
         guard coordinates.count > 1 else {
             throw RenderError(message: "Not enough route points to render a recap video")
         }
@@ -93,8 +101,13 @@ enum TripRecapVideoRenderer {
         let maxLng = lngs.max() ?? 0
 
         let paddingFactor = 1.5 // 25% padding on every side
-        var latDelta = max((maxLat - minLat) * paddingFactor, 0.01)
-        var lngDelta = max((maxLng - minLng) * paddingFactor, 0.01)
+        // Capped well under the true 180/360 limits -- a trip crossing the
+        // antimeridian (e.g. Fiji, the Aleutians) would otherwise compute a
+        // span from the raw numeric min/max spread across the date line,
+        // and `MKMapSnapshotOptions.setRegion:` throws on an out-of-range
+        // region instead of just clamping it.
+        var latDelta = min(max((maxLat - minLat) * paddingFactor, 0.01), 170)
+        var lngDelta = min(max((maxLng - minLng) * paddingFactor, 0.01), 170)
 
         // Match the video's own portrait aspect so the snapshot's route
         // isn't squeezed/stretched relative to what actually gets drawn.
@@ -105,6 +118,11 @@ enum TripRecapVideoRenderer {
         } else {
             lngDelta = latDelta * targetAspect
         }
+        // The aspect correction above can push either delta back past the
+        // cap it was just given (e.g. a wide lngDelta forcing latDelta up
+        // to match), so it needs re-clamping once more before use.
+        latDelta = min(latDelta, 170)
+        lngDelta = min(lngDelta, 170)
 
         return MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: (minLat + maxLat) / 2, longitude: (minLng + maxLng) / 2),

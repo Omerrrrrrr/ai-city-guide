@@ -1,3 +1,4 @@
+import StoreKit
 import SwiftUI
 
 // Not country flags — Apple's HIG explicitly discourages flags for language
@@ -30,8 +31,18 @@ private let appearanceOptions: [(scheme: ColorScheme?, icon: String, labelKey: S
 /// sharing the word with `SavedCollectionKind.plan`'s actual saved plans
 /// (shown a few cards below as the "Planlar" stat) read as the same
 /// feature when it very much isn't.
+///
+/// `interests` opens first, ahead of `profession` — interests bear more
+/// directly on what gets recommended, so they're the more useful default
+/// to land on. `profession` and `interests` are both stable personal
+/// traits (this is also where `faith` lives); `plan` is different in
+/// kind -- pace/budget/group/occasion aren't who the user IS, they're
+/// this profile's *standing defaults* for trips generally, reused as-is
+/// on every AI call (`profileSummaryCard`'s doc comment) until changed
+/// here -- `settings.tabs.plan` and its `.subtitle` say so explicitly
+/// now, rather than reading as one-off "this trip" settings.
 private enum ProfileTab: Hashable, Identifiable {
-    case profession, interests, plan
+    case interests, profession, plan
     var id: Self { self }
 }
 
@@ -72,10 +83,11 @@ struct ProfileScreen: View {
     @State private var liveRateTask: Task<Void, Never>?
     @State private var showingSaved: SavedTab?
     @State private var showingRestartHint = false
-    @State private var profileTab: ProfileTab = .profession
+    @State private var profileTab: ProfileTab = .interests
     @State private var newInterestText = ""
     @State private var showingSignIn = false
     @State private var showingPaywall = false
+    @State private var showingManageSubscriptions = false
     @State private var showingAvatarPicker = false
     @State private var showingDeleteAccountConfirm = false
     @State private var isDeletingAccount = false
@@ -145,6 +157,14 @@ struct ProfileScreen: View {
         .sheet(item: $showingSaved) { tab in SavedScreen(initialTab: tab) }
         .sheet(isPresented: $showingSignIn) { SignInScreen() }
         .sheet(isPresented: $showingPaywall) { PaywallScreen() }
+        // Apple's own native manage-subscriptions UI, presented in-app
+        // instead of the old `Link` to apps.apple.com/account/subscriptions
+        // -- that sent every tap (upgrade or cancel alike) out to Safari.
+        // Now only actual cancellation/renewal management goes here;
+        // switching tiers stays in-app via `showingPaywall` above, which
+        // lets StoreKit prorate the existing subscription automatically
+        // since both tiers share one subscription group.
+        .manageSubscriptionsSheet(isPresented: $showingManageSubscriptions)
         .sheet(isPresented: $isEditingAppSettings) {
             NavigationStack {
                 ScrollView {
@@ -198,12 +218,30 @@ struct ProfileScreen: View {
                             .font(.footnote)
                             .foregroundStyle(Theme.secondaryText)
                     }
-                    if let url = URL(string: "https://apps.apple.com/account/subscriptions") {
-                        Link(destination: url) {
+                    HStack(spacing: 16) {
+                        // Reuses `PaywallScreen` itself rather than a
+                        // separate "change plan" screen -- picking a
+                        // different tier/period there and purchasing it
+                        // hands StoreKit a product already in this same
+                        // subscription group, which prorates and swaps the
+                        // active subscription automatically instead of
+                        // stacking a second one.
+                        Button {
+                            showingPaywall = true
+                        } label: {
+                            Text(String(localized: String.LocalizationValue("settings.premium.changePlan")))
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(Theme.gold)
+                        }
+                        .buttonStyle(.plain)
+                        Button {
+                            showingManageSubscriptions = true
+                        } label: {
                             Text(String(localized: String.LocalizationValue("settings.premium.manage")))
                                 .font(.footnote.weight(.semibold))
                                 .foregroundStyle(Theme.gold)
                         }
+                        .buttonStyle(.plain)
                     }
                 }
             } else {
@@ -417,8 +455,8 @@ struct ProfileScreen: View {
 
     private var profileTabsSegment: some View {
         HStack(spacing: 3) {
-            profileTabButton(.profession, label: String(localized: "settings.tabs.profession"))
             profileTabButton(.interests, label: String(localized: "settings.tabs.interests"))
+            profileTabButton(.profession, label: String(localized: "settings.tabs.profession"))
             profileTabButton(.plan, label: String(localized: "settings.tabs.plan"))
         }
         .padding(3)
@@ -569,9 +607,17 @@ struct ProfileScreen: View {
 
     // Grouped the same way `OnboardingScreen.travelStyleStep` already
     // groups them — pace, budget, and "who are you traveling with" (group
-    // type) all under one "Preferences" heading.
+    // type) all under one "Preferences" heading. Leads with a subtitle
+    // (unlike `professionCard`/`interestsTabContent`) because unlike
+    // those two, nothing about this tab's own contents makes it obvious
+    // these are reused defaults for every future trip rather than
+    // one-off settings for whatever trip is currently open.
     @ViewBuilder
     private var planTabContent: some View {
+        Text("settings.tabs.plan.subtitle")
+            .font(.caption)
+            .foregroundStyle(Theme.secondaryText)
+            .padding(.horizontal, 4)
         card(titleKey: "onboarding.travelStyle.paceLabel") {
             ChipGrid(options: ProfileOptions.paces, isSelected: { profile.pace == $0 }) { value in
                 Haptics.light()

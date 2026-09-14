@@ -132,6 +132,19 @@ struct PlanBuilderScreen: View {
         }
     }
 
+    /// Pace only ever fed its own chip's selected state until now -- see
+    /// the "PlanBuilder pace selector inert" note: this is the fix
+    /// direction settled on, a recommended target shown to the user, who
+    /// still manually picks which candidates to add rather than the range
+    /// silently changing the search itself.
+    private var recommendedStopRange: ClosedRange<Int> {
+        switch pace {
+        case .relaxed: 3...4
+        case .balanced: 5...6
+        case .packed: 7...8
+        }
+    }
+
     private var paceSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("planBuilder.paceLabel").font(.system(size: 12, weight: .bold)).foregroundStyle(.secondary).tracking(0.6)
@@ -139,6 +152,9 @@ struct PlanBuilderScreen: View {
                 Haptics.light()
                 pace = value
             }
+            Text(L("planBuilder.paceRecommendation", recommendedStopRange.lowerBound, recommendedStopRange.upperBound))
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
         }
     }
 

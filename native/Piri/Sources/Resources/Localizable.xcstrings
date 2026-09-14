@@ -28743,6 +28743,59 @@
         }
       }
     },
+    "planBuilder.paceRecommendation" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Empfohlen: %1$lld–%2$lld Stopps"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recommended: %1$lld–%2$lld stops"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recomendado: %1$lld–%2$lld paradas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recommandé : %1$lld–%2$lld arrêts"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Consigliato: %1$lld–%2$lld tappe"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anbefalt: %1$lld–%2$lld stopp"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recomendado: %1$lld–%2$lld paradas"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Önerilen: %1$lld–%2$lld durak"
+          }
+        }
+      }
+    },
     "planBuilder.paceLabel" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -35434,49 +35487,49 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mit KI erstellen"
+            "value" : "Plan erstellen"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Build with AI"
+            "value" : "Build a plan"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Crear con IA"
+            "value" : "Crear un plan"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Créer avec l'IA"
+            "value" : "Créer un plan"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Crea con l'IA"
+            "value" : "Crea un piano"
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lag med AI"
+            "value" : "Lag en plan"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Criar com IA"
+            "value" : "Criar um plano"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI ile Planla"
+            "value" : "Plan Oluştur"
           }
         }
       }
@@ -39227,6 +39280,59 @@
         }
       }
     },
+    "settings.premium.changePlan" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plan ändern"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Change plan"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cambiar de plan"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changer de forfait"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cambia piano"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bytt plan"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mudar de plano"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Planı değiştir"
+          }
+        }
+      }
+    },
     "settings.premium.manage" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -40399,49 +40505,102 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Präferenzen"
+            "value" : "Standardwerte"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preferences"
+            "value" : "Defaults"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preferencias"
+            "value" : "Por defecto"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Préférences"
+            "value" : "Par défaut"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preferenze"
+            "value" : "Predefiniti"
           }
         },
         "nb" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preferanser"
+            "value" : "Standard"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Preferências"
+            "value" : "Padrão"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tercihler"
+            "value" : "Varsayılanlar"
+          }
+        }
+      }
+    },
+    "settings.tabs.plan.subtitle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wird als dein Standard für jede Reise verwendet, bis du es hier änderst."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Used as your default for every trip until you change it here."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se usa como tu valor predeterminado en cada viaje hasta que lo cambies aquí."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utilisé comme réglage par défaut pour chaque voyage, jusqu'à ce que tu le changes ici."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usato come impostazione predefinita per ogni viaggio, finché non lo modifichi qui."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Brukes som standard for hver reise til du endrer det her."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usado como seu padrão em cada viagem até que você o altere aqui."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Burada değiştirene kadar her gezinde varsayılan olarak kullanılır."
           }
         }
       }
