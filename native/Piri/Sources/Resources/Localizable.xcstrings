@@ -1,577 +1,6 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "design.profile.signInHint" : {"extractionState":"manual","localizations":{"de":{"stringUnit":{"state":"translated","value":"Melde dich an und behalte deine Entdeckungen"}},"en":{"stringUnit":{"state":"translated","value":"Sign in and keep your discoveries"}},"es":{"stringUnit":{"state":"translated","value":"Inicia sesión y conserva tus descubrimientos"}},"fr":{"stringUnit":{"state":"translated","value":"Connecte-toi pour garder tes découvertes"}},"it":{"stringUnit":{"state":"translated","value":"Accedi per conservare le tue scoperte"}},"nb":{"stringUnit":{"state":"translated","value":"Logg inn og behold oppdagelsene dine"}},"pt-BR":{"stringUnit":{"state":"translated","value":"Entre e guarde suas descobertas"}},"tr":{"stringUnit":{"state":"translated","value":"Giriş yap ve keşiflerini sakla"}}}},
-    "design.profile.edit" : {"extractionState": "manual", "localizations": {"de":{"stringUnit":{"state":"translated","value":"Profil bearbeiten"}},"en": {"stringUnit": {"state": "translated", "value": "Edit profile"}},"es":{"stringUnit":{"state":"translated","value":"Editar perfil"}},"fr":{"stringUnit":{"state":"translated","value":"Modifier le profil"}},"it":{"stringUnit":{"state":"translated","value":"Modifica profilo"}},"nb":{"stringUnit":{"state":"translated","value":"Rediger profil"}},"pt-BR":{"stringUnit":{"state":"translated","value":"Editar perfil"}},"tr": {"stringUnit": {"state": "translated", "value": "Profili düzenle"}}}},
-    "design.profile.travelStyle" : {"extractionState": "manual", "localizations": {"de":{"stringUnit":{"state":"translated","value":"Dein Reisestil"}},"en": {"stringUnit": {"state": "translated", "value": "Your travel style"}},"es":{"stringUnit":{"state":"translated","value":"Tu estilo de viaje"}},"fr":{"stringUnit":{"state":"translated","value":"Ton style de voyage"}},"it":{"stringUnit":{"state":"translated","value":"Il tuo stile di viaggio"}},"nb":{"stringUnit":{"state":"translated","value":"Reisestilen din"}},"pt-BR":{"stringUnit":{"state":"translated","value":"Seu estilo de viagem"}},"tr": {"stringUnit": {"state": "translated", "value": "Seyahat tarzın"}}}},
-    "design.profile.exploringCity" : {"extractionState": "manual", "localizations": {"de":{"stringUnit":{"state":"translated","value":"STADT, DIE DU ERKUNDEST"}},"en": {"stringUnit": {"state": "translated", "value": "CITY YOU ARE EXPLORING"}},"es":{"stringUnit":{"state":"translated","value":"CIUDAD QUE ESTÁS EXPLORANDO"}},"fr":{"stringUnit":{"state":"translated","value":"VILLE QUE TU EXPLORES"}},"it":{"stringUnit":{"state":"translated","value":"CITTÀ CHE STAI ESPLORANDO"}},"nb":{"stringUnit":{"state":"translated","value":"BYEN DU UTFORSKER"}},"pt-BR":{"stringUnit":{"state":"translated","value":"CIDADE QUE VOCÊ ESTÁ EXPLORANDO"}},"tr": {"stringUnit": {"state": "translated", "value": "KEŞFETTİĞİN ŞEHİR"}}}},
-    "design.profile.currencies" : {"extractionState": "manual", "localizations": {"de":{"stringUnit":{"state":"translated","value":"Währungen"}},"en": {"stringUnit": {"state": "translated", "value": "Currencies"}},"es":{"stringUnit":{"state":"translated","value":"Monedas"}},"fr":{"stringUnit":{"state":"translated","value":"Devises"}},"it":{"stringUnit":{"state":"translated","value":"Valute"}},"nb":{"stringUnit":{"state":"translated","value":"Valutaer"}},"pt-BR":{"stringUnit":{"state":"translated","value":"Moedas"}},"tr": {"stringUnit": {"state": "translated", "value": "Para birimleri"}}}},
-    "design.profile.personalizeHint" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Füge deine Interessen und deinen Reisestil hinzu, um persönlichere Vorschläge zu erhalten." } }, "en" : { "stringUnit" : { "state" : "translated", "value" : "Add your interests and travel style for more personal suggestions." } }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Añade tus intereses y tu estilo de viaje para recibir sugerencias más personales." } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ajoute tes centres d'intérêt et ton style de voyage pour des suggestions plus personnelles." } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Aggiungi i tuoi interessi e il tuo stile di viaggio per suggerimenti più personali." } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Legg til interessene og reisestilen din for mer personlige forslag." } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Adicione seus interesses e estilo de viagem para sugestões mais pessoais." } }, "tr" : { "stringUnit" : { "state" : "translated", "value" : "Sana uygun öneriler için ilgi alanlarını ve seyahat tarzını ekle." } }
-      }
-    },
-    "design.tabs.explore" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Entdecken" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Explore"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Explorar" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Explorer" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Esplora" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Utforsk" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Explorar" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Keşfet"
-          }
-        }
-      }
-    },
-    "design.home.planCount.one" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "%lld Plan" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld plan"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "%lld plan" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "%lld projet" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "%lld piano" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "%lld plan" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "%lld plano" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld plan"
-          }
-        }
-      }
-    },
-    "design.home.planCount.other" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "%lld Pläne" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld plans"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "%lld planes" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "%lld projets" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "%lld piani" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "%lld planer" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "%lld planos" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld plan"
-          }
-        }
-      }
-    },
-    "design.home.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Was erkunden wir heute?" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Where shall we explore today?"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "¿Qué exploramos hoy?" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Qu'explorons-nous aujourd'hui ?" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Cosa esploriamo oggi?" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Hva skal vi utforske i dag?" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "O que vamos explorar hoje?" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bugün nereyi keşfedelim?"
-          }
-        }
-      }
-    },
-    "design.home.saved" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Gespeicherte Orte" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Saved places"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Lugares guardados" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Lieux enregistrés" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Luoghi salvati" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Lagrede steder" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Lugares salvos" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kaydedilenler"
-          }
-        }
-      }
-    },
-    "design.home.plans" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Meine Pläne" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "My plans"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Mis planes" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Mes projets" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "I miei piani" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Planene mine" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Meus planos" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Planlarım"
-          }
-        }
-      }
-    },
-    "design.home.planTogether" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Lass uns gemeinsam planen" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Let’s plan together"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Planeemos juntos" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Planifions ensemble" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Pianifichiamo insieme" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "La oss planlegge sammen" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Vamos planejar juntos" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Birlikte planlayalım"
-          }
-        }
-      }
-    },
-    "design.home.planSubtitle" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Macht gemeinsam einen ganzen Tag daraus." } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Make a day of it, together."
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Conviértanlo en un día entero, juntos." } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Faites-en une journée entière, ensemble." } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Trasformatelo in una giornata intera, insieme." } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Gjør det til en hel dag, sammen." } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Transformem isso em um dia inteiro, juntos." } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hayalindeki günü birlikte kuralım."
-          }
-        }
-      }
-    },
-    "design.home.askPiri" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Piri fragen" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ask Piri"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Pregúntale a Piri" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Demander à Piri" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Chiedi a Piri" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Spør Piri" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Pergunte à Piri" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Piri’ye sor"
-          }
-        }
-      }
-    },
-    "design.ai.introduction" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Ich kann dir einen Tag voller Kaffee, Spaziergänge und schöner Entdeckungen in %@ planen." } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "I can plan a day of coffee, walks and lovely discoveries in %@."
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Puedo planear un día de café, paseos y bonitos descubrimientos en %@." } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Je peux te préparer une journée café, balades et jolies découvertes à %@." } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Posso organizzare una giornata di caffè, passeggiate e belle scoperte a %@." } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Jeg kan planlegge en dag med kaffe, spaserturer og fine oppdagelser i %@." } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Posso planejar um dia de café, caminhadas e boas descobertas em %@." } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@’da kahve, yürüyüş ve güzel keşiflerle dolu bir plan hazırlayabilirim."
-          }
-        }
-      }
-    },
-    "design.common.back" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Zurück" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Back"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Atrás" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Retour" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Indietro" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Tilbake" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Voltar" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Geri"
-          }
-        }
-      }
-    },
-    "design.ai.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Ein Tag, nur für dich." } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A day, just for you."
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Un día, solo para ti." } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Une journée, rien que pour toi." } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Una giornata, solo per te." } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "En dag, bare for deg." } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Um dia, só para você." } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sana göre bir gün."
-          }
-        }
-      }
-    },
-    "design.ai.showLess" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Weniger anzeigen" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Show less"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Mostrar menos" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Afficher moins" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Mostra meno" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Vis mindre" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Mostrar menos" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Daha az göster"
-          }
-        }
-      }
-    },
-    "design.ai.fullResponse" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Vollständige Antwort" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Full response"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Respuesta completa" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Réponse complète" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Risposta completa" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Fullstendig svar" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Resposta completa" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Yanıtın tamamı"
-          }
-        }
-      }
-    },
-    "design.photo.source" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Fotoquelle" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Photo source"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Fuente de la foto" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Source de la photo" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Fonte della foto" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Bildekilde" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Fonte da foto" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fotoğraf kaynağı"
-          }
-        }
-      }
-    },
-    "design.photo.remove" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Foto entfernen" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Remove photo"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Quitar foto" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Supprimer la photo" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Rimuovi foto" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Fjern bilde" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Remover foto" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fotoğrafı kaldır"
-          }
-        }
-      }
-    },
-    "design.photo.attach" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Foto anhängen" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Attach photo"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Adjuntar foto" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Joindre une photo" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Allega foto" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Legg ved bilde" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Anexar foto" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fotoğraf ekle"
-          }
-        }
-      }
-    },
-    "design.ai.placeholder" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Frag Piri etwas …" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ask Piri something…"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Pregúntale algo a Piri…" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Demande quelque chose à Piri…" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Chiedi qualcosa a Piri…" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Spør Piri om noe …" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Pergunte algo à Piri…" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Piri’ye bir şey sor…"
-          }
-        }
-      }
-    },
-    "design.map.plan" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Route planen" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Plan a route"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Planear una ruta" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Planifier un itinéraire" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Pianifica un percorso" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Planlegg en rute" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Planejar uma rota" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rota planla"
-          }
-        }
-      }
-    },
-    "design.map.appearance" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Kartendarstellung" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Map appearance"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Apariencia del mapa" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Apparence de la carte" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Aspetto della mappa" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Kartutseende" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Aparência do mapa" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Harita görünümü"
-          }
-        }
-      }
-    },
-    "design.map.recenter" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Auf meinen Standort zentrieren" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recenter on my location"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Volver a mi ubicación" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Recentrer sur ma position" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Ricentra sulla mia posizione" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Sentrer på posisjonen min" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Centralizar na minha localização" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Konumuma dön"
-          }
-        }
-      }
-    },
-    "design.map.search" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "In diesem Gebiet suchen" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Search this area"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Buscar en esta zona" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Rechercher dans cette zone" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Cerca in quest'area" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Søk i dette området" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Pesquisar nesta área" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bu bölgede ara"
-          }
-        }
-      }
-    },
-    "design.map.clearSearch" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Suche löschen" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clear search"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Borrar búsqueda" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Effacer la recherche" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Cancella ricerca" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Fjern søk" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Limpar pesquisa" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aramayı temizle"
-          }
-        }
-      }
-    },
-    "design.common.all" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Alle" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "All"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Todos" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Tous" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Tutti" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Alle" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Todos" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tümü"
-          }
-        }
-      }
-    },
-    "design.map.collapse" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Einklappen" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Collapse"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Contraer" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Réduire" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Comprimi" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Slå sammen" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Recolher" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Küçült"
-          }
-        }
-      }
-    },
-    "design.map.details" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Details ansehen" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "View details"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Ver detalles" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Voir les détails" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Visualizza dettagli" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Se detaljer" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Ver detalhes" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Detayları gör"
-          }
-        }
-      }
-    },
-    "design.common.close" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Schließen" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Close"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Cerrar" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Fermer" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Chiudi" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Lukk" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Fechar" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kapat"
-          }
-        }
-      }
-    },
-    "design.map.createRoute" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Route erstellen" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Create route"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Crear ruta" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Créer un itinéraire" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Crea percorso" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Opprett rute" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Criar rota" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rota oluştur"
-          }
-        }
-      }
-    },
-    "design.common.place" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Ort" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Place"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Lugar" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Lieu" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Luogo" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Sted" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Lugar" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mekân"
-          }
-        }
-      }
-    },
-    "design.detail.narration" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Piris Erzählung" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Piri’s narration"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "El relato de Piri" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Le récit de Piri" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Il racconto di Piri" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Piris fortelling" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "A narração da Piri" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Piri’nin anlatımı"
-          }
-        }
-      }
-    },
-    "design.detail.fullStory" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Die ganze Geschichte lesen" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Read the full story"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Leer la historia completa" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Lire l'histoire complète" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Leggi la storia completa" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Les hele historien" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Ler a história completa" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Anlatımın devamı"
-          }
-        }
-      }
-    },
-    "design.detail.location" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Standort und Details" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Location and details"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Ubicación y detalles" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Emplacement et détails" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Posizione e dettagli" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Beliggenhet og detaljer" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Localização e detalhes" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Konum ve bilgiler"
-          }
-        }
-      }
-    },
-    "design.detail.placeOfInterest" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Sehenswürdigkeit" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Place of interest"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Lugar de interés" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Lieu d'intérêt" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Luogo di interesse" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Severdighet" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Ponto de interesse" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Görülecek yer"
-          }
-        }
-      }
-    },
-    "design.photo.contributions" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Fotos & Beiträge" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Photos & contributions"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Fotos y contribuciones" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Photos et contributions" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Foto e contributi" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Bilder og bidrag" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Fotos e contribuições" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fotoğraflar ve katkılar"
-          }
-        }
-      }
-    },
-    "design.photo.fullScreen" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Foto im Vollbild öffnen" } }, "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open photo full screen"
-          }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Abrir foto en pantalla completa" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ouvrir la photo en plein écran" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Apri la foto a schermo intero" } }, "nb" : { "stringUnit" : { "state" : "translated", "value" : "Åpne bildet i fullskjerm" } }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Abrir foto em tela cheia" } }, "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fotoğrafı tam ekran aç"
-          }
-        }
-      }
-    },
     " %@" : {
       "comment" : "A secondary line of text below the place name, showing the category of the place.",
       "isCommentAutoGenerated" : true
@@ -640,10 +69,6 @@
     },
     "(%@)" : {
       "comment" : "A small, secondary label",
-      "isCommentAutoGenerated" : true
-    },
-    "#%@" : {
-      "comment" : "A label displaying a user's leaderboard rank. The argument is the user's rank.",
       "isCommentAutoGenerated" : true
     },
     "%.1f (%@)" : {
@@ -8297,7 +7722,6 @@
       }
     },
     "categoryFilters.all" : {
-      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -9405,7 +8829,6 @@
       }
     },
     "cityPicker.searchPlaceholder" : {
-      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -10671,7 +10094,6 @@
       }
     },
     "common.cancel" : {
-      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -10777,7 +10199,6 @@
       }
     },
     "common.clear" : {
-      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -12830,6 +12251,2179 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bu hedef için kurlar henüz mevcut değil."
+          }
+        }
+      }
+    },
+    "design.ai.fullResponse" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vollständige Antwort"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Full response"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Respuesta completa"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réponse complète"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Risposta completa"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fullstendig svar"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resposta completa"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yanıtın tamamı"
+          }
+        }
+      }
+    },
+    "design.ai.introduction" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ich kann dir einen Tag voller Kaffee, Spaziergänge und schöner Entdeckungen in %@ planen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I can plan a day of coffee, walks and lovely discoveries in %@."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Puedo planear un día de café, paseos y bonitos descubrimientos en %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je peux te préparer une journée café, balades et jolies découvertes à %@."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Posso organizzare una giornata di caffè, passeggiate e belle scoperte a %@."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jeg kan planlegge en dag med kaffe, spaserturer og fine oppdagelser i %@."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Posso planejar um dia de café, caminhadas e boas descobertas em %@."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@’da kahve, yürüyüş ve güzel keşiflerle dolu bir plan hazırlayabilirim."
+          }
+        }
+      }
+    },
+    "design.ai.placeholder" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Frag Piri etwas …"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ask Piri something…"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pregúntale algo a Piri…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demande quelque chose à Piri…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chiedi qualcosa a Piri…"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spør Piri om noe …"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pergunte algo à Piri…"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Piri’ye bir şey sor…"
+          }
+        }
+      }
+    },
+    "design.ai.showLess" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weniger anzeigen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show less"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar menos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher moins"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostra meno"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vis mindre"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar menos"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Daha az göster"
+          }
+        }
+      }
+    },
+    "design.ai.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein Tag, nur für dich."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A day, just for you."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un día, solo para ti."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une journée, rien que pour toi."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Una giornata, solo per te."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En dag, bare for deg."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Um dia, só para você."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sana göre bir gün."
+          }
+        }
+      }
+    },
+    "design.common.all" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tous"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tutti"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alle"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todos"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tümü"
+          }
+        }
+      }
+    },
+    "design.common.back" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zurück"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atrás"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retour"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indietro"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tilbake"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voltar"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geri"
+          }
+        }
+      }
+    },
+    "design.common.close" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schließen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cerrar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chiudi"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lukk"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fechar"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kapat"
+          }
+        }
+      }
+    },
+    "design.common.place" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ort"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Place"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lugar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lieu"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Luogo"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sted"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lugar"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mekân"
+          }
+        }
+      }
+    },
+    "design.detail.fullStory" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die ganze Geschichte lesen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read the full story"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leer la historia completa"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lire l'histoire complète"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leggi la storia completa"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les hele historien"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ler a história completa"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anlatımın devamı"
+          }
+        }
+      }
+    },
+    "design.detail.location" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Standort und Details"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location and details"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ubicación y detalles"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Emplacement et détails"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Posizione e dettagli"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beliggenhet og detaljer"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Localização e detalhes"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Konum ve bilgiler"
+          }
+        }
+      }
+    },
+    "design.detail.narration" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Piris Erzählung"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Piri’s narration"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El relato de Piri"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le récit de Piri"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il racconto di Piri"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Piris fortelling"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A narração da Piri"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Piri’nin anlatımı"
+          }
+        }
+      }
+    },
+    "design.detail.placeOfInterest" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sehenswürdigkeit"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Place of interest"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lugar de interés"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lieu d'intérêt"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Luogo di interesse"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Severdighet"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ponto de interesse"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Görülecek yer"
+          }
+        }
+      }
+    },
+    "design.home.askPiri" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Piri fragen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ask Piri"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pregúntale a Piri"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demander à Piri"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chiedi a Piri"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spør Piri"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pergunte à Piri"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Piri’ye sor"
+          }
+        }
+      }
+    },
+    "design.home.planCount.one" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Plan"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld plan"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld plan"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld projet"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld piano"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld plan"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld plano"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld plan"
+          }
+        }
+      }
+    },
+    "design.home.planCount.other" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Pläne"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld plans"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld planes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld projets"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld piani"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld planer"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld planos"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld plan"
+          }
+        }
+      }
+    },
+    "design.home.plans" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Meine Pläne"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My plans"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mis planes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mes projets"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I miei piani"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Planene mine"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Meus planos"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Planlarım"
+          }
+        }
+      }
+    },
+    "design.home.planSubtitle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Macht gemeinsam einen ganzen Tag daraus."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Make a day of it, together."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conviértanlo en un día entero, juntos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faites-en une journée entière, ensemble."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trasformatelo in una giornata intera, insieme."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gjør det til en hel dag, sammen."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transformem isso em um dia inteiro, juntos."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hayalindeki günü birlikte kuralım."
+          }
+        }
+      }
+    },
+    "design.home.planTogether" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lass uns gemeinsam planen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Let’s plan together"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Planeemos juntos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Planifions ensemble"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pianifichiamo insieme"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La oss planlegge sammen"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vamos planejar juntos"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Birlikte planlayalım"
+          }
+        }
+      }
+    },
+    "design.home.saved" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gespeicherte Orte"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved places"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lugares guardados"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lieux enregistrés"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Luoghi salvati"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lagrede steder"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lugares salvos"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kaydedilenler"
+          }
+        }
+      }
+    },
+    "design.home.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Was erkunden wir heute?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Where shall we explore today?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Qué exploramos hoy?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qu'explorons-nous aujourd'hui ?"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cosa esploriamo oggi?"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hva skal vi utforske i dag?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O que vamos explorar hoje?"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bugün nereyi keşfedelim?"
+          }
+        }
+      }
+    },
+    "design.map.appearance" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kartendarstellung"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Map appearance"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apariencia del mapa"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apparence de la carte"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aspetto della mappa"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kartutseende"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aparência do mapa"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Harita görünümü"
+          }
+        }
+      }
+    },
+    "design.map.clearSearch" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suche löschen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear search"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Borrar búsqueda"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Effacer la recherche"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancella ricerca"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fjern søk"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limpar pesquisa"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aramayı temizle"
+          }
+        }
+      }
+    },
+    "design.map.collapse" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einklappen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Collapse"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contraer"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réduire"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Comprimi"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slå sammen"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recolher"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Küçült"
+          }
+        }
+      }
+    },
+    "design.map.createRoute" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Route erstellen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create route"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crear ruta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Créer un itinéraire"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crea percorso"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opprett rute"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Criar rota"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rota oluştur"
+          }
+        }
+      }
+    },
+    "design.map.details" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Details ansehen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View details"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ver detalles"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voir les détails"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Visualizza dettagli"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se detaljer"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ver detalhes"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detayları gör"
+          }
+        }
+      }
+    },
+    "design.map.plan" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Route planen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plan a route"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Planear una ruta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Planifier un itinéraire"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pianifica un percorso"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Planlegg en rute"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Planejar uma rota"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rota planla"
+          }
+        }
+      }
+    },
+    "design.map.recenter" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf meinen Standort zentrieren"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recenter on my location"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volver a mi ubicación"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recentrer sur ma position"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ricentra sulla mia posizione"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sentrer på posisjonen min"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Centralizar na minha localização"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Konumuma dön"
+          }
+        }
+      }
+    },
+    "design.map.search" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In diesem Gebiet suchen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search this area"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Buscar en esta zona"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechercher dans cette zone"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cerca in quest'area"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Søk i dette området"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pesquisar nesta área"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu bölgede ara"
+          }
+        }
+      }
+    },
+    "design.photo.attach" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Foto anhängen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attach photo"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adjuntar foto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Joindre une photo"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allega foto"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Legg ved bilde"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anexar foto"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fotoğraf ekle"
+          }
+        }
+      }
+    },
+    "design.photo.contributions" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fotos & Beiträge"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos & contributions"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fotos y contribuciones"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos et contributions"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Foto e contributi"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bilder og bidrag"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fotos e contribuições"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fotoğraflar ve katkılar"
+          }
+        }
+      }
+    },
+    "design.photo.fullScreen" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Foto im Vollbild öffnen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open photo full screen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir foto en pantalla completa"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir la photo en plein écran"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apri la foto a schermo intero"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Åpne bildet i fullskjerm"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir foto em tela cheia"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fotoğrafı tam ekran aç"
+          }
+        }
+      }
+    },
+    "design.photo.remove" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Foto entfernen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove photo"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quitar foto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer la photo"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rimuovi foto"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fjern bilde"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remover foto"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fotoğrafı kaldır"
+          }
+        }
+      }
+    },
+    "design.photo.source" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fotoquelle"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo source"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fuente de la foto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source de la photo"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fonte della foto"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bildekilde"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fonte da foto"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fotoğraf kaynağı"
+          }
+        }
+      }
+    },
+    "design.profile.currencies" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Währungen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Currencies"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monedas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Devises"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valute"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valutaer"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Moedas"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Para birimleri"
+          }
+        }
+      }
+    },
+    "design.profile.edit" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Profil bearbeiten"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit profile"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editar perfil"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modifier le profil"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modifica profilo"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rediger profil"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Editar perfil"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Profili düzenle"
+          }
+        }
+      }
+    },
+    "design.profile.exploringCity" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "STADT, DIE DU ERKUNDEST"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CITY YOU ARE EXPLORING"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CIUDAD QUE ESTÁS EXPLORANDO"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VILLE QUE TU EXPLORES"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CITTÀ CHE STAI ESPLORANDO"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BYEN DU UTFORSKER"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CIDADE QUE VOCÊ ESTÁ EXPLORANDO"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "KEŞFETTİĞİN ŞEHİR"
+          }
+        }
+      }
+    },
+    "design.profile.personalizeHint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Füge deine Interessen und deinen Reisestil hinzu, um persönlichere Vorschläge zu erhalten."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add your interests and travel style for more personal suggestions."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añade tus intereses y tu estilo de viaje para recibir sugerencias más personales."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoute tes centres d'intérêt et ton style de voyage pour des suggestions plus personnelles."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi i tuoi interessi e il tuo stile di viaggio per suggerimenti più personali."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Legg til interessene og reisestilen din for mer personlige forslag."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicione seus interesses e estilo de viagem para sugestões mais pessoais."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sana uygun öneriler için ilgi alanlarını ve seyahat tarzını ekle."
+          }
+        }
+      }
+    },
+    "design.profile.signInHint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Melde dich an und behalte deine Entdeckungen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sign in and keep your discoveries"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inicia sesión y conserva tus descubrimientos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connecte-toi pour garder tes découvertes"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accedi per conservare le tue scoperte"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Logg inn og behold oppdagelsene dine"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entre e guarde suas descobertas"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Giriş yap ve keşiflerini sakla"
+          }
+        }
+      }
+    },
+    "design.profile.travelStyle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Reisestil"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your travel style"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu estilo de viaje"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ton style de voyage"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il tuo stile di viaggio"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reisestilen din"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seu estilo de viagem"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seyahat tarzın"
+          }
+        }
+      }
+    },
+    "design.tabs.explore" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entdecken"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Explore"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Explorar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Explorer"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esplora"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utforsk"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Explorar"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keşfet"
           }
         }
       }
@@ -15743,6 +17337,7 @@
       }
     },
     "home.aiBanner.sub" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -15795,6 +17390,7 @@
       }
     },
     "home.aiBanner.title" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -19756,112 +21352,6 @@
         }
       }
     },
-    "map.route.transitStopsCount.one" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$lld Haltestelle"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$lld stop"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$lld parada"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$lld arrêt"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$lld fermata"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$lld holdeplass"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$lld parada"
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$lld durak"
-          }
-        }
-      }
-    },
-    "map.route.transitStopsCount.other" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$lld Haltestellen"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$lld stops"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$lld paradas"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$lld arrêts"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$lld fermate"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$lld holdeplasser"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$lld paradas"
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$lld durak"
-          }
-        }
-      }
-    },
     "map.route.tracking.one" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -20070,6 +21560,112 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bu duraklar arasında toplu taşıma rotası bulunamadı."
+          }
+        }
+      }
+    },
+    "map.route.transitStopsCount.one" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld Haltestelle"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld stop"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld parada"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld arrêt"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld fermata"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld holdeplass"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld parada"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld durak"
+          }
+        }
+      }
+    },
+    "map.route.transitStopsCount.other" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld Haltestellen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld stops"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld paradas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld arrêts"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld fermate"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld holdeplasser"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld paradas"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld durak"
           }
         }
       }
@@ -22603,218 +24199,6 @@
         }
       }
     },
-    "profileOptions.occasions.anniversary" : {
-      "comment" : "Chip label: this trip is for a wedding/relationship anniversary.",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Jahrestag"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Anniversary"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aniversario"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Anniversaire de couple"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Anniversario"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Jubileum"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aniversário"
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Yıldönümü"
-          }
-        }
-      }
-    },
-    "profileOptions.occasions.business" : {
-      "comment" : "Chip label: this trip is a business trip.",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Geschäftsreise"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Business trip"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Viaje de negocios"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Voyage d'affaires"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Viaggio di lavoro"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Forretningsreise"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Viagem de negócios"
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "İş seyahati"
-          }
-        }
-      }
-    },
-    "profileOptions.occasions.celebration" : {
-      "comment" : "Chip label: this trip is for a general celebration (birthday, graduation, etc.).",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Feier"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Celebration"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Celebración"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Célébration"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Celebrazione"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Feiring"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Celebração"
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kutlama"
-          }
-        }
-      }
-    },
-    "profileOptions.occasions.honeymoon" : {
-      "comment" : "Chip label: this trip is a honeymoon.",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Flitterwochen"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Honeymoon"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Luna de miel"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lune de miel"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Luna di miele"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bryllupsreise"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lua de mel"
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Balayı"
-          }
-        }
-      }
-    },
     "onboarding.travelStyle.paceLabel" : {
       "localizations" : {
         "de" : {
@@ -24244,6 +25628,10 @@
     "Photo by" : {
 
     },
+    "Piri" : {
+      "comment" : "The name of the company.",
+      "isCommentAutoGenerated" : true
+    },
     "PIRI" : {
       "comment" : "The name of the app.",
       "isCommentAutoGenerated" : true
@@ -24460,7 +25848,6 @@
       }
     },
     "placeDetail.actionBar.save" : {
-      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -28743,59 +30130,6 @@
         }
       }
     },
-    "planBuilder.paceRecommendation" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Empfohlen: %1$lld–%2$lld Stopps"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recommended: %1$lld–%2$lld stops"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recomendado: %1$lld–%2$lld paradas"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recommandé : %1$lld–%2$lld arrêts"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Consigliato: %1$lld–%2$lld tappe"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Anbefalt: %1$lld–%2$lld stopp"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Recomendado: %1$lld–%2$lld paradas"
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Önerilen: %1$lld–%2$lld durak"
-          }
-        }
-      }
-    },
     "planBuilder.paceLabel" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -28845,6 +30179,59 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "NASIL BİR TEMPO"
+          }
+        }
+      }
+    },
+    "planBuilder.paceRecommendation" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Empfohlen: %1$lld–%2$lld Stopps"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recommended: %1$lld–%2$lld stops"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recomendado: %1$lld–%2$lld paradas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recommandé : %1$lld–%2$lld arrêts"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Consigliato: %1$lld–%2$lld tappe"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anbefalt: %1$lld–%2$lld stopp"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recomendado: %1$lld–%2$lld paradas"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Önerilen: %1$lld–%2$lld durak"
           }
         }
       }
@@ -29644,60 +31031,6 @@
         }
       }
     },
-    "poiExplain.localAcademicHint" : {
-      "comment" : "Shown under the 'Ask about this place' button when a real university exists nearby (Wikidata-sourced) -- an invitation to ask, not a guarantee a specific paper about this place exists.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ich kann in den Archiven örtlicher Universitäten nachsehen."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "I can check local university archives for more."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Puedo consultar los archivos de universidades locales."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Je peux consulter les archives d'universités locales."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Posso controllare gli archivi delle università locali."
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Jeg kan sjekke arkivene til lokale universiteter."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Posso verificar arquivos de universidades locais."
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Yerel üniversite kaynaklarını inceleyebilirim."
-          }
-        }
-      }
-    },
     "poiExplain.fullDetails" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -29853,6 +31186,60 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bilmekte fayda var"
+          }
+        }
+      }
+    },
+    "poiExplain.localAcademicHint" : {
+      "comment" : "Shown under the 'Ask about this place' button when a real university exists nearby (Wikidata-sourced) -- an invitation to ask, not a guarantee a specific paper about this place exists.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ich kann in den Archiven örtlicher Universitäten nachsehen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I can check local university archives for more."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Puedo consultar los archivos de universidades locales."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Je peux consulter les archives d'universités locales."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Posso controllare gli archivi delle università locali."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jeg kan sjekke arkivene til lokale universiteter."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Posso verificar arquivos de universidades locais."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yerel üniversite kaynaklarını inceleyebilirim."
           }
         }
       }
@@ -32033,17 +33420,49 @@
     "profile.avatar.choosePhoto" : {
       "extractionState" : "manual",
       "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Foto auswählen" } }, "en" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Foto auswählen"
+          }
+        },
+        "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Choose Photo"
           }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Elegir foto" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Choisir une photo" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Scegli foto" } }, "nb" : {
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elegir foto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisir une photo"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scegli foto"
+          }
+        },
+        "nb" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Velg bilde"
           }
-        }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Escolher foto" } }, "tr" : {
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolher foto"
+          }
+        },
+        "tr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fotoğraf Seç"
@@ -32054,17 +33473,49 @@
     "profile.avatar.remove" : {
       "extractionState" : "manual",
       "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Foto entfernen" } }, "en" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Foto entfernen"
+          }
+        },
+        "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Remove Photo"
           }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Quitar foto" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Supprimer la photo" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Rimuovi foto" } }, "nb" : {
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quitar foto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer la photo"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rimuovi foto"
+          }
+        },
+        "nb" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fjern bilde"
           }
-        }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Remover foto" } }, "tr" : {
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remover foto"
+          }
+        },
+        "tr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fotoğrafı Kaldır"
@@ -32075,17 +33526,49 @@
     "profile.avatar.title" : {
       "extractionState" : "manual",
       "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Profilfoto" } }, "en" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Profilfoto"
+          }
+        },
+        "en" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Profile Photo"
           }
-        }, "es" : { "stringUnit" : { "state" : "translated", "value" : "Foto de perfil" } }, "fr" : { "stringUnit" : { "state" : "translated", "value" : "Photo de profil" } }, "it" : { "stringUnit" : { "state" : "translated", "value" : "Foto profilo" } }, "nb" : {
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Foto de perfil"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo de profil"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Foto profilo"
+          }
+        },
+        "nb" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Profilbilde"
           }
-        }, "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Foto do perfil" } }, "tr" : {
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Foto do perfil"
+          }
+        },
+        "tr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Profil Fotoğrafı"
@@ -33414,6 +34897,222 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Spor"
+          }
+        }
+      }
+    },
+    "profileOptions.occasions.anniversary" : {
+      "comment" : "Chip label: this trip is for a wedding/relationship anniversary.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jahrestag"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anniversary"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aniversario"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anniversaire de couple"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anniversario"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jubileum"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aniversário"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yıldönümü"
+          }
+        }
+      }
+    },
+    "profileOptions.occasions.business" : {
+      "comment" : "Chip label: this trip is a business trip.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geschäftsreise"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Business trip"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Viaje de negocios"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voyage d'affaires"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Viaggio di lavoro"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Forretningsreise"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Viagem de negócios"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "İş seyahati"
+          }
+        }
+      }
+    },
+    "profileOptions.occasions.celebration" : {
+      "comment" : "Chip label: this trip is for a general celebration (birthday, graduation, etc.).",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Feier"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Celebration"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Celebración"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Célébration"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Celebrazione"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Feiring"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Celebração"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kutlama"
+          }
+        }
+      }
+    },
+    "profileOptions.occasions.honeymoon" : {
+      "comment" : "Chip label: this trip is a honeymoon.",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flitterwochen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Honeymoon"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Luna de miel"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lune de miel"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Luna di miele"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bryllupsreise"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lua de mel"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Balayı"
           }
         }
       }
@@ -37007,7 +38706,6 @@
       }
     },
     "settings.account" : {
-      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -37055,6 +38753,218 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Hesap"
+          }
+        }
+      }
+    },
+    "settings.account.deleteAccount" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Konto löschen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete Account"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminar cuenta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer le compte"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elimina account"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slett konto"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir conta"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hesabı Sil"
+          }
+        }
+      }
+    },
+    "settings.account.deleteConfirmMessage" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dies löscht dein Konto und alles, was damit verknüpft ist – gespeicherte Orte, Reisen, Bewertungen und Fotos – dauerhaft. Dies kann nicht rückgängig gemacht werden."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This permanently deletes your account and everything tied to it — saved places, trips, reviews, and photos. This can't be undone."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esto elimina permanentemente tu cuenta y todo lo relacionado con ella: lugares guardados, viajes, reseñas y fotos. Esta acción no se puede deshacer."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette action supprime définitivement votre compte et tout ce qui y est lié : lieux enregistrés, voyages, avis et photos. Cette action est irréversible."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questa azione elimina definitivamente il tuo account e tutto ciò che è collegato ad esso: luoghi salvati, viaggi, recensioni e foto. Non può essere annullata."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dette sletter kontoen din og alt knyttet til den permanent – lagrede steder, turer, anmeldelser og bilder. Dette kan ikke angres."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Isso exclui permanentemente sua conta e tudo relacionado a ela — lugares salvos, viagens, avaliações e fotos. Essa ação não pode ser desfeita."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu işlem hesabını ve ona bağlı her şeyi — kaydedilen yerler, geziler, yorumlar ve fotoğraflar — kalıcı olarak siler. Bu işlem geri alınamaz."
+          }
+        }
+      }
+    },
+    "settings.account.deleteConfirmTitle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Konto löschen?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete your account?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Eliminar tu cuenta?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer votre compte ?"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminare il tuo account?"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slette kontoen din?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excluir sua conta?"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hesabını silmek istiyor musun?"
+          }
+        }
+      }
+    },
+    "settings.account.deleteFailed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dein Konto konnte nicht gelöscht werden. Bitte versuche es erneut."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't delete your account. Please try again."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo eliminar tu cuenta. Inténtalo de nuevo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de supprimer votre compte. Veuillez réessayer."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile eliminare il tuo account. Riprova."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kunne ikke slette kontoen din. Prøv igjen."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível excluir sua conta. Tente novamente."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hesabın silinemedi. Lütfen tekrar dene."
           }
         }
       }
@@ -37216,58 +39126,6 @@
             "value" : "Çıkış Yap"
           }
         }
-      }
-    },
-    "settings.account.deleteAccount" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Konto löschen" } },
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Delete Account" } },
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "Eliminar cuenta" } },
-        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Supprimer le compte" } },
-        "it" : { "stringUnit" : { "state" : "translated", "value" : "Elimina account" } },
-        "nb" : { "stringUnit" : { "state" : "translated", "value" : "Slett konto" } },
-        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Excluir conta" } },
-        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Hesabı Sil" } }
-      }
-    },
-    "settings.account.deleteConfirmTitle" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Konto löschen?" } },
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Delete your account?" } },
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "¿Eliminar tu cuenta?" } },
-        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Supprimer votre compte ?" } },
-        "it" : { "stringUnit" : { "state" : "translated", "value" : "Eliminare il tuo account?" } },
-        "nb" : { "stringUnit" : { "state" : "translated", "value" : "Slette kontoen din?" } },
-        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Excluir sua conta?" } },
-        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Hesabını silmek istiyor musun?" } }
-      }
-    },
-    "settings.account.deleteConfirmMessage" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Dies löscht dein Konto und alles, was damit verknüpft ist – gespeicherte Orte, Reisen, Bewertungen und Fotos – dauerhaft. Dies kann nicht rückgängig gemacht werden." } },
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "This permanently deletes your account and everything tied to it — saved places, trips, reviews, and photos. This can't be undone." } },
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "Esto elimina permanentemente tu cuenta y todo lo relacionado con ella: lugares guardados, viajes, reseñas y fotos. Esta acción no se puede deshacer." } },
-        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Cette action supprime définitivement votre compte et tout ce qui y est lié : lieux enregistrés, voyages, avis et photos. Cette action est irréversible." } },
-        "it" : { "stringUnit" : { "state" : "translated", "value" : "Questa azione elimina definitivamente il tuo account e tutto ciò che è collegato ad esso: luoghi salvati, viaggi, recensioni e foto. Non può essere annullata." } },
-        "nb" : { "stringUnit" : { "state" : "translated", "value" : "Dette sletter kontoen din og alt knyttet til den permanent – lagrede steder, turer, anmeldelser og bilder. Dette kan ikke angres." } },
-        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Isso exclui permanentemente sua conta e tudo relacionado a ela — lugares salvos, viagens, avaliações e fotos. Essa ação não pode ser desfeita." } },
-        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bu işlem hesabını ve ona bağlı her şeyi — kaydedilen yerler, geziler, yorumlar ve fotoğraflar — kalıcı olarak siler. Bu işlem geri alınamaz." } }
-      }
-    },
-    "settings.account.deleteFailed" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Dein Konto konnte nicht gelöscht werden. Bitte versuche es erneut." } },
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Couldn't delete your account. Please try again." } },
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "No se pudo eliminar tu cuenta. Inténtalo de nuevo." } },
-        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Impossible de supprimer votre compte. Veuillez réessayer." } },
-        "it" : { "stringUnit" : { "state" : "translated", "value" : "Impossibile eliminare il tuo account. Riprova." } },
-        "nb" : { "stringUnit" : { "state" : "translated", "value" : "Kunne ikke slette kontoen din. Prøv igjen." } },
-        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Não foi possível excluir sua conta. Tente novamente." } },
-        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Hesabın silinemedi. Lütfen tekrar dene." } }
       }
     },
     "settings.adminDevOnly" : {
@@ -39121,6 +40979,113 @@
         }
       }
     },
+    "settings.occasion.subtitle" : {
+      "comment" : "Explains that the occasion field is temporary and should be cleared once the trip is over.",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nur für diese Reise — vergiss nicht, es danach wieder zu entfernen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Just for this trip — remember to clear it once it's over."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo para este viaje — recuerda quitarlo cuando termine."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seulement pour ce voyage — pense à le retirer une fois terminé."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo per questo viaggio — ricordati di rimuoverlo una volta finito."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bare for denne turen — husk å fjerne det når den er over."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Só para esta viagem — lembre-se de remover quando terminar."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sadece bu gezi için — bittiğinde kaldırmayı unutma."
+          }
+        }
+      }
+    },
+    "settings.occasion.title" : {
+      "comment" : "Card title above the occasion chip picker (honeymoon/anniversary/celebration/business).",
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Besonderer Anlass?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Special occasion?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Ocasión especial?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Occasion spéciale ?"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Occasione speciale?"
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spesiell anledning?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ocasião especial?"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Özel bir durum mu?"
+          }
+        }
+      }
+    },
     "settings.premium" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -39227,59 +41192,6 @@
         }
       }
     },
-    "settings.premium.free" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Du nutzt den kostenlosen Plan."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "You're on the free plan."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Estás en el plan gratuito."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tu es sur le forfait gratuit."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sei sul piano gratuito."
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Du er på gratisplanen."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Você está no plano gratuito."
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ücretsiz plandasınız."
-          }
-        }
-      }
-    },
     "settings.premium.changePlan" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -39329,6 +41241,59 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Planı değiştir"
+          }
+        }
+      }
+    },
+    "settings.premium.free" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du nutzt den kostenlosen Plan."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You're on the free plan."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estás en el plan gratuito."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tu es sur le forfait gratuit."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sei sul piano gratuito."
+          }
+        },
+        "nb" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du er på gratisplanen."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Você está no plano gratuito."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ücretsiz plandasınız."
           }
         }
       }
@@ -39594,112 +41559,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Düzenle"
-          }
-        }
-      }
-    },
-    "settings.occasion.subtitle" : {
-      "comment" : "Explains that the occasion field is temporary and should be cleared once the trip is over.",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nur für diese Reise — vergiss nicht, es danach wieder zu entfernen."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Just for this trip — remember to clear it once it's over."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Solo para este viaje — recuerda quitarlo cuando termine."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seulement pour ce voyage — pense à le retirer une fois terminé."
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Solo per questo viaggio — ricordati di rimuoverlo una volta finito."
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bare for denne turen — husk å fjerne det når den er over."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Só para esta viagem — lembre-se de remover quando terminar."
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sadece bu gezi için — bittiğinde kaldırmayı unutma."
-          }
-        }
-      }
-    },
-    "settings.occasion.title" : {
-      "comment" : "Card title above the occasion chip picker (honeymoon/anniversary/celebration/business).",
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Besonderer Anlass?"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Special occasion?"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "¿Ocasión especial?"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Occasion spéciale ?"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Occasione speciale?"
-          }
-        },
-        "nb" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Spesiell anledning?"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ocasião especial?"
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Özel bir durum mu?"
           }
         }
       }
