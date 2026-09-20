@@ -203,22 +203,27 @@ struct PaywallScreen: View {
                         if success { dismiss() }
                     }
                 } label: {
-                    if isPurchasing {
-                        ProgressView().tint(Theme.gold)
-                    } else {
-                        Text(L("paywall.tripPass.description", tripPassProduct.displayPrice))
+                    Group {
+                        if isPurchasing {
+                            ProgressView().tint(Theme.gold)
+                        } else {
+                            Text(L("paywall.tripPass.description", tripPassProduct.displayPrice))
+                        }
                     }
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Theme.gold)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(RoundedRectangle(cornerRadius: 14).stroke(Theme.gold, lineWidth: 1.5))
                 }
                 .buttonStyle(.plain)
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(Theme.gold)
                 .disabled(purchasingProductID != nil)
 
                 Text(String(localized: "paywall.tripPass.oneTime"))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
-            .multilineTextAlignment(.center)
         }
     }
 
