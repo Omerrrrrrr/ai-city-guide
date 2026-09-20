@@ -2,8 +2,13 @@ import SwiftUI
 
 struct MainTabView: View {
     @State private var tabSelection = TabSelection()
+    /// One recorder for the whole app -- Home and Map both start/end trips
+    /// through it, and the recap video below is presented from here so it
+    /// appears no matter which tab ended the trip.
+    @State private var tripRecorder = TripRecorder()
     @Environment(PushNotificationManager.self) private var pushManager
     @Environment(CityStore.self) private var cityStore
+    @Environment(TripsStore.self) private var tripsStore
 
     var body: some View {
         VStack(spacing: 0) {
@@ -31,6 +36,20 @@ struct MainTabView: View {
         .tint(Theme.gold)
         .preferredColorScheme(.dark)
         .environment(tabSelection)
+        .environment(tripRecorder)
+        // A trip still active from before the app was closed: its GPS
+        // recording doesn't survive a relaunch by itself.
+        .task { tripRecorder.resumeIfNeeded(tripsStore: tripsStore) }
+        .sheet(item: Bindable(tripRecorder).pendingRecap) { pending in
+            TripRecapView(
+                trip: pending.trip,
+                xpBefore: pending.xpBefore,
+                xpAfter: pending.xpAfter,
+                levelBefore: pending.levelBefore,
+                levelAfter: pending.levelAfter,
+                myLifetimeTripCount: pending.myLifetimeTripCount
+            )
+        }
         .onChange(of: pushManager.pendingTapPayload) { _, payload in
             guard let payload else { return }
             cityStore.setCity(id: payload.cityId, name: payload.cityName)

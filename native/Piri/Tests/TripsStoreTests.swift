@@ -91,6 +91,47 @@ final class TripsStoreTests: XCTestCase {
         XCTAssertNotNil(store.trips.first { $0.id == id }?.endedAt)
     }
 
+    /// A trip started from Home has no stops and no planned route, so
+    /// distance/duration must be measured from what was actually recorded --
+    /// the recap video's stat tiles read exactly these fields.
+    func testEndingAStoplessTripMeasuresDistanceAndDurationFromBreadcrumb() {
+        let store = makeStore()
+        let id = store.startTrip(stops: [])
+        let start = store.trips[0].startedAt
+        // ~1.11 km apart (0.01 degrees of latitude).
+        store.addBreadcrumb(id, point: TripWaypoint(lat: 58.10, lng: 7.9, timestamp: start))
+        store.addBreadcrumb(id, point: TripWaypoint(lat: 58.11, lng: 7.9, timestamp: start + 60_000))
+        store.endTrip(id)
+
+        let trip = store.trips[0]
+        XCTAssertNotNil(trip.endedAt)
+        XCTAssertEqual(trip.distanceMeters ?? 0, 1112, accuracy: 15)
+        XCTAssertNotNil(trip.durationSeconds)
+        XCTAssertGreaterThanOrEqual(trip.durationSeconds ?? -1, 0)
+    }
+
+    func testEndingAPlannedTripKeepsItsRouteDistanceAndDuration() {
+        let store = makeStore()
+        let id = store.startTrip(stops: [stop("a"), stop("b")], route: RouteInfo(routeGeometry: nil, distanceMeters: 1200, durationSeconds: 900))
+        store.addBreadcrumb(id, point: TripWaypoint(lat: 58.10, lng: 7.9, timestamp: 0))
+        store.addBreadcrumb(id, point: TripWaypoint(lat: 58.20, lng: 7.9, timestamp: 1))
+        store.endTrip(id)
+
+        XCTAssertEqual(store.trips[0].distanceMeters, 1200)
+        XCTAssertEqual(store.trips[0].durationSeconds, 900)
+    }
+
+    func testMeasuredDistanceIgnoresInvalidPointsAndShortPaths() {
+        XCTAssertEqual(TripsStore.measuredDistance(of: []), 0)
+        XCTAssertEqual(TripsStore.measuredDistance(of: [TripWaypoint(lat: 58, lng: 7, timestamp: 0)]), 0)
+        let withGlitch = [
+            TripWaypoint(lat: 58.10, lng: 7.9, timestamp: 0),
+            TripWaypoint(lat: .nan, lng: 7.9, timestamp: 1),
+            TripWaypoint(lat: 58.11, lng: 7.9, timestamp: 2),
+        ]
+        XCTAssertEqual(TripsStore.measuredDistance(of: withGlitch), 1112, accuracy: 15)
+    }
+
     func testDeleteTripClearsActiveTripIdIfItWasActive() {
         let store = makeStore()
         let id = store.startTrip(stops: [stop("posebyen")])

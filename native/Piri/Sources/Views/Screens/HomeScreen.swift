@@ -16,6 +16,10 @@ struct HomeScreen: View {
     @Environment(TabSelection.self) private var tabSelection
     @Environment(AuthStore.self) private var authStore
     @Environment(SavedPlacesStore.self) private var savedPlacesStore
+    @Environment(TripsStore.self) private var tripsStore
+    @Environment(TripRecorder.self) private var tripRecorder
+    @Environment(MyReviewsStore.self) private var myReviewsStore
+    @Environment(\.openURL) private var openURL
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ScaledMetric(relativeTo: .largeTitle) private var headlineSize = 34
     @ScaledMetric(relativeTo: .title) private var featuredTitleSize = 29
@@ -27,6 +31,8 @@ struct HomeScreen: View {
     @State private var locationManager = LocationManager()
     @State private var nearbyUser: [PlaceWithDistance] = []
     @State private var showingCityPicker = false
+    @State private var showingEndTripConfirm = false
+    @State private var showingLocationDenied = false
     @State private var showingWeatherForecast = false
     @State private var showingSaved: SavedTab?
     @State private var selectedCategoryGroup: POICategoryGroup?
@@ -80,6 +86,7 @@ struct HomeScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 6) {
                 header
+                tripCard
                 categoryChipsRow
                 if !Self.useCuratedHomeData, dietaryFilter != nil {
                     dietaryResultsSection
@@ -266,6 +273,141 @@ struct HomeScreen: View {
         let groups = POICategoryGroups.all.filter { $0.categories != nil }
         return priority.compactMap { key in groups.first { $0.labelKey == key } }
             + groups.filter { !priority.contains($0.labelKey) }
+    }
+
+    // MARK: - Trip ("Geziye Başla" / "Geziyi Sonlandır")
+
+    private func startTrip() {
+        let status = tripRecorder.locationManager.authorizationStatus
+        if status == .denied || status == .restricted {
+            showingLocationDenied = true
+            return
+        }
+        Haptics.medium()
+        tripRecorder.startFreeTrip(tripsStore: tripsStore)
+    }
+
+    private func endTrip() {
+        Haptics.medium()
+        tripRecorder.finishActiveTrip(
+            tripsStore: tripsStore,
+            userProfileStore: userProfileStore,
+            savedPlacesStore: savedPlacesStore,
+            recentlyViewedStore: recentlyViewedStore,
+            myReviewsStore: myReviewsStore
+        )
+    }
+
+    @ViewBuilder
+    private var tripCard: some View {
+        Group {
+            if let trip = tripsStore.activeTrip {
+                activeTripCard(trip)
+            } else {
+                startTripCard
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 4)
+        .alert(String(localized: "home.trip.end.confirm.title"), isPresented: $showingEndTripConfirm) {
+            Button(String(localized: "home.trip.end.confirm.action"), role: .destructive) { endTrip() }
+            Button(String(localized: "home.trip.end.confirm.keep"), role: .cancel) {}
+        } message: {
+            Text("home.trip.end.confirm.message")
+        }
+        .alert(String(localized: "home.trip.locationDenied.title"), isPresented: $showingLocationDenied) {
+            Button(String(localized: "home.trip.locationDenied.settings")) {
+                if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+            }
+            Button(String(localized: "common.cancel"), role: .cancel) {}
+        } message: {
+            Text("home.trip.locationDenied.message")
+        }
+    }
+
+    private var startTripCard: some View {
+        Button(action: startTrip) {
+            HStack(spacing: 14) {
+                Image(systemName: "figure.walk")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(Theme.navy)
+                    .frame(width: 44, height: 44)
+                    .background(Theme.gold, in: Circle())
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("home.trip.start.title")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                    Text("home.trip.start.subtitle")
+                        .font(.caption)
+                        .foregroundStyle(Theme.secondaryText)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Theme.gold)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.cardFill, in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.gold.opacity(0.55), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("piri.home.startTrip")
+    }
+
+    private func activeTripCard(_ trip: Trip) -> some View {
+        let meters = TripsStore.measuredDistance(of: trip.breadcrumb)
+        let distanceText = meters >= 1000
+            ? String(format: "%.1f km", meters / 1000)
+            : String(format: "%.0f m", meters)
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                Circle().fill(Theme.closedRed).frame(width: 9, height: 9)
+                Text("home.trip.active.title")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                Spacer(minLength: 0)
+                Text(Date(timeIntervalSince1970: trip.startedAt / 1000), style: .timer)
+                    .font(.system(size: 22, weight: .heavy).monospacedDigit())
+                    .foregroundStyle(Theme.gold)
+                    .multilineTextAlignment(.trailing)
+            }
+            Text(distanceText)
+                .font(.caption)
+                .foregroundStyle(Theme.secondaryText)
+            HStack(spacing: 10) {
+                Button {
+                    showingEndTripConfirm = true
+                } label: {
+                    Text("home.trip.end")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Theme.closedRed, in: RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("piri.home.endTrip")
+
+                Button {
+                    Haptics.light()
+                    tabSelection.selection = 2
+                } label: {
+                    Text("home.trip.viewMap")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.border))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.cardFill, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.closedRed.opacity(0.6), lineWidth: 1))
     }
 
     private var categoryChipsRow: some View {

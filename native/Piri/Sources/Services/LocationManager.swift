@@ -25,6 +25,12 @@ final class LocationManager: NSObject, @MainActor CLLocationManagerDelegate {
 
     private let manager = CLLocationManager()
     private(set) var isRecordingBreadcrumb = false
+    /// Called for every breadcrumb point actually recorded. Lets a
+    /// long-lived owner (see `TripRecorder`) persist points itself instead
+    /// of relying on a SwiftUI `onChange` in whichever screen happens to be
+    /// on screen -- Home can now start a trip, so the map tab is no longer
+    /// the only place a trip is recorded from.
+    var onBreadcrumbPoint: ((TripWaypoint) -> Void)?
     /// Matches the RN app's breadcrumb sampling: a new point roughly every
     /// 20s or 25m of movement, whichever comes first (`map.tsx` `watchPositionAsync`).
     private var lastBreadcrumbAt: Date?
@@ -121,6 +127,8 @@ final class LocationManager: NSObject, @MainActor CLLocationManagerDelegate {
 
         lastBreadcrumbAt = now
         lastBreadcrumbLocation = location
-        breadcrumb.append(TripWaypoint(lat: location.coordinate.latitude, lng: location.coordinate.longitude, timestamp: now.timeIntervalSince1970 * 1000))
+        let point = TripWaypoint(lat: location.coordinate.latitude, lng: location.coordinate.longitude, timestamp: now.timeIntervalSince1970 * 1000)
+        breadcrumb.append(point)
+        onBreadcrumbPoint?(point)
     }
 }

@@ -115,9 +115,7 @@ extension MapScreen {
         routeDurationSeconds = activeTrip.durationSeconds
         hydratedTripId = activeTrip.id
         routeProfileDirty = false
-        if !locationManager.isRecordingBreadcrumb {
-            locationManager.startBreadcrumbRecording()
-        }
+        tripRecorder.beginRecording(tripsStore: tripsStore)
     }
 
     /// Resolves a tapped Apple base-map POI feature (same path
@@ -261,7 +259,7 @@ extension MapScreen {
             )
             hydratedTripId = tripId
             routeProfileDirty = false
-            locationManager.startBreadcrumbRecording()
+            tripRecorder.beginRecording(tripsStore: tripsStore)
         } catch {
             routeError = directionsErrorMessage(error)
         }
@@ -313,39 +311,21 @@ extension MapScreen {
     }
 
     func endRoute() {
-        if let activeTripId = tripsStore.activeTripId {
-            // XP is derived fresh from current counts, not logged (see
-            // Gamification.swift) -- the only way to know what THIS trip
-            // was worth is to snapshot immediately before and after the
-            // one thing that's about to change, completedTripCount.
-            let profile = userProfileStore.profile
-            let savedPlaceCount = savedPlacesStore.collections.reduce(0) { $0 + $1.places.count }
-            let completedBefore = tripsStore.trips.filter { $0.endedAt != nil }.count
-            let visitedCount = recentlyViewedStore.viewed.count
-            let reviewCount = myReviewsStore.count
-            let xpBefore = Gamification.xp(profile: profile, savedPlaceCount: savedPlaceCount, completedTripCount: completedBefore, visitedCount: visitedCount, reviewCount: reviewCount)
+        // Ending, XP snapshotting and queueing the recap video all live in
+        // `TripRecorder` now, shared with Home's "Geziyi Sonlandır".
+        tripRecorder.finishActiveTrip(
+            tripsStore: tripsStore,
+            userProfileStore: userProfileStore,
+            savedPlacesStore: savedPlacesStore,
+            recentlyViewedStore: recentlyViewedStore,
+            myReviewsStore: myReviewsStore
+        )
+        resetRouteState()
+    }
 
-            tripsStore.endTrip(activeTripId)
-
-            let completedAfter = tripsStore.trips.filter { $0.endedAt != nil }.count
-            let xpAfter = Gamification.xp(profile: profile, savedPlaceCount: savedPlaceCount, completedTripCount: completedAfter, visitedCount: visitedCount, reviewCount: reviewCount)
-
-            // Snapshot after endTrip() so distanceMeters/durationSeconds and
-            // endedAt are already final -- endTrip() keeps the trip in
-            // tripsStore.trips (just clears activeTripId), it doesn't
-            // delete it, so this lookup is safe.
-            if let endedTrip = tripsStore.trips.first(where: { $0.id == activeTripId }) {
-                pendingTripRecap = PendingTripRecap(
-                    trip: endedTrip,
-                    xpBefore: xpBefore,
-                    xpAfter: xpAfter,
-                    levelBefore: Gamification.level(forXP: xpBefore),
-                    levelAfter: Gamification.level(forXP: xpAfter),
-                    myLifetimeTripCount: completedAfter
-                )
-            }
-        }
-        locationManager.stopBreadcrumbRecording()
+    /// Clears this screen's own planning/route state once no trip is
+    /// active any more, whichever screen ended it.
+    func resetRouteState() {
         hydratedTripId = nil
         plannedStops = []
         routeGeometry = nil

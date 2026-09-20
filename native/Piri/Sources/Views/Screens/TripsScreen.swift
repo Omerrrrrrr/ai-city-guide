@@ -110,7 +110,11 @@ private struct TripRowView: View {
     }
 
     private var metaText: String {
-        var text = LPlural("trips.stopsCount", count: trip.stops.count)
+        // A trip recorded without planned stops has no stop count worth
+        // showing -- lead with what it actually covered.
+        var text = trip.stops.isEmpty && trip.distanceMeters != nil
+            ? trip.formattedDistance
+            : LPlural("trips.stopsCount", count: trip.stops.count)
         if !trip.photos.isEmpty {
             text += " · " + LPlural("trips.photosCount", count: trip.photos.count)
         }

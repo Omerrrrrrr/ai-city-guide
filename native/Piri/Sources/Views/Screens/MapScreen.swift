@@ -40,6 +40,7 @@ struct MapScreen: View {
     @Environment(SavedPlacesStore.self) var savedPlacesStore
     @Environment(UserProfileStore.self) var userProfileStore
     @Environment(TripsStore.self) var tripsStore
+    @Environment(TripRecorder.self) var tripRecorder
     @Environment(TabSelection.self) private var tabSelection
     @Environment(AuthStore.self) private var authStore
     @Environment(RecentlyViewedStore.self) var recentlyViewedStore
@@ -139,13 +140,6 @@ struct MapScreen: View {
     /// should be drawn instead of the trip's stale persisted one until
     /// "Güncelle" is tapped. Mirrors `stopsChangedFromActiveTrip`.
     @State var routeProfileDirty = false
-    /// Set by `endRoute()` right after ending a trip — presenting
-    /// `TripRecapView` as a `.sheet(item:)` this drives. `nil` the rest
-    /// of the time, so the animated recap only ever plays once, right when
-    /// a trip actually finishes, not on every future visit to this screen
-    /// (revisiting an old trip later shows the static `TripSummarySheet`
-    /// instead, from `TripDetailScreen`).
-    @State var pendingTripRecap: PendingTripRecap?
     /// "Rotayı Kaydet" — saves the currently-planned stops (in their
     /// current order) as a new Plan collection, without starting a live
     /// trip. Previously the only way out of route mode was "Rotayı Başlat"
@@ -354,9 +348,14 @@ struct MapScreen: View {
             recenterTrigger = focus.trigger
             tabSelection.pendingMapFocus = nil
         }
-        .onChange(of: locationManager.breadcrumb) { _, points in
-            guard let activeTripId = tripsStore.activeTripId, let last = points.last else { return }
-            tripsStore.addBreadcrumb(activeTripId, point: last)
+        // A trip can now also be ended from Home ("Geziyi Sonlandır"), which
+        // this screen doesn't see happen -- drop the local route/planning
+        // state it was still showing for that trip. `endRoute()` resets the
+        // same state itself first, so this is a no-op for that path.
+        .onChange(of: tripsStore.activeTripId) { _, newValue in
+            if newValue == nil, hydratedTripId != nil {
+                resetRouteState()
+            }
         }
         // Live preview as stops are picked/reordered/removed — previously
         // the route line (and its distance) only appeared after explicitly
@@ -418,16 +417,6 @@ struct MapScreen: View {
         }
         .sheet(item: $trailForReviews) { trail in
             TrailReviewsSheet(trail: trail)
-        }
-        .sheet(item: $pendingTripRecap) { pending in
-            TripRecapView(
-                trip: pending.trip,
-                xpBefore: pending.xpBefore,
-                xpAfter: pending.xpAfter,
-                levelBefore: pending.levelBefore,
-                levelAfter: pending.levelAfter,
-                myLifetimeTripCount: pending.myLifetimeTripCount
-            )
         }
     }
 

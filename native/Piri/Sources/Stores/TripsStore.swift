@@ -80,12 +80,37 @@ final class TripsStore {
 
     func endTrip(_ id: String) {
         if let index = trips.firstIndex(where: { $0.id == id }) {
-            trips[index].endedAt = Date().timeIntervalSince1970 * 1000
+            let now = Date().timeIntervalSince1970 * 1000
+            trips[index].endedAt = now
+            // A trip started without a planned route (Home's "Start a Trip")
+            // has no distance/duration from a directions call, and the
+            // recap video's stat tiles read exactly these two fields --
+            // measure what actually happened instead of showing "—".
+            // Planned trips keep their route's own numbers.
+            if trips[index].distanceMeters == nil {
+                let measured = Self.measuredDistance(of: trips[index].breadcrumb)
+                trips[index].distanceMeters = measured > 0 ? measured : nil
+            }
+            if trips[index].durationSeconds == nil {
+                trips[index].durationSeconds = max(0, (now - trips[index].startedAt) / 1000)
+            }
         }
         if activeTripId == id {
             activeTripId = nil
         }
         persist()
+    }
+
+    /// Sum of straight-line hops between consecutive valid GPS samples.
+    static func measuredDistance(of breadcrumb: [TripWaypoint]) -> Double {
+        let valid = breadcrumb.filter { $0.lat.isFinite && $0.lng.isFinite }
+        guard valid.count > 1 else { return 0 }
+        var total: CLLocationDistance = 0
+        for (previous, next) in zip(valid, valid.dropFirst()) {
+            total += CLLocation(latitude: previous.lat, longitude: previous.lng)
+                .distance(from: CLLocation(latitude: next.lat, longitude: next.lng))
+        }
+        return total
     }
 
     func addBreadcrumb(_ id: String, point: TripWaypoint) {
