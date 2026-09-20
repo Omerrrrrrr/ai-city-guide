@@ -8,10 +8,12 @@ primary_region = "fra"
   force_https = true
   auto_stop_machines = "stop"
   auto_start_machines = true
-  # 0, not 1 -- the app isn't live yet, so there's no reason to pay for an
-  # always-on machine. Costs a few seconds' cold start on the first request
-  # after idle; bump to 1 before real launch traffic to remove that.
-  min_machines_running = 0
+  # 1: the app has been live on the App Store since 2026-09-18, and with 0 the
+  # first request after idle waits a few seconds for the machine to start
+  # (sign-in, photos, AI answers). One always-on shared-cpu-1x/512MB machine
+  # is the cost of avoiding that. Nothing in the API runs on timers, so this
+  # is purely about cold starts.
+  min_machines_running = 1
 
 [[vm]]
   cpu_kind = "shared"
