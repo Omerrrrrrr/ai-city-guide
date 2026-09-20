@@ -31,8 +31,11 @@ struct HomeScreen: View {
     @State private var locationManager = LocationManager()
     @State private var nearbyUser: [PlaceWithDistance] = []
     @State private var showingCityPicker = false
-    @State private var showingEndTripConfirm = false
-    @State private var showingLocationDenied = false
+    /// One alert for the whole screen -- two `.alert`s on the same view is
+    /// unreliable on iOS 18, and an alert attached to the card itself sat in
+    /// the tap path of the "Start a Trip" button.
+    private enum TripAlert { case confirmEnd, locationDenied }
+    @State private var tripAlert: TripAlert?
     @State private var showingWeatherForecast = false
     @State private var showingSaved: SavedTab?
     @State private var selectedCategoryGroup: POICategoryGroup?
@@ -172,6 +175,26 @@ struct HomeScreen: View {
             }
             Task { await loadDietaryResults(filter) }
         }
+        .alert(tripAlertTitle, isPresented: tripAlertPresented) {
+            switch tripAlert {
+            case .confirmEnd:
+                Button(String(localized: "home.trip.end.confirm.action"), role: .destructive) { endTrip() }
+                Button(String(localized: "home.trip.end.confirm.keep"), role: .cancel) {}
+            case .locationDenied:
+                Button(String(localized: "home.trip.locationDenied.settings")) {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                }
+                Button(String(localized: "common.cancel"), role: .cancel) {}
+            case nil:
+                EmptyView()
+            }
+        } message: {
+            switch tripAlert {
+            case .confirmEnd: Text("home.trip.end.confirm.message")
+            case .locationDenied: Text("home.trip.locationDenied.message")
+            case nil: EmptyView()
+            }
+        }
         .sheet(isPresented: $showingCityPicker) { CityPickerScreen() }
         .sheet(item: $selectedPOI) { poi in POIExplainSheet(poi: poi) }
         .sheet(item: $showingHolidayDetail) { holiday in HolidayDetailSheet(holiday: holiday) }
@@ -277,10 +300,22 @@ struct HomeScreen: View {
 
     // MARK: - Trip ("Geziye Başla" / "Geziyi Sonlandır")
 
+    private var tripAlertPresented: Binding<Bool> {
+        Binding(get: { tripAlert != nil }, set: { if !$0 { tripAlert = nil } })
+    }
+
+    private var tripAlertTitle: String {
+        switch tripAlert {
+        case .confirmEnd: String(localized: "home.trip.end.confirm.title")
+        case .locationDenied: String(localized: "home.trip.locationDenied.title")
+        case nil: ""
+        }
+    }
+
     private func startTrip() {
         let status = tripRecorder.locationManager.authorizationStatus
         if status == .denied || status == .restricted {
-            showingLocationDenied = true
+            tripAlert = .locationDenied
             return
         }
         Haptics.medium()
@@ -300,28 +335,14 @@ struct HomeScreen: View {
 
     @ViewBuilder
     private var tripCard: some View {
-        Group {
-            if let trip = tripsStore.activeTrip {
-                activeTripCard(trip)
-            } else {
-                startTripCard
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.bottom, 4)
-        .alert(String(localized: "home.trip.end.confirm.title"), isPresented: $showingEndTripConfirm) {
-            Button(String(localized: "home.trip.end.confirm.action"), role: .destructive) { endTrip() }
-            Button(String(localized: "home.trip.end.confirm.keep"), role: .cancel) {}
-        } message: {
-            Text("home.trip.end.confirm.message")
-        }
-        .alert(String(localized: "home.trip.locationDenied.title"), isPresented: $showingLocationDenied) {
-            Button(String(localized: "home.trip.locationDenied.settings")) {
-                if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
-            }
-            Button(String(localized: "common.cancel"), role: .cancel) {}
-        } message: {
-            Text("home.trip.locationDenied.message")
+        if let trip = tripsStore.activeTrip {
+            activeTripCard(trip)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 4)
+        } else {
+            startTripCard
+                .padding(.horizontal, 20)
+                .padding(.bottom, 4)
         }
     }
 
@@ -351,6 +372,7 @@ struct HomeScreen: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Theme.cardFill, in: RoundedRectangle(cornerRadius: 16))
             .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.gold.opacity(0.55), lineWidth: 1))
+            .contentShape(RoundedRectangle(cornerRadius: 16))
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("piri.home.startTrip")
@@ -378,7 +400,7 @@ struct HomeScreen: View {
                 .foregroundStyle(Theme.secondaryText)
             HStack(spacing: 10) {
                 Button {
-                    showingEndTripConfirm = true
+                    tripAlert = .confirmEnd
                 } label: {
                     Text("home.trip.end")
                         .font(.subheadline.weight(.bold))
@@ -496,6 +518,7 @@ struct HomeScreen: View {
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 20))
                     .overlay(RoundedRectangle(cornerRadius: 20).stroke(Theme.border))
+                    .contentShape(RoundedRectangle(cornerRadius: 20))
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("piri.home.featured")
@@ -697,6 +720,7 @@ struct HomeScreen: View {
                                 }
                                 .frame(minHeight: dynamicTypeSize.isAccessibilitySize ? 240 : 170)
                                 .clipShape(RoundedRectangle(cornerRadius: 18))
+                                .contentShape(RoundedRectangle(cornerRadius: 18))
                                 .shadow(color: .black.opacity(0.35), radius: 12, x: 0, y: 6)
                             }
                             .buttonStyle(.plain)
@@ -755,6 +779,12 @@ struct HomeScreen: View {
     @ViewBuilder
     private func nearbyTileImage(for poi: POIPlace, maxPixelSize: CGFloat = 400) -> some View {
         let urlString = poiPhotos[poi.name]?.photoUrl
+        // Purely decorative: `.clipped()` clips what's drawn but not the hit
+        // area, so a portrait photo that overflows its box used to sit on
+        // top of the views above it and swallow their taps (the Home trip
+        // card's Start/End buttons were unresponsive whenever the featured
+        // place had a real photo). The owning Buttons set their own
+        // `contentShape`.
         GeometryReader { geo in
             if let urlString, !urlString.isEmpty, let url = URL(string: urlString) {
                 CachedAsyncImage(url: url, maxPixelSize: maxPixelSize) { image in
@@ -768,6 +798,7 @@ struct HomeScreen: View {
                 nearbyIconFallback(for: poi)
             }
         }
+        .allowsHitTesting(false)
     }
 
     private func nearbyIconFallback(for poi: POIPlace) -> some View {

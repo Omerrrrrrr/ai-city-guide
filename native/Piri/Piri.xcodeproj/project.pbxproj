@@ -128,6 +128,7 @@
 		B2B584378F5D247B1E51752A /* Holiday.swift in Sources */ = {isa = PBXBuildFile; fileRef = D977BAA37BFC620E4871D165 /* Holiday.swift */; };
 		B32A7E5F97F0950A4DDC57EC /* SavedScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A6344FD16ACEE6A9600CDCC /* SavedScreen.swift */; };
 		B35C8AE24419CF47051D65D4 /* POICategoryGroups.swift in Sources */ = {isa = PBXBuildFile; fileRef = 674770D930511AA70C53CCF8 /* POICategoryGroups.swift */; };
+		B37F0FE3AFC1B70B62A031DA /* StoreScreenshotsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A5C1BDE94AFF29C022BF43A /* StoreScreenshotsUITests.swift */; };
 		B677F221497F73CD6E3F9F51 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B2507E5B02737F2619D4077 /* MainTabView.swift */; };
 		B6C5F6E5EA18F5B5C8BA032D /* ProfileOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6993AA4D03C823EF1D3DCFEE /* ProfileOptions.swift */; };
 		B76B20B3FEABC73E69373793 /* Trip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96FE584464E381510D16935C /* Trip.swift */; };
@@ -256,6 +257,7 @@
 		70F5AFBFBB5E4BADED23CEA9 /* AccountUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountUITests.swift; sourceTree = "<group>"; };
 		717A345206E0678E81ADF461 /* PlaceHours.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceHours.swift; sourceTree = "<group>"; };
 		7978003D4CAD0718174A839F /* UIImage+Resize.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UIImage+Resize.swift"; sourceTree = "<group>"; };
+		7A5C1BDE94AFF29C022BF43A /* StoreScreenshotsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreScreenshotsUITests.swift; sourceTree = "<group>"; };
 		7D94810B3041C6319D82ADC9 /* LanguageStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanguageStore.swift; sourceTree = "<group>"; };
 		7DBAC07C896E4A79299A7872 /* SavedPlacesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedPlacesStore.swift; sourceTree = "<group>"; };
 		7E07D1E03C83B3FD300DC4C5 /* PiriApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PiriApp.swift; sourceTree = "<group>"; };
@@ -654,6 +656,7 @@
 				CB671448AA1226B18D624218 /* AppSmokeUITests.swift */,
 				0DDA307816D14E50993A0021 /* CollectionDetailUITests.swift */,
 				86DB5417C3A05EBAEE7EB68E /* PlanBuilderUITests.swift */,
+				7A5C1BDE94AFF29C022BF43A /* StoreScreenshotsUITests.swift */,
 				C7EA68A54F9B588564D6847A /* TripFlowUITests.swift */,
 			);
 			path = UITests;
@@ -831,6 +834,7 @@
 				41036D1BB9344639267F7DAE /* AppSmokeUITests.swift in Sources */,
 				2245B40AE81DDB3A0DC88340 /* CollectionDetailUITests.swift in Sources */,
 				E640521527F5AC8FD9D572B9 /* PlanBuilderUITests.swift in Sources */,
+				B37F0FE3AFC1B70B62A031DA /* StoreScreenshotsUITests.swift in Sources */,
 				28DFF7BFFD29F40B5C21F11F /* TripFlowUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
