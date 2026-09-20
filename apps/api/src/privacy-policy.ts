@@ -21,7 +21,7 @@ export const PRIVACY_POLICY_HTML = `<!doctype html>
 </head>
 <body>
   <h1>Piri — Privacy Policy</h1>
-  <p class="updated">Last updated: August 19, 2026</p>
+  <p class="updated">Last updated: September 20, 2026</p>
 
   <p class="intro">
     Piri ("the app", "we", "us") is a travel and points-of-interest discovery app.
@@ -36,7 +36,16 @@ export const PRIVACY_POLICY_HTML = `<!doctype html>
       with Apple. An optional display name and username.</li>
     <li><strong>Profile preferences</strong>: things you choose to tell us to
       personalize recommendations — interests, profession, budget level, group type,
-      travel pace, and dietary needs (e.g. halal, kosher, vegetarian). All optional.</li>
+      travel pace, dietary needs (e.g. halal, kosher, vegetarian), and your faith or
+      belief (including "secular" or "prefer not to say"). All optional. Faith and
+      dietary details are sensitive; we use them only to tailor recommendations
+      (for example, surfacing places of worship or suitable food) and they are
+      included in the requests we send to our AI providers when you ask for a
+      personalized answer. We never use them for advertising.</li>
+    <li><strong>Purchases</strong>: when you buy a Piri subscription or Trip Pass,
+      Apple sends us a signed transaction record (product and transaction ID) so we
+      can unlock your benefits. We never receive your payment card or Apple ID
+      payment details.</li>
     <li><strong>Content you submit</strong>: photos and captions you upload for a
       place, reports you file about other users' content, and users you choose to
       block.</li>
@@ -50,7 +59,14 @@ export const PRIVACY_POLICY_HTML = `<!doctype html>
   <ul>
     <li><strong>Location</strong>: used, with your permission, to search nearby places,
       show weather, and calculate directions. Sent with each relevant request; Piri
-      does not build or store a history of your past locations.</li>
+      does not keep a running history of your location outside of trips you
+      choose to record.</li>
+    <li><strong>Trips you record</strong>: when you start a trip, Piri records the
+      route you travel and the places you visit, and saves them to your account so
+      they sync across your devices and power your Trip Recap. If you grant
+      "Always" location access, this recording continues in the background, but
+      only while a trip recording is active. You can delete any trip, or your whole
+      account, at any time.</li>
     <li><strong>Photos you scan or ask about</strong>: when you use the camera-based
       "identify this place" feature or ask a question about a place, the photo or
       question is sent to our AI providers to generate a response. It is not stored
@@ -87,6 +103,11 @@ export const PRIVACY_POLICY_HTML = `<!doctype html>
       currently configured for that feature.</li>
     <li><strong>Tripadvisor, Unsplash, OpenWeather, OpenRouteService</strong> —
       ratings/reviews, photos, weather, and turn-by-turn directions respectively.</li>
+    <li><strong>Open data services</strong> (Wikipedia, Wikimedia Commons, Wikidata,
+      Wikivoyage, OpenStreetMap Nominatim and Overpass, and public-holiday data) —
+      receive a place or city name or approximate coordinates to look up
+      descriptions, photos, nearby places, and local holidays. No account
+      information is sent.</li>
     <li><strong>Sentry</strong> — crash and error diagnostics.</li>
     <li><strong>Apple</strong> — Sign in with Apple and push notification delivery.</li>
   </ul>
@@ -100,7 +121,8 @@ export const PRIVACY_POLICY_HTML = `<!doctype html>
     associated data at any time by contacting us at the address below. Deleting your
     account removes your profile, saved places, trips, and submitted content from our
     systems, except where we are required to retain records (e.g. content already
-    reported for moderation review).</p>
+    reported for moderation review) and the anonymous transaction IDs of one-time
+    purchases, which we keep so a purchase receipt cannot be redeemed twice.</p>
 
   <h2>Children's privacy</h2>
   <p>Piri is not directed at children under 13, and we do not knowingly collect
