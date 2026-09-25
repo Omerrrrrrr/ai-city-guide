@@ -12,6 +12,7 @@
 		01E11F836036C9A92B408707 /* AIResponses.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05C12B028A3AA7D0966851D5 /* AIResponses.swift */; };
 		025D3E8C3D65AEFD244455F4 /* City.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DDB1F8B09EEB0E1E5A7C23D /* City.swift */; };
 		044CF447A382D7944F38A822 /* AddToCollectionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A559EA917EE2CAFE7D251A4B /* AddToCollectionSheet.swift */; };
+		0730792F77AACD4E455E1FD7 /* DirectionsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CD2E8FCC0C519A0777F93D7 /* DirectionsUITests.swift */; };
 		07CFBD5CA4E9F0F8D3F4CF4D /* DirectionsPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96EF6CE3617825D5ADD787AF /* DirectionsPreview.swift */; };
 		07FA334EE5441A5F9A5A51F5 /* AdminReviewsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6774362FE77E72E23C4DF520 /* AdminReviewsScreen.swift */; };
 		0808D02AA7D14514A6EA09CB /* TranslateAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = A22B5F3A18A73BF19316CC62 /* TranslateAPI.swift */; };
@@ -283,6 +284,7 @@
 		976D59311B25086F62FC1B9B /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
 		9A815DA9290E4BCF581F66E2 /* UserDefaultsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDefaultsStore.swift; sourceTree = "<group>"; };
 		9C03701EFE9483DB178D3A66 /* MapScreen+RouteMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MapScreen+RouteMode.swift"; sourceTree = "<group>"; };
+		9CD2E8FCC0C519A0777F93D7 /* DirectionsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectionsUITests.swift; sourceTree = "<group>"; };
 		A17B0F507C6E18A7B9522F96 /* AuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthStore.swift; sourceTree = "<group>"; };
 		A22B5F3A18A73BF19316CC62 /* TranslateAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslateAPI.swift; sourceTree = "<group>"; };
 		A24DA0F5384457944827F2EA /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -657,6 +659,7 @@
 				70F5AFBFBB5E4BADED23CEA9 /* AccountUITests.swift */,
 				CB671448AA1226B18D624218 /* AppSmokeUITests.swift */,
 				0DDA307816D14E50993A0021 /* CollectionDetailUITests.swift */,
+				9CD2E8FCC0C519A0777F93D7 /* DirectionsUITests.swift */,
 				86DB5417C3A05EBAEE7EB68E /* PlanBuilderUITests.swift */,
 				796B39844ABA1010694C8295 /* POIChatUITests.swift */,
 				7A5C1BDE94AFF29C022BF43A /* StoreScreenshotsUITests.swift */,
@@ -836,6 +839,7 @@
 				50B18F789199EECB319D0C41 /* AccountUITests.swift in Sources */,
 				41036D1BB9344639267F7DAE /* AppSmokeUITests.swift in Sources */,
 				2245B40AE81DDB3A0DC88340 /* CollectionDetailUITests.swift in Sources */,
+				0730792F77AACD4E455E1FD7 /* DirectionsUITests.swift in Sources */,
 				366BB4BEBE0D3D03148A29F8 /* POIChatUITests.swift in Sources */,
 				E640521527F5AC8FD9D572B9 /* PlanBuilderUITests.swift in Sources */,
 				B37F0FE3AFC1B70B62A031DA /* StoreScreenshotsUITests.swift in Sources */,

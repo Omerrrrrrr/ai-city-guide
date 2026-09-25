@@ -48,36 +48,60 @@ enum PlaceDirections {
     static func openInMaps(name: String, coordinate: CLLocationCoordinate2D, tabSelection: TabSelection) {
         switch preferredProvider {
         case .piri:
-            // Jump to Map and center there — works identically whether
-            // the caller is already on the Map tab (MapScreen's own card)
-            // or not (POIExplainSheet/PlaceDetailScreen): `selection = 2`
-            // is a no-op if already selected, and MapScreen consumes
-            // `pendingMapFocus` the same way either way.
+            // Jump to Map, center there, AND hand off a single-stop route
+            // request — `pendingRouteStops` is the same hand-off
+            // `CollectionDetailScreen`'s "Haritada Rota Oluştur" already
+            // uses for a multi-stop plan; MapScreen's existing
+            // `startPendingRoute`/`previewRoute` draw the actual route line
+            // from the user's current location to this one destination
+            // (see `previewRoute`'s own comment on why a single stop is
+            // allowed through its guard). A synthetic identifier matches
+            // `POIPlace.asReference`'s own fallback convention -- this
+            // entry point only ever has a name/coordinate, never a real
+            // `MKMapItem` to read `.identifier` from.
+            // `selection = 2` is a no-op if already selected, and
+            // MapScreen consumes both pending values the same way either
+            // way.
+            let identifier = "local:\(name)|\(coordinate.latitude)|\(coordinate.longitude)"
+            tabSelection.pendingRouteStops = [
+                SavedPOIReference(identifier: identifier, name: name, lat: coordinate.latitude, lng: coordinate.longitude)
+            ]
             tabSelection.pendingMapFocus = TabSelection.MapFocusRequest(lat: coordinate.latitude, lng: coordinate.longitude)
             tabSelection.selection = 2
 
         case .apple:
+            // `MKLaunchOptionsDirectionsModeKey` is what actually asks Maps
+            // for a route from the user's current location to this item --
+            // without it, `openInMaps()` just drops a pin and leaves the
+            // user to tap "Directions" themselves inside Apple Maps, which
+            // read as this button doing nothing.
             let mapItem = MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
             mapItem.name = name
-            mapItem.openInMaps()
+            mapItem.openInMaps(launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDefault])
 
         case .google:
-            // Documented Google Maps URL scheme/web-search format --
+            // `daddr` (destination address) is what triggers turn-by-turn
+            // directions from the user's current location -- `q`/`center`
+            // (the previous params here) only drop a search pin, same gap
+            // as the old bare `openInMaps()` call above.
             // https://developers.google.com/maps/documentation/urls/ios-urlscheme
-            // and the api=1 web search URL (https://developers.google.com/maps/documentation/urls/get-started).
+            // and the api=1 web directions URL (https://developers.google.com/maps/documentation/urls/get-started).
             let query = "\(coordinate.latitude),\(coordinate.longitude)"
             openExternal(
-                appURL: URL(string: "comgooglemaps://?q=\(query)&center=\(query)"),
-                webURL: URL(string: "https://www.google.com/maps/search/?api=1&query=\(query)")!
+                appURL: URL(string: "comgooglemaps://?daddr=\(query)"),
+                webURL: URL(string: "https://www.google.com/maps/dir/?api=1&destination=\(query)")!
             )
 
         case .yandex:
-            // Yandex Maps URI scheme takes lon,lat (reverse of lat,lng) --
+            // `rtext=~lat,lon` builds a route ending at this point, with the
+            // empty segment before `~` telling Yandex to start from the
+            // user's current location -- `pt=` (the previous param here)
+            // only drops a point marker, same gap as Google's `q=` above.
             // https://yandex.com/dev/mapkit/doc/en/uri/ext/maps.
-            let point = "\(coordinate.longitude),\(coordinate.latitude)"
+            let point = "\(coordinate.latitude),\(coordinate.longitude)"
             openExternal(
-                appURL: URL(string: "yandexmaps://maps.yandex.ru/?pt=\(point)&z=16&l=map"),
-                webURL: URL(string: "https://yandex.com/maps/?pt=\(point)&z=16&l=map")!
+                appURL: URL(string: "yandexmaps://maps.yandex.ru/?rtext=~\(point)&rtt=auto"),
+                webURL: URL(string: "https://yandex.com/maps/?rtext=~\(point)&rtt=auto")!
             )
         }
     }

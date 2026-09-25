@@ -18,14 +18,18 @@ final class TabSelection {
     /// Rota Oluştur") wants Map to start Route Mode with these stops already
     /// planned and a real route already fetched. Same cross-tab hand-off
     /// pattern as `pendingAIQuery` — `MapScreen` consumes and clears this.
+    /// Also carries a single stop for the "Piri Haritası" maps-provider
+    /// option's own "Yol Tarifi" hand-off (see `PlaceDirections`) —
+    /// `previewRoute`'s guard allows one stop through as long as the user's
+    /// live location is available to route from.
     var pendingRouteStops: [SavedPOIReference]?
-    /// Set alongside `selection = 2` when a screen wants Map to jump to and
+    /// Set alongside `selection = 2` (and, for "Piri Haritası", alongside
+    /// `pendingRouteStops` above) when a screen wants Map to jump to and
     /// center on a single coordinate — the "Piri Haritası" maps-provider
-    /// option's hand-off (see `MapsProvider`/`PlaceDirections`), distinct
-    /// from `pendingRouteStops`' multi-stop route hand-off. `trigger` is a
-    /// fresh `UUID` every time so re-focusing the same coordinate twice in
-    /// a row (e.g. two taps on the same POI from Home) still re-fires —
-    /// same reasoning as `PiriMapView`'s own `recenterTrigger`.
+    /// option's hand-off (see `MapsProvider`/`PlaceDirections`). `trigger`
+    /// is a fresh `UUID` every time so re-focusing the same coordinate
+    /// twice in a row (e.g. two taps on the same POI from Home) still
+    /// re-fires — same reasoning as `PiriMapView`'s own `recenterTrigger`.
     struct MapFocusRequest: Equatable {
         var lat: Double
         var lng: Double

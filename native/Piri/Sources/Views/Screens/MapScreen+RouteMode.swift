@@ -218,8 +218,22 @@ extension MapScreen {
         }
     }
 
+    /// Guards on the actual routable point count (`stopCoordinates()`, which
+    /// prepends the user's live position), not `plannedStops.count` --
+    /// lets a single-stop hand-off (`PlaceDirections`'s "Yol Tarifi", via
+    /// `pendingRouteStops`) preview a real route from the user's current
+    /// location, not just the ≥2-manually-picked-stops case this guard
+    /// originally covered alone. A single planned stop with no location fix
+    /// yet still correctly falls through to nothing rather than routing
+    /// between one point.
     func previewRoute() async {
-        guard plannedStops.count >= 2 else { return }
+        let coordinates = stopCoordinates()
+        guard coordinates.count >= 2 else {
+            if plannedStops.count == 1 {
+                routeError = String(localized: "directions.preview.noLocation")
+            }
+            return
+        }
         isFetchingRoute = true
         routeError = nil
         defer { isFetchingRoute = false }
