@@ -290,6 +290,7 @@ struct POIExplainContent: View {
                                         .frame(minHeight: 44)
                                         .contentShape(Rectangle())
                                     }
+                                    .accessibilityIdentifier("piri.detail.chat.toggle")
                                     // A real nearby university exists (Wikidata-
                                     // sourced) -- an honest invitation, not a
                                     // promise: asking might still come back empty
@@ -373,8 +374,21 @@ struct POIExplainContent: View {
             if showingChat {
                 Divider()
                 chatInputBar
+            } else {
+                // Hidden while chatting, not just visually de-emphasized --
+                // confirmed live: this full-width gold button used to sit
+                // right below the chat input's small "send" circle with
+                // only ~32pt between them, right where the keyboard pushes
+                // the whole card to. A real tap aimed at "send" easily
+                // landed on this instead, and since the default provider
+                // (`PlaceDirections`) is Apple Maps, that meant every
+                // mistyped send silently backgrounded Piri into Maps with
+                // no warning -- reported as "asking something redirects to
+                // Maps." "Location and details" below still has its own
+                // "Open in Maps" action, so directions aren't lost, just
+                // out of the chat's hot zone while it's open.
+                directionsButton
             }
-            directionsButton
         }
         .frame(width: viewportWidth)
         .background(Theme.navy)
@@ -730,6 +744,7 @@ struct POIExplainContent: View {
             TextField(String(localized: "poiChat.inputPlaceholder"), text: $chatInput)
                 .textFieldStyle(.roundedBorder)
                 .onSubmit { Task { await sendChat() } }
+                .accessibilityIdentifier("piri.detail.chat.input")
             Button {
                 Task { await sendChat() }
             } label: {
@@ -737,6 +752,7 @@ struct POIExplainContent: View {
                     .foregroundStyle(Theme.gold)
             }
             .disabled(chatInput.trimmingCharacters(in: .whitespaces).isEmpty || chatSending)
+            .accessibilityIdentifier("piri.detail.chat.send")
         }
         .padding(12)
     }
